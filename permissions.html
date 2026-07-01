@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Permissions — Marina Ops Docs</title>
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="index.html" class="brand">Marina&nbsp;Ops</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="index.html">Introduction</a>
+      <a href="terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="architecture.html">Stack &amp; Architecture</a>
+      <a href="api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="data-model.html">Data Model</a>
+      <a href="permissions.html" class="current">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="pages/index.html">Page Specifications</a>
+      <a href="wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Data &amp; Access</span>
+    <h1>Permissions</h1>
+    <p class="lede">A trinary, role-based permission system designed so one platform can fit marinas that organize their staff completely differently — without any code changes.</p>
+
+    <h2>Roles vs. Permissions</h2>
+    <ul>
+      <li>A <strong>Role</strong> is a named bundle of permission settings (e.g. "Security," "Office," "Night Manager"). Marinas start with sensible defaults and can add, edit, duplicate, or delete roles freely.</li>
+      <li>A <strong>User</strong> can hold <strong>multiple roles</strong> at once. This is the mechanism for staff who wear more than one hat — an office manager who also triages maintenance tickets simply holds both the Office and Maintenance roles, rather than needing a special combined role maintained by hand.</li>
+      <li>Permissions are <strong>unscoped</strong>: a permission applies globally across the marina's data. There is no per-record or per-department scoping (e.g. "assign ticket to others" is not limited to tickets of a particular category) — this is a deliberate simplicity constraint. All tickets are maintenance tickets; there's no sub-typing that would require scoped permissions.</li>
+    </ul>
+
+    <h2>The trinary model</h2>
+    <p>Each permission, on each role, is set to one of three values:</p>
+    <div class="grid-3">
+      <div class="card">
+        <span class="perm-cell perm-allow">✓</span>
+        <h4 style="margin-top:10px;">Allow</h4>
+        <p style="margin:0; font-size:0.9rem;">This role explicitly grants the permission.</p>
+      </div>
+      <div class="card">
+        <span class="perm-cell perm-deny">✕</span>
+        <h4 style="margin-top:10px;">Deny</h4>
+        <p style="margin:0; font-size:0.9rem;">This role explicitly revokes the permission, overriding any Allow from another role.</p>
+      </div>
+      <div class="card">
+        <span class="perm-cell perm-undef"></span>
+        <h4 style="margin-top:10px;">Undefined</h4>
+        <p style="margin:0; font-size:0.9rem;">This role has no opinion — displayed as an empty checkbox, contributes nothing to the computation.</p>
+      </div>
+    </div>
+
+    <h3>How a user's effective permissions are computed</h3>
+    <p>For each permission, evaluated independently:</p>
+    <ol>
+      <li>Start from a default of <strong>Deny</strong>.</li>
+      <li>Apply <strong>Allow</strong> from any of the user's roles that has it set to Allow.</li>
+      <li>Apply <strong>Deny</strong> from any of the user's roles that has it set to Deny — this cancels an Allow from step 2, even if another role allowed it.</li>
+      <li>Undefined never changes the outcome; it simply means that role isn't a factor for that permission.</li>
+    </ol>
+    <div class="note">
+      <strong>In short: Deny always wins.</strong> If a user holds two roles and either one explicitly denies a permission, the user does not have it — regardless of how many other roles allow it. This makes Deny a reliable way to carve out an exception (e.g. a trainee who holds the full Security role but should not yet have "assign ticket to others") without editing the base role.
+    </div>
+
+    <h3>Worked example</h3>
+    <p>A user holds both the <strong>Security</strong> role and a marina-specific <strong>Trainee</strong> role:</p>
+    <table>
+      <tr><th>Permission</th><th>Security role</th><th>Trainee role</th><th>Effective result</th></tr>
+      <tr>
+        <td>Create incidents</td>
+        <td><span class="perm-cell perm-allow">✓</span></td>
+        <td><span class="perm-cell perm-undef"></span></td>
+        <td><strong>Allow</strong> — only Security has an opinion.</td>
+      </tr>
+      <tr>
+        <td>Assign ticket to others</td>
+        <td><span class="perm-cell perm-allow">✓</span></td>
+        <td><span class="perm-cell perm-deny">✕</span></td>
+        <td><strong>Deny</strong> — Trainee's explicit Deny cancels Security's Allow.</td>
+      </tr>
+      <tr>
+        <td>View contact info</td>
+        <td><span class="perm-cell perm-undef"></span></td>
+        <td><span class="perm-cell perm-undef"></span></td>
+        <td><strong>Deny</strong> — default, since nothing allowed it.</td>
+      </tr>
+    </table>
+
+    <h2>Permission list</h2>
+    <p>The full, fixed catalog of permissions. Marinas cannot invent new permissions, but can assign the existing ones to as many custom roles as needed.</p>
+    <table>
+      <tr><th>Permission</th><th>Governs</th></tr>
+      <tr><td><code>create_incidents</code></td><td>Creating new incidents, and adding comments/addendums to any incident. (Editing an incident's original content is limited to its author until end of their shift, regardless of this permission.)</td></tr>
+      <tr><td><code>view_incidents</code></td><td>Seeing incidents in lists/reports, and seeing the incident link from a ticket that was raised from one.</td></tr>
+      <tr><td><code>assign_ticket_to_self</code></td><td>Taking an unassigned ticket for oneself.</td></tr>
+      <tr><td><code>assign_ticket_to_others</code></td><td>Assigning a ticket to another user.</td></tr>
+      <tr><td><code>view_owner</code></td><td>Seeing that a slip/boat has an associated owner and their name.</td></tr>
+      <tr><td><code>view_contact</code></td><td>Seeing an owner's or contact's phone/email details (separate from just knowing who they are).</td></tr>
+      <tr><td><code>edit_owner_contact</code></td><td>Editing owner and contact records.</td></tr>
+      <tr><td><code>view_lease</code></td><td>Viewing lease/contract details, variances, and documents.</td></tr>
+      <tr><td><code>manage_lease</code></td><td>Creating and editing lease/contract records.</td></tr>
+      <tr><td><code>manage_checklists</code></td><td>Creating and editing checklist templates (global and role-scoped; personal templates are always editable by their creator regardless of this permission).</td></tr>
+      <tr><td><code>manage_users</code></td><td>Inviting, editing, and deactivating user accounts.</td></tr>
+      <tr><td><code>manage_roles</code></td><td>Creating, editing, duplicating, and deleting roles and their permission settings.</td></tr>
+      <tr><td><code>place_calls</code></td><td>Initiating outbound calls/SMS from the Comms section.</td></tr>
+      <tr><td><code>view_reports</code></td><td>Access to the Reports section.</td></tr>
+    </table>
+
+    <div class="note">
+      <strong>Permissions identified during workflow design, pending confirmation.</strong> A few additional permissions surfaced while writing out <a href="workflows.html">Role Workflows</a> and the page specs, implied by features but not yet in the explicit list above. Flagging them here rather than silently adding them:
+      <ul style="margin-bottom:0;">
+        <li><code>view_all_chats</code> — see every chat room, not just ones you're invited to (explicitly mentioned in the Comms requirements).</li>
+        <li><code>manage_assets</code> — create/edit assets, maintenance rules, and checkout records.</li>
+        <li><code>manage_locations</code> — create/edit locations, location types, and checkpoints.</li>
+        <li><code>manage_reservations</code> — create/edit reservations and override status/dates.</li>
+        <li><code>manage_marina_settings</code> — the MarinaSettings record: retention policy, GPS defaults, phone lines, recording toggle.</li>
+      </ul>
+    </div>
+
+    <h2>Ticket creation is not gated</h2>
+    <p>Per the original requirement, every role can create a maintenance ticket by default — there is deliberately no <code>create_ticket</code> permission in the list above. If a future need arises to restrict this for a specific marina, it would need to be added as a new permission rather than repurposing an existing one, since the current design treats ticket creation as a baseline capability of the system rather than a gated one.</p>
+
+    <h2>Admin visibility</h2>
+    <p>The <strong>Admin</strong> section of the app (see <a href="pages/index.html">Page Specifications</a>) is only shown in navigation to a user holding at least one of the "manage_*" permissions. Within Admin, each sub-section (Users, Roles, Checklist Templates, Location Types, Marina Settings, etc.) is independently gated by its own corresponding permission.</p>
+
+    <div class="page-foot">
+      <a href="data-model.html">← Data Model</a>
+      <a href="workflows.html">Role Workflows →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Role Workflows — Marina Ops Docs</title>
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="index.html" class="brand">Marina&nbsp;Ops</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="index.html">Introduction</a>
+      <a href="terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="architecture.html">Stack &amp; Architecture</a>
+      <a href="api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="data-model.html">Data Model</a>
+      <a href="permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="workflows.html" class="current">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="pages/index.html">Page Specifications</a>
+      <a href="wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Behavior</span>
+    <h1>Role Workflows</h1>
+    <p class="lede">How each role actually experiences the system, end to end. These are narrative walkthroughs, not UI specs — see <a href="pages/index.html">Page Specifications</a> for exact screen behavior.</p>
+
+    <div class="note">
+      Remember a single person can hold multiple roles (see <a href="permissions.html">Permissions</a>). These workflows describe each role's concerns in isolation; a real user's experience is the union of whichever roles they hold.
+    </div>
+
+    <div class="fathom">role 1</div>
+    <h2>Security</h2>
+
+    <h3>Starting a shift</h3>
+    <p>A guard starts their shift from the Home dashboard. This creates a Shift record and may itself be configured as a checklist trigger — for example, a "start of shift" checklist that asks the guard to select their patrol vehicle and log its current mileage.</p>
+
+    <h3>Working a tour</h3>
+    <p>Depending on how the marina has configured its tours, the guard either:</p>
+    <ul>
+      <li><strong>Follows a fixed route (Linear tour)</strong> — the app can show which checkpoint is next.</li>
+      <li><strong>Works freely (Freeform tour)</strong> — visits all required checkpoints in any order before shift end, with the app tracking which remain.</li>
+      <li><strong>Follows app-directed randomization (Randomized tour)</strong> — the app selects the next checkpoint (or small set of checkpoints) once the current one is complete, so patrol patterns aren't predictable to anyone watching the property.</li>
+    </ul>
+
+    <h3>Checking in at a checkpoint</h3>
+    <p>The guard taps their phone against an NFC tag (or scans a QR code) mounted at the checkpoint's location. This opens the checkpoint's unique URL, which immediately:</p>
+    <ol>
+      <li>Logs the check-in — checkpoint, guard, and timestamp — capturing device GPS and validating it against the checkpoint's configured radius (flagging the check-in if it falls outside that radius, to guard against spoofing).</li>
+      <li>Surfaces whichever checklist template(s) apply right now, based on that checkpoint's configured triggers (e.g. a different checklist at night than during the day).</li>
+      <li>Presents the checklist for completion, and/or a place to add a note or log an incident, even if no checklist applies.</li>
+    </ol>
+    <p>If a tag is missing or unreadable, the guard can manually check in instead — the app requires a short reason for the manual entry before proceeding, and this is recorded alongside the check-in.</p>
+
+    <h3>Working through a checklist</h3>
+    <p>Each item on a checklist behaves according to its type:</p>
+    <table>
+      <tr><th>Item type</th><th>Guard experience</th></tr>
+      <tr><td>Simple Check</td><td>Tap to mark complete. Nothing further required.</td></tr>
+      <tr><td>Verify Task</td><td>Confirm the task was done by whoever was responsible, or reject it — either with a written reason, or by immediately raising a linked ticket. If configured, a rejection prompts the guard to attempt the task themselves before moving on.</td></tr>
+      <tr><td>Door Check</td><td>Select the door's current state. If it doesn't match the expected state, the guard is asked to correct it (open/close/lock/unlock) and select again. If it's still wrong on the second attempt, the guard is prompted for a note or to raise a ticket — the app does not let a mismatched door check silently pass.</td></tr>
+      <tr><td>Location-Based Check</td><td>Opens its own nested checklist scoped to that specific location before returning to the parent checklist.</td></tr>
+    </table>
+
+    <h3>Logging incidents and notes on the move</h3>
+    <p>At any checkpoint, or from the Incidents section directly, a guard can log an incident (short title, expandable type, optional rich-text detail) or a quick note. Incidents can optionally be assigned to someone and can spawn a linked ticket on the spot. Everything the guard logs stays fully editable by them, without needing connectivity, until their shift ends — at which point their incidents lock to author-edits (though anyone with the create-incidents permission can still add comments).</p>
+
+    <h3>Handling slip/owner information</h3>
+    <p>While viewing a slip or boat during a round, the guard sees whatever the marina has configured them to see — some marinas expose full owner contact information to security, others only the owner's name and let the office handle contact, per the <code>view_owner</code> / <code>view_contact</code> permissions.</p>
+
+    <h3>Ending a shift</h3>
+    <p>If the marina has defined an end-of-shift checklist, completing and submitting it ends the shift automatically. Otherwise, the guard ends the shift manually from the dashboard. Either way, ending the shift triggers compilation of the shift report, emailed to the marina's configured distribution list.</p>
+
+    <div class="fathom">role 2</div>
+    <h2>Maintenance</h2>
+
+    <h3>Working the ticket queue</h3>
+    <p>Tickets appear in a list sorted by priority (Urgent → Low). Depending on how the marina's maintenance department is structured, a worker either:</p>
+    <ul>
+      <li>Waits for a manager (or anyone with <code>assign_ticket_to_others</code>) to assign tickets to them, or</li>
+      <li>Self-assigns tickets directly from the shared queue (<code>assign_ticket_to_self</code>), or</li>
+      <li>Assigns tickets to teammates themselves, if the marina has granted <code>assign_ticket_to_others</code> more broadly.</li>
+    </ul>
+    <p>A ticket carries whatever context it was created with — often a link back to an Incident, a note about which asset or location it concerns, and (for auto-generated tickets) which maintenance rule triggered it.</p>
+
+    <h3>Scheduled and reactive work side by side</h3>
+    <p>Most maintenance work arrives reactively — someone (any role) files a ticket. Some arrives automatically: an asset with a meter (e.g. a patrol vehicle) generates a ticket on its own once its mileage or hours crosses a configured threshold since the last service, or once enough time has elapsed. Meter readings themselves come either from a checklist item (e.g. a guard logging vehicle mileage at shift end) or directly from the asset's own page.</p>
+
+    <h3>Asset condition &amp; checkout</h3>
+    <p>Maintenance staff are typically the ones updating an asset's status log (e.g. marking a vehicle Out of Service) and processing checkouts/returns for shared equipment — recording who has it and when it's expected back, even though any role can technically check an asset in or out if permitted.</p>
+
+    <div class="fathom">role 3</div>
+    <h2>Office</h2>
+
+    <h3>Handling calls</h3>
+    <p>When a call comes in on a marina line, the office user sees a panel appear automatically — a right-side panel on desktop, a pop-up on mobile — showing the caller's matched contact, any active reservation, related slip/boat information, and prior call notes. They can add new notes during or after the call. If recording/transcription is enabled for the marina, that's available on the same screen once the call completes.</p>
+    <p>A floating badge elsewhere in the app shows a running count of missed calls and unread texts; tapping it opens the same kind of detail view, including a playback of any voicemail left.</p>
+
+    <h3>New or unmatched callers</h3>
+    <p>If an inbound number doesn't match an existing Contact, a new Contact is created automatically. Whenever the office views a nameless contact, the app prompts for a name — and once entered, shows any similar existing contacts so the office can confirm a match and merge, rather than ending up with duplicate records for the same person.</p>
+
+    <h3>Reservations</h3>
+    <p>The office manages bookings for whichever locations and assets the marina has configured to accept reservations — a cabin, an RV site, a short-term slip, a rental boat. A reservation captures the reserving contact, expected/actual check-in and check-out, and — for anything other than a purely internal reservation — rate, deposit, and balance. An upcoming reservation is shown prominently next to the location/asset so staff know it's coming, but its status doesn't change until the reservation actually begins (the guest checks in, or the asset goes out); when it ends, the location/asset lands in whatever post-reservation status it's configured for — a cabin to "Needs Cleaning," a jump pack to "Needs Charging."</p>
+
+    <h3>Owner, boat &amp; lease records</h3>
+    <p>The office is typically where owner and contact records get created and kept current, and where lease/contract details, variances, and documents live — gated by <code>edit_owner_contact</code>, <code>view_lease</code>, and <code>manage_lease</code> respectively.</p>
+
+    <h3>Creating tickets on behalf of customers</h3>
+    <p>When an owner calls in a maintenance issue, the office logs it as a standard ticket — the same ticket-creation capability every role has by default — typically attached to the relevant boat or slip.</p>
+
+    <div class="fathom">role 4</div>
+    <h2>Marina Manager / Owner</h2>
+
+    <h3>Configuring the system to match how this marina actually runs</h3>
+    <p>This is the role that shapes the platform for a specific property, through Admin:</p>
+    <ul>
+      <li>Defining roles and setting each one's trinary permissions (see <a href="permissions.html">Permissions</a>).</li>
+      <li>Adding/editing users and assigning roles.</li>
+      <li>Defining location types and their valid parent relationships, and laying out the marina's actual locations (docks, slips, buildings, checkpoints).</li>
+      <li>Building checklist templates and deciding which tour mode(s) to use.</li>
+      <li>Defining asset maintenance rules, and which locations/assets accept reservations.</li>
+      <li>Setting marina-wide defaults: GPS validation radius, Activity Log retention, call recording/transcription toggles, phone line routing, and the shift report distribution list.</li>
+    </ul>
+
+    <h3>Oversight</h3>
+    <p>Day to day, this role leans on Reports (shift summaries, incident history, ticket throughput, call logs) and the Activity Log for a full, chronological view of everything happening at the marina, scoped to whatever they have permission to see.</p>
+
+    <h3>Stepping into other roles</h3>
+    <p>Because roles are additive, a hands-on owner-operator often holds Manager permissions alongside Office or Maintenance permissions directly, rather than needing a separate "do everything" account — the same multi-role mechanism available to any staff member.</p>
+
+    <div class="fathom">cross-cutting</div>
+    <h2>Comms: chat rooms (all roles)</h2>
+    <p>Any user can start a topic-based chat room and invite specific users and/or roles into it. These are entirely internal and separate from call/SMS logging — no database relationship links a chat message to a customer call. Pasting a URL to a location, asset, contact, or similar into a chat message renders a lightweight preview card so the conversation stays legible, but that's link parsing for display, not a stored relationship. Anyone holding <code>view_all_chats</code> can see every room at the marina, invited or not — useful for a manager keeping a general eye on team communication.</p>
+
+    <div class="page-foot">
+      <a href="permissions.html">← Permissions</a>
+      <a href="api-structure.html">API Structure →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

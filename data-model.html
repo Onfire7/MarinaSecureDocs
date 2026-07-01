@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Model — Marina Ops Docs</title>
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="index.html" class="brand">Marina&nbsp;Ops</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="index.html">Introduction</a>
+      <a href="terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="architecture.html">Stack &amp; Architecture</a>
+      <a href="api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="data-model.html" class="current">Data Model</a>
+      <a href="permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="pages/index.html">Page Specifications</a>
+      <a href="wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content wide">
+    <span class="eyebrow">Data &amp; Access</span>
+    <h1>Data Model</h1>
+    <p class="lede">Every entity tracked by the system, its fields, and how it relates to everything else. This describes schema-level structure and intent — not InstantDB query code.</p>
+
+    <div class="note">
+      <strong>Reading these tables.</strong> Field types are described in plain terms (text, number, date, boolean, reference). A field marked <code>ref → Entity</code> is a relationship to another entity, and <code>ref[] → Entity</code> is a relationship to many. Fields aren't exhaustive of every UI nicety — see individual <a href="pages/index.html">page specs</a> for form-level detail.
+    </div>
+
+    <h2>Attachable entities pattern</h2>
+    <p>Notes, Incidents, and Tickets all follow the same attachment rule described in <a href="terminology.html">Terminology</a>: each attaches to <strong>exactly one</strong> of a fixed set of target types — Location, Checkpoint, Boat, Owner/Contact, or Asset — never freeform, and the set of valid target types may grow as new needs are identified. Rather than repeat this per entity below, it's called out once here and referenced as "Attachment Target" in each entity's field list.</p>
+
+    <div class="fathom">people &amp; access</div>
+
+    <h2>User, Role &amp; Permissions</h2>
+
+    <div class="schema-entity">
+      <div class="head"><span>User</span><span class="tag">core</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>name</td><td>text</td><td></td></tr>
+        <tr><td>email / phone</td><td>text</td><td>Used by auth provider; see <a href="architecture.html">Architecture</a>.</td></tr>
+        <tr><td>roles</td><td>ref[] → Role</td><td>A user may hold multiple roles simultaneously.</td></tr>
+        <tr><td>active</td><td>boolean</td><td>Deactivated users are hidden from assignment pickers but preserved for historical records.</td></tr>
+        <tr><td>contact</td><td>ref → Contact</td><td>Optional link so a User can also be reached as a Contact (e.g. for asset checkout).</td></tr>
+      </table>
+    </div>
+
+    <div class="schema-entity">
+      <div class="head"><span>Role</span><span class="tag">core</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>name</td><td>text</td><td>e.g. "Security," "Maintenance," "Office," "Marina Manager." Admin-editable; can be duplicated or removed.</td></tr>
+        <tr><td>permissions</td><td>map of Permission → trinary value</td><td>See <a href="permissions.html">Permissions</a> for the full list and computation logic.</td></tr>
+      </table>
+    </div>
+
+    <p>Permission values themselves aren't a separate top-level entity with rows per user — they're a fixed, admin-editable list (see <a href="permissions.html">Permissions</a>) applied as a map on each Role.</p>
+
+    <div class="fathom">locations &amp; checkpoints</div>
+
+    <h2>Location &amp; LocationType</h2>
+
+    <div class="schema-entity">
+      <div class="head"><span>LocationType</span><span class="tag">admin-defined</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>name</td><td>text</td><td>e.g. "Dock," "Slip," "Cabin," "Building," "RV Site."</td></tr>
+        <tr><td>valid_parent_types</td><td>ref[] → LocationType</td><td>Which type(s) a Location of this type may nest under. A type may allow more than one valid parent.</td></tr>
+        <tr><td>allows_reservations</td><td>boolean</td><td>Whether Locations of this type can be configured to accept reservations.</td></tr>
+      </table>
+    </div>
+
+    <div class="schema-entity">
+      <div class="head"><span>Location</span><span class="tag">core</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>name / label</td><td>text</td><td>e.g. "Slip 14," "Dock C."</td></tr>
+        <tr><td>type</td><td>ref → LocationType</td><td></td></tr>
+        <tr><td>parent</td><td>ref → Location</td><td>Optional; must match one of type's valid_parent_types.</td></tr>
+        <tr><td>status</td><td>enum</td><td>Occupied / Vacant / Reserved / Out of Service, plus admin-defined additions.</td></tr>
+        <tr><td>reservation_enabled</td><td>boolean</td><td>Whether this specific Location accepts reservations (public or internal-only — see Reservation below).</td></tr>
+        <tr><td>post_reservation_status</td><td>ref → status value</td><td>What status this Location is set to when a reservation completes (e.g. a Cabin → "Needs Cleaning").</td></tr>
+        <tr><td>gps_coordinates</td><td>lat/lng</td><td>Used as the default position for any Checkpoint at this location.</td></tr>
+        <tr><td>current_boat</td><td>ref → Boat</td><td>Applicable to Slip-type locations; nullable.</td></tr>
+        <tr><td>notes</td><td>ref[] → Note</td><td>Attachment target.</td></tr>
+      </table>
+    </div>
+
+    <div class="schema-entity">
+      <div class="head"><span>Checkpoint</span><span class="tag">core</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>name</td><td>text</td><td>e.g. "Dock C Gate," "Fuel Shed."</td></tr>
+        <tr><td>location</td><td>ref → Location</td><td>Every checkpoint belongs to exactly one Location.</td></tr>
+        <tr><td>guid_url</td><td>text</td><td>Unique URL containing a GUID; bound to an NFC tag or QR code.</td></tr>
+        <tr><td>gps_coordinates</td><td>lat/lng</td><td>Defaults from Location, may be refined per checkpoint.</td></tr>
+        <tr><td>gps_validation_radius</td><td>number (meters)</td><td>Overrides the marina-wide default; used to reject spoofed check-ins.</td></tr>
+        <tr><td>checklist_templates</td><td>ref[] → ChecklistTemplate</td><td>Multiple templates may apply, gated by trigger conditions (time of day, season, etc.).</td></tr>
+        <tr><td>tours</td><td>ref[] → Tour</td><td>Tours this checkpoint participates in.</td></tr>
+      </table>
+    </div>
+
+    <div class="schema-entity">
+      <div class="head"><span>Tour</span><span class="tag">core</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>name</td><td>text</td><td></td></tr>
+        <tr><td>mode</td><td>enum</td><td>Linear / Freeform / Randomized.</td></tr>
+        <tr><td>checkpoints</td><td>ref[] → Checkpoint</td><td>Ordered for Linear mode; unordered set for Freeform/Randomized.</td></tr>
+      </table>
+    </div>
+
+    <h3>Check-In record</h3>
+    <p>Each time a checkpoint is visited, a check-in record is created (either scanned or manual):</p>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+      <tr><td>checkpoint</td><td>ref → Checkpoint</td><td></td></tr>
+      <tr><td>user</td><td>ref → User</td><td></td></tr>
+      <tr><td>timestamp</td><td>datetime</td><td></td></tr>
+      <tr><td>method</td><td>enum</td><td>Scanned / Manual.</td></tr>
+      <tr><td>reason</td><td>text</td><td>Required when method = Manual.</td></tr>
+      <tr><td>gps_at_checkin</td><td>lat/lng</td><td>Device-reported location, compared against the checkpoint's validation radius.</td></tr>
+      <tr><td>within_radius</td><td>boolean</td><td>Result of the GPS validation check; flagged for review if false.</td></tr>
+      <tr><td>generated_checklist</td><td>ref → Checklist</td><td>Nullable — not every check-in produces a checklist.</td></tr>
+    </table>
+
+    <div class="fathom">checklists</div>
+
+    <h2>ChecklistTemplate &amp; Checklist</h2>
+
+    <div class="schema-entity">
+      <div class="head"><span>ChecklistTemplate</span><span class="tag">admin/user-defined</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>name</td><td>text</td><td></td></tr>
+        <tr><td>visibility</td><td>enum</td><td>Global (marina-wide) / Role-restricted / Personal (creator only).</td></tr>
+        <tr><td>trigger_type</td><td>enum</td><td>Clock In/Out, Scheduled Time, Checkpoint Visit, Incident Type, Manual.</td></tr>
+        <tr><td>trigger_config</td><td>structured</td><td>Shape depends on trigger_type — e.g. a schedule expression, or a checkpoint + condition (time of day / season).</td></tr>
+        <tr><td>assignment_mode</td><td>enum</td><td>Assign to triggering user, or to a specified Role.</td></tr>
+        <tr><td>items</td><td>ref[] → ChecklistTemplateItem</td><td>Ordered.</td></tr>
+      </table>
+    </div>
+
+    <div class="schema-entity">
+      <div class="head"><span>ChecklistTemplateItem</span><span class="tag">admin/user-defined</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>type</td><td>enum</td><td>Simple Check / Verify Task / Door Check / Location-Based Check / Meter Reading.</td></tr>
+        <tr><td>label</td><td>text</td><td></td></tr>
+        <tr><td>config</td><td>structured</td><td>Type-specific: e.g. Door Check's expected state; Verify Task's "prompt retry after rejection" flag; Location-Based Check's nested checklist reference; Meter Reading's asset selection (a fixed Asset, or user-selected at completion time — e.g. "select your patrol vehicle").</td></tr>
+        <tr><td>order</td><td>number</td><td></td></tr>
+      </table>
+    </div>
+
+    <div class="schema-entity">
+      <div class="head"><span>Checklist</span><span class="tag">instance</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>template</td><td>ref → ChecklistTemplate</td><td></td></tr>
+        <tr><td>assigned_to</td><td>ref → User</td><td></td></tr>
+        <tr><td>status</td><td>enum</td><td>Not Started / In Progress / Complete.</td></tr>
+        <tr><td>triggered_by</td><td>structured</td><td>Reference to the check-in, clock event, schedule fire, or manual action that created it.</td></tr>
+        <tr><td>started_at / completed_at</td><td>datetime</td><td></td></tr>
+        <tr><td>item_results</td><td>ref[] → ChecklistItemResult</td><td></td></tr>
+      </table>
+    </div>
+
+    <div class="schema-entity">
+      <div class="head"><span>ChecklistItemResult</span><span class="tag">instance</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>template_item</td><td>ref → ChecklistTemplateItem</td><td></td></tr>
+        <tr><td>result</td><td>structured</td><td>Type-specific: boolean for Simple Check; Confirmed/Rejected-Reason/Rejected-Ticket for Verify Task; observed state (+ retry history) for Door Check.</td></tr>
+        <tr><td>note</td><td>text</td><td>Optional freeform addition.</td></tr>
+        <tr><td>linked_ticket</td><td>ref → Ticket</td><td>Set when a Verify Task or Door Check failure raises a ticket.</td></tr>
+        <tr><td>completed_at</td><td>datetime</td><td></td></tr>
+      </table>
+    </div>
+
+    <div class="fathom">incidents, tickets &amp; notes</div>
+
+    <h2>Note, Incident &amp; Ticket</h2>
+
+    <div class="schema-entity">
+      <div class="head"><span>Note</span><span class="tag">core</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>author</td><td>ref → User</td><td></td></tr>
+        <tr><td>body</td><td>text</td><td></td></tr>
+        <tr><td>attached_to</td><td>ref → Location | Checkpoint | Boat | Contact | Asset</td><td>Exactly one target — see attachment pattern above.</td></tr>
+        <tr><td>created_at</td><td>datetime</td><td></td></tr>
+      </table>
+    </div>
+
+    <div class="schema-entity">
+      <div class="head"><span>IncidentType</span><span class="tag">admin-defined, expandable</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>name</td><td>text</td><td>Users can add new types inline; list grows per marina.</td></tr>
+      </table>
+    </div>
+
+    <div class="schema-entity">
+      <div class="head"><span>Incident</span><span class="tag">core</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>title</td><td>text</td><td>Short, required.</td></tr>
+        <tr><td>type</td><td>ref → IncidentType</td><td></td></tr>
+        <tr><td>status</td><td>enum</td><td>Default set: Open / Under Review / Resolved / Closed, plus a Custom option (see <a href="workflows.html">Role Workflows</a>).</td></tr>
+        <tr><td>details</td><td>rich text (markdown)</td><td>Optional, lightweight WYSIWYG markdown editor.</td></tr>
+        <tr><td>author</td><td>ref → User</td><td>Editable by the author only until the end of their shift.</td></tr>
+        <tr><td>assigned_to</td><td>ref → User</td><td>Optional.</td></tr>
+        <tr><td>attached_to</td><td>ref → Location | Checkpoint | Boat | Contact | Asset</td><td></td></tr>
+        <tr><td>linked_tickets</td><td>ref[] → Ticket</td><td>Visible only to users holding "view incidents" permission when viewed from the Ticket side.</td></tr>
+        <tr><td>created_at</td><td>datetime</td><td></td></tr>
+      </table>
+    </div>
+
+    <div class="schema-entity">
+      <div class="head"><span>IncidentComment</span><span class="tag">addendum</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>incident</td><td>ref → Incident</td><td></td></tr>
+        <tr><td>author</td><td>ref → User</td><td>Anyone holding the "create incidents" permission.</td></tr>
+        <tr><td>body</td><td>rich text (markdown)</td><td></td></tr>
+        <tr><td>created_at</td><td>datetime</td><td></td></tr>
+      </table>
+    </div>
+
+    <div class="schema-entity">
+      <div class="head"><span>Ticket</span><span class="tag">core</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>title</td><td>text</td><td></td></tr>
+        <tr><td>description</td><td>rich text (markdown)</td><td></td></tr>
+        <tr><td>priority</td><td>enum</td><td>Low / Medium / High / Urgent.</td></tr>
+        <tr><td>status</td><td>enum</td><td>Open / Assigned / In Progress / Complete (admin-adjustable label set).</td></tr>
+        <tr><td>created_by</td><td>ref → User</td><td>Any role, by default.</td></tr>
+        <tr><td>assigned_to</td><td>ref → User</td><td>Requires "assign ticket to self" or "assign ticket to others" permission depending on who's assigning and to whom.</td></tr>
+        <tr><td>attached_to</td><td>ref → Location | Checkpoint | Boat | Contact | Asset</td><td></td></tr>
+        <tr><td>source_incident</td><td>ref → Incident</td><td>Nullable — set when raised from an Incident or a failed checklist item.</td></tr>
+        <tr><td>auto_generated</td><td>boolean</td><td>True when created by a scheduled/meter-based maintenance rule (see Asset below).</td></tr>
+        <tr><td>created_at / resolved_at</td><td>datetime</td><td></td></tr>
+      </table>
+    </div>
+
+    <div class="fathom">assets &amp; reservations</div>
+
+    <h2>Asset, AssetStatusLog, Checkout &amp; Reservation</h2>
+
+    <div class="schema-entity">
+      <div class="head"><span>Asset</span><span class="tag">core</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>name</td><td>text</td><td>e.g. "Security Truck #2," "Jump Pack A."</td></tr>
+        <tr><td>category</td><td>text</td><td>Admin-defined grouping.</td></tr>
+        <tr><td>has_meter</td><td>boolean</td><td>If false, hours accumulate automatically over time instead.</td></tr>
+        <tr><td>meter_type</td><td>enum</td><td>Mileage / Hours (when has_meter is true).</td></tr>
+        <tr><td>meter_reading</td><td>number</td><td>Current reading; updatable directly from the asset page.</td></tr>
+        <tr><td>maintenance_rules</td><td>structured[]</td><td>e.g. "every 3,000 miles" or "every 90 days since last completed" — each rule auto-generates a Ticket when triggered (scheduling mechanism: see <a href="architecture.html">Architecture</a>).</td></tr>
+        <tr><td>checkoutable</td><td>boolean</td><td>Whether this asset supports checkout/return.</td></tr>
+        <tr><td>reservation_enabled</td><td>boolean</td><td>Whether this asset accepts Reservations (public or internal-only).</td></tr>
+        <tr><td>post_return_status</td><td>ref → status value</td><td>What status to set when the asset is checked back in — whether returning from a plain checkout or completing a Reservation (e.g. Jump Pack → "Needs Charging").</td></tr>
+        <tr><td>current_status</td><td>text</td><td>Denormalized latest value from AssetStatusLog, for fast display.</td></tr>
+      </table>
+    </div>
+
+    <table>
+      <tr><th>Entity</th><th>Key Fields</th></tr>
+      <tr>
+        <td><strong>AssetStatusLog</strong></td>
+        <td><code>asset</code> (ref), <code>status</code> (text), <code>note</code> (text, optional), <code>logged_by</code> (ref → User), <code>timestamp</code></td>
+      </tr>
+      <tr>
+        <td><strong>AssetCheckout</strong></td>
+        <td><code>asset</code> (ref), <code>checked_out_by</code> (ref → User, who processed it), <code>person</code> (ref → Contact, defaults to a User's linked contact), <code>time_out</code>, <code>time_in</code> (nullable while checked out)</td>
+      </tr>
+      <tr>
+        <td><strong>AssetMeterReading</strong></td>
+        <td><code>asset</code> (ref), <code>value</code> (number), <code>source</code> (Manual entry on asset page / Checklist item), <code>logged_by</code> (ref → User), <code>timestamp</code></td>
+      </tr>
+    </table>
+
+    <div class="schema-entity">
+      <div class="head"><span>Reservation</span><span class="tag">core</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>contact</td><td>ref → Contact</td><td></td></tr>
+        <tr><td>target</td><td>ref → Location | Asset</td><td>Exactly one of the two — whichever is being reserved.</td></tr>
+        <tr><td>status</td><td>enum</td><td>Requested / Confirmed / Checked In / Checked Out / Cancelled.</td></tr>
+        <tr><td>expected_checkin / expected_checkout</td><td>date</td><td></td></tr>
+        <tr><td>actual_checkin / actual_checkout</td><td>datetime</td><td>Setting actual_checkin (guest arrives / asset goes out) is what changes the target's status; setting actual_checkout (guest leaves / asset returned) sets the target to its configured post-reservation status. An upcoming reservation changes nothing — it's displayed alongside the target's status instead.</td></tr>
+        <tr><td>early_checkin / late_checkout</td><td>boolean or datetime</td><td>Ignored/hidden for internal-only reservations.</td></tr>
+        <tr><td>rate / deposit / balance</td><td>currency</td><td>Ignored/hidden for internal-only reservations.</td></tr>
+      </table>
+    </div>
+
+    <div class="fathom">boats, owners &amp; leases</div>
+
+    <h2>Boat, Contact &amp; Lease</h2>
+
+    <div class="schema-entity">
+      <div class="head"><span>Contact</span><span class="tag">core</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>name</td><td>text</td><td>Nullable temporarily — see call-matching flow in <a href="workflows.html">Role Workflows</a>.</td></tr>
+        <tr><td>phone</td><td>text</td><td>Used for automatic call/SMS matching.</td></tr>
+        <tr><td>email</td><td>text</td><td></td></tr>
+        <tr><td>merged_into</td><td>ref → Contact</td><td>Set when this contact record has been merged into another.</td></tr>
+      </table>
+    </div>
+
+    <div class="schema-entity">
+      <div class="head"><span>Boat</span><span class="tag">core</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>name</td><td>text</td><td></td></tr>
+        <tr><td>description</td><td>text</td><td>Freeform details beyond the structured fields below.</td></tr>
+        <tr><td>length / make / model</td><td>text/number</td><td></td></tr>
+        <tr><td>registration_number</td><td>text</td><td></td></tr>
+        <tr><td>owners</td><td>ref[] → Contact (ordered)</td><td>Order of succession — who to contact first.</td></tr>
+        <tr><td>authorized_users</td><td>ref[] → Contact</td><td></td></tr>
+        <tr><td>current_slip</td><td>ref → Location</td><td>Nullable; boats are sometimes moved between slips, and history is preserved via Activity Log rather than a separate table.</td></tr>
+      </table>
+    </div>
+
+    <div class="schema-entity">
+      <div class="head"><span>Lease</span><span class="tag">core</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>location</td><td>ref → Location</td><td>Typically a Slip, but any location type that supports leasing.</td></tr>
+        <tr><td>lessees</td><td>ref[] → Contact</td><td></td></tr>
+        <tr><td>start_date / end_date</td><td>date</td><td></td></tr>
+        <tr><td>variances_and_conditions</td><td>text</td><td>Displayed alongside the Slip and Boat info it affects.</td></tr>
+        <tr><td>documents</td><td>file[]</td><td>Stored contract documents.</td></tr>
+        <tr><td>comments</td><td>ref[] → LeaseComment</td><td>Operates like a standard comment thread; each LeaseComment carries <code>author</code> (ref → User), <code>body</code> (text), and <code>created_at</code>.</td></tr>
+      </table>
+    </div>
+
+    <div class="fathom">shifts &amp; audit</div>
+
+    <h2>Shift &amp; Activity Log</h2>
+
+    <div class="schema-entity">
+      <div class="head"><span>Shift</span><span class="tag">core</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>guard</td><td>ref → User</td><td></td></tr>
+        <tr><td>started_at</td><td>datetime</td><td>Set from the dashboard.</td></tr>
+        <tr><td>ended_at</td><td>datetime</td><td>Set either by submitting the end-of-shift checklist (if defined) or by manually ending the shift.</td></tr>
+        <tr><td>end_of_shift_checklist</td><td>ref → Checklist</td><td>Nullable.</td></tr>
+        <tr><td>report_sent_at</td><td>datetime</td><td></td></tr>
+      </table>
+      <p style="padding:0 18px 16px; margin:0; font-size:0.9rem; color:var(--slate);">Other records (checklists, incidents, tickets, check-ins) are <strong>not</strong> directly linked to a Shift by reference — association is computed from timestamps falling within the shift's start/end window. This avoids needing every writable entity to carry a shift reference.</p>
+    </div>
+
+    <div class="schema-entity">
+      <div class="head"><span>ActivityLogEntry</span><span class="tag">immutable</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>event_type</td><td>text</td><td>e.g. "ticket.created," "incident.status_changed."</td></tr>
+        <tr><td>actor</td><td>ref → User</td><td>Nullable for system-generated events (e.g. scheduled maintenance ticket).</td></tr>
+        <tr><td>subject</td><td>ref → any entity</td><td>The record the event happened to.</td></tr>
+        <tr><td>summary</td><td>text</td><td>Human-readable description, generated at write time.</td></tr>
+        <tr><td>timestamp</td><td>datetime</td><td></td></tr>
+        <tr><td>protected</td><td>boolean</td><td>Exempts this entry from the marina's retention purge.</td></tr>
+      </table>
+    </div>
+
+    <div class="fathom">communications</div>
+
+    <h2>Call, SMS &amp; Chat</h2>
+
+    <table>
+      <tr><th>Entity</th><th>Key Fields</th></tr>
+      <tr>
+        <td><strong>Call</strong></td>
+        <td><code>direction</code> (Inbound/Outbound), <code>line</code> (which marina number), <code>contact</code> (ref, auto-matched), <code>from_number</code>, <code>to_number</code>, <code>started_at</code>, <code>duration</code>, <code>recording_url</code> (nullable), <code>transcript</code> (nullable), <code>missed</code> (boolean), <code>voicemail_url</code> (nullable), <code>notes</code> (ref[] → CallNote)</td>
+      </tr>
+      <tr>
+        <td><strong>CallNote</strong></td>
+        <td><code>call</code> (ref), <code>author</code> (ref → User), <code>body</code> (text), <code>created_at</code></td>
+      </tr>
+      <tr>
+        <td><strong>SMSThread</strong></td>
+        <td><code>contact</code> (ref, auto-matched), <code>line</code>, <code>last_message_at</code>, <code>unread</code> (boolean)</td>
+      </tr>
+      <tr>
+        <td><strong>SMSMessage</strong></td>
+        <td><code>thread</code> (ref), <code>direction</code>, <code>body</code>, <code>sent_by</code> (ref → User, for outbound), <code>timestamp</code></td>
+      </tr>
+      <tr>
+        <td><strong>SMSTemplate</strong></td>
+        <td><code>label</code>, <code>body</code>, <code>scope</code> (Global / Personal), <code>owner</code> (ref → User, when Personal)</td>
+      </tr>
+      <tr>
+        <td><strong>ChatRoom</strong></td>
+        <td><code>title</code>, <code>topic</code>, <code>created_by</code> (ref → User), <code>invited_users</code> (ref[]), <code>invited_roles</code> (ref[])</td>
+      </tr>
+      <tr>
+        <td><strong>ChatMessage</strong></td>
+        <td><code>room</code> (ref), <code>author</code> (ref → User), <code>body</code> (text, parsed for entity URLs to render preview cards), <code>attachments</code> (file[]), <code>timestamp</code></td>
+      </tr>
+    </table>
+
+    <div class="fathom">marina-level configuration</div>
+
+    <h2>MarinaSettings</h2>
+    <p>A single settings record per marina instance, holding the configuration that lets one codebase serve very differently-run properties:</p>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+      <tr><td>gps_validation_radius_default</td><td>number (meters)</td><td>Marina-wide default; overridable per Checkpoint.</td></tr>
+      <tr><td>activity_log_retention_days</td><td>number</td><td>Entries older than this are eligible for purge unless <code>protected</code>.</td></tr>
+      <tr><td>call_recording_enabled</td><td>boolean</td><td></td></tr>
+      <tr><td>call_transcription_enabled</td><td>boolean</td><td></td></tr>
+      <tr><td>shift_report_recipients</td><td>text[] (emails)</td><td>Distribution list for the shift-end report.</td></tr>
+      <tr><td>phone_lines</td><td>structured[]</td><td>Each line's Twilio number, label (e.g. "Office," "Security"), and routing behavior.</td></tr>
+    </table>
+
+    <div class="page-foot">
+      <a href="architecture.html">← Stack &amp; Architecture</a>
+      <a href="permissions.html">Permissions →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

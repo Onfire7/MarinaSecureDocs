@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terminology — Marina Ops Docs</title>
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="index.html" class="brand">Marina&nbsp;Ops</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="index.html">Introduction</a>
+      <a href="terminology.html" class="current">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="architecture.html">Stack &amp; Architecture</a>
+      <a href="api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="data-model.html">Data Model</a>
+      <a href="permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="pages/index.html">Page Specifications</a>
+      <a href="wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Reference</span>
+    <h1>Terminology</h1>
+    <p class="lede">Definitions for every domain-specific term used across this document set. Terms are grouped by area; alphabetical order within each group.</p>
+
+    <div class="note">
+      <strong>Three deliberately overloaded terms.</strong> Marina vocabulary reuses a few words in different senses; the docs always make the sense clear from context, but be aware of the distinction:
+      <ul style="margin-bottom:0;">
+        <li><strong>Check-in</strong> — (1) a guard checking in at a <em>Checkpoint</em>; (2) a guest's arrival that begins a <em>Reservation</em>; (3) an <em>Asset</em> being returned ("checked back in") after checkout. Note the inversion: an asset reservation <em>begins</em> when the asset is checked <em>out</em>.</li>
+        <li><strong>Check-out</strong> — (1) taking an <em>Asset</em> (start of a checkout); (2) a guest's departure that ends a <em>Reservation</em>.</li>
+        <li><strong>Owner</strong> — (1) the predefined <em>Owner role</em>, the marina owner's top-level administrative role; (2) a <em>boat owner</em>, a Contact in a boat's ownership succession list.</li>
+      </ul>
+    </div>
+
+    <h2>Core concepts</h2>
+    <dl class="glossary">
+      <dt>Marina <span class="term-tag">tenant</span></dt>
+      <dd>A single customer of the platform. Each marina is a fully independent deployment: its own subdomain, its own Netlify site, its own InstantDB instance, and its own Twilio-integrated telephony server. No data or infrastructure is shared between marinas.</dd>
+
+      <dt>Location</dt>
+      <dd>Any physical place the system tracks: a boathouse, a dock, a slip, a building, a cabin or RV site, or any other admin-defined type. Locations can nest under other locations (a Slip is a child of a Dock, for example) and carry a status (Occupied / Vacant / Reserved / Out of Service, or other admin-defined statuses).</dd>
+
+      <dt>Location Type</dt>
+      <dd>An admin-defined category of location (e.g. "Dock," "Slip," "Cabin," "Building"). Each type specifies which other type(s) it is allowed to be a child of — a type may have more than one valid parent type.</dd>
+
+      <dt>Slip</dt>
+      <dd>A specific location type where a boat is moored. The most common core unit in the system; typically a child of a Dock or Boathouse location.</dd>
+
+      <dt>Asset</dt>
+      <dd>A tracked piece of equipment that either needs regular maintenance (a meter- or time-based service cycle) or can be checked out (like a vehicle or a jump pack), or both. Static infrastructure with no maintenance cycle and no checkout behavior (a gate, a utility pedestal) is not modeled as an Asset.</dd>
+    </dl>
+
+    <h2>Checkpoints &amp; checklists</h2>
+    <dl class="glossary">
+      <dt>Checkpoint</dt>
+      <dd>A specific physical location a guard checks in at, always tied to a Location and to a set of GPS coordinates used to validate that the check-in happened nearby. Each checkpoint has a unique URL (containing a GUID), typically bound to an NFC tag or QR code. Visiting the URL logs the check-in and surfaces any checklist(s) associated with that checkpoint.</dd>
+
+      <dt>Manual Check-In</dt>
+      <dd>A check-in at a checkpoint performed without scanning the NFC tag or QR code — for example when a tag is damaged or unreachable. Always requires a reason, which is recorded with the check-in.</dd>
+
+      <dt>Tour</dt>
+      <dd>A defined set of checkpoints a guard is expected to visit during a shift, in one of three modes: <strong>Linear</strong> (a fixed, ordered route), <strong>Freeform</strong> (all checkpoints must be visited before shift end, in any order), or <strong>Randomized</strong> (the app selects the next checkpoint, or set of checkpoints, once the prior one is complete).</dd>
+
+      <dt>Checklist</dt>
+      <dd>A specific, in-progress or completed instance of a Checklist Template — the actual record of what was checked, verified, or noted at a point in time.</dd>
+
+      <dt>Checklist Template</dt>
+      <dd>The reusable definition of a checklist: its items, item types, and trigger conditions. Templates can be global (visible to everyone at the marina), role-restricted, or personal (created by and visible only to the user who made them). A single checkpoint can have multiple templates active under different conditions (time of day, season, etc.).</dd>
+
+      <dt>Checklist Trigger</dt>
+      <dd>The event that generates a new checklist instance from a template: clocking in or out, a scheduled time, visiting an associated checkpoint, a specified route or type of incident, or a manual trigger. A generated checklist is assigned either to the user who triggered it or to a role, per the template's configuration.</dd>
+
+      <dt>Simple Check</dt>
+      <dd>The most basic checklist item type — a single item marked complete with no further detail required.</dd>
+
+      <dt>Verify Task</dt>
+      <dd>A checklist item representing work that is meant to be performed by security or by someone else, where the guard's role is to confirm it. A verify task can be <strong>confirmed</strong> as done, <strong>rejected with a reason</strong>, or <strong>rejected with a ticket</strong> — and can optionally be configured to ask the guard to attempt the task themselves after a rejection.</dd>
+
+      <dt>Door Check</dt>
+      <dd>A checklist item that records a door's state (Open / Closed / Locked) against an expected state. If the selected state doesn't match, the guard is prompted to correct it and check again; if it still doesn't match on the second attempt, the guard is prompted to leave a note or raise a ticket.</dd>
+
+      <dt>Meter Reading <span class="term-tag">item type</span></dt>
+      <dd>A checklist item that records an Asset's meter value — for example, selecting a patrol vehicle at shift start/end and entering its current mileage. Readings feed the asset's meter-based maintenance rules (e.g. an oil-change ticket every 3,000 miles).</dd>
+
+      <dt>Location-Based Check</dt>
+      <dd>A checklist item or sub-checklist scoped to a specific location, used when a checkpoint's checklist needs to branch into its own set of items for that location.</dd>
+    </dl>
+
+    <h2>Incidents, tickets &amp; notes</h2>
+    <dl class="glossary">
+      <dt>Note</dt>
+      <dd>A freeform log entry attached to a Location, Checkpoint, Boat, Owner, Asset, or Contact. Notes appear in the Activity Log but carry no status, priority, or notification behavior of their own.</dd>
+
+      <dt>Incident</dt>
+      <dd>A logged occurrence that isn't fully covered by a Note or a Ticket — anything from a security concern to property damage. An incident has a status (defaults: <strong>Open / Under Review / Resolved / Closed</strong>, plus a Custom option), an expandable type list, a short title, and an optional long-form description using a lightweight WYSIWYG markdown editor. An incident may optionally be assigned to a person, and may spawn one or more linked Tickets. Its original content is editable by its author only, and only until the end of the author's shift — after that it locks, and changes take the form of Addendums.</dd>
+
+      <dt>Addendum <span class="term-tag">incident comment</span></dt>
+      <dd>A timestamped addition to an incident after the original content has locked. Anyone holding the create-incidents permission can add addendums and comments to any incident; the original record is never altered.</dd>
+
+      <dt>Ticket <span class="term-tag">maintenance ticket</span></dt>
+      <dd>A unit of maintenance work, with a priority of Low, Medium, High, or Urgent. Any role can create a ticket by default. Tickets can be assigned to self or to others depending on the assigning user's permissions, and can be linked back to the Incident that spawned them (visible only to users with permission to view incidents).</dd>
+    </dl>
+
+    <h2>Assets &amp; reservations</h2>
+    <dl class="glossary">
+      <dt>Meter</dt>
+      <dd>A numeric reading tracked on an Asset — mileage or hours — used to trigger scheduled maintenance (e.g. an oil change every 3,000 miles). Assets without a meter can instead be configured to accumulate elapsed hours automatically.</dd>
+
+      <dt>Asset Status Log</dt>
+      <dd>A running history of an Asset's condition (e.g. In Service, Needs Cleaning, Needs Charging, Out of Service), each entry with an optional note. The Asset always displays its latest status prominently.</dd>
+
+      <dt>Checkout Log</dt>
+      <dd>A record of an Asset being signed out and returned: the asset, the user who processed it, the person it was checked out to (defaults to a User, but can be any Contact), and the time out and time in.</dd>
+
+      <dt>Reservation</dt>
+      <dd>A booking of a Location or Asset that has been configured to accept reservations (public or internal-only) — a cabin stay, an RV site, a short-term slip, a rental boat, a jump pack, etc. Tracks the reserving Contact, expected and actual check-in/check-out times, and (for public-facing reservations) rate, deposit, and balance. An upcoming reservation never changes the target's status by itself — it's displayed prominently <em>next to</em> the status instead. The status only changes when the reservation becomes active (the guest checks in / the asset is checked out), and when it completes (check-out / return) the target's own settings decide what status it lands in — a cabin to "Needs Cleaning," a jump pack to "Needs Charging."</dd>
+    </dl>
+
+    <h2>People &amp; contacts</h2>
+    <dl class="glossary">
+      <dt>Contact</dt>
+      <dd>Any person or entity tracked in the system who isn't necessarily a system User — a boat owner, a lessee, someone who calls the office. Owners are a specific kind of Contact.</dd>
+
+      <dt>Owner</dt>
+      <dd>A Contact associated with a Boat, listed in order of succession (who to contact first, second, etc.).</dd>
+
+      <dt>Authorized User <span class="term-tag">boat</span></dt>
+      <dd>A Contact permitted to use or access a specific Boat, distinct from its Owner(s).</dd>
+
+      <dt>Lessee</dt>
+      <dd>A Contact who is party to a Lease/Contract for a slip or other location.</dd>
+
+      <dt>Lease / Contract</dt>
+      <dd>An agreement tied to a slip (or other location), tracking dates, lessees, any variances or special conditions, a comment-style notes thread, and stored documents.</dd>
+
+      <dt>Variance</dt>
+      <dd>A documented exception granted to a standard lease or slip condition (for example, a boat that exceeds a slip's normal size limit), displayed alongside the slip and boat information it affects.</dd>
+
+      <dt>User</dt>
+      <dd>An authenticated account holder in the system — a staff member. Every User has one or more Roles.</dd>
+    </dl>
+
+    <h2>Roles &amp; access</h2>
+    <dl class="glossary">
+      <dt>Role</dt>
+      <dd>A named set of permissions. The system ships with five predefined roles — <strong>Security, Maintenance, Office, Marina Manager, and Owner</strong> — but marinas can add, edit, duplicate, or remove roles freely. A User can hold multiple roles simultaneously.</dd>
+
+      <dt>Permission</dt>
+      <dd>A single grantable capability (e.g. "assign ticket to others," "view owner contact info"). Permissions are trinary — <strong>Allow</strong>, <strong>Deny</strong>, or <strong>Undefined</strong> — and unscoped (a permission applies globally, not to a subset of records). See <a href="permissions.html">Permissions</a> for how a user's effective permissions are computed from their combined roles.</dd>
+
+      <dt>Admin</dt>
+      <dd>The configuration area of the app — visible only to users holding permission to at least one admin sub-section (managing users, roles, checklist templates, location types, etc.).</dd>
+    </dl>
+
+    <h2>Shifts &amp; reporting</h2>
+    <dl class="glossary">
+      <dt>Shift</dt>
+      <dd>A period of active duty for a specific guard, started and ended from the dashboard. Other records (checklists, incidents, tickets) aren't directly linked to a shift in the database; they're associated with it by matching timestamps when needed.</dd>
+
+      <dt>Shift Report</dt>
+      <dd>An end-of-shift email summary compiled automatically when a shift ends — either after the guard submits a defined end-of-shift checklist, or immediately when they manually end the shift if no such checklist exists. Delivered to a marina-configured distribution list.</dd>
+
+      <dt>Activity Log</dt>
+      <dd>An immutable, chronological audit trail generated automatically as a byproduct of nearly every database change. Each entry can be individually marked <strong>Protected</strong> to exempt it from the marina's configurable retention/purge policy.</dd>
+    </dl>
+
+    <h2>Communications</h2>
+    <dl class="glossary">
+      <dt>Comms</dt>
+      <dd>The top-level section covering Calls, SMS, and Chat Rooms.</dd>
+
+      <dt>Line</dt>
+      <dd>One of the marina's public, advertised phone numbers managed through Twilio — most commonly a primary Office line and a secondary Security line that skips directly to the security menu. A marina may have zero, one, or a handful of lines; individual staff extensions remain on the marina's own PBX and are outside this system.</dd>
+
+      <dt>Active Call Panel</dt>
+      <dd>The panel that appears automatically during an active call — a right-hand sidebar on desktop, a pop-up on mobile — showing the caller's matched Contact, any active reservations, related slip/boat information, prior call notes, and (where enabled) recording and transcription. New notes can be added directly from it.</dd>
+
+      <dt>Missed Comms Badge</dt>
+      <dd>A floating bubble showing a running count of missed calls and unread SMS messages. Tapping it opens a detail view of what was missed, including playback of any voicemail left.</dd>
+
+      <dt>SMS Template</dt>
+      <dd>A saved, reusable message body for handling common queries — available globally (marina-wide) or per user. SMS remains primarily conversational; templates are a convenience, not an automation system.</dd>
+
+      <dt>Call / SMS Log</dt>
+      <dd>A record of an inbound or outbound phone call or text message, handled through the marina's Twilio-integrated phone lines and automatically matched to a Contact by phone number (creating a new Contact if no match exists).</dd>
+
+      <dt>Chat Room</dt>
+      <dd>An internal-only messaging thread, unrelated to Calls or SMS, created by a user who invites specific users and/or roles. Supports images and file attachments. A pasted URL to a Location, Asset, Contact, etc. is rendered as an enriched preview card, but no database relationship is created — it's link parsing, not a linked record.</dd>
+
+      <dt>Recording / Transcription</dt>
+      <dd>Optional Twilio-provided call recording and transcription, enabled per marina in Admin settings.</dd>
+    </dl>
+
+    <div class="page-foot">
+      <a href="index.html">← Introduction</a>
+      <a href="architecture.html">Stack &amp; Architecture →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marina Ops — Implementation Documentation</title>
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="index.html" class="brand">Marina&nbsp;Ops</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="index.html" class="current">Introduction</a>
+      <a href="terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="architecture.html">Stack &amp; Architecture</a>
+      <a href="api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="data-model.html">Data Model</a>
+      <a href="permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="pages/index.html">Page Specifications</a>
+      <a href="wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Marina Ops · Implementation Documentation</span>
+    <h1>Marina Ops</h1>
+    <p class="lede">A permissions-driven operations platform for overnight security, maintenance, and front-office staff at marinas — built to run offline on the dock, sync automatically, and be configured differently for every property that adopts it.</p>
+
+    <div class="note">
+      <strong>What this document set is.</strong> This is architectural and design documentation for engineering and stakeholder review — role definitions, data model, permission logic, page-by-page specifications, and wireframes. It intentionally avoids implementation code; the goal is a shared, unambiguous understanding of what gets built before anyone builds it.
+    </div>
+
+    <h2>The problem</h2>
+    <p>Marinas run overnight security and maintenance operations on a patchwork of paper logs, radio calls, spreadsheets, and whatever the previous office manager left behind. Shift handoffs lose information. Incident reports live in someone's notebook. Maintenance requests get relayed by word of mouth. Owner and slip information isn't available to the person standing at the boat who needs it. And every marina does it slightly differently — so anything built for one has to bend without breaking for the next.</p>
+    <p>Marina Ops replaces that patchwork with a single system that a night guard can use standing on a dark dock with one bar of signal, that an office manager can use to log a customer call, and that an owner-operator can reconfigure without touching code when their operation doesn't match the defaults.</p>
+
+    <h2>Who this is for</h2>
+    <div class="grid-2">
+      <div class="card">
+        <h4>Security</h4>
+        <p style="margin:0;">Guards on overnight rounds — completing checklists, checking in at physical checkpoints, logging incidents, and raising maintenance tickets as they walk the property.</p>
+      </div>
+      <div class="card">
+        <h4>Maintenance</h4>
+        <p style="margin:0;">Staff working a shared ticket queue, tracking asset condition and meters, and completing scheduled and reactive work.</p>
+      </div>
+      <div class="card">
+        <h4>Office</h4>
+        <p style="margin:0;">Front-desk and administrative staff handling calls, texts, reservations, owner and contact records.</p>
+      </div>
+      <div class="card">
+        <h4>Manager / Owner</h4>
+        <p style="margin:0;">Oversight, reporting, and the administrative configuration that lets one system fit very different marinas.</p>
+      </div>
+    </div>
+    <p>A single person often wears more than one of these hats. The system reflects that directly — see <a href="permissions.html">Permissions</a> for how roles and access combine per user, and <a href="workflows.html">Role Workflows</a> for how each role actually experiences the product.</p>
+
+    <h2>Design principles</h2>
+    <div class="grid-2">
+      <div class="panel">
+        <h4 style="margin-top:0;">Configurable, not hard-coded</h4>
+        <p style="margin:0;">Location types, checklist templates, permission sets, ticket workflows, and incident categories are all admin-defined per marina. Nothing about a specific marina's operation is assumed in the schema.</p>
+      </div>
+      <div class="panel">
+        <h4 style="margin-top:0;">Offline is the default, not an edge case</h4>
+        <p style="margin:0;">A guard on a dock with no signal is a normal condition, not a failure state. The system is built around local-first data from the ground up.</p>
+      </div>
+      <div class="panel">
+        <h4 style="margin-top:0;">Every marina is its own island</h4>
+        <p style="margin:0;">Each marina gets its own subdomain, its own deployment, its own database, and its own phone integration. No shared infrastructure, no cross-tenant data model to defend.</p>
+      </div>
+      <div class="panel">
+        <h4 style="margin-top:0;">An honest, permanent record</h4>
+        <p style="margin:0;">The Activity Log is an immutable audit trail of what happened and when — generated automatically as a byproduct of using the system, not a separate thing anyone has to maintain.</p>
+      </div>
+    </div>
+
+    <h2>The stack, at a glance</h2>
+    <p>Full detail lives in <a href="architecture.html">Stack &amp; Architecture</a>. In short:</p>
+    <ul>
+      <li><strong>Frontend</strong> — a static site, deployed per-marina to its own Netlify site and subdomain.</li>
+      <li><strong>Database</strong> — InstantDB, giving the app local-first storage and automatic sync with no custom offline logic to build.</li>
+      <li><strong>Telephony</strong> — a small dedicated server per marina integrating Twilio for calls and SMS, writing directly into that marina's InstantDB instance.</li>
+      <li><strong>Auth</strong> — an InstantDB-compatible auth provider, supporting both personal devices and shared shift devices.</li>
+    </ul>
+
+    <h2>How to read this document set</h2>
+    <table>
+      <tr><th>Document</th><th>What it covers</th></tr>
+      <tr><td><a href="terminology.html">Terminology</a></td><td>Definitions for every domain term used throughout — read this first if a term elsewhere is unclear.</td></tr>
+      <tr><td><a href="architecture.html">Stack &amp; Architecture</a></td><td>The technical shape of the system: hosting, database, telephony server, sync and offline behavior, scheduling.</td></tr>
+      <tr><td><a href="data-model.html">Data Model</a></td><td>Every entity, its fields, and its relationships.</td></tr>
+      <tr><td><a href="permissions.html">Permissions</a></td><td>The role and trinary-permission system, and the full permission list.</td></tr>
+      <tr><td><a href="workflows.html">Role Workflows</a></td><td>Narrative walkthroughs of how each role actually uses the system, end to end.</td></tr>
+      <tr><td><a href="api-structure.html">API Structure</a></td><td>How the frontend, InstantDB, and the Twilio server communicate.</td></tr>
+      <tr><td><a href="pages/index.html">Page Specifications</a></td><td>A detailed spec for every screen in the application.</td></tr>
+      <tr><td><a href="wireframes/index.html">Wireframes</a></td><td>Low-fidelity HTML wireframes of every screen, sharing one stylesheet for consistency.</td></tr>
+    </table>
+
+    <div class="page-foot">
+      <span></span>
+      <a href="terminology.html">Terminology →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API Structure — Marina Ops Docs</title>
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="index.html" class="brand">Marina&nbsp;Ops</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="index.html">Introduction</a>
+      <a href="terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="architecture.html">Stack &amp; Architecture</a>
+      <a href="api-structure.html" class="current">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="data-model.html">Data Model</a>
+      <a href="permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="pages/index.html">Page Specifications</a>
+      <a href="wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Architecture</span>
+    <h1>API Structure</h1>
+    <p class="lede">Two integration surfaces make up the system's API: the frontend talking directly to InstantDB for almost everything, and the frontend talking to the per-marina telephony server for anything that has to touch Twilio.</p>
+
+    <h2>Two surfaces, one rule of thumb</h2>
+    <div class="grid-2">
+      <div class="panel panel-teal">
+        <h4 style="margin-top:0;">Frontend ↔ InstantDB</h4>
+        <p style="margin:0;">Direct client-side queries, subscriptions, and writes. This covers the entire application except calls and SMS: locations, checklists, incidents, tickets, assets, reservations, contacts, leases, chat, the Activity Log, and Admin configuration.</p>
+      </div>
+      <div class="panel">
+        <h4 style="margin-top:0;">Frontend ↔ Telephony Server ↔ Twilio</h4>
+        <p style="margin:0;">A small REST API, used only for actions that require Twilio: initiating a call/SMS, and receiving Twilio's webhooks. The server writes results into InstantDB; the frontend then reads those results the same way it reads everything else.</p>
+      </div>
+    </div>
+    <div class="note">
+      <strong>Why not route calls through InstantDB writes directly?</strong> Because initiating a call or SMS requires a server-side Twilio credential that must never reach the client, and because Twilio's own webhooks need a real HTTP endpoint to call back to. Everything that doesn't have that constraint stays a direct InstantDB interaction — that's the dividing line.
+    </div>
+
+    <h2>Frontend ↔ InstantDB patterns</h2>
+    <table>
+      <tr><th>Pattern</th><th>Used for</th></tr>
+      <tr><td>Subscribed queries</td><td>Any list or detail view that should update live — the ticket queue, an active checklist, a chat room, missed-call badge counts.</td></tr>
+      <tr><td>Local-first writes</td><td>Every user action: completing a checklist item, logging an incident, updating an asset's meter. Written locally immediately, synced automatically per <a href="architecture.html">Architecture</a>.</td></tr>
+      <tr><td>Permission-aware rules</td><td>InstantDB's permission rules are configured to check the acting user's effective permission (computed per <a href="permissions.html">Permissions</a>) before allowing a read or write, so enforcement isn't solely a client-side UI concern.</td></tr>
+    </table>
+    <p>Because this surface is direct client-to-database, there is no separate application-defined REST or GraphQL schema to document beyond InstantDB's own query/write model and the entity structure already described in <a href="data-model.html">Data Model</a>.</p>
+
+    <div class="fathom">telephony server</div>
+    <h2>Telephony Server API</h2>
+    <p>A minimal REST API, scoped entirely to bridging Twilio. Two categories of endpoint: <strong>inbound webhooks</strong> (called by Twilio) and <strong>outbound actions</strong> (called by the frontend, authenticated as a logged-in user).</p>
+
+    <h3>Inbound — Twilio webhooks</h3>
+    <table>
+      <tr><th>Endpoint</th><th>Triggered by</th><th>Behavior</th></tr>
+      <tr>
+        <td><code>POST /webhooks/voice/inbound</code></td>
+        <td>An incoming call to a marina number</td>
+        <td>Looks up which configured line was dialed, applies its routing (e.g. the security line skipping straight to a security menu), performs contact matching, creates a <code>Call</code> record in InstantDB, and returns TwiML directing Twilio how to proceed (ring staff, play a menu, go to voicemail).</td>
+      </tr>
+      <tr>
+        <td><code>POST /webhooks/voice/status</code></td>
+        <td>Call state changes (ringing, answered, completed, no-answer)</td>
+        <td>Updates the corresponding <code>Call</code> record's status, duration, and missed flag.</td>
+      </tr>
+      <tr>
+        <td><code>POST /webhooks/voice/recording</code></td>
+        <td>A call recording becomes available</td>
+        <td>Attaches the recording URL to the <code>Call</code> record, if recording is enabled for the marina.</td>
+      </tr>
+      <tr>
+        <td><code>POST /webhooks/voice/transcription</code></td>
+        <td>A transcription completes</td>
+        <td>Attaches transcript text to the <code>Call</code> record, if transcription is enabled.</td>
+      </tr>
+      <tr>
+        <td><code>POST /webhooks/voice/voicemail</code></td>
+        <td>A caller leaves a voicemail</td>
+        <td>Stores the voicemail recording URL against the <code>Call</code> record and flags it for the missed-call badge.</td>
+      </tr>
+      <tr>
+        <td><code>POST /webhooks/sms/inbound</code></td>
+        <td>An incoming text to a marina number</td>
+        <td>Performs contact matching, appends to (or creates) the matching <code>SMSThread</code>, creates the <code>SMSMessage</code>, and marks the thread unread.</td>
+      </tr>
+    </table>
+
+    <h3>Outbound — called by the frontend</h3>
+    <table>
+      <tr><th>Endpoint</th><th>Requires</th><th>Behavior</th></tr>
+      <tr>
+        <td><code>POST /calls/initiate</code></td>
+        <td><code>place_calls</code> permission</td>
+        <td>Accepts a target number (or Contact reference) and a line to call from; instructs Twilio to bridge the call to the requesting user's device; creates the outbound <code>Call</code> record.</td>
+      </tr>
+      <tr>
+        <td><code>POST /sms/send</code></td>
+        <td><code>place_calls</code> permission</td>
+        <td>Accepts a target number (or Contact reference), a line, and a message body (optionally sourced from an <code>SMSTemplate</code>); sends via Twilio; creates the outbound <code>SMSMessage</code>.</td>
+      </tr>
+      <tr>
+        <td><code>GET /calls/active</code></td>
+        <td>Authenticated user</td>
+        <td>Returns any call currently ringing/in-progress for the requesting user's line(s) — used to drive the active-call panel/pop-up without waiting on a webhook round-trip to InstantDB in edge cases.</td>
+      </tr>
+      <tr>
+        <td><code>POST /reports/shift/:shiftId/send</code></td>
+        <td>Authenticated user (the shift's guard, or <code>view_reports</code>)</td>
+        <td>Compiles the shift report from the shift's time window and emails it to the marina's configured recipients (see <a href="architecture.html">Architecture — Shift report delivery</a>). Called automatically on shift end; retried on reconnect if the shift ended offline; also usable to re-send.</td>
+      </tr>
+    </table>
+
+    <div class="note">
+      <strong>Auth for the telephony server.</strong> Outbound endpoints authenticate the caller using the same session/identity issued by the InstantDB-compatible auth provider (see <a href="architecture.html">Architecture</a>), so the telephony server can independently verify the request is from a logged-in user holding the required permission — it does not trust the frontend's own permission check alone.
+    </div>
+
+    <h3>Contact matching</h3>
+    <p>Both inbound webhook paths run the same contact-matching step before writing a record:</p>
+    <ol>
+      <li>Normalize the incoming phone number and look for an exact match against existing <code>Contact</code> records.</li>
+      <li>If found, link the <code>Call</code>/<code>SMSThread</code> to that contact.</li>
+      <li>If not found, create a new <code>Contact</code> with the phone number and no name.</li>
+    </ol>
+    <p>The "nameless contact" prompt and merge-suggestion flow described in <a href="workflows.html">Role Workflows</a> happens entirely in the frontend when such a contact is later viewed — the telephony server's job stops at creating the bare record.</p>
+
+    <div class="fathom">scheduling — open question</div>
+    <h2>Scheduled jobs</h2>
+    <p>As noted in <a href="architecture.html">Architecture</a>, the mechanism for time- and meter-based checklist/ticket generation is not yet finalized. Whatever mechanism is chosen, it will need its own narrow write path into InstantDB (functionally similar to the telephony server's webhook handlers — evaluate a condition, then create a <code>Checklist</code> or <code>Ticket</code> record) rather than a broad API surface. This section will be filled in once that decision is made.</p>
+
+    <div class="page-foot">
+      <a href="workflows.html">← Role Workflows</a>
+      <a href="pages/index.html">Page Specifications →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>
