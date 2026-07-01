@@ -1,0 +1,400 @@
+/* ============================================================
+   Marina Ops — Implementation Documentation
+   Shared stylesheet for the documentation site itself.
+   (Not to be confused with /wireframes/shared/styles.css,
+   which styles the wireframes of the actual application.)
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --navy:        #0F2438;
+  --navy-deep:   #0A1928;
+  --cream:       #F2EDE1;
+  --cream-panel: #FBF8F1;
+  --teal:        #1B5E63;
+  --teal-light:  #DCEBEA;
+  --orange:      #D9622B;
+  --orange-dim:  #F0D6C4;
+  --ink:         #1A1F26;
+  --slate:       #5B6773;
+  --line:        #C9C0AC;
+  --line-dark:   #2A3F55;
+
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: var(--cream);
+  line-height: 1.6;
+  font-size: 16px;
+}
+
+/* ---------- Layout shell ---------- */
+
+.shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+}
+
+.sidenav {
+  background: var(--navy);
+  color: #CBD8E3;
+  padding: 28px 22px 40px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.sidenav .brand {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.3rem;
+  color: #fff;
+  text-decoration: none;
+  letter-spacing: 0.01em;
+  margin-bottom: 4px;
+}
+
+.sidenav .brand-sub {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--orange);
+  display: block;
+  margin-bottom: 28px;
+}
+
+.sidenav nav h3 {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #6E8298;
+  margin: 22px 0 8px;
+  font-weight: 500;
+}
+
+.sidenav nav h3:first-of-type { margin-top: 0; }
+
+.sidenav nav a {
+  display: block;
+  color: #CBD8E3;
+  text-decoration: none;
+  font-size: 0.9rem;
+  padding: 6px 0 6px 14px;
+  border-left: 2px solid var(--line-dark);
+  margin-bottom: 1px;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.sidenav nav a:hover { color: #fff; border-left-color: var(--orange); }
+.sidenav nav a.current {
+  color: #fff;
+  border-left-color: var(--orange);
+  font-weight: 600;
+}
+
+.content {
+  padding: 56px 64px 120px;
+  max-width: 900px;
+}
+
+.content.wide { max-width: 1100px; }
+
+/* ---------- Typography ---------- */
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  color: var(--navy-deep);
+  line-height: 1.2;
+  margin-top: 0;
+}
+
+h1 { font-size: 2.6rem; font-weight: 600; margin-bottom: 6px; }
+h2 { font-size: 1.7rem; font-weight: 600; margin: 48px 0 16px; padding-top: 4px; }
+h3 { font-size: 1.25rem; font-weight: 600; margin: 32px 0 12px; }
+h4 { font-size: 1.02rem; font-weight: 600; margin: 22px 0 8px; color: var(--teal); }
+
+p { margin: 0 0 16px; color: var(--ink); }
+p.lede {
+  font-size: 1.15rem;
+  color: var(--slate);
+  font-family: var(--font-display);
+  font-weight: 400;
+  margin: 18px 0 36px;
+}
+
+a { color: var(--teal); }
+a:hover { color: var(--orange); }
+
+strong { color: var(--navy-deep); }
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--orange);
+  margin-bottom: 10px;
+  display: block;
+}
+
+/* Depth-mark divider — a nod to chart soundings; used only between
+   true sequential sections, not as decoration. */
+.fathom {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 56px 0 28px;
+  color: var(--slate);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+.fathom::before, .fathom::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 10px);
+}
+
+hr.rule {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 40px 0;
+}
+
+/* ---------- Lists ---------- */
+
+ul, ol { padding-left: 22px; margin: 0 0 16px; }
+li { margin-bottom: 6px; }
+
+/* ---------- Panels / cards ---------- */
+
+.panel {
+  background: var(--cream-panel);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 22px 26px;
+  margin: 20px 0;
+}
+
+.panel-teal {
+  background: var(--teal-light);
+  border: 1px solid #b7d3d1;
+}
+
+.note {
+  border-left: 3px solid var(--orange);
+  background: var(--orange-dim);
+  padding: 14px 20px;
+  margin: 20px 0;
+  border-radius: 0 3px 3px 0;
+  font-size: 0.94rem;
+}
+.note strong { color: var(--navy-deep); }
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin: 20px 0;
+}
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin: 20px 0;
+}
+@media (max-width: 720px) {
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+}
+
+.card {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 3px;
+  padding: 18px 20px;
+}
+.card h4 { margin-top: 0; }
+
+/* ---------- Tables ---------- */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0 28px;
+  font-size: 0.92rem;
+}
+th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--slate);
+  border-bottom: 2px solid var(--navy);
+  padding: 8px 14px 8px 0;
+}
+td {
+  padding: 10px 14px 10px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+tr:last-child td { border-bottom: none; }
+td code, th code { font-size: 0.85em; }
+
+/* ---------- Code / schema blocks ---------- */
+
+code {
+  font-family: var(--font-mono);
+  background: #EAE3D2;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.88em;
+  color: var(--navy-deep);
+}
+
+pre {
+  background: var(--navy-deep);
+  color: #DCE6EE;
+  padding: 20px 22px;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.65;
+  margin: 20px 0;
+}
+pre code { background: none; color: inherit; padding: 0; }
+
+.schema-entity {
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  margin: 22px 0;
+  overflow: hidden;
+}
+.schema-entity .head {
+  background: var(--navy);
+  color: #fff;
+  padding: 10px 18px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.schema-entity .head .tag {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--orange-dim);
+  background: rgba(217,98,43,0.25);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.schema-entity table { margin: 0; }
+.schema-entity td, .schema-entity th { padding-left: 18px; }
+.schema-entity th:first-child, .schema-entity td:first-child { padding-left: 18px; }
+
+/* ---------- Badges / tags ---------- */
+
+.tag-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.tag {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: var(--teal-light);
+  color: var(--teal);
+  border: 1px solid #b7d3d1;
+}
+.tag.orange { background: var(--orange-dim); color: #9a3f14; border-color: #e3b494; }
+.tag.navy { background: #dfe6ec; color: var(--navy-deep); border-color: #b9c6d2; }
+
+/* ---------- Permission matrix (trinary) ---------- */
+
+.perm-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--slate);
+  border-radius: 3px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.perm-allow { background: var(--teal); border-color: var(--teal); color: #fff; }
+.perm-deny  { background: #C94A2B; border-color: #C94A2B; color: #fff; }
+.perm-undef { background: transparent; }
+
+/* ---------- Definition list (glossary) ---------- */
+
+dl.glossary dt {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.08rem;
+  color: var(--navy-deep);
+  margin-top: 26px;
+}
+dl.glossary dt .term-tag {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--slate);
+  font-weight: 500;
+  margin-left: 10px;
+  letter-spacing: 0.06em;
+}
+dl.glossary dd { margin: 6px 0 0; color: var(--ink); }
+
+/* ---------- Breadcrumb / page footer nav ---------- */
+
+.page-foot {
+  margin-top: 80px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}
+.page-foot a { text-decoration: none; }
+
+/* ---------- Status pill for "doc status" ---------- */
+
+.doc-status {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 3px 10px;
+  border-radius: 10px;
+  background: var(--teal-light);
+  color: var(--teal);
+  margin-bottom: 22px;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; }
+  .sidenav { position: relative; height: auto; }
+  .content { padding: 36px 24px 80px; }
+  h1 { font-size: 2rem; }
+}
