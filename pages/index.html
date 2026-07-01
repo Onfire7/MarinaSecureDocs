@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Page Specifications — Marina Ops Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">Marina&nbsp;Ops</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Specifications</span>
+    <span class="doc-status">Planned — not yet written</span>
+    <h1>Page Specifications</h1>
+    <p class="lede">A detailed spec for every screen in the application: purpose, data displayed, actions available, permission gating, and mobile/desktop behavior. This section is the next phase of work — the table below is the proposed scope, grouped to match top-level navigation, for review before writing begins.</p>
+
+    <div class="note">
+      <strong>Review this list first.</strong> ~30 individual page docs is a lot to produce sight-unseen. Confirm the grouping and granularity below — or flag anything missing, split differently, or unnecessary — before I write full specs for each.
+    </div>
+
+    <h2>Proposed page list</h2>
+
+    <h3>Access</h3>
+    <ul>
+      <li>Sign in</li>
+      <li>User switch (shared shift devices — fast handoff without full sign-out; see <a href="../architecture.html">Architecture</a>)</li>
+    </ul>
+
+    <h3>Home</h3>
+    <ul>
+      <li>Dashboard (role-adaptive: shift start/end for security, ticket/incident summary, missed call badge, upcoming reservations)</li>
+    </ul>
+
+    <h3>Checklists &amp; Tours</h3>
+    <ul>
+      <li>Checklist list (mine / assigned to my role)</li>
+      <li>Active checklist (in-progress, item-by-item — includes the Verify Task rejection and Door Check mismatch flows)</li>
+      <li>Checkpoint check-in screen (the page a scanned NFC/QR URL opens)</li>
+      <li>Manual check-in dialog (reason required)</li>
+      <li>Tour progress view (security-only — linear/freeform/randomized status)</li>
+      <li>Checklist detail (completed, read-only)</li>
+    </ul>
+
+    <h3>Locations</h3>
+    <ul>
+      <li>Location list / map view</li>
+      <li>Location detail (status, current boat, checkpoints, notes, incidents, tickets)</li>
+      <li>Checkpoint detail (within a location)</li>
+    </ul>
+
+    <h3>Comms</h3>
+    <ul>
+      <li>Comms home (recent calls, texts, chat rooms)</li>
+      <li>Active call panel/pop-up</li>
+      <li>Missed calls / unread SMS detail view</li>
+      <li>New call dialog (dialer / contact picker — <code>place_calls</code>)</li>
+      <li>SMS thread (incl. template picker)</li>
+      <li>New SMS dialog</li>
+      <li>Chat room</li>
+      <li>New chat room / invite screen</li>
+    </ul>
+
+    <h3>Tickets</h3>
+    <ul>
+      <li>Ticket queue (priority-sorted)</li>
+      <li>Ticket detail</li>
+      <li>New ticket form</li>
+    </ul>
+
+    <h3>Incidents</h3>
+    <ul>
+      <li>Incident list</li>
+      <li>Incident detail (with comments/addendums, linked tickets)</li>
+      <li>New incident form</li>
+    </ul>
+
+    <h3>Reservations</h3>
+    <ul>
+      <li>Reservation calendar/list</li>
+      <li>Reservation detail</li>
+      <li>New reservation form</li>
+      <li>Reservation check-in / check-out dialog (sets target status per its configuration)</li>
+    </ul>
+
+    <h3>Boats</h3>
+    <ul>
+      <li>Boat list</li>
+      <li>Boat detail (owners, authorized users, current slip, lease link)</li>
+    </ul>
+
+    <h3>Owners &amp; Contacts</h3>
+    <ul>
+      <li>Owner/Contact list</li>
+      <li>Owner/Contact detail</li>
+      <li>Nameless-contact name prompt &amp; merge dialog</li>
+      <li>Lease detail (variances, documents, comments)</li>
+    </ul>
+
+    <h3>Assets</h3>
+    <ul>
+      <li>Asset list</li>
+      <li>Asset detail (status log, meter, maintenance rules, checkout)</li>
+      <li>Checkout / return dialog</li>
+      <li>Meter update dialog (set reading, or add hours for meterless assets)</li>
+    </ul>
+
+    <h3>Shared dialogs</h3>
+    <ul>
+      <li>New note dialog (attach to location / checkpoint / boat / contact / asset)</li>
+      <li>Attachment-target picker (shared by notes, incidents, tickets)</li>
+    </ul>
+
+    <h3>Activity Log</h3>
+    <ul>
+      <li>Activity Log (filterable chronological feed, permission-scoped)</li>
+    </ul>
+
+    <h3>Reports</h3>
+    <ul>
+      <li>Reports home</li>
+      <li>Shift report (view/resend)</li>
+    </ul>
+
+    <h3>Admin</h3>
+    <ul>
+      <li>Admin home / section picker</li>
+      <li>Users</li>
+      <li>Roles &amp; Permissions (trinary matrix editor)</li>
+      <li>Checklist Templates (builder)</li>
+      <li>Location Types &amp; Locations setup (incl. checkpoint setup: GUID URL, NFC/QR, GPS radius)</li>
+      <li>Tours setup</li>
+      <li>Incident Types</li>
+      <li>Asset categories &amp; maintenance rules</li>
+      <li>SMS Templates (global; personal templates managed from Comms)</li>
+      <li>Marina Settings (GPS default, retention, recording/transcription, phone lines, shift report recipients)</li>
+    </ul>
+
+    <div class="page-foot">
+      <a href="../api-structure.html">← API Structure</a>
+      <a href="../wireframes/index.html">Wireframes →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>
