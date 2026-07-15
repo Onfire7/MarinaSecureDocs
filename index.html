@@ -40,14 +40,15 @@
     <p class="lede">A permissions-driven operations platform for overnight security, maintenance, and front-office staff at marinas — built to run offline on the dock, sync automatically, and be configured differently for every property that adopts it.</p>
 
     <div class="note">
-      <strong>What this document set is.</strong> This is architectural and design documentation for engineering and stakeholder review — role definitions, data model, permission logic, page-by-page specifications, and wireframes. It intentionally avoids implementation code; the goal is a shared, unambiguous understanding of what gets built before anyone builds it.
+      <strong>What this document set is — and who it's for.</strong> This is implementation documentation, written for the developers who will build the application. It defines the architecture, data model, permission logic, per-role functional requirements, page-by-page specifications, and wireframes in enough detail to implement from directly. It intentionally stops short of implementation code: it specifies <em>what</em> gets built and <em>how the pieces fit</em>, and leaves code-level decisions to the implementing team.
     </div>
 
     <h2>The problem</h2>
     <p>Marinas run overnight security and maintenance operations on a patchwork of paper logs, radio calls, spreadsheets, and whatever the previous office manager left behind. Shift handoffs lose information. Incident reports live in someone's notebook. Maintenance requests get relayed by word of mouth. Owner and slip information isn't available to the person standing at the boat who needs it. And every marina does it slightly differently — so anything built for one has to bend without breaking for the next.</p>
     <p>Marina Ops replaces that patchwork with a single system that a night guard can use standing on a dark dock with one bar of signal, that an office manager can use to log a customer call, and that an owner-operator can reconfigure without touching code when their operation doesn't match the defaults.</p>
 
-    <h2>Who this is for</h2>
+    <h2>The application's user roles</h2>
+    <p>These are the end users the <em>application</em> serves — the personas every requirement in this document set exists for. (The documentation itself is addressed to you, the implementer.)</p>
     <div class="grid-2">
       <div class="card">
         <h4>Security</h4>
@@ -66,7 +67,7 @@
         <p style="margin:0;">Oversight, reporting, and the administrative configuration that lets one system fit very different marinas.</p>
       </div>
     </div>
-    <p>A single person often wears more than one of these hats. The system reflects that directly — see <a href="permissions.html">Permissions</a> for how roles and access combine per user, and <a href="workflows.html">Role Workflows</a> for how each role actually experiences the product.</p>
+    <p>A single person often wears more than one of these hats. The system reflects that directly — see <a href="permissions.html">Permissions</a> for how roles and access combine per user, and <a href="workflows.html">Role Workflows</a> for the functional requirements each role imposes on the implementation.</p>
 
     <h2>Design principles</h2>
     <div class="grid-2">
@@ -98,13 +99,14 @@
     </ul>
 
     <h2>How to read this document set</h2>
+    <p>Documents are ordered for a first read-through by an implementing developer; the goal is that the system can be built from these documents and the wireframes without further product input. Where a decision is deliberately deferred, it's marked as an open question rather than left implicit.</p>
     <table>
       <tr><th>Document</th><th>What it covers</th></tr>
       <tr><td><a href="terminology.html">Terminology</a></td><td>Definitions for every domain term used throughout — read this first if a term elsewhere is unclear.</td></tr>
       <tr><td><a href="architecture.html">Stack &amp; Architecture</a></td><td>The technical shape of the system: hosting, database, telephony server, sync and offline behavior, scheduling.</td></tr>
       <tr><td><a href="data-model.html">Data Model</a></td><td>Every entity, its fields, and its relationships.</td></tr>
       <tr><td><a href="permissions.html">Permissions</a></td><td>The role and trinary-permission system, and the full permission list.</td></tr>
-      <tr><td><a href="workflows.html">Role Workflows</a></td><td>Narrative walkthroughs of how each role actually uses the system, end to end.</td></tr>
+      <tr><td><a href="workflows.html">Role Workflows</a></td><td>Per-role functional requirements, written as end-to-end narratives.</td></tr>
       <tr><td><a href="api-structure.html">API Structure</a></td><td>How the frontend, InstantDB, and the Twilio server communicate.</td></tr>
       <tr><td><a href="pages/index.html">Page Specifications</a></td><td>A detailed spec for every screen in the application.</td></tr>
       <tr><td><a href="wireframes/index.html">Wireframes</a></td><td>Low-fidelity HTML wireframes of every screen, sharing one stylesheet for consistency.</td></tr>

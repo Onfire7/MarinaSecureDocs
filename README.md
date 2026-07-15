@@ -1,10 +1,10 @@
 # MarinaSecureDocs
 
-Implementation documentation for the Marina Ops platform — architecture, data model, permissions, role workflows, API structure, page specifications, and wireframes.
+Implementation documentation for the Marina Ops platform, written for the developers building the application — architecture, data model, permissions, per-role functional requirements, API structure, page specifications, and wireframes.
 
-**Start here:** open `index.html`, or enable GitHub Pages to browse the rendered docs:
+**Start here:** open `index.html`, or browse the rendered docs via GitHub Pages:
 
 > Settings → Pages → Source: *Deploy from a branch* → Branch: `main`, folder `/ (root)` → Save.
-> The docs will be served at `https://<your-username>.github.io/MarinaSecureDocs/`.
+> Served at `https://<your-username>.github.io/MarinaSecureDocs/`.
 
-(GitHub's file viewer shows HTML as source code — Pages is what renders it.)
+(GitHub's file viewer shows HTML as source — Pages is what renders it.)
