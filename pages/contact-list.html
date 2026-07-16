@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Owner / Contact List — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Owners &amp; Contacts · Page Specification</span>
+    <h1>Owner / Contact List</h1>
+    <p class="lede">Every Contact known to the marina — boat owners, authorized users, lessees, and anyone who's simply called or texted in.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from the Owners &amp; Contacts top-level nav item (note the nav groups Boats separately, but Contacts underlies both — see <a href="../terminology.html">Terminology</a>). A <code>Contact</code> isn't necessarily a <code>User</code>; most entries here never sign into the app at all.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Name</td><td>Contact.name</td><td>Requires <code>view_owner</code>; nameless contacts (name = null) show a "needs a name" indicator instead. Gating extended here from its literal "slip/boat owner" wording in <a href="../permissions.html">Permissions</a> to cover Contacts generally, for consistency with how the same two permissions gate Contact info everywhere else it appears (Boat, Location, Active Call Panel, etc.).</td></tr>
+      <tr><td>Phone / email</td><td>Contact.phone / email</td><td>Requires <code>view_contact</code>, additionally to <code>view_owner</code>.</td></tr>
+      <tr><td>Linked boats</td><td>Boat.owners / authorized_users containing this Contact</td><td>Shown as a short tag/count, not full detail.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Open a contact</td><td><code>view_owner</code></td><td>Navigates to <a href="contact-detail.html">Owner/Contact detail</a> — or, for a nameless contact, into <a href="nameless-contact-merge.html">the name prompt &amp; merge dialog</a> first.</td></tr>
+      <tr><td>Add a contact</td><td><code>edit_owner_contact</code></td><td>Creates a new Contact directly (as opposed to one auto-created by an inbound call/text).</td></tr>
+      <tr><td>Search / filter</td><td>Same as viewing</td><td>By name or phone.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No <code>view_owner</code></strong> — the list and the Owners &amp; Contacts nav item are effectively unreachable in any useful form.</li>
+      <li><strong>Merged contact</strong> (<code>merged_into</code> set) — excluded from this list entirely; only the canonical target record appears, per <a href="../data-model.html">Data Model — Contact</a>.</li>
+      <li><strong>Nameless contact</strong> — included in the list with a distinct visual treatment, so staff can spot ones that still need a name/merge decision.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: single searchable list. Desktop: sortable table, with the phone/email columns present only for users holding <code>view_contact</code>.</p>
+
+    <div class="page-foot">
+      <a href="boat-detail.html">← Boat Detail</a>
+      <a href="contact-detail.html">Owner / Contact Detail →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

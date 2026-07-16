@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lease Detail — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Owners &amp; Contacts · Page Specification</span>
+    <h1>Lease Detail</h1>
+    <p class="lede">A location's long-term lease record — lessees, dates, variances, documents, and a running comment thread — gated entirely by <code>view_lease</code>.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from a Location's detail page (typically a Slip) or a lessee Contact's detail page. This is the long-term counterpart to a short-term <a href="reservation-detail.html">Reservation</a>: a marina typically sets a given Slip up as either reservation-enabled (short-term) or leased (long-term), not both — which is exactly what lets a mixed-use Dock keep its short-term Slips and long-term-leased Slips side by side. The data model doesn't hard-enforce that split (<code>reservation_enabled</code> and having a <code>Lease</code> are independent fields), so it's a marina-configuration convention rather than a system constraint.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Location</td><td>Lease.location</td><td>Links to <a href="location-detail.html">Location detail</a>; variances are displayed alongside the Location's (and its current Boat's) info there too, per <a href="../data-model.html">Data Model</a>.</td></tr>
+      <tr><td>Lessees</td><td>Lease.lessees</td><td>Requires <code>view_owner</code> for names, <code>view_contact</code> for phone/email — same gating as everywhere else Contacts appear.</td></tr>
+      <tr><td>Dates</td><td>Lease.start_date / end_date</td><td></td></tr>
+      <tr><td>Variances &amp; conditions</td><td>Lease.variances_and_conditions</td><td>Freeform text.</td></tr>
+      <tr><td>Documents</td><td>Lease.documents</td><td>Stored contract files.</td></tr>
+      <tr><td>Comments</td><td>Lease.comments → LeaseComment</td><td>Author, body, timestamp — an ongoing thread, not locked like an Incident's original content.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Edit lease details</td><td><code>manage_lease</code></td><td>Dates, variances, lessees.</td></tr>
+      <tr><td>Upload a document</td><td><code>manage_lease</code></td><td></td></tr>
+      <tr><td>Download a document</td><td><code>view_lease</code></td><td>Viewing-tier action, unlike upload.</td></tr>
+      <tr><td>Add a comment</td><td><code>manage_lease</code></td><td>Reuses the same gate as editing, matching the pattern established for Incident comments (<code>create_incidents</code> covers both creating and commenting) — no separate lease-commenting permission.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No <code>view_lease</code></strong> — this page, and any link into it from Location/Contact detail, is unreachable.</li>
+      <li><strong><code>view_lease</code> without <code>manage_lease</code></strong> — full read access including document download, but no editing or commenting.</li>
+      <li><strong>Expired lease</strong> (<code>end_date</code> passed) — shown plainly as historical; the data model doesn't auto-flip the Location's status or <code>reservation_enabled</code> on expiry, so renewing or transitioning a Slip to reservation-enabled after a lease ends is a manual admin action, not an automated workflow.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: fields and documents stack vertically, comment thread below. Desktop: comment thread can sit alongside the lease's own fields, matching the pattern used on <a href="incident-detail.html">Incident detail</a>.</p>
+
+    <div class="page-foot">
+      <a href="nameless-contact-merge.html">← Nameless-Contact Name Prompt &amp; Merge Dialog</a>
+      <a href="asset-list.html">Asset List →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Asset List — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Assets · Page Specification</span>
+    <h1>Asset List</h1>
+    <p class="lede">Every tracked piece of equipment — vehicles, jump packs, anything with a maintenance cycle or a checkout log.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from the Assets top-level nav item. Viewing has no dedicated permission — same pattern as Tickets, Reservations, and Boats — only creating/editing requires <code>manage_assets</code>, per <a href="../permissions.html">Permissions</a>. Static infrastructure with no maintenance cycle and no checkout (a fixed gate, a pedestal) is deliberately not modeled as an Asset at all, per <a href="../terminology.html">Terminology</a>, so this list is shorter than "everything physical at the marina."</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Name, category</td><td>Asset.name / category</td><td>Category is an admin-defined grouping.</td></tr>
+      <tr><td>Current status</td><td>Asset.current_status</td><td>Denormalized latest value from AssetStatusLog.</td></tr>
+      <tr><td>Meter / hours</td><td>Asset.meter_reading (if has_meter) or accumulated hours</td><td>A meterless asset accrues hours automatically over time rather than showing a reading, per <a href="../data-model.html">Data Model</a>.</td></tr>
+      <tr><td>Checked out?</td><td>Open AssetCheckout (time_in null)</td><td>Only shown for <code>checkoutable</code> assets.</td></tr>
+      <tr><td>Reservable?</td><td>Asset.reservation_enabled</td><td>Small indicator; links into <a href="reservation-list.html">Reservation calendar/list</a> filtered to this asset when applicable.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Open an asset</td><td>None</td><td>Navigates to <a href="asset-detail.html">Asset detail</a>.</td></tr>
+      <tr><td>Add an asset</td><td><code>manage_assets</code></td><td>Category and maintenance-rule setup happens in <a href="admin-assets.html">Admin → Asset categories &amp; maintenance rules</a>; this is the day-to-day asset record itself.</td></tr>
+      <tr><td>Filter by category / status / checked-out</td><td>None</td><td>Client-side filter over the subscribed query.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No <code>manage_assets</code></strong> — the list is fully visible; only creation and the checkout/status/meter actions on <a href="asset-detail.html">Asset detail</a> are hidden.</li>
+      <li><strong>Meterless asset</strong> — shows accumulated hours instead of a reading, with no manual "set reading" action available for it beyond adding hours (see <a href="meter-update-dialog.html">Meter update dialog</a>).</li>
+      <li><strong>Empty list</strong> — plain empty state.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: single filterable list. Desktop: sortable table with status/checkout columns visible without opening each asset.</p>
+
+    <div class="page-foot">
+      <a href="lease-detail.html">← Lease Detail</a>
+      <a href="asset-detail.html">Asset Detail →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

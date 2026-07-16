@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meter Update Dialog — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Assets · Page Specification</span>
+    <h1>Meter Update Dialog</h1>
+    <p class="lede">Set an asset's current meter reading, or add accumulated hours if it has no meter at all.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="asset-detail.html">Asset detail</a>. This is the direct, admin-style edit path — distinct from a Meter Reading checklist item, which captures the same underlying data (an <code>AssetMeterReading</code>) as part of normal checklist completion and is unrestricted, per <a href="active-checklist.html">Active checklist</a>. Both paths feed the same maintenance-rule evaluation, per <a href="../api-structure.html">API Structure</a>.</p>
+
+    <h2>Data shown / form fields</h2>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+      <tr><td>Current value</td><td>Read-only, Asset.meter_reading or accumulated hours</td><td>Shown for reference before entering a new value.</td></tr>
+      <tr><td>New reading</td><td>Number — only if <code>has_meter</code></td><td>An absolute value (e.g. odometer mileage), not a delta.</td></tr>
+      <tr><td>Hours to add</td><td>Number — only if <em>not</em> <code>has_meter</code></td><td>An incremental value, added to the running total rather than replacing it — matches the pages inventory's "set reading, or add hours for meterless assets."</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Save</td><td><code>manage_assets</code></td><td>Creates an <code>AssetMeterReading</code> (<code>source</code> = Manual entry on asset page) and updates <code>Asset.meter_reading</code>. Meter-based maintenance rules are evaluated inline as part of this same write — a due rule creates a <code>Ticket</code> immediately, not on a delay.</td></tr>
+      <tr><td>Cancel</td><td>None</td><td>Closes without recording a reading.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>New reading lower than current</strong> (for a metered asset) — flagged as a warning rather than blocked outright, since a meter replacement or correction is a real scenario; the implementing team should confirm whether to hard-block this before build.</li>
+      <li><strong>Meterless asset</strong> — the form only ever offers "add hours," never "set an absolute value," since there's no absolute reading to set.</li>
+      <li><strong>Maintenance rule triggers on save</strong> — the resulting <code>Ticket</code> is <code>auto_generated</code> = true, identical in every other respect to a manually created one; see <a href="ticket-detail.html">Ticket detail</a>.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Same dialog on both; no meaningful layout divergence beyond the app's general responsive treatment.</p>
+
+    <div class="page-foot">
+      <a href="asset-checkout-dialog.html">← Checkout / Return Dialog</a>
+      <a href="index.html">Page Specifications →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

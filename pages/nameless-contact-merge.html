@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nameless-Contact Name Prompt &amp; Merge Dialog — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Owners &amp; Contacts · Page Specification</span>
+    <h1>Nameless-Contact Name Prompt &amp; Merge Dialog</h1>
+    <p class="lede">What happens the moment anyone opens a Contact that was auto-created from an inbound call or text and never got a name — prompt first, then check for a duplicate.</p>
+
+    <h2>Purpose</h2>
+    <p>Per <a href="../workflows.html">Role Workflows — New or unmatched callers</a> and <a href="../api-structure.html">API Structure — Contact matching</a>: an unmatched inbound number auto-creates a bare <code>Contact</code> (phone only, no name), performed by the Twilio Function. This dialog is where that gets resolved into a real, named record — and, critically, where it gets caught before becoming a duplicate of someone already in the system.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Phone number</td><td>Contact.phone</td><td>The only identifying information available so far.</td></tr>
+      <tr><td>Name input</td><td>User-entered</td><td></td></tr>
+      <tr><td>Similar existing contacts</td><td>Contact, fuzzy-matched against the entered name</td><td>Surfaced only after a name is typed — there's nothing to match against beforehand.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Save name, no merge</td><td><code>edit_owner_contact</code></td><td>Sets <code>Contact.name</code>; the record stays distinct. Used when no similar contact is shown, or none of the ones shown are actually the same person.</td></tr>
+      <tr><td>Confirm a merge</td><td><code>edit_owner_contact</code></td><td>Sets this Contact's <code>merged_into</code> to the selected existing Contact. The nameless record's phone number stays associated with it (so future calls from that number still match it directly), but any display of this Contact resolves through <code>merged_into</code> to show the canonical person instead.</td></tr>
+      <tr><td>Dismiss / decide later</td><td>None</td><td>Leaves the Contact nameless; the same prompt reappears next time anyone opens it.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No similar contacts found</strong> — the dialog skips straight to a plain name-save with no merge step.</li>
+      <li><strong>Multiple similar matches</strong> — presented as a list to choose from, with an explicit "none of these" option rather than forcing a pick.</li>
+      <li><strong>No <code>edit_owner_contact</code></strong> — the contact can still be viewed (per <a href="contact-detail.html">Owner/Contact detail</a>'s gating) but this prompt has nothing actionable to offer; it can show read-only ("no name on file yet") rather than the interactive form.</li>
+      <li><strong>A second inbound call from the same nameless number before it's resolved</strong> — matches the existing bare Contact by phone as usual; no duplicate nameless record is created for the same number.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: full-screen prompt, since it interrupts a task (usually mid-call, via <a href="active-call-panel.html">Active Call Panel</a>). Desktop: a smaller modal, since there's more surrounding context already visible.</p>
+
+    <div class="page-foot">
+      <a href="contact-detail.html">← Owner / Contact Detail</a>
+      <a href="lease-detail.html">Lease Detail →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

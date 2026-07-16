@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Asset Detail — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Assets · Page Specification</span>
+    <h1>Asset Detail</h1>
+    <p class="lede">Full record of one asset — status history, meter, maintenance rules, and checkout log.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="asset-list.html">Asset list</a>, a Ticket/Incident/Note attached to it, a Reservation targeting it, or a Meter Reading checklist item's asset link.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Name, category</td><td>Asset.name / category</td><td></td></tr>
+      <tr><td>Current status</td><td>Asset.current_status, with full AssetStatusLog history below it</td><td>Latest value displayed prominently; the log is the running record it's derived from.</td></tr>
+      <tr><td>Meter</td><td>Asset.meter_reading / meter_type, or accumulated hours if meterless</td><td>Recent AssetMeterReading history shown alongside, with each entry's source (Manual / Checklist item).</td></tr>
+      <tr><td>Maintenance rules</td><td>Asset.maintenance_rules</td><td>e.g. "every 3,000 miles," "every 90 days since last completed"; edited in <a href="admin-assets.html">Admin</a>, shown read-only here.</td></tr>
+      <tr><td>Checkout log</td><td>AssetCheckout, most recent first</td><td>Only shown for <code>checkoutable</code> assets; current open checkout (if any) highlighted at the top.</td></tr>
+      <tr><td>Reservation config</td><td>Asset.reservation_enabled / reservation_visibility / post_return_status</td><td>Read-only summary here; upcoming reservations shown alongside status per <a href="../data-model.html">Data Model — Reservation</a>.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Log a status update</td><td><code>manage_assets</code></td><td>Creates a new AssetStatusLog entry; updates <code>Asset.current_status</code>.</td></tr>
+      <tr><td>Check out / return</td><td><code>manage_assets</code></td><td>Opens <a href="asset-checkout-dialog.html">Checkout / return dialog</a> — checkout records are explicitly part of this permission's scope in <a href="../permissions.html">Permissions</a>, so "any role can check an asset in or out if permitted" (per <a href="../workflows.html">Role Workflows</a>) means "if they hold <code>manage_assets</code>," not a separate gate.</td></tr>
+      <tr><td>Update the meter</td><td><code>manage_assets</code></td><td>Opens <a href="meter-update-dialog.html">Meter update dialog</a>. Distinct from a Meter Reading checklist item, which is unrestricted as part of normal checklist completion (see <a href="active-checklist.html">Active checklist</a>) — this is the direct, outside-of-a-checklist edit path.</td></tr>
+      <tr><td>Add a note</td><td>Unrestricted</td><td>Opens <a href="new-note-dialog.html">New note dialog</a>, pre-attached.</td></tr>
+      <tr><td>Log an incident</td><td><code>create_incidents</code></td><td>Opens <a href="new-incident-form.html">New incident form</a>, pre-attached.</td></tr>
+      <tr><td>Create a ticket</td><td>Unrestricted</td><td>Opens <a href="new-ticket-form.html">New ticket form</a>, pre-attached.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Checkout doesn't itself change status</strong> — creating an <code>AssetCheckout</code> record doesn't automatically write an AssetStatusLog entry; if the marina wants "checked out" reflected as a status, whoever processes the checkout logs that separately. Only <em>return</em> has a modeled automatic status effect (<code>post_return_status</code>).</li>
+      <li><strong>Asset already checked out</strong> — the checkout action becomes a return action instead; a checkoutable asset can't have two simultaneous open checkouts (a second <code>time_in</code>-null record for the same asset).</li>
+      <li><strong>Not checkoutable</strong> — the checkout log section and action are both omitted entirely.</li>
+      <li><strong>No maintenance rules configured</strong> — shown plainly; an asset with a meter still works fine with zero rules, it just never auto-generates tickets.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: sections stack vertically, collapsible. Desktop: sections visible together in a wider layout, matching the pattern used on <a href="boat-detail.html">Boat detail</a> and <a href="location-detail.html">Location detail</a>.</p>
+
+    <div class="page-foot">
+      <a href="asset-list.html">← Asset List</a>
+      <a href="asset-checkout-dialog.html">Checkout / Return Dialog →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

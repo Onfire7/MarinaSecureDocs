@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checkout / Return Dialog — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Assets · Page Specification</span>
+    <h1>Checkout / Return Dialog</h1>
+    <p class="lede">Process an asset going out or coming back — one dialog, two modes depending on whether the asset is currently checked out.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="asset-detail.html">Asset detail</a>, gated by <code>manage_assets</code> (checkout records are explicitly within its scope, per <a href="../permissions.html">Permissions</a>).</p>
+
+    <h2>Data shown / form fields</h2>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+      <tr><td>Checking out to</td><td>Contact search/select</td><td>Defaults to the current user's own linked Contact (<code>User.contact</code>) but can be set to any Contact, per <a href="../data-model.html">Data Model — AssetCheckout</a>.</td></tr>
+      <tr><td>Time out / in</td><td>Datetime, defaults to now</td><td>Editable for backfilling.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Check out</td><td><code>manage_assets</code></td><td>Creates an <code>AssetCheckout</code>: <code>asset</code>, <code>checked_out_by</code> = current user, <code>person</code> = selected contact, <code>time_out</code> = now, <code>time_in</code> = null. Shown only when the asset has no open checkout.</td></tr>
+      <tr><td>Return</td><td><code>manage_assets</code></td><td>Sets <code>time_in</code> on the open checkout record, then applies <code>Asset.post_return_status</code> — writes a new <code>AssetStatusLog</code> entry (e.g. Jump Pack → "Needs Charging"). Shown only when the asset currently has an open checkout.</td></tr>
+      <tr><td>Cancel</td><td>None</td><td>Closes without creating or closing a checkout.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Already checked out</strong> — the dialog opens directly in Return mode; there's no way to check out an asset that's already out.</li>
+      <li><strong>Returning without a status change</strong> — <code>post_return_status</code> always applies on return; there's no option to skip it, since it's the target's configured behavior, not a per-return choice.</li>
+      <li><strong>Person isn't a User</strong> — perfectly normal; <code>person</code> is a Contact reference, and most checkouts (e.g. a jump pack lent to a boat owner) go to someone who never signs into the app.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Same dialog on both; no meaningful layout divergence beyond the app's general responsive treatment.</p>
+
+    <div class="page-foot">
+      <a href="asset-detail.html">← Asset Detail</a>
+      <a href="meter-update-dialog.html">Meter Update Dialog →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

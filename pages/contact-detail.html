@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Owner / Contact Detail — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Owners &amp; Contacts · Page Specification</span>
+    <h1>Owner / Contact Detail</h1>
+    <p class="lede">Everything tied to one person — contact info, the boats they own or are authorized on, leases, and anything attached to them.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="contact-list.html">Owner/Contact list</a>, a Boat's owners/authorized users, a Lease's lessees, or an inbound Call/SMS's matched contact. Opening a <strong>nameless</strong> contact (<code>name</code> = null) routes straight into <a href="nameless-contact-merge.html">the name prompt &amp; merge dialog</a> instead of this page — this page assumes a named contact.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Name</td><td>Contact.name</td><td>Requires <code>view_owner</code>.</td></tr>
+      <tr><td>Phone / email</td><td>Contact.phone / email</td><td>Requires <code>view_contact</code>.</td></tr>
+      <tr><td>Boats owned</td><td>Boat.owners containing this Contact</td><td>Shown in succession order where relevant; links to <a href="boat-detail.html">Boat detail</a>.</td></tr>
+      <tr><td>Boats authorized on</td><td>Boat.authorized_users containing this Contact</td><td></td></tr>
+      <tr><td>Leases</td><td>Lease.lessees containing this Contact</td><td>Requires <code>view_lease</code>; omitted entirely without it.</td></tr>
+      <tr><td>Notes, incidents, tickets</td><td>attached_to = this Contact</td><td>Standard gating (incidents require <code>view_incidents</code>; notes and tickets unrestricted).</td></tr>
+      <tr><td>Call / SMS history</td><td>Call.contact / SMSThread.contact = this Contact</td><td>Requires <code>view_calls</code> / <code>view_sms</code> respectively, per <a href="../permissions.html">Permissions</a>.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Edit contact info</td><td><code>edit_owner_contact</code></td><td></td></tr>
+      <tr><td>Merge with another contact</td><td><code>edit_owner_contact</code></td><td>Manually triggered version of the automatic nameless-contact merge — sets this Contact's (or the other one's) <code>merged_into</code>; anywhere a Contact is displayed, the app resolves through <code>merged_into</code> to the canonical record rather than rewriting every Call/SMSThread/Boat reference.</td></tr>
+      <tr><td>Call / text</td><td><code>place_calls</code></td><td>Opens <a href="new-call-dialog.html">New call dialog</a> or <a href="new-sms-dialog.html">New SMS dialog</a> pre-filled with this contact.</td></tr>
+      <tr><td>Add a note</td><td>Unrestricted</td><td>Opens <a href="new-note-dialog.html">New note dialog</a>, pre-attached to this Contact.</td></tr>
+      <tr><td>Log an incident</td><td><code>create_incidents</code></td><td>Opens <a href="new-incident-form.html">New incident form</a>, pre-attached.</td></tr>
+      <tr><td>Create a ticket</td><td>Unrestricted</td><td>Opens <a href="new-ticket-form.html">New ticket form</a>, pre-attached.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No <code>view_contact</code></strong> — name and boat/lease relationships still show (given <code>view_owner</code>); phone/email are omitted, and consequently the call/text actions have nothing to pre-fill from unless the user separately knows the number.</li>
+      <li><strong>Merged contact viewed directly</strong> — reroutes to the canonical target's detail page rather than showing a stub for the merged-away record.</li>
+      <li><strong>No linked boats or leases</strong> — those sections are simply omitted, same as elsewhere in the app.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: sections stack vertically, collapsible. Desktop: sections visible together in a wider layout, matching <a href="boat-detail.html">Boat detail</a>'s pattern.</p>
+
+    <div class="page-foot">
+      <a href="contact-list.html">← Owner / Contact List</a>
+      <a href="nameless-contact-merge.html">Nameless-Contact Name Prompt &amp; Merge Dialog →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>
