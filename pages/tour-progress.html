@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tour Progress View — Marina Ops Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">Marina&nbsp;Ops</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Checklists &amp; Tours · Page Specification</span>
+    <h1>Tour Progress View</h1>
+    <p class="lede">Security-only view of where a guard stands within their current Tour — presentation differs by tour mode, since Randomized mode must not reveal the full remaining route.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from the Tours tab on <a href="checklist-list.html">Checklist list</a>. Read-only progress tracker — actual check-ins happen through <a href="checkpoint-checkin.html">Checkpoint check-in</a> or the <a href="manual-checkin-dialog.html">manual dialog</a>, not here.</p>
+
+    <h2>Data shown, by mode</h2>
+    <table>
+      <tr><th>Mode</th><th>Display</th></tr>
+      <tr><td>Linear</td><td>The full ordered checkpoint list from <code>Tour.checkpoints</code>, with completed checkpoints marked and the next one highlighted.</td></tr>
+      <tr><td>Freeform</td><td>The full checkpoint set, marked visited/remaining, in no particular order — all must be visited before shift end but order is the guard's choice.</td></tr>
+      <tr><td>Randomized</td><td>Only the currently-available next checkpoint(s) are shown, plus a remaining count. The rest of the set is deliberately withheld so patrol patterns stay unpredictable, per <a href="../workflows.html">Role Workflows</a>.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Tap a checkpoint (Linear/Freeform)</td><td>Security role</td><td>Shows checkpoint detail/location; does not itself perform a check-in — that still requires the scan or manual flow.</td></tr>
+      <tr><td>View on map</td><td>Security role</td><td>Shows the next checkpoint's GPS position relative to the guard's current location.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No active tour</strong> — empty state directing the guard back to Checklist list or Dashboard.</li>
+      <li><strong>Tour scope resets per shift</strong> — progress is derived from check-ins whose timestamps fall within the current <code>Shift</code> window (association by timestamp, not a direct reference, per <a href="../data-model.html">Data Model — Shift</a>), so a new shift starts every tour fresh.</li>
+      <li><strong>Read access for managers</strong> — a manager reviewing a guard's live progress (e.g. via Reports) sees the same data read-only; not permission-gated in the fixed list, so treat as covered by general <code>view_reports</code> access.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile is the primary surface — used in the field mid-round. A desktop rendering is useful for a manager watching a guard's progress live from the office; same data, read-only either way, with desktop showing a larger map alongside the list.</p>
+
+    <div class="page-foot">
+      <a href="manual-checkin-dialog.html">← Manual Check-In Dialog</a>
+      <a href="checklist-detail.html">Checklist Detail →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

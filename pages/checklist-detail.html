@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checklist Detail — Marina Ops Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">Marina&nbsp;Ops</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Checklists &amp; Tours · Page Specification</span>
+    <h1>Checklist Detail</h1>
+    <p class="lede">Read-only view of a completed Checklist instance — the full record of what was checked, by whom, and what it turned up.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="checklist-list.html">Checklist list</a> once a checklist's <code>status</code> is Complete. Distinct from <a href="active-checklist.html">Active checklist</a>, which handles Not Started/In Progress — this page never accepts new input.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Template &amp; assignment</td><td>Checklist.template, Checklist.assigned_to</td><td></td></tr>
+      <tr><td>Timing</td><td>Checklist.started_at / completed_at</td><td></td></tr>
+      <tr><td>Item results</td><td>Checklist.item_results → ChecklistItemResult</td><td>Each item's recorded result, including Door Check retry history and Verify Task rejection reasons.</td></tr>
+      <tr><td>Linked tickets</td><td>ChecklistItemResult.linked_ticket</td><td>Shown inline against the item that raised them, linking to <a href="ticket-detail.html">Ticket detail</a>.</td></tr>
+      <tr><td>Nested Location-Based Checks</td><td>Nested Checklist instances</td><td>Shown expandable under their parent item rather than as separate top-level entries.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Open a linked ticket</td><td><code>view_incidents</code> not required for tickets themselves</td><td>Navigates to <a href="ticket-detail.html">Ticket detail</a>.</td></tr>
+      <tr><td>Open the location of a Location-Based Check</td><td>None</td><td>Navigates to <a href="location-detail.html">Location detail</a>.</td></tr>
+    </table>
+    <p>No edit actions exist on this screen — a completed checklist instance is immutable, consistent with it being an <a href="../architecture.html">Activity Log</a>-eligible historical record.</p>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Item with no note or ticket</strong> — displayed plainly with just its result; not every failed Door Check or rejected Verify Task necessarily produced a ticket.</li>
+      <li><strong>Very long checklists</strong> — item list is virtualized/paginated rather than rendered in full at once on lower-end devices.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: item results as stacked cards, one per item. Desktop: a denser list/table layout with results visible without expanding each item individually.</p>
+
+    <div class="page-foot">
+      <a href="tour-progress.html">← Tour Progress View</a>
+      <a href="index.html">Page Specifications →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -94,7 +94,7 @@
     <ul>
       <li><strong>Frontend</strong> — a static site, deployed per-marina to its own Netlify site and subdomain.</li>
       <li><strong>Database</strong> — InstantDB, giving the app local-first storage and automatic sync with no custom offline logic to build.</li>
-      <li><strong>Telephony</strong> — a small dedicated server per marina integrating Twilio for calls and SMS, writing directly into that marina's InstantDB instance.</li>
+      <li><strong>Telephony</strong> — Twilio Functions per marina integrating Twilio for calls and SMS, writing directly into that marina's InstantDB instance. No dedicated server to host.</li>
       <li><strong>Auth</strong> — an InstantDB-compatible auth provider, supporting both personal devices and shared shift devices.</li>
     </ul>
 
@@ -103,11 +103,11 @@
     <table>
       <tr><th>Document</th><th>What it covers</th></tr>
       <tr><td><a href="terminology.html">Terminology</a></td><td>Definitions for every domain term used throughout — read this first if a term elsewhere is unclear.</td></tr>
-      <tr><td><a href="architecture.html">Stack &amp; Architecture</a></td><td>The technical shape of the system: hosting, database, telephony server, sync and offline behavior, scheduling.</td></tr>
+      <tr><td><a href="architecture.html">Stack &amp; Architecture</a></td><td>The technical shape of the system: hosting, database, Twilio Functions, sync and offline behavior, scheduling via Netlify Scheduled Functions.</td></tr>
       <tr><td><a href="data-model.html">Data Model</a></td><td>Every entity, its fields, and its relationships.</td></tr>
       <tr><td><a href="permissions.html">Permissions</a></td><td>The role and trinary-permission system, and the full permission list.</td></tr>
       <tr><td><a href="workflows.html">Role Workflows</a></td><td>Per-role functional requirements, written as end-to-end narratives.</td></tr>
-      <tr><td><a href="api-structure.html">API Structure</a></td><td>How the frontend, InstantDB, and the Twilio server communicate.</td></tr>
+      <tr><td><a href="api-structure.html">API Structure</a></td><td>How the frontend, InstantDB, and Twilio Functions communicate.</td></tr>
       <tr><td><a href="pages/index.html">Page Specifications</a></td><td>A detailed spec for every screen in the application.</td></tr>
       <tr><td><a href="wireframes/index.html">Wireframes</a></td><td>Low-fidelity HTML wireframes of every screen, sharing one stylesheet for consistency.</td></tr>
     </table>

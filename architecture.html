@@ -40,24 +40,24 @@
     <p class="lede">One marina, one deployment. No shared infrastructure, no multi-tenant data model to defend — every property gets its own isolated copy of the whole stack.</p>
 
     <h2>System overview</h2>
-    <p>Three pieces make up a single marina's deployment:</p>
+    <p>Three pieces make up a single marina's deployment, and none of them is a server the team has to provision or patch — every piece is a managed service:</p>
     <div class="grid-3">
       <div class="card">
         <h4>Static Frontend</h4>
-        <p style="margin:0;">The application itself — hosted as a static site on Netlify, on the marina's own subdomain.</p>
+        <p style="margin:0;">The application itself — hosted as a static site on Netlify, on the marina's own subdomain. Also hosts the small set of Netlify Functions covering shift-report dispatch and scheduling (see below).</p>
       </div>
       <div class="card">
         <h4>InstantDB</h4>
         <p style="margin:0;">The marina's database — local-first, syncing automatically, giving the frontend offline read/write with no custom sync logic.</p>
       </div>
       <div class="card">
-        <h4>Telephony Server</h4>
-        <p style="margin:0;">A lightweight server bridging Twilio and the marina's InstantDB instance for call and SMS logging.</p>
+        <h4>Twilio + Twilio Functions</h4>
+        <p style="margin:0;">Twilio's own serverless functions, deployed to the marina's Twilio account, bridging calls/SMS into InstantDB. Also the shift-report send path, via Twilio SendGrid. No separately hosted telephony server.</p>
       </div>
     </div>
 
     <div class="note">
-      <strong>Per-marina isolation.</strong> Each marina receives its own subdomain, its own Netlify deployment, its own InstantDB instance, and its own telephony server (with its own Twilio numbers). There is no cross-marina database, no shared auth realm, and no tenant-scoping logic anywhere in the schema — isolation is structural, not enforced by application code.
+      <strong>Per-marina isolation.</strong> Each marina receives its own subdomain, its own Netlify deployment, its own InstantDB instance, and its own Twilio account/subaccount with its own numbers and Twilio Functions deployment. There is no cross-marina database, no shared auth realm, and no tenant-scoping logic anywhere in the schema — isolation is structural, not enforced by application code.
     </div>
 
     <h2>Frontend</h2>
@@ -88,27 +88,29 @@
     </ul>
     <p>The specific provider and the shared-device switching mechanism are an open implementation decision — noted here as a requirement the chosen provider must satisfy, not yet finalized.</p>
 
-    <h2>Telephony server</h2>
-    <p>A single small server per marina sits between Twilio and that marina's InstantDB instance. Its job is narrow and specific:</p>
+    <h2>Telephony — Twilio Functions</h2>
+    <p>The Twilio↔InstantDB bridge is implemented as <strong>Twilio Functions</strong> — Twilio's own serverless functions product — deployed directly into each marina's Twilio account rather than as a bespoke Node server we host and operate. Same narrow job, no infrastructure of our own to provision, patch, or scale:</p>
     <ul>
-      <li>Receive inbound call and SMS webhooks from Twilio.</li>
+      <li>Receive inbound call and SMS webhooks from Twilio (the Function <em>is</em> the webhook target — no separate host to expose).</li>
       <li>Route calls per the marina's configured menu (e.g. a secondary line that skips directly to a security queue).</li>
       <li>Write call/SMS metadata, recordings, and transcriptions (where enabled) into InstantDB as they occur, so the frontend simply reads live data rather than polling Twilio directly.</li>
       <li>Accept outbound call/SMS initiation requests from the frontend and relay them to Twilio.</li>
       <li>Perform contact matching (incoming number → existing Contact, or create a new one) as described in <a href="terminology.html">Terminology</a> and detailed further in <a href="data-model.html">Data Model</a>.</li>
-      <li>Compile and email the shift-end report (see "Shift report delivery" below).</li>
     </ul>
-    <p>Full request/response shape is covered in <a href="api-structure.html">API Structure</a>. Architecturally, this server is intentionally thin — it holds no business logic beyond what's required to bridge Twilio events into InstantDB records; everything else (call UI, notes, missed-call badges) is frontend behavior reacting to that data.</p>
+    <p>Functions write to InstantDB using its server-side/admin API, authenticated with a per-marina admin token stored as an encrypted Twilio Function environment variable — never exposed to the frontend. Full request/response shape is covered in <a href="api-structure.html">API Structure</a>. These Functions are intentionally thin: no business logic beyond bridging Twilio events into InstantDB records; everything else (call UI, notes, missed-call badges) is frontend behavior reacting to that data.</p>
+    <div class="note">
+      <strong>Why Twilio Functions over a hosted server.</strong> The bridge logic only ever needs to react to Twilio events and make one outbound write to InstantDB — it has no state of its own and no reason to run continuously. Deploying it as a Twilio Function means one fewer service per marina to host, monitor, and keep patched; scaling and availability are Twilio's problem, not ours.
+    </div>
 
     <div class="fathom">data flow</div>
     <pre>Inbound call/SMS
    → Twilio
-     → Telephony Server (contact matching, recording/transcription capture)
+     → Twilio Function (contact matching, recording/transcription capture)
        → InstantDB (marina instance)
          → Frontend (live UI update via InstantDB sync)
 
 Outbound call/SMS
-   Frontend → Telephony Server → Twilio → (recipient)
+   Frontend → Twilio Function → Twilio → (recipient)
                     ↓
                 InstantDB (call/SMS record written)</pre>
 
@@ -119,23 +121,28 @@ Outbound call/SMS
       <li>Custom conflict resolution for concurrent edits.</li>
       <li>Manual "sync now" triggers or sync-status polling — InstantDB's connection state is sufficient for any UI indicator needed (e.g. a small "offline / syncing" badge).</li>
     </ul>
-    <p>The one area that is <em>not</em> covered by InstantDB's offline behavior is the telephony server, which inherently requires connectivity — call/SMS features are only available while online, and this should be reflected honestly in the UI (see relevant page specs) rather than presented as available offline.</p>
+    <p>The one area that is <em>not</em> covered by InstantDB's offline behavior is telephony, which inherently requires connectivity — call/SMS features are only available while online, and this should be reflected honestly in the UI (see relevant page specs) rather than presented as available offline.</p>
 
-    <h2>Shift report delivery</h2>
-    <p>The shift-end report is an email, which means it can't be produced by the static frontend alone — something server-side must compile and send it. The natural home is the per-marina telephony server, since it already exists as the one always-on process with a write path into InstantDB; adding a mail-dispatch responsibility keeps the deployment at three pieces rather than four. (The email provider itself is an open implementation choice.)</p>
-    <p>The flow: ending a shift — by submitting the end-of-shift checklist if one is defined, or by tapping End Shift otherwise — marks the Shift record ended. The server then compiles the report from that shift's window (check-ins, checklists, incidents, tickets, associated by timestamp per the <a href="data-model.html">Data Model</a>) and emails it to the marina's configured distribution list.</p>
-    <div class="note">
-      <strong>Offline shift end.</strong> A guard may end their shift with no connectivity. The shift-end write succeeds locally like any other InstantDB write; the report is compiled and sent once that record syncs to the server. The report is therefore defined as "sent on shift end, or as soon after as connectivity allows" — never silently dropped.
-    </div>
-
-    <h2>Scheduling <span class="tag orange">Open question</span></h2>
+    <h2>Scheduling — Netlify Scheduled Functions</h2>
     <p>Several features require something to run on a schedule independent of any user having the app open:</p>
     <ul>
       <li>Time/schedule-based checklist triggers (e.g. a checklist generated automatically every morning at 6am).</li>
       <li>Meter- and time-based maintenance ticket generation (e.g. "create a ticket every 3,000 miles" or "every 90 days since last completed").</li>
       <li>Activity Log retention enforcement — purging entries older than the configured retention window (excluding <strong>Protected</strong> entries).</li>
+      <li>The shift-report backstop sweep (see "Shift report delivery" below).</li>
     </ul>
-    <p>Since the frontend is a static site with no persistent server process of its own, this scheduling responsibility needs to live somewhere with an always-on execution context — candidates include a scheduled function alongside the Netlify deployment, a cron responsibility added to the per-marina telephony server, or a dedicated small scheduler service. <strong>This is intentionally left open</strong> and should be resolved as its own design pass before implementation; noting it here so it isn't lost.</p>
+    <p><strong>Resolved: Netlify Scheduled Functions.</strong> Since the frontend already lives on Netlify, its Scheduled Functions give an always-on execution context with no extra service to deploy or operate — one cron-triggered function per responsibility above, each running on its own interval, each with a narrow write path into InstantDB (evaluate a condition, then create or purge a record). This was chosen over adding cron responsibility to a bridging server because there is no longer a per-marina server to add it to — see Telephony, above — and over a dedicated scheduler service because Netlify's own scheduling is sufficient at this system's scale and keeps the deployment surface small.</p>
+
+    <h2>Shift report delivery</h2>
+    <p>The shift-end report is an email, which means it can't be produced by the static frontend alone — something server-side must compile and send it. This lives as a Netlify Function alongside the frontend, called two ways:</p>
+    <ul>
+      <li><strong>On-demand</strong> — the frontend calls it directly the moment a shift ends while online, so the report goes out immediately rather than waiting for the next scheduled sweep.</li>
+      <li><strong>Scheduled backstop</strong> — the same Scheduled Functions mechanism above periodically sweeps for any Shift record marked ended with no report yet sent, and dispatches it. This is what catches a shift that ended offline: the on-demand call never happened, so the sweep picks it up once the ended-shift write syncs to InstantDB.</li>
+    </ul>
+    <p>The flow: ending a shift — by submitting the end-of-shift checklist if one is defined, or by tapping End Shift otherwise — marks the Shift record ended. The function then compiles the report from that shift's window (check-ins, checklists, incidents, tickets, associated by timestamp per the <a href="data-model.html">Data Model</a>) and sends it via <strong>Twilio SendGrid</strong> to the marina's configured distribution list — reusing the same Twilio account/credentials already in place for calls and SMS rather than introducing a separate email vendor.</p>
+    <div class="note">
+      <strong>Offline shift end.</strong> A guard may end their shift with no connectivity. The shift-end write succeeds locally like any other InstantDB write; the on-demand call never fires, but the report is picked up by the scheduled backstop sweep once that record syncs. The report is therefore defined as "sent on shift end, or as soon after as connectivity allows and the next sweep runs" — never silently dropped.
+    </div>
 
     <h2>Activity Log generation</h2>
     <p>The Activity Log (see <a href="terminology.html">Terminology</a>) is generated at write time, immutably, by the same code paths that make the underlying change — not reconstructed later from other tables. As a rule of thumb: any user-initiated change to persisted data should produce a corresponding entry, with two categories of exception:</p>

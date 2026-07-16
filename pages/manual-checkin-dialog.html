@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual Check-In Dialog — Marina Ops Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">Marina&nbsp;Ops</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Checklists &amp; Tours · Page Specification</span>
+    <h1>Manual Check-In Dialog</h1>
+    <p class="lede">Fallback path for when a checkpoint's NFC tag or QR code is missing, damaged, or unreadable.</p>
+
+    <h2>Purpose</h2>
+    <p>Reachable from the current tour view or checklist list ("Check in manually"). Requires a reason so a manual entry is always distinguishable from a scanned one in review — see <a href="../workflows.html">Role Workflows</a>.</p>
+
+    <h2>Data shown / form fields</h2>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+      <tr><td>Checkpoint</td><td>Search/select</td><td>Defaults to nearby checkpoints (by device GPS) when possible, full list otherwise.</td></tr>
+      <tr><td>Reason</td><td>Required text</td><td>Cannot submit without it — the one field this dialog exists to collect.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Submit</td><td>Reason required</td><td>Creates a Check-In record identical in shape to a scanned one, except <code>method</code> = Manual and <code>reason</code> set. GPS is still captured and validated against the checkpoint's radius the same way. Proceeds into whatever applicable checklist(s) exist, same as <a href="checkpoint-checkin.html">Checkpoint Check-In</a>.</td></tr>
+      <tr><td>Cancel</td><td>None</td><td>Closes without creating a record.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No reason entered</strong> — submit stays disabled; this is the one hard validation rule on the dialog.</li>
+      <li><strong>GPS unavailable</strong> (e.g. device location services off) — <code>gps_at_checkin</code> is left null and <code>within_radius</code> cannot be computed; the check-in still records, flagged for review rather than blocked.</li>
+      <li><strong>Offline</strong> — writes locally like any other check-in.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Primarily a mobile dialog, triggered in the field. Not a typical desktop path, but the same dialog works unmodified if triggered from a desktop context (e.g. a supervisor backfilling a check-in during review).</p>
+
+    <div class="page-foot">
+      <a href="checkpoint-checkin.html">← Checkpoint Check-In</a>
+      <a href="tour-progress.html">Tour Progress View →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -51,7 +51,7 @@
     <h2>Core concepts</h2>
     <dl class="glossary">
       <dt>Marina <span class="term-tag">tenant</span></dt>
-      <dd>A single customer of the platform. Each marina is a fully independent deployment: its own subdomain, its own Netlify site, its own InstantDB instance, and its own Twilio-integrated telephony server. No data or infrastructure is shared between marinas.</dd>
+      <dd>A single customer of the platform. Each marina is a fully independent deployment: its own subdomain, its own Netlify site, its own InstantDB instance, and its own Twilio account with its own Twilio Functions deployment. No data or infrastructure is shared between marinas.</dd>
 
       <dt>Location</dt>
       <dd>Any physical place the system tracks: a boathouse, a dock, a slip, a building, a cabin or RV site, or any other admin-defined type. Locations can nest under other locations (a Slip is a child of a Dock, for example) and carry a status (Occupied / Vacant / Reserved / Out of Service, or other admin-defined statuses).</dd>

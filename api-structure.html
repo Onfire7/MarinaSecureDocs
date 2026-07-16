@@ -37,7 +37,7 @@
   <main class="content">
     <span class="eyebrow">Architecture</span>
     <h1>API Structure</h1>
-    <p class="lede">Two integration surfaces make up the system's API: the frontend talking directly to InstantDB for almost everything, and the frontend talking to the per-marina telephony server for anything that has to touch Twilio.</p>
+    <p class="lede">Two integration surfaces make up the system's API: the frontend talking directly to InstantDB for almost everything, and the frontend talking to per-marina Twilio Functions for anything that has to touch Twilio.</p>
 
     <h2>Two surfaces, one rule of thumb</h2>
     <div class="grid-2">
@@ -46,8 +46,8 @@
         <p style="margin:0;">Direct client-side queries, subscriptions, and writes. This covers the entire application except calls and SMS: locations, checklists, incidents, tickets, assets, reservations, contacts, leases, chat, the Activity Log, and Admin configuration.</p>
       </div>
       <div class="panel">
-        <h4 style="margin-top:0;">Frontend ↔ Telephony Server ↔ Twilio</h4>
-        <p style="margin:0;">A small REST API, used only for actions that require Twilio: initiating a call/SMS, and receiving Twilio's webhooks. The server writes results into InstantDB; the frontend then reads those results the same way it reads everything else.</p>
+        <h4 style="margin-top:0;">Frontend ↔ Twilio Functions ↔ Twilio</h4>
+        <p style="margin:0;">A small REST API implemented as Twilio Functions, used only for actions that require Twilio: initiating a call/SMS, and receiving Twilio's webhooks. The Functions write results into InstantDB; the frontend then reads those results the same way it reads everything else.</p>
       </div>
     </div>
     <div class="note">
@@ -63,9 +63,9 @@
     </table>
     <p>Because this surface is direct client-to-database, there is no separate application-defined REST or GraphQL schema to document beyond InstantDB's own query/write model and the entity structure already described in <a href="data-model.html">Data Model</a>.</p>
 
-    <div class="fathom">telephony server</div>
-    <h2>Telephony Server API</h2>
-    <p>A minimal REST API, scoped entirely to bridging Twilio. Two categories of endpoint: <strong>inbound webhooks</strong> (called by Twilio) and <strong>outbound actions</strong> (called by the frontend, authenticated as a logged-in user).</p>
+    <div class="fathom">twilio functions</div>
+    <h2>Twilio Functions API</h2>
+    <p>A minimal REST API, scoped entirely to bridging Twilio, implemented as Twilio Functions deployed to the marina's own Twilio account rather than a hosted server (see <a href="architecture.html">Architecture — Telephony</a>). Two categories of endpoint: <strong>inbound webhooks</strong> (called by Twilio) and <strong>outbound actions</strong> (called by the frontend, authenticated as a logged-in user).</p>
 
     <h3>Inbound — Twilio webhooks</h3>
     <table>
@@ -120,15 +120,10 @@
         <td>Authenticated user</td>
         <td>Returns any call currently ringing/in-progress for the requesting user's line(s) — used to drive the active-call panel/pop-up without waiting on a webhook round-trip to InstantDB in edge cases.</td>
       </tr>
-      <tr>
-        <td><code>POST /reports/shift/:shiftId/send</code></td>
-        <td>Authenticated user (the shift's guard, or <code>view_reports</code>)</td>
-        <td>Compiles the shift report from the shift's time window and emails it to the marina's configured recipients (see <a href="architecture.html">Architecture — Shift report delivery</a>). Called automatically on shift end; retried on reconnect if the shift ended offline; also usable to re-send.</td>
-      </tr>
     </table>
 
     <div class="note">
-      <strong>Auth for the telephony server.</strong> Outbound endpoints authenticate the caller using the same session/identity issued by the InstantDB-compatible auth provider (see <a href="architecture.html">Architecture</a>), so the telephony server can independently verify the request is from a logged-in user holding the required permission — it does not trust the frontend's own permission check alone.
+      <strong>Auth for Twilio Functions.</strong> Outbound endpoints authenticate the caller using the same session/identity issued by the InstantDB-compatible auth provider (see <a href="architecture.html">Architecture</a>), so the Function can independently verify the request is from a logged-in user holding the required permission — it does not trust the frontend's own permission check alone.
     </div>
 
     <h3>Contact matching</h3>
@@ -138,11 +133,40 @@
       <li>If found, link the <code>Call</code>/<code>SMSThread</code> to that contact.</li>
       <li>If not found, create a new <code>Contact</code> with the phone number and no name.</li>
     </ol>
-    <p>The "nameless contact" prompt and merge-suggestion flow described in <a href="workflows.html">Role Workflows</a> happens entirely in the frontend when such a contact is later viewed — the telephony server's job stops at creating the bare record.</p>
+    <p>The "nameless contact" prompt and merge-suggestion flow described in <a href="workflows.html">Role Workflows</a> happens entirely in the frontend when such a contact is later viewed — the Twilio Function's job stops at creating the bare record.</p>
 
-    <div class="fathom">scheduling — open question</div>
-    <h2>Scheduled jobs</h2>
-    <p>As noted in <a href="architecture.html">Architecture</a>, the mechanism for time- and meter-based checklist/ticket generation is not yet finalized. Whatever mechanism is chosen, it will need its own narrow write path into InstantDB (functionally similar to the telephony server's webhook handlers — evaluate a condition, then create a <code>Checklist</code> or <code>Ticket</code> record) rather than a broad API surface. This section will be filled in once that decision is made.</p>
+    <div class="fathom">netlify functions</div>
+    <h2>Shift Report &amp; Scheduled Jobs API</h2>
+    <p>Distinct from the Twilio Functions above, these run as Netlify Functions alongside the static frontend (see <a href="architecture.html">Architecture — Scheduling</a> and <a href="architecture.html">Shift report delivery</a>). Only the shift-report send path touches Twilio, and only as an outbound API call to Twilio SendGrid — it isn't deployed as a Twilio Function itself.</p>
+    <table>
+      <tr><th>Function</th><th>Trigger</th><th>Behavior</th></tr>
+      <tr>
+        <td><code>POST /reports/shift/:shiftId/send</code></td>
+        <td>Called on-demand by the frontend (authenticated as the shift's guard, or a user with <code>view_reports</code>)</td>
+        <td>Compiles the shift report from the shift's time window and sends it via Twilio SendGrid to the marina's configured recipients. Called immediately on shift end while online; also usable to re-send from the Reports section.</td>
+      </tr>
+      <tr>
+        <td><code>scheduled: shift-report-sweep</code></td>
+        <td>Netlify Scheduled Function, runs on a short interval (e.g. every few minutes)</td>
+        <td>Finds any Shift marked ended with no report yet sent and dispatches it — the backstop for a shift that ended offline, where the on-demand call never fired.</td>
+      </tr>
+      <tr>
+        <td><code>scheduled: checklist-triggers</code></td>
+        <td>Netlify Scheduled Function, runs on the marina's finest-configured checklist schedule granularity</td>
+        <td>Evaluates ChecklistTemplates with a schedule-based trigger against the current time and generates a new <code>Checklist</code> instance when due.</td>
+      </tr>
+      <tr>
+        <td><code>scheduled: maintenance-ticket-generation</code></td>
+        <td>Netlify Scheduled Function, runs daily (time-based rules) and on Meter Reading writes are evaluated inline by the frontend write itself (meter-based rules)</td>
+        <td>Evaluates each Asset's time-based maintenance rules (e.g. "every 90 days since last completed") and creates a <code>Ticket</code> when due. Meter-based rules (e.g. "every 3,000 miles") are checked as part of the InstantDB write when a Meter Reading is recorded, since that's the only moment the value changes.</td>
+      </tr>
+      <tr>
+        <td><code>scheduled: activity-log-retention</code></td>
+        <td>Netlify Scheduled Function, runs daily</td>
+        <td>Purges Activity Log entries older than the marina's configured retention window, skipping any entry flagged <strong>Protected</strong>.</td>
+      </tr>
+    </table>
+    <p>Each of these has a narrow write path into InstantDB — evaluate a condition, then create or purge a record — using the same server-side/admin API and per-marina admin token pattern as the Twilio Functions. The shift-report send path additionally holds the marina's Twilio SendGrid API key as a Netlify environment variable, scoped to that one function.</p>
 
     <div class="page-foot">
       <a href="workflows.html">← Role Workflows</a>
