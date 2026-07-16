@@ -37,21 +37,24 @@
   <main class="content">
     <span class="eyebrow">Architecture</span>
     <h1>API Structure</h1>
-    <p class="lede">Two integration surfaces make up the system's API: the frontend talking directly to InstantDB for almost everything, and the frontend talking to per-marina Twilio Functions for anything that has to touch Twilio.</p>
+    <p class="lede">Two integration surfaces make up the system's API: InstantDB, talked to directly by the frontend for almost everything and by Netlify Functions for non-Twilio scheduled jobs; and Twilio Functions, the single gateway that the frontend, Twilio, and Netlify Functions all go through for anything that has to touch Twilio.</p>
 
     <h2>Two surfaces, one rule of thumb</h2>
     <div class="grid-2">
       <div class="panel panel-teal">
-        <h4 style="margin-top:0;">Frontend ↔ InstantDB</h4>
-        <p style="margin:0;">Direct client-side queries, subscriptions, and writes. This covers the entire application except calls and SMS: locations, checklists, incidents, tickets, assets, reservations, contacts, leases, chat, the Activity Log, and Admin configuration.</p>
+        <h4 style="margin-top:0;">Frontend / Netlify Functions ↔ InstantDB</h4>
+        <p style="margin:0;">Direct queries, subscriptions, and writes — from the frontend for the entire application except calls, SMS, and shift-report email, and from Netlify Scheduled Functions for the non-Twilio scheduled jobs (checklist triggers, maintenance tickets, retention purge).</p>
       </div>
       <div class="panel">
-        <h4 style="margin-top:0;">Frontend ↔ Twilio Functions ↔ Twilio</h4>
-        <p style="margin:0;">A small REST API implemented as Twilio Functions, used only for actions that require Twilio: initiating a call/SMS, and receiving Twilio's webhooks. The Functions write results into InstantDB; the frontend then reads those results the same way it reads everything else.</p>
+        <h4 style="margin-top:0;">Frontend + Twilio + Netlify Functions ↔ Twilio Functions ↔ Twilio</h4>
+        <p style="margin:0;">A small REST API implemented as Twilio Functions — the only thing in the system that talks to Twilio. Three callers reach it: the frontend (initiating a call/SMS), Twilio itself (inbound webhooks), and the shift-report Netlify Function (sending the report email via Twilio SendGrid). The Functions write the results into InstantDB themselves; everyone else just reads those results the same way they read everything else.</p>
       </div>
     </div>
     <div class="note">
       <strong>Why not route calls through InstantDB writes directly?</strong> Because initiating a call or SMS requires a server-side Twilio credential that must never reach the client, and because Twilio's own webhooks need a real HTTP endpoint to call back to. Everything that doesn't have that constraint stays a direct InstantDB interaction — that's the dividing line.
+    </div>
+    <div class="note">
+      <strong>Why Twilio Functions write the result, not the caller.</strong> Whenever Twilio is involved, the value that ends up in InstantDB should be Twilio's version of it — a normalized phone number, a call's actual timestamp, a SendGrid delivery ID — not whatever the caller guessed before Twilio processed the request. So the Twilio Function that made the Twilio call is also the one that writes the outcome to InstantDB; the frontend and Netlify Functions that triggered it never write that data themselves, even though they initiated the action. See <a href="architecture.html">Architecture — Telephony</a>.
     </div>
 
     <h2>Frontend ↔ InstantDB patterns</h2>
@@ -65,7 +68,7 @@
 
     <div class="fathom">twilio functions</div>
     <h2>Twilio Functions API</h2>
-    <p>A minimal REST API, scoped entirely to bridging Twilio, implemented as Twilio Functions deployed to the marina's own Twilio account rather than a hosted server (see <a href="architecture.html">Architecture — Telephony</a>). Two categories of endpoint: <strong>inbound webhooks</strong> (called by Twilio) and <strong>outbound actions</strong> (called by the frontend, authenticated as a logged-in user).</p>
+    <p>A minimal REST API, scoped entirely to bridging Twilio, implemented as Twilio Functions deployed to the marina's own Twilio account rather than a hosted server (see <a href="architecture.html">Architecture — Telephony</a>). Three categories of endpoint, one per caller: <strong>inbound webhooks</strong> (called by Twilio), <strong>outbound actions</strong> (called by the frontend, authenticated as a logged-in user), and <strong>server-to-server actions</strong> (called by Netlify Functions, authenticated with a service credential rather than a user session).</p>
 
     <h3>Inbound — Twilio webhooks</h3>
     <table>
@@ -123,7 +126,20 @@
     </table>
 
     <div class="note">
-      <strong>Auth for Twilio Functions.</strong> Outbound endpoints authenticate the caller using the same Clerk session (see <a href="architecture.html">Architecture</a>), so the Function can independently verify the request is from a logged-in user holding the required permission — it does not trust the frontend's own permission check alone.
+      <strong>Auth for outbound endpoints.</strong> These authenticate the caller using the same Clerk session (see <a href="architecture.html">Architecture</a>), so the Function can independently verify the request is from a logged-in user holding the required permission — it does not trust the frontend's own permission check alone.
+    </div>
+
+    <h3>Server-to-server — called by Netlify Functions</h3>
+    <table>
+      <tr><th>Endpoint</th><th>Requires</th><th>Behavior</th></tr>
+      <tr>
+        <td><code>POST /email/shift-report/send</code></td>
+        <td>Netlify service credential (not a Clerk session — there's no logged-in user in a scheduled-function context)</td>
+        <td>Accepts the already-compiled report content and recipient list from the shift-report Netlify Function (see <a href="architecture.html">Architecture — Shift report delivery</a>), sends it via Twilio SendGrid, and — being the Twilio Function that made the Twilio call — writes <code>Shift.report_sent_at</code> (and any SendGrid delivery metadata) to InstantDB itself, per the source-of-truth rule above.</td>
+      </tr>
+    </table>
+    <div class="note">
+      <strong>Auth for server-to-server endpoints.</strong> Netlify Functions authenticate to Twilio Functions with a per-marina service credential (a shared secret stored as an encrypted environment variable on both sides), distinct from the Clerk-session auth used by frontend-originated calls.
     </div>
 
     <h3>Contact matching</h3>
@@ -137,18 +153,18 @@
 
     <div class="fathom">netlify functions</div>
     <h2>Shift Report &amp; Scheduled Jobs API</h2>
-    <p>Distinct from the Twilio Functions above, these run as Netlify Functions alongside the static frontend (see <a href="architecture.html">Architecture — Scheduling</a> and <a href="architecture.html">Shift report delivery</a>). Only the shift-report send path touches Twilio, and only as an outbound API call to Twilio SendGrid — it isn't deployed as a Twilio Function itself.</p>
+    <p>Distinct from the Twilio Functions above, these run as Netlify Functions alongside the static frontend (see <a href="architecture.html">Architecture — Scheduling</a> and <a href="architecture.html">Shift report delivery</a>). None of them hold a Twilio credential or talk to Twilio directly — the shift-report path delegates the actual send to the Twilio Function's <code>POST /email/shift-report/send</code> above, consistent with Twilio Functions being the only writer of Twilio-sourced data.</p>
     <table>
       <tr><th>Function</th><th>Trigger</th><th>Behavior</th></tr>
       <tr>
         <td><code>POST /reports/shift/:shiftId/send</code></td>
         <td>Called on-demand by the frontend (authenticated as the shift's guard, or a user with <code>view_reports</code>)</td>
-        <td>Compiles the shift report from the shift's time window and sends it via Twilio SendGrid to the marina's configured recipients. Called immediately on shift end while online; also usable to re-send from the Reports section.</td>
+        <td>Compiles the shift report from the shift's time window (an InstantDB read) and calls the Twilio Function's <code>POST /email/shift-report/send</code> to actually send it. Does <strong>not</strong> call Twilio SendGrid itself and does not write <code>Shift.report_sent_at</code> — the Twilio Function does both. Called immediately on shift end while online; also usable to re-send from the Reports section.</td>
       </tr>
       <tr>
         <td><code>scheduled: shift-report-sweep</code></td>
         <td>Netlify Scheduled Function, runs on a short interval (e.g. every few minutes)</td>
-        <td>Finds any Shift marked ended with no report yet sent and dispatches it — the backstop for a shift that ended offline, where the on-demand call never fired.</td>
+        <td>Finds any Shift marked ended with no report yet sent and dispatches it the same way — compile, then hand off to the Twilio Function — the backstop for a shift that ended offline, where the on-demand call never fired.</td>
       </tr>
       <tr>
         <td><code>scheduled: checklist-triggers</code></td>
@@ -166,7 +182,7 @@
         <td>Purges Activity Log entries older than the marina's configured retention window, skipping any entry flagged <strong>Protected</strong>.</td>
       </tr>
     </table>
-    <p>Each of these has a narrow write path into InstantDB — evaluate a condition, then create or purge a record — using the same server-side/admin API and per-marina admin token pattern as the Twilio Functions. The shift-report send path additionally holds the marina's Twilio SendGrid API key as a Netlify environment variable, scoped to that one function.</p>
+    <p>Each of these has a narrow write path into InstantDB — evaluate a condition, then create or purge a record — using the same server-side/admin API and per-marina admin token pattern as the Twilio Functions. The shift-report path is the one exception: it reads from InstantDB but never writes the report-sent outcome itself, since that write belongs to whichever Function actually talked to Twilio.</p>
 
     <div class="page-foot">
       <a href="workflows.html">← Role Workflows</a>

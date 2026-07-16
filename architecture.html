@@ -95,11 +95,16 @@
       <li>Route calls per the marina's configured menu (e.g. a secondary line that skips directly to a security queue).</li>
       <li>Write call/SMS metadata, recordings, and transcriptions (where enabled) into InstantDB as they occur, so the frontend simply reads live data rather than polling Twilio directly.</li>
       <li>Accept outbound call/SMS initiation requests from the frontend and relay them to Twilio.</li>
+      <li>Send the shift-report email via Twilio SendGrid on behalf of the shift-report Netlify Function (see "Shift report delivery" below).</li>
       <li>Perform contact matching (incoming number → existing Contact, or create a new one) as described in <a href="terminology.html">Terminology</a> and detailed further in <a href="data-model.html">Data Model</a>.</li>
     </ul>
+    <p>Twilio Functions are the <strong>single gateway to Twilio</strong> — every caller that needs Twilio to do something routes through them rather than talking to Twilio directly: Twilio itself (inbound webhooks), the frontend (initiating a call/SMS), and Netlify Functions (sending the shift-report email). No other part of the system holds a Twilio credential.</p>
     <p>Functions write to InstantDB using its server-side/admin API, authenticated with a per-marina admin token stored as an encrypted Twilio Function environment variable — never exposed to the frontend. Full request/response shape is covered in <a href="api-structure.html">API Structure</a>. These Functions are intentionally thin: no business logic beyond bridging Twilio events into InstantDB records; everything else (call UI, notes, missed-call badges) is frontend behavior reacting to that data.</p>
     <div class="note">
       <strong>Why Twilio Functions over a hosted server.</strong> The bridge logic only ever needs to react to Twilio events and make one outbound write to InstantDB — it has no state of its own and no reason to run continuously. Deploying it as a Twilio Function means one fewer service per marina to host, monitor, and keep patched; scaling and availability are Twilio's problem, not ours.
+    </div>
+    <div class="note">
+      <strong>Twilio Functions are the only writer of Twilio-sourced data.</strong> Whenever a value passes through Twilio — a phone number Twilio has normalized, a call's actual start/end timestamp, a delivery status, a SendGrid message ID — the Twilio Function that received it from Twilio is also what writes it to InstantDB. Neither the frontend nor a Netlify Function ever writes that data itself, even when it initiated the request, because Twilio's version of the value is the one that should land in the database, not a client-side guess made before Twilio processed it.
     </div>
 
     <div class="fathom">data flow</div>
@@ -112,7 +117,13 @@
 Outbound call/SMS
    Frontend → Twilio Function → Twilio → (recipient)
                     ↓
-                InstantDB (call/SMS record written)</pre>
+                InstantDB (call/SMS record written)
+
+Shift-report email
+   Netlify Function (compiles report from InstantDB, read-only)
+     → Twilio Function → Twilio SendGrid → (recipients)
+                    ↓
+                InstantDB (Shift.report_sent_at written by the Twilio Function)</pre>
 
     <h2>Offline &amp; sync behavior</h2>
     <p>Because InstantDB handles local-first storage and sync natively, no additional offline architecture is required in the application layer. Specifically out of scope for custom engineering:</p>
@@ -134,12 +145,17 @@ Outbound call/SMS
     <p><strong>Resolved: Netlify Scheduled Functions.</strong> Since the frontend already lives on Netlify, its Scheduled Functions give an always-on execution context with no extra service to deploy or operate — one cron-triggered function per responsibility above, each running on its own interval, each with a narrow write path into InstantDB (evaluate a condition, then create or purge a record). This was chosen over adding cron responsibility to a bridging server because there is no longer a per-marina server to add it to — see Telephony, above — and over a dedicated scheduler service because Netlify's own scheduling is sufficient at this system's scale and keeps the deployment surface small.</p>
 
     <h2>Shift report delivery</h2>
-    <p>The shift-end report is an email, which means it can't be produced by the static frontend alone — something server-side must compile and send it. This lives as a Netlify Function alongside the frontend, called two ways:</p>
+    <p>The shift-end report is an email, which means it can't be produced by the static frontend alone — something server-side must compile and send it. Compiling the report and sending it are split across two functions, split by the Twilio-source-of-truth rule above:</p>
+    <ul>
+      <li>A <strong>Netlify Function</strong> reads the shift's window from InstantDB (check-ins, checklists, incidents, tickets, associated by timestamp per the <a href="data-model.html">Data Model</a>) and compiles the report content — an InstantDB read, not a Twilio action, so it belongs on the Netlify side.</li>
+      <li>It then calls a <strong>Twilio Function</strong> with the compiled content and the marina's configured recipients. The Twilio Function is what actually calls <strong>Twilio SendGrid</strong> — and, having just made the Twilio call, is also what writes <code>Shift.report_sent_at</code> (and any SendGrid delivery metadata) back to InstantDB.</li>
+    </ul>
+    <p>The Netlify Function is called two ways:</p>
     <ul>
       <li><strong>On-demand</strong> — the frontend calls it directly the moment a shift ends while online, so the report goes out immediately rather than waiting for the next scheduled sweep.</li>
-      <li><strong>Scheduled backstop</strong> — the same Scheduled Functions mechanism above periodically sweeps for any Shift record marked ended with no report yet sent, and dispatches it. This is what catches a shift that ended offline: the on-demand call never happened, so the sweep picks it up once the ended-shift write syncs to InstantDB.</li>
+      <li><strong>Scheduled backstop</strong> — the Scheduled Functions mechanism above periodically sweeps for any Shift record marked ended with no report yet sent, and dispatches it. This is what catches a shift that ended offline: the on-demand call never happened, so the sweep picks it up once the ended-shift write syncs to InstantDB.</li>
     </ul>
-    <p>The flow: ending a shift — by submitting the end-of-shift checklist if one is defined, or by tapping End Shift otherwise — marks the Shift record ended. The function then compiles the report from that shift's window (check-ins, checklists, incidents, tickets, associated by timestamp per the <a href="data-model.html">Data Model</a>) and sends it via <strong>Twilio SendGrid</strong> to the marina's configured distribution list — reusing the same Twilio account/credentials already in place for calls and SMS rather than introducing a separate email vendor.</p>
+    <p>The flow: ending a shift — by submitting the end-of-shift checklist if one is defined, or by tapping End Shift otherwise — marks the Shift record ended, which is what the on-demand call and the sweep both key off of.</p>
     <div class="note">
       <strong>Offline shift end.</strong> A guard may end their shift with no connectivity. The shift-end write succeeds locally like any other InstantDB write; the on-demand call never fires, but the report is picked up by the scheduled backstop sweep once that record syncs. The report is therefore defined as "sent on shift end, or as soon after as connectivity allows and the next sweep runs" — never silently dropped.
     </div>
