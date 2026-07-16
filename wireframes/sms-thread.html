@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — SMS Thread — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/sms-thread.html">Page Spec: SMS Thread →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="new-call-dialog.html">← New Call Dialog</a>
+      <a href="new-sms-dialog.html">Next: New SMS Dialog →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Comms · Wireframe</span>
+  <h1 class="wf-h1">SMS Thread</h1>
+  <p class="wf-lede">Reaching this screen requires view_sms; sending requires the separate place_calls. Mobile: full-screen conversation. Desktop: split view alongside the thread list.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <div class="wf-appbar-back">←</div>
+          <span class="wf-appbar-title">Slip 22</span>
+        </div>
+        <div class="wf-content" style="display:flex; flex-direction:column; min-height:420px;">
+          <div style="flex:1;">
+            <div class="wf-card" style="max-width:75%;">"When's checkout tomorrow?"</div>
+            <div class="wf-card" style="max-width:75%; margin-left:auto; background:var(--wf-fill);">"11 AM, see you then"</div>
+          </div>
+          <div class="wf-field"><span class="wf-field-label">Template <span class="wf-gate">place_calls</span></span><div class="wf-select">Checkout reminder</div></div>
+          <div class="wf-actions"><div class="wf-input" style="flex:1;">Type a message…</div><div class="wf-button wf-button-primary">Send</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled) — split view</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-desktop-body">
+          <aside class="wf-sidenav" style="width:220px;">
+            <div class="wf-card-title" style="margin-bottom:6px;">Threads</div>
+            <a class="wf-sidenav-item current">Slip 22</a>
+            <a class="wf-sidenav-item">R. Delgado</a>
+          </aside>
+          <div class="wf-content">
+            <div class="wf-card" style="max-width:60%;">"When's checkout tomorrow?"</div>
+            <div class="wf-card" style="max-width:60%; margin-left:auto; background:var(--wf-fill);">"11 AM, see you then"</div>
+            <div class="wf-actions" style="margin-top:14px;"><div class="wf-input" style="flex:1;">Type a message…</div><div class="wf-button wf-button-primary">Send</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-section" style="margin-top:24px;">
+    <div class="wf-annotation">Offline: history fully viewable (given view_sms); composer disabled — sending is a Twilio (online-only) action.</div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="new-sms-dialog.html">Next: New SMS Dialog →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Active Call Panel — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/active-call-panel.html">Page Spec: Active Call Panel →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="comms-home.html">← Comms Home</a>
+      <a href="missed-comms-detail.html">Next: Missed Comms Detail →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Comms · Wireframe</span>
+  <h1 class="wf-h1">Active Call Panel / Pop-Up</h1>
+  <p class="wf-lede">Right-side panel on desktop, bottom pop-up on mobile. Appears for anyone the call is routed to, regardless of permission — but enriched content requires view_calls.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px — pop-up over app</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-frame-dialog-backdrop" style="align-items:flex-end; padding:0;">
+          <div class="wf-dialog-card" style="max-width:none; border-radius:8px 8px 0 0; border-bottom:none;">
+            <div class="wf-card-title">Inbound · Office Line · 0:14</div>
+            <div class="wf-field-label" style="margin-top:8px;">Contact <span class="wf-gate">view_calls</span></div>
+            <div class="wf-field-value">R. Delgado — Slip 14 owner</div>
+            <div class="wf-field-label" style="margin-top:6px;">Active reservation</div>
+            <div class="wf-field-value">none</div>
+            <div class="wf-field-label" style="margin-top:6px;">Prior notes</div>
+            <div class="wf-field-value">"Asked about pump-out schedule — 7/10"</div>
+            <div class="wf-actions">
+              <div class="wf-button">+ Note</div>
+              <div class="wf-button wf-button-primary">End Call <span class="wf-gate">place_calls</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled) — persistent right panel</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-desktop-body">
+          <div class="wf-content" style="flex:1; color:var(--wf-mute); display:flex; align-items:center; justify-content:center;">rest of the app, dimmed for illustration</div>
+          <aside class="wf-sidenav" style="width:260px; border-left:1px solid var(--wf-line); border-right:none;">
+            <div class="wf-card-title">Inbound · Office Line · 0:14</div>
+            <div class="wf-field-label" style="margin-top:8px;">Contact <span class="wf-gate">view_calls</span></div>
+            <div class="wf-field-value">R. Delgado — Slip 14 owner</div>
+            <div class="wf-field-label" style="margin-top:6px;">Recording/transcript</div>
+            <div class="wf-field-value">populates once available <span class="wf-gate">call_recording_enabled</span></div>
+            <div class="wf-actions"><div class="wf-button wf-button-primary">End Call</div></div>
+          </aside>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-section" style="margin-top:24px;">
+    <div class="wf-section-title">Notes</div>
+    <div class="wf-annotation">User without view_calls: panel still appears (it's their device ringing) but shows only bare call state + End Call, no contact/notes/recording.</div>
+    <div class="wf-annotation">No match found for the number → prompt to enter a name, then similar-contacts merge suggestions (see Nameless-Contact Merge).</div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="missed-comms-detail.html">Next: Missed Comms Detail →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

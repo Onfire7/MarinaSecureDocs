@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — New Call Dialog — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/new-call-dialog.html">Page Spec: New Call Dialog →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="missed-comms-detail.html">← Missed Comms Detail</a>
+      <a href="sms-thread.html">Next: SMS Thread →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Comms · Wireframe</span>
+  <h1 class="wf-h1">New Call Dialog</h1>
+  <p class="wf-lede">Gated by place_calls. Mobile keeps a numeric keypad primary; desktop leads with contact search.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-frame-dialog-backdrop">
+          <div class="wf-dialog-card">
+            <div class="wf-card-title">New Call <span class="wf-gate">place_calls</span></div>
+            <div class="wf-field"><span class="wf-field-label">Contact / number</span><div class="wf-input">R. Delgado — (555) 019-2244</div></div>
+            <div class="wf-field"><span class="wf-field-label">Line</span><div class="wf-select">Office</div></div>
+            <div class="wf-grid-3" style="margin:10px 0;">
+              <div class="wf-input" style="text-align:center;">1</div><div class="wf-input" style="text-align:center;">2</div><div class="wf-input" style="text-align:center;">3</div>
+              <div class="wf-input" style="text-align:center;">4</div><div class="wf-input" style="text-align:center;">5</div><div class="wf-input" style="text-align:center;">6</div>
+            </div>
+            <div class="wf-actions"><div class="wf-button wf-button-primary">Call</div><div class="wf-button">Cancel</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-frame-dialog-backdrop">
+          <div class="wf-dialog-card">
+            <div class="wf-card-title">New Call <span class="wf-gate">place_calls</span></div>
+            <div class="wf-field"><span class="wf-field-label">Contact search</span><div class="wf-input">R. Delgado — (555) 019-2244</div></div>
+            <div class="wf-field"><span class="wf-field-label">Line</span><div class="wf-select">Office</div></div>
+            <div class="wf-annotation">Keypad present but secondary — desktop users are more likely dialing a known contact.</div>
+            <div class="wf-actions"><div class="wf-button wf-button-primary">Call</div><div class="wf-button">Cancel</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-section" style="margin-top:24px;">
+    <div class="wf-annotation">Offline: disabled with an explanation — calling requires connectivity (Twilio Function).</div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="sms-thread.html">Next: SMS Thread →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

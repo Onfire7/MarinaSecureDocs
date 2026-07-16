@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Comms Home — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/comms-home.html">Page Spec: Comms Home →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="checkpoint-detail.html">← Checkpoint Detail</a>
+      <a href="active-call-panel.html">Next: Active Call Panel →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Comms · Wireframe</span>
+  <h1 class="wf-h1">Comms Home</h1>
+  <p class="wf-lede">Three independently-gated sections. Chat rooms split into "My chat rooms" and "Other chat rooms" (view_all_chats) — never merged into one list.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <span class="wf-appbar-title">Comms</span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-actions">
+            <div class="wf-badge">Calls <span class="wf-gate">view_calls</span></div>
+            <div class="wf-badge">Texts <span class="wf-gate">view_sms</span></div>
+            <div class="wf-badge">Chat</div>
+          </div>
+          <div class="wf-divider"></div>
+          <div class="wf-card"><div class="wf-card-title">R. Delgado</div><div class="wf-card-meta">Missed · 2m ago</div></div>
+          <div class="wf-card"><div class="wf-card-title">Office Line</div><div class="wf-card-meta">Inbound · 6:02 PM · 3m</div></div>
+        </div>
+        <div class="wf-tabbar">
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Home</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Checklists</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Locations</div>
+          <div class="wf-tab current"><div class="wf-tab-icon"></div>Comms</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Other</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled) — Chat tab</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <div class="wf-grid-3">
+            <div class="wf-card"><div class="wf-card-meta">CALLS</div><div class="wf-card-title">R. Delgado — missed</div></div>
+            <div class="wf-card"><div class="wf-card-meta">TEXTS</div><div class="wf-card-title">Slip 22 — "when's checkout?"</div></div>
+            <div>
+              <div class="wf-section-title">My chat rooms</div>
+              <div class="wf-card"><div class="wf-card-title">Weekend Coverage</div></div>
+              <div class="wf-section-title" style="margin-top:14px;">Other chat rooms <span class="wf-gate">view_all_chats</span></div>
+              <div class="wf-card" style="opacity:0.7;"><div class="wf-card-title">Dock C Renovation</div><div class="wf-card-meta">read-only until joined</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="active-call-panel.html">Next: Active Call Panel →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Missed Comms Detail — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/missed-comms-detail.html">Page Spec: Missed Comms Detail →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="active-call-panel.html">← Active Call Panel</a>
+      <a href="new-call-dialog.html">Next: New Call Dialog →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Comms · Wireframe</span>
+  <h1 class="wf-h1">Missed Calls / Unread SMS Detail</h1>
+  <p class="wf-lede">Opens from the floating Missed Comms Badge. Mobile: full-screen. Desktop: popover anchored to the badge rather than a takeover.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px — full screen</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <div class="wf-appbar-back">←</div>
+          <span class="wf-appbar-title">Missed &amp; Unread</span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-section-title">Missed calls <span class="wf-gate">view_calls</span></div>
+          <div class="wf-card">
+            <div class="wf-card-title">R. Delgado</div>
+            <div class="wf-card-meta">2:14 PM · Voicemail (0:22) ▶</div>
+            <div class="wf-actions"><div class="wf-button">Call back</div></div>
+          </div>
+          <div class="wf-section-title" style="margin-top:14px;">Unread texts <span class="wf-gate">view_sms</span></div>
+          <div class="wf-card">
+            <div class="wf-card-title">Slip 22</div>
+            <div class="wf-card-meta">"when's checkout?"</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled) — popover</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content" style="display:flex; justify-content:flex-end;">
+          <div class="wf-card" style="width:300px;">
+            <div class="wf-card-title">Missed &amp; Unread</div>
+            <div class="wf-section-title" style="margin-top:8px;">Missed calls</div>
+            <div class="wf-card-meta">R. Delgado — 2:14 PM ▶</div>
+            <div class="wf-section-title" style="margin-top:8px;">Unread texts</div>
+            <div class="wf-card-meta">Slip 22 — "when's checkout?"</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="new-call-dialog.html">Next: New Call Dialog →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

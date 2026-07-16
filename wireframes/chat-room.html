@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Chat Room — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/chat-room.html">Page Spec: Chat Room →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="new-sms-dialog.html">← New SMS Dialog</a>
+      <a href="new-chat-room.html">Next: New Chat Room / Invite Screen →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Comms · Wireframe</span>
+  <h1 class="wf-h1">Chat Room</h1>
+  <p class="wf-lede">Two participant states matter more than the mobile/desktop split here, so this page shows both: an actual participant (mobile frame) vs. a view_all_chats-only viewer who hasn't joined (desktop frame).</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px — as a participant</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <div class="wf-appbar-back">←</div>
+          <span class="wf-appbar-title">Weekend Coverage</span>
+        </div>
+        <div class="wf-content" style="display:flex; flex-direction:column; min-height:420px;">
+          <div style="flex:1;">
+            <div class="wf-card" style="max-width:75%;">"Who's got Saturday night?"</div>
+            <div class="wf-card" style="max-width:75%; margin-left:auto; background:var(--wf-fill);">"I can take it"</div>
+            <div class="wf-annotation">Pasted URL to Slip 14 renders as a preview card — display only, not a stored relationship.</div>
+          </div>
+          <div class="wf-actions"><div class="wf-input" style="flex:1;">Type a message…</div><div class="wf-button wf-button-primary">Send</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled) — view_all_chats, not a participant</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <div class="wf-card-title">Dock C Renovation <span class="wf-gate">view_all_chats</span></div>
+          <div class="wf-card" style="max-width:60%; margin-top:10px;">"Contractor arrives Monday 7 AM"</div>
+          <div class="wf-card" style="max-width:60%; margin-left:auto; background:var(--wf-fill);">"Noted, I'll flag it to the gate guard"</div>
+          <div style="position:relative; margin-top:14px;">
+            <div class="wf-input wf-button-disabled" style="cursor:default;">Type a message… (read-only)</div>
+            <div class="wf-badge wf-badge-warn" style="position:absolute; top:-10px; right:0;">+ Join this conversation <span class="wf-gate">manage_chats</span></div>
+          </div>
+          <div class="wf-annotation">Composer disabled for a non-participant. The join overlay only appears if the viewer also holds manage_chats — without it, just disabled, no action offered.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-section" style="margin-top:24px;">
+    <div class="wf-section-title">Notes</div>
+    <div class="wf-annotation">Room creator, or manage_chats holder, can add/remove invitees on this room at any time.</div>
+    <div class="wf-annotation">invited_roles is a live reference — a user later granted that role gains access immediately, no re-invite needed.</div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="new-chat-room.html">Next: New Chat Room / Invite Screen →</a></div>
+  </div>
+
+</div>
+</body>
+</html>
