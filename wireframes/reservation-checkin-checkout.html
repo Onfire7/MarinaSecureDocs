@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Reservation Check-In / Check-Out Dialog — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/reservation-checkin-checkout.html">Page Spec: Reservation Check-In / Check-Out Dialog →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="new-reservation-form.html">← New Reservation Form</a>
+      <a href="boat-list.html">Next: Boat List →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Reservations · Wireframe</span>
+  <h1 class="wf-h1">Reservation Check-In / Check-Out Dialog</h1>
+  <p class="wf-lede">A side effect matters here: check-in moves the target to occupied; check-out moves it to its configured post-reservation status.</p>
+
+  <div class="wf-frames">
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Any width — 375px shown</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-frame-dialog-backdrop">
+          <div class="wf-dialog-card">
+            <div class="wf-card-title">Check Out — Cabin 3 <span class="wf-gate">manage_reservations</span></div>
+            <div class="wf-field-value">R. Delgado · Jul 20 → Jul 22</div>
+            <div class="wf-field"><span class="wf-field-label">Actual check-out</span><div class="wf-input">Now — Jul 22, 10:58 AM</div></div>
+            <div class="wf-annotation">On save: Reservation.status → Checked Out; Cabin 3's status → "Needs Cleaning" (its configured post_reservation_status).</div>
+            <div class="wf-actions"><div class="wf-button wf-button-primary">Confirm Check-Out</div><div class="wf-button">Cancel</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="boat-list.html">Next: Boat List →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

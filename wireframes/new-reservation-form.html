@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — New Reservation Form — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/new-reservation-form.html">Page Spec: New Reservation Form →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="reservation-detail.html">← Reservation Detail</a>
+      <a href="reservation-checkin-checkout.html">Next: Check-In / Check-Out Dialog →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Reservations · Wireframe</span>
+  <h1 class="wf-h1">New Reservation Form</h1>
+  <p class="wf-lede">Target picker only offers reservation-enabled Locations/Assets. Rate/deposit fields appear or vanish as the target selection changes.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-frame-dialog-backdrop">
+          <div class="wf-dialog-card">
+            <div class="wf-card-title">New Reservation <span class="wf-gate">manage_reservations</span></div>
+            <div class="wf-field"><span class="wf-field-label">Target</span><div class="wf-select">Cabin 3</div></div>
+            <div class="wf-field"><span class="wf-field-label">Contact</span><div class="wf-input">R. Delgado</div></div>
+            <div class="wf-field"><span class="wf-field-label">Expected check-in / out</span><div class="wf-input">Jul 20 → Jul 22</div></div>
+            <div class="wf-field"><span class="wf-field-label">Rate / deposit</span><div class="wf-input">$180/night · $50</div></div>
+            <div class="wf-actions"><div class="wf-button wf-button-primary">Submit</div><div class="wf-button">Cancel</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled) — with map target picker</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-frame-dialog-backdrop">
+          <div class="wf-dialog-card" style="max-width:600px;">
+            <div class="wf-card-title">New Reservation <span class="wf-gate">manage_reservations</span></div>
+            <div class="wf-grid-2">
+              <div>
+                <div class="wf-field"><span class="wf-field-label">Target</span><div class="wf-select">Cabin 3</div></div>
+                <div class="wf-field"><span class="wf-field-label">Contact</span><div class="wf-input">R. Delgado</div></div>
+                <div class="wf-field"><span class="wf-field-label">Dates</span><div class="wf-input">Jul 20 → Jul 22</div></div>
+              </div>
+              <div class="wf-map-placeholder" style="min-height:0; height:130px;">point-and-click target picker</div>
+            </div>
+            <div class="wf-annotation">Overlapping-dates check runs on submit — blocked by default (MarinaSettings.allow_overlapping_reservations), unless the marina has opted in.</div>
+            <div class="wf-actions"><div class="wf-button wf-button-primary">Submit</div><div class="wf-button">Cancel</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="reservation-checkin-checkout.html">Next: Check-In / Check-Out Dialog →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

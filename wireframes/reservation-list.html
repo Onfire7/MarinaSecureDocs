@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Reservation Calendar / List — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/reservation-list.html">Page Spec: Reservation Calendar / List →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="new-incident-form.html">← New Incident Form</a>
+      <a href="reservation-detail.html">Next: Reservation Detail →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Reservations · Wireframe</span>
+  <h1 class="wf-h1">Reservation Calendar / List</h1>
+  <p class="wf-lede">List/calendar/map toggle. The map shares plotted rectangles with Location list's schematic mode, colored here by reservation status instead of occupancy/type.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px — List mode</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <span class="wf-appbar-title">Reservations</span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-actions">
+            <div class="wf-badge">List</div><div class="wf-badge">Calendar</div><div class="wf-badge">Map</div>
+          </div>
+          <div class="wf-divider"></div>
+          <div class="wf-card">
+            <div class="wf-card-title">Cabin 3 — R. Delgado</div>
+            <div class="wf-card-meta"><span class="wf-badge wf-badge-warn">Confirmed</span> Jul 20–22 · $180/night</div>
+          </div>
+          <div class="wf-card">
+            <div class="wf-card-title">Jump Pack A — Dockmaster</div>
+            <div class="wf-card-meta"><span class="wf-badge">Requested</span> Internal — no billing shown</div>
+          </div>
+        </div>
+        <div class="wf-tabbar">
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Home</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Checklists</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Locations</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Comms</div>
+          <div class="wf-tab current"><div class="wf-tab-icon"></div>Other</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled) — Map mode</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <div class="wf-actions" style="margin-bottom:10px;">
+            <div class="wf-badge">List</div><div class="wf-badge">Calendar</div><div class="wf-badge wf-badge-good">Map ●</div>
+            <div class="wf-select" style="width:auto; margin-left:auto;">Root: Harborview Marina ▾</div>
+          </div>
+          <div class="wf-map-placeholder" style="min-height:280px;">
+            <div class="wf-map-rect" style="top:15%; left:10%; width:100px; height:36px; background:var(--wf-good-bg); border-color:var(--wf-good);">Slip 15<br>Vacant</div>
+            <div class="wf-map-rect" style="top:15%; left:30%; width:100px; height:36px; background:var(--wf-warn-bg); border-color:var(--wf-warn);">Cabin 3<br>Upcoming Jul 20</div>
+            <div class="wf-map-rect" style="top:55%; left:20%; width:120px; height:36px; background:var(--wf-bad-bg); border-color:var(--wf-bad);">RV Site 4<br>Checked In</div>
+          </div>
+          <div class="wf-annotation">Asset-target reservations (Jump Pack A) have no rectangle to plot — list/calendar view only.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-section" style="margin-top:24px;">
+    <div class="wf-section-title">Notes</div>
+    <div class="wf-annotation">Mixed-use dock: Slips with reservation_enabled off (long-term leased) don't get a rectangle here at all.</div>
+    <div class="wf-annotation">Creating a reservation requires manage_reservations; browsing this whole screen is unrestricted.</div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="reservation-detail.html">Next: Reservation Detail →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

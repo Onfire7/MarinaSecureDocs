@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Boat List — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/boat-list.html">Page Spec: Boat List →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="reservation-checkin-checkout.html">← Check-In / Check-Out Dialog</a>
+      <a href="boat-detail.html">Next: Boat Detail →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Boats · Wireframe</span>
+  <h1 class="wf-h1">Boat List</h1>
+  <p class="wf-lede">Unrestricted to browse. Owner column omitted without view_owner.</p>
+
+  <div class="wf-frames">
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <span class="wf-appbar-title">Boats</span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-card"><div class="wf-card-title">Second Wind</div><div class="wf-card-meta">Slip 14 · Owner: R. Delgado <span class="wf-gate">view_owner</span></div></div>
+          <div class="wf-card"><div class="wf-card-title">Salty Dog</div><div class="wf-card-meta">Slip 22</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <table class="wf-table">
+            <tr><th>Name</th><th>Make/Model</th><th>Slip</th><th>Owner</th></tr>
+            <tr><td>Second Wind</td><td>Sea Ray 280</td><td>Slip 14</td><td>R. Delgado</td></tr>
+            <tr><td>Salty Dog</td><td>Boston Whaler 220</td><td>Slip 22</td><td>—</td></tr>
+          </table>
+          <div class="wf-actions" style="margin-top:12px;"><div class="wf-button">+ Add Boat <span class="wf-gate">edit_owner_contact</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="boat-detail.html">Next: Boat Detail →</a></div>
+  </div>
+
+</div>
+</body>
+</html>
