@@ -62,6 +62,8 @@
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
       <tr><td>Change status</td><td><code>manage_locations</code></td><td>Same status-edit path as <a href="location-list.html">Location list</a>.</td></tr>
       <tr><td>Add a checkpoint</td><td><code>manage_locations</code></td><td>Shortcut into <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>.</td></tr>
+      <tr><td>Add a lease</td><td><code>manage_lease</code></td><td>Only offered when this Location has no current Lease; opens <a href="lease-detail.html">Lease detail</a> in create mode. If <code>reservation_enabled</code> is currently on for this Location, shows a warning first (not a block) — see <a href="lease-detail.html">Lease detail</a>.</td></tr>
+      <tr><td>Toggle reservation-enabled</td><td><code>manage_locations</code></td><td>Same field as configured in <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>; if this Location has an active Lease, turning it on shows a warning first (not a block).</td></tr>
       <tr><td>Add a note</td><td>Unrestricted</td><td>Opens <a href="new-note-dialog.html">New note dialog</a>, pre-attached to this Location.</td></tr>
       <tr><td>Log an incident</td><td><code>create_incidents</code></td><td>Opens <a href="new-incident-form.html">New incident form</a>, pre-attached.</td></tr>
       <tr><td>Create a ticket</td><td>Unrestricted</td><td>Opens <a href="new-ticket-form.html">New ticket form</a>, pre-attached.</td></tr>

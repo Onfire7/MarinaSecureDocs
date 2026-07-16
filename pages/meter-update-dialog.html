@@ -48,6 +48,7 @@
       <tr><td>Current value</td><td>Read-only, Asset.meter_reading or accumulated hours</td><td>Shown for reference before entering a new value.</td></tr>
       <tr><td>New reading</td><td>Number — only if <code>has_meter</code></td><td>An absolute value (e.g. odometer mileage), not a delta.</td></tr>
       <tr><td>Hours to add</td><td>Number — only if <em>not</em> <code>has_meter</code></td><td>An incremental value, added to the running total rather than replacing it — matches the pages inventory's "set reading, or add hours for meterless assets."</td></tr>
+      <tr><td>Reason for lower reading</td><td>Text, conditionally required</td><td>Appears only when the entered value is lower than the asset's current reading; must be filled before Save is enabled. Stored as <code>AssetMeterReading.correction_reason</code>.</td></tr>
     </table>
 
     <h2>Actions</h2>
@@ -59,7 +60,7 @@
 
     <h2>States &amp; edge cases</h2>
     <ul>
-      <li><strong>New reading lower than current</strong> (for a metered asset) — flagged as a warning rather than blocked outright, since a meter replacement or correction is a real scenario; the implementing team should confirm whether to hard-block this before build.</li>
+      <li><strong>New reading lower than current</strong> (for a metered asset) — shows a warning inline and requires the Reason field to be filled before Save is enabled; not a hard block on the scenario itself (meter replacement/correction is a real case), just a forced explanation, matching the pattern already established for the "outside radius" GPS flag elsewhere: allow, but record why.</li>
       <li><strong>Meterless asset</strong> — the form only ever offers "add hours," never "set an absolute value," since there's no absolute reading to set.</li>
       <li><strong>Maintenance rule triggers on save</strong> — the resulting <code>Ticket</code> is <code>auto_generated</code> = true, identical in every other respect to a manually created one; see <a href="ticket-detail.html">Ticket detail</a>.</li>
     </ul>

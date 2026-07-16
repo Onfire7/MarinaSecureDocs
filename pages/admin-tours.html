@@ -62,7 +62,7 @@
     <h2>States &amp; edge cases</h2>
     <ul>
       <li><strong>Checkpoint belongs to multiple Tours</strong> — allowed; <code>Checkpoint.tours</code> is a list, so the same physical checkpoint can participate in more than one tour definition.</li>
-      <li><strong>Empty Tour</strong> — a Tour with zero checkpoints is valid to save but not meaningfully assignable to a shift; the implementing team should decide whether to warn on save.</li>
+      <li><strong>Empty Tour</strong> — a Tour with zero checkpoints saves without any warning; it's simply not meaningfully assignable to a shift until checkpoints are added, no different from saving any other config screen mid-setup.</li>
       <li><strong>Randomized mode with very few checkpoints</strong> — the unpredictability the mode is meant to provide degrades with a small set; not blocked, just a natural limitation of the marina's own layout.</li>
     </ul>
 

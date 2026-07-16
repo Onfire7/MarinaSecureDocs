@@ -40,14 +40,15 @@
     <p class="lede">The landing point for the Comms top-level nav item — recent calls, texts, and chat rooms in one place, and the entry point for starting any of the three.</p>
 
     <h2>Purpose</h2>
-    <p>Three independently-gated sections sharing one screen: <code>view_calls</code> controls the calls section, <code>view_sms</code> controls the texts section, and chat room visibility is invite-based (or <code>view_all_chats</code>). None of these three overlap with <code>place_calls</code>, which gates only <em>initiating</em> a call or SMS — a marina can have staff who see call/text history without being able to place calls, or who can place calls but can't browse past ones, per <a href="../permissions.html">Permissions</a>.</p>
+    <p>Three independently-gated sections sharing one screen: <code>view_calls</code> controls the calls section, <code>view_sms</code> controls the texts section, and chat rooms split into "My chat rooms" (participant, always visible) and "Other chat rooms" (visible only with <code>view_all_chats</code>, and only readable until the user joins — see <a href="chat-room.html">Chat Room</a>). None of these overlap with <code>place_calls</code>, which gates only <em>initiating</em> a call or SMS — a marina can have staff who see call/text history without being able to place calls, or who can place calls but can't browse past ones, per <a href="../permissions.html">Permissions</a>.</p>
 
     <h2>Data shown</h2>
     <table>
       <tr><th>Section</th><th>Requires</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Recent calls</td><td><code>view_calls</code></td><td>Call, most recent first</td><td>Direction, matched Contact (gated by <code>view_owner</code>/<code>view_contact</code> the same as everywhere a Contact appears), line, time, duration or missed flag.</td></tr>
       <tr><td>Recent texts</td><td><code>view_sms</code></td><td>SMSThread, ordered by <code>last_message_at</code></td><td>Contact, line, last message preview, unread indicator.</td></tr>
-      <tr><td>Chat rooms</td><td>Invited, or <code>view_all_chats</code></td><td>ChatRoom where the user is <code>created_by</code>, in <code>invited_users</code>, or holds a role in <code>invited_roles</code> — or all rooms, with <code>view_all_chats</code></td><td>Title, most recent activity.</td></tr>
+      <tr><td>My chat rooms</td><td>None — every user sees their own</td><td>ChatRoom where the user is <code>created_by</code>, in <code>invited_users</code>, or holds a role in <code>invited_roles</code></td><td>Title, most recent activity. These are rooms the user can actually post in.</td></tr>
+      <tr><td>Other chat rooms</td><td><code>view_all_chats</code></td><td>Every remaining ChatRoom</td><td>Shown in a visually separate section from "My chat rooms," never merged into one list — read-only until joined, per <a href="chat-room.html">Chat Room</a>.</td></tr>
     </table>
 
     <h2>Actions</h2>
@@ -58,7 +59,8 @@
       <tr><td>Start a chat room</td><td>Unrestricted — any user</td><td>Opens <a href="new-chat-room.html">New chat room / invite screen</a>.</td></tr>
       <tr><td>Open a call entry</td><td><code>view_calls</code></td><td>Expands inline — matched contact, notes, recording/transcript if enabled — rather than a separate call-detail page; a live call instead surfaces via <a href="active-call-panel.html">Active call panel</a>.</td></tr>
       <tr><td>Open a text thread</td><td><code>view_sms</code></td><td>Navigates to <a href="sms-thread.html">SMS thread</a>; marks it read.</td></tr>
-      <tr><td>Open a chat room</td><td>Must be invited, or hold <code>view_all_chats</code></td><td>Navigates to <a href="chat-room.html">Chat room</a>.</td></tr>
+      <tr><td>Open a room from "My chat rooms"</td><td>None beyond already being a participant</td><td>Navigates to <a href="chat-room.html">Chat Room</a> with the composer enabled.</td></tr>
+      <tr><td>Open a room from "Other chat rooms"</td><td><code>view_all_chats</code></td><td>Navigates to <a href="chat-room.html">Chat Room</a> read-only, with the join overlay if the user also holds <code>manage_chats</code>.</td></tr>
     </table>
 
     <h2>States &amp; edge cases</h2>
@@ -67,11 +69,12 @@
       <li><strong>No <code>view_sms</code></strong> — same treatment for the texts section.</li>
       <li><strong>No <code>place_calls</code></strong> — the start-call and start-text actions are hidden, but existing history stays visible to anyone holding <code>view_calls</code>/<code>view_sms</code>; a marina can have staff who need call/text context without being able to place calls themselves.</li>
       <li><strong>Empty sections</strong> (as opposed to gated-off ones) — each has its own empty state rather than hiding the whole section.</li>
-      <li><strong>Not invited to any chat room and no <code>view_all_chats</code></strong> — the chat section shows only the "start a room" action with nothing listed, rather than being hidden outright.</li>
+      <li><strong>No <code>view_all_chats</code></strong> — "Other chat rooms" is omitted entirely; the user sees only "My chat rooms," which shows just the "start a room" action if that's also empty.</li>
+      <li><strong>Joining a room from "Other"</strong> — once the user performs the Join action on <a href="chat-room.html">Chat Room</a>, that room moves to "My chat rooms" on next load, since participant status is what determines the split.</li>
     </ul>
 
     <h2>Mobile vs. desktop</h2>
-    <p>Mobile: calls, texts, and chat rooms as three switchable tabs to keep each list full-width and scannable. Desktop: the three sections can sit side by side in columns, since there's room to scan all of them without switching.</p>
+    <p>Mobile: calls, texts, and chat rooms as three switchable tabs to keep each list full-width and scannable; within the chat tab, "My chat rooms" and "Other chat rooms" are stacked sections rather than a further sub-tab. Desktop: the three top-level sections can sit side by side in columns, with the chat column showing both "My" and "Other" sections at once.</p>
 
     <div class="page-foot">
       <a href="checkpoint-detail.html">← Checkpoint Detail</a>

@@ -40,7 +40,7 @@
     <p class="lede">One internal, topic-based conversation — entirely separate from calls and SMS, with no database relationship linking the two.</p>
 
     <h2>Purpose</h2>
-    <p>Reached from <a href="comms-home.html">Comms Home</a>. Per <a href="../workflows.html">Role Workflows — Comms: chat rooms</a>, any user can start a room and invite specific users and/or roles into it; this page is where that room's conversation actually happens.</p>
+    <p>Reached from <a href="comms-home.html">Comms Home</a>. Per <a href="../workflows.html">Role Workflows — Comms: chat rooms</a>, any user can start a room and invite specific users and/or roles into it; this page is where that room's conversation actually happens. Two distinct permissions govern access beyond actual participation: <code>view_all_chats</code> (read any room, participant or not) and <code>manage_chats</code> (add yourself or someone else as an actual participant to any room) — see <a href="../permissions.html">Permissions</a>.</p>
 
     <h2>Data shown</h2>
     <table>
@@ -49,22 +49,27 @@
       <tr><td>Messages</td><td>ChatMessage, ordered by timestamp</td><td>Author, body, attachments, timestamp.</td></tr>
       <tr><td>Entity preview cards</td><td>ChatMessage.body, parsed for Location/Asset/Contact/etc. URLs</td><td>Rendered inline for display only — pasting a URL is link parsing, not a stored relationship, per <a href="../data-model.html">Data Model</a>.</td></tr>
       <tr><td>Invited users / roles</td><td>ChatRoom.invited_users / invited_roles</td><td><code>invited_roles</code> is a live reference to Role, not a snapshot — a user granted that role after the room was created gains access to it immediately, without being re-invited.</td></tr>
+      <tr><td>Participant status</td><td>Derived: is the viewing user in <code>invited_users</code>, a member of an <code>invited_roles</code> role, or <code>created_by</code>?</td><td>Not a stored field — computed on load to decide whether the composer is enabled. Drives the disabled-input/join-overlay state below.</td></tr>
     </table>
 
     <h2>Actions</h2>
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
-      <tr><td>Send a message</td><td>Must be invited (directly or via role), or hold <code>view_all_chats</code></td><td>Creates a <code>ChatMessage</code>; a <code>view_all_chats</code> holder who isn't actually invited can read but sending as a non-participant is a judgment call left to the marina's own norms, not a hard technical gate beyond visibility.</td></tr>
+      <tr><td>Send a message</td><td>Must be an actual participant — <code>created_by</code>, in <code>invited_users</code>, or a member of a role in <code>invited_roles</code></td><td>Creates a <code>ChatMessage</code>. <code>view_all_chats</code> alone does <strong>not</strong> satisfy this — it only grants the ability to open and read the room.</td></tr>
       <tr><td>Attach a file/image</td><td>Same as sending</td><td>Stored on <code>ChatMessage.attachments</code>.</td></tr>
       <tr><td>Paste an entity URL</td><td>Same as sending</td><td>Auto-renders a preview card; purely cosmetic, no relationship written.</td></tr>
-      <tr><td>Manage invitees</td><td>Room creator</td><td>Add/remove invited users or roles after creation; not gated by a new permission — ownership of the room is the gate, consistent with avoiding permission bloat (see <a href="../permissions.html">Permissions</a>).</td></tr>
+      <tr><td>Join the conversation</td><td><code>manage_chats</code></td><td>Adds the current user to <code>invited_users</code>, making them a real participant from that point forward. This is the action behind the composer overlay described below.</td></tr>
+      <tr><td>Add someone else</td><td>Room creator, or <code>manage_chats</code></td><td>Adds another user (or role) to <code>invited_users</code>/<code>invited_roles</code>. The room creator retains this ability over their own room without needing <code>manage_chats</code>; <code>manage_chats</code> extends the same ability to any room, which is the whole point of the permission — letting a manager place someone into a conversation they didn't create.</td></tr>
+      <tr><td>Remove an invitee</td><td>Room creator, or <code>manage_chats</code></td><td>Same gating as adding.</td></tr>
     </table>
 
     <h2>States &amp; edge cases</h2>
     <ul>
       <li><strong>Not invited, no <code>view_all_chats</code></strong> — the room isn't reachable or listed anywhere; there's no "request access" path.</li>
+      <li><strong><code>view_all_chats</code> holder viewing a room they aren't a participant of</strong> — full read access to the message history, but the composer (text box) is disabled. If they also hold <code>manage_chats</code>, a link overlays the disabled composer offering to join the conversation — tapping it performs the Join action above. Without <code>manage_chats</code>, the composer is simply disabled with no overlay; they can read, not act.</li>
       <li><strong>Offline</strong> — chat is ordinary InstantDB data, not a Twilio action, so it works fully offline (send, read, attach) and syncs on reconnect, unlike SMS.</li>
       <li><strong>Role membership changes mid-room</strong> — a user removed from an <code>invited_roles</code> role loses access to the room going forward, but past messages they sent remain (their authorship doesn't get retracted).</li>
+      <li><strong>Joining, then leaving</strong> — no explicit "leave" action is modeled; a participant added via Join (or original invite) stays a participant unless a room creator or <code>manage_chats</code> holder removes them.</li>
     </ul>
 
     <h2>Mobile vs. desktop</h2>

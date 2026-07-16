@@ -60,7 +60,7 @@
 
     <h2>States &amp; edge cases</h2>
     <ul>
-      <li><strong>Deactivating the last <code>manage_users</code> holder</strong> — the app should warn before locking the marina out of user management entirely; the implementing team should confirm whether to hard-block this.</li>
+      <li><strong>Deactivating the last <code>manage_users</code> holder</strong> — blocked outright. The check is computed the same way effective permissions are (per <a href="../permissions.html">Permissions</a>): if no other active user would be left holding <code>manage_users</code> through any role, the deactivation is rejected with an explanation, not just warned about.</li>
       <li><strong>Removing all roles from a user</strong> — allowed; that user simply loses access to every role-gated feature until reassigned, without being deactivated outright.</li>
       <li><strong>Pending invitation not yet accepted</strong> — shown with a distinct status, separate from active/deactivated.</li>
     </ul>

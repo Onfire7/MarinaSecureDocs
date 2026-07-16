@@ -61,7 +61,7 @@
     <h2>States &amp; edge cases</h2>
     <ul>
       <li><strong>Target not reservation-enabled</strong> — never appears in the picker; there's no way to attempt booking a non-reservable Location or Asset from here.</li>
-      <li><strong>Overlapping dates on the same target</strong> — flagged as a warning rather than blocked outright, since a marina may legitimately want to overbook and sort it out manually (e.g. a waitlist scenario); this is a judgment call for the implementing team to confirm before build.</li>
+      <li><strong>Overlapping dates on the same target</strong> — governed by <code>MarinaSettings.allow_overlapping_reservations</code> (off by default, see <a href="admin-marina-settings.html">Marina Settings</a>): with the default off, submitting is blocked outright with an error naming the conflicting reservation; a marina that wants a waitlist/overbooking model can turn the setting on, at which point overlapping dates are simply permitted with no confirmation friction.</li>
       <li><strong>No <code>manage_reservations</code></strong> — this form is unreachable; every entry point to it is gated the same way.</li>
       <li><strong>Internal-only target</strong> — rate/deposit fields never appear, and the resulting reservation has no billing surface anywhere downstream.</li>
     </ul>

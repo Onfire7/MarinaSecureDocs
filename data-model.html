@@ -97,7 +97,7 @@
         <tr><td>type</td><td>ref → LocationType</td><td></td></tr>
         <tr><td>parent</td><td>ref → Location</td><td>Optional; must match one of type's valid_parent_types.</td></tr>
         <tr><td>status</td><td>enum</td><td>Occupied / Vacant / Reserved / Out of Service, plus admin-defined additions.</td></tr>
-        <tr><td>reservation_enabled</td><td>boolean</td><td>Whether <em>this specific</em> Location accepts reservations at all. A simple per-location toggle in that location's own settings, deliberately independent of its siblings — this is what makes mixed-use possible: on a single Dock, the front half of Slips can have this on (short-term rentals) while the back half have it off and are tied to a Lease instead (long-term). Only meaningful when the Location's <code>type.allows_reservations</code> is true.</td></tr>
+        <tr><td>reservation_enabled</td><td>boolean</td><td>Whether <em>this specific</em> Location accepts reservations at all. A simple per-location toggle in that location's own settings, deliberately independent of its siblings — this is what makes mixed-use possible: on a single Dock, the front half of Slips can have this on (short-term rentals) while the back half have it off and are tied to a Lease instead (long-term). Only meaningful when the Location's <code>type.allows_reservations</code> is true. Not hard-exclusive with having a <code>Lease</code>: turning this on for a Location with an active Lease (and, symmetrically, creating a Lease for a Location that's reservation-enabled) is allowed but triggers a warning in the UI — see <a href="pages/admin-locations.html">Admin — Location Types &amp; Locations setup</a> and <a href="pages/lease-detail.html">Lease Detail</a>.</td></tr>
         <tr><td>reservation_visibility</td><td>enum: Public / Internal, only when reservation_enabled</td><td>Public reservations carry the full rate/deposit/balance and early-checkin/late-checkout fields; Internal ones hide all of that (staff-only bookings, no billing) — see Reservation below.</td></tr>
         <tr><td>post_reservation_status</td><td>ref → status value</td><td>What status this Location is set to when a reservation completes (e.g. a Cabin → "Needs Cleaning").</td></tr>
         <tr><td>gps_coordinates</td><td>lat/lng</td><td>Real-world coordinates, used as the default position for any Checkpoint at this location and for the geographic (pin) map view. Distinct from a Location's plotted position on a schematic <code>MarinaMap</code> — see below.</td></tr>
@@ -319,7 +319,7 @@
       </tr>
       <tr>
         <td><strong>AssetMeterReading</strong></td>
-        <td><code>asset</code> (ref), <code>value</code> (number), <code>source</code> (Manual entry on asset page / Checklist item), <code>logged_by</code> (ref → User), <code>timestamp</code></td>
+        <td><code>asset</code> (ref), <code>value</code> (number), <code>source</code> (Manual entry on asset page / Checklist item), <code>logged_by</code> (ref → User), <code>timestamp</code>, <code>correction_reason</code> (text, nullable — required when <code>value</code> is lower than the asset's immediately preceding reading, e.g. a meter replacement)</td>
       </tr>
     </table>
 
@@ -457,6 +457,7 @@
       <tr><td>call_transcription_enabled</td><td>boolean</td><td></td></tr>
       <tr><td>shift_report_recipients</td><td>text[] (emails)</td><td>Distribution list for the shift-end report.</td></tr>
       <tr><td>phone_lines</td><td>structured[]</td><td>Each line's Twilio number, label (e.g. "Office," "Security"), and routing behavior.</td></tr>
+      <tr><td>allow_overlapping_reservations</td><td>boolean, default false</td><td>When false (the default), a new Reservation whose dates overlap an existing one for the same target is blocked outright. A marina that wants to run a waitlist/overbooking model can turn this on to allow it — see <a href="pages/new-reservation-form.html">New Reservation Form</a>.</td></tr>
     </table>
 
     <div class="page-foot">

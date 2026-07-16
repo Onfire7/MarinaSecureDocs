@@ -144,7 +144,7 @@
 
     <div class="fathom">cross-cutting</div>
     <h2>Comms: chat rooms (all roles)</h2>
-    <p>Any user can start a topic-based chat room and invite specific users and/or roles into it. These are entirely internal and separate from call/SMS logging — no database relationship links a chat message to a customer call. Pasting a URL to a location, asset, contact, or similar into a chat message renders a lightweight preview card so the conversation stays legible, but that's link parsing for display, not a stored relationship. Anyone holding <code>view_all_chats</code> can see every room at the marina, invited or not — useful for a manager keeping a general eye on team communication.</p>
+    <p>Any user can start a topic-based chat room and invite specific users and/or roles into it. These are entirely internal and separate from call/SMS logging — no database relationship links a chat message to a customer call. Pasting a URL to a location, asset, contact, or similar into a chat message renders a lightweight preview card so the conversation stays legible, but that's link parsing for display, not a stored relationship. Anyone holding <code>view_all_chats</code> can see every room at the marina, invited or not — useful for a manager keeping a general eye on team communication — but that's read-only until they're an actual participant; <code>manage_chats</code> is the separate permission that lets a manager or department head add themselves, or someone else, into a room they weren't originally invited to. See <a href="permissions.html">Permissions</a> and <a href="pages/chat-room.html">Page Specifications — Chat Room</a>.</p>
 
     <div class="page-foot">
       <a href="permissions.html">← Permissions</a>

@@ -54,7 +54,7 @@
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Name, type, parent</td><td>Location fields</td><td>Parent must match one of the type's valid_parent_types.</td></tr>
-      <tr><td>Reservation toggle</td><td>Location.reservation_enabled + reservation_visibility</td><td>The per-location toggle that makes mixed-use possible — set independently per Slip, per <a href="../data-model.html">Data Model — Location</a>. Only offered when the type's <code>allows_reservations</code> is on.</td></tr>
+      <tr><td>Reservation toggle</td><td>Location.reservation_enabled + reservation_visibility</td><td>The per-location toggle that makes mixed-use possible — set independently per Slip, per <a href="../data-model.html">Data Model — Location</a>. Only offered when the type's <code>allows_reservations</code> is on. Turning it on for a Location with an active <a href="lease-detail.html">Lease</a> shows a warning, not a block.</td></tr>
       <tr><td>Post-reservation status</td><td>Location.post_reservation_status</td><td>Only relevant when reservation-enabled.</td></tr>
       <tr><td>GPS coordinates</td><td>Location.gps_coordinates</td><td>Real-world lat/lng, used for the geographic pin map and as the default for any Checkpoint here.</td></tr>
       <tr><td>Checkpoints</td><td>Checkpoint.location = this Location</td><td>Each checkpoint's GUID URL (auto-generated), GPS radius override, and applicable checklist templates.</td></tr>

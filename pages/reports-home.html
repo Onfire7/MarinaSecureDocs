@@ -46,9 +46,9 @@
     <table>
       <tr><th>Section</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Shift reports</td><td>Shift, most recent first</td><td>Guard, date, <code>report_sent_at</code> status; each links to <a href="shift-report.html">Shift report</a>.</td></tr>
-      <tr><td>Incident history</td><td>Incident, aggregated</td><td>Counts and trends by type/status over a selected date range.</td></tr>
-      <tr><td>Ticket throughput</td><td>Ticket, aggregated</td><td>Created vs. resolved counts over a selected date range.</td></tr>
-      <tr><td>Call logs</td><td>Call / SMSThread, aggregated</td><td>Volume over a selected date range; individual call/text detail still lives in <a href="comms-home.html">Comms</a>, not duplicated here.</td></tr>
+      <tr><td>Incident history</td><td>Incident, aggregated</td><td>Counts and trends by type/status over a selected date range — numbers only, no individual incident titles/details. Visible under <code>view_reports</code> alone, regardless of <code>view_incidents</code>, per the aggregate-data rule below.</td></tr>
+      <tr><td>Ticket throughput</td><td>Ticket, aggregated</td><td>Created vs. resolved counts over a selected date range; tickets have no dedicated view permission anyway, so this is unrestricted the same way <a href="ticket-queue.html">Ticket queue</a> is.</td></tr>
+      <tr><td>Call logs</td><td>Call / SMSThread, aggregated</td><td>Volume counts only, over a selected date range — no caller identity, no message content, no individual entries. Visible under <code>view_reports</code> alone, regardless of <code>view_calls</code>/<code>view_sms</code>; individual call/text detail still lives in <a href="comms-home.html">Comms</a>, gated there as normal, not duplicated here.</td></tr>
     </table>
 
     <h2>Actions</h2>
@@ -61,7 +61,7 @@
     <h2>States &amp; edge cases</h2>
     <ul>
       <li><strong>No <code>view_reports</code></strong> — the Reports nav item doesn't appear; this page is unreachable, matching the same all-or-nothing pattern as <a href="incident-list.html">Incident list</a>'s <code>view_incidents</code> gate.</li>
-      <li><strong>Aggregate sections independent of entity-level permissions</strong> — <code>view_reports</code> is its own gate; a user holding it sees the incident-history aggregate even without <code>view_incidents</code>, since a report is a summary, not a browse of the underlying records. This is a deliberate, narrow exception to the entry-level scoping used on <a href="activity-log.html">Activity Log feed</a> — worth confirming with the implementing team before build, since it means aggregate counts can reveal more than the detail screens they're counting.</li>
+      <li><strong>Aggregate data vs. detail data</strong> — the rule for this screen: a section that only ever shows counts/trends (no individual record, no name, no content) is gated by <code>view_reports</code> alone, full stop — that's Incident history, Ticket throughput, and Call logs as specified above. Anything that would show an individual record — a specific incident's title, a specific caller's name, a specific message — falls back to that record's own normal gate (<code>view_incidents</code>, <code>view_calls</code>, <code>view_contact</code>, etc.) and is hidden entirely without it, same as <a href="activity-log.html">Activity Log feed</a>. This screen currently has no such detail sections, only aggregates — if one is added later (e.g. a "most active incidents" drill-down list), it must follow the detail rule, not the aggregate one.</li>
       <li><strong>No shifts yet</strong> — empty state for a brand-new marina.</li>
     </ul>
 

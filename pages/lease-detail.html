@@ -56,6 +56,7 @@
     <h2>Actions</h2>
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Create the lease</td><td><code>manage_lease</code></td><td>Reached via <a href="location-detail.html">Location detail</a>'s "Add a lease" action when the Location has none yet — this page doubles as the creation form, similar to how <a href="nameless-contact-merge.html">Nameless-contact merge</a> handles a not-yet-resolved state. If the Location's <code>reservation_enabled</code> is currently on, shows a warning before creating ("this location currently accepts reservations — continue?") but doesn't block it; proceeding doesn't itself turn <code>reservation_enabled</code> off.</td></tr>
       <tr><td>Edit lease details</td><td><code>manage_lease</code></td><td>Dates, variances, lessees.</td></tr>
       <tr><td>Upload a document</td><td><code>manage_lease</code></td><td></td></tr>
       <tr><td>Download a document</td><td><code>view_lease</code></td><td>Viewing-tier action, unlike upload.</td></tr>
@@ -67,6 +68,7 @@
       <li><strong>No <code>view_lease</code></strong> — this page, and any link into it from Location/Contact detail, is unreachable.</li>
       <li><strong><code>view_lease</code> without <code>manage_lease</code></strong> — full read access including document download, but no editing or commenting.</li>
       <li><strong>Expired lease</strong> (<code>end_date</code> passed) — shown plainly as historical; the data model doesn't auto-flip the Location's status or <code>reservation_enabled</code> on expiry, so renewing or transitioning a Slip to reservation-enabled after a lease ends is a manual admin action, not an automated workflow.</li>
+      <li><strong>Reservations turned on for this Location while an active lease exists</strong> — the symmetric case, triggered from <a href="location-detail.html">Location detail</a> or <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>, not from here; also a warning, not a block, per <a href="../data-model.html">Data Model — Location</a>.</li>
     </ul>
 
     <h2>Mobile vs. desktop</h2>

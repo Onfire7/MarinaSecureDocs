@@ -48,8 +48,9 @@
       <tr><td>GPS validation radius default</td><td>MarinaSettings.gps_validation_radius_default</td><td>Fallback used by any Checkpoint without its own override, per <a href="admin-locations.html">Location Types &amp; Locations setup</a>.</td></tr>
       <tr><td>Activity Log retention</td><td>MarinaSettings.activity_log_retention_days</td><td>Entries older than this are eligible for purge by the <code>activity-log-retention</code> Scheduled Function unless flagged <strong>Protected</strong>, per <a href="../api-structure.html">API Structure</a>.</td></tr>
       <tr><td>Call recording / transcription toggles</td><td>MarinaSettings.call_recording_enabled / call_transcription_enabled</td><td>Governs whether <a href="active-call-panel.html">Active Call Panel</a> and call history ever show a recording/transcript at all.</td></tr>
-      <tr><td>Shift report recipients</td><td>MarinaSettings.shift_report_recipients</td><td>Email distribution list, per <a href="../architecture.html">Architecture — Shift report delivery</a>.</td></tr>
+      <tr><td>Shift report recipients</td><td>MarinaSettings.shift_report_recipients</td><td>Email distribution list, per <a href="../architecture.html">Architecture — Shift report delivery</a>. An inline warning appears directly beside this field, and only here, when it's empty — see States &amp; edge cases below.</td></tr>
       <tr><td>Phone lines</td><td>MarinaSettings.phone_lines</td><td>Each line's Twilio number, label, and routing behavior (e.g. a Security line skipping straight to a security menu).</td></tr>
+      <tr><td>Allow overlapping reservations</td><td>MarinaSettings.allow_overlapping_reservations</td><td>Off by default. Governs whether <a href="new-reservation-form.html">New Reservation Form</a> blocks a booking whose dates overlap an existing one for the same target, or permits it (e.g. for a marina running a waitlist/overbooking model).</td></tr>
     </table>
 
     <h2>Actions</h2>
@@ -63,7 +64,7 @@
     <ul>
       <li><strong>Lowering the retention window</strong> — takes effect on the next scheduled purge, not retroactively instantaneously; existing entries older than the new window are purged (unless Protected) at that next run, not the moment the setting is saved.</li>
       <li><strong>Removing the last phone line</strong> — leaves the marina with no Twilio-routed number; calling/texting features have nothing to route through until a line is reconfigured. Should warn before allowing, pending implementation-team confirmation.</li>
-      <li><strong>Empty shift report recipients</strong> — the shift-report Twilio Function still runs and compiles the report, it simply has nowhere to send it; the implementing team should confirm whether to surface a warning here rather than let reports silently go nowhere.</li>
+      <li><strong>Empty shift report recipients</strong> — the shift-report Twilio Function still runs and compiles the report, it simply has nowhere to send it. This is surfaced as an inline warning next to the field on this screen only — not as a banner elsewhere in the app, not on <a href="reports-home.html">Reports</a> or <a href="shift-report.html">Shift report</a>, and not blocking save. It's a nudge at the one place it's actually configured, nothing more.</li>
     </ul>
 
     <h2>Mobile vs. desktop</h2>
