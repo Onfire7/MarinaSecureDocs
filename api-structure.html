@@ -123,7 +123,7 @@
     </table>
 
     <div class="note">
-      <strong>Auth for Twilio Functions.</strong> Outbound endpoints authenticate the caller using the same session/identity issued by the InstantDB-compatible auth provider (see <a href="architecture.html">Architecture</a>), so the Function can independently verify the request is from a logged-in user holding the required permission — it does not trust the frontend's own permission check alone.
+      <strong>Auth for Twilio Functions.</strong> Outbound endpoints authenticate the caller using the same Clerk session (see <a href="architecture.html">Architecture</a>), so the Function can independently verify the request is from a logged-in user holding the required permission — it does not trust the frontend's own permission check alone.
     </div>
 
     <h3>Contact matching</h3>

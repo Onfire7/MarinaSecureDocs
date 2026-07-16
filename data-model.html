@@ -55,7 +55,8 @@
       <table>
         <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
         <tr><td>name</td><td>text</td><td></td></tr>
-        <tr><td>email / phone</td><td>text</td><td>Used by auth provider; see <a href="architecture.html">Architecture</a>.</td></tr>
+        <tr><td>email / phone</td><td>text</td><td>Mirrors the identity Clerk holds for this user; see <a href="architecture.html">Architecture</a>.</td></tr>
+        <tr><td>clerk_user_id</td><td>text</td><td>Clerk's own user ID, linking this record to its Clerk identity. Set on first sign-in; used to resolve InstantDB's verified auth identity back to a <code>User</code> record.</td></tr>
         <tr><td>roles</td><td>ref[] → Role</td><td>A user may hold multiple roles simultaneously.</td></tr>
         <tr><td>active</td><td>boolean</td><td>Deactivated users are hidden from assignment pickers but preserved for historical records.</td></tr>
         <tr><td>contact</td><td>ref → Contact</td><td>Optional link so a User can also be reached as a Contact (e.g. for asset checkout).</td></tr>

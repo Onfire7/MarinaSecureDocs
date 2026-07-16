@@ -37,29 +37,25 @@
   <main class="content">
     <span class="eyebrow">Access · Page Specification</span>
     <h1>Sign In</h1>
-    <p class="lede">The entry point for any user with no active local session on this device — authenticates against the marina's InstantDB-compatible auth provider.</p>
+    <p class="lede">The entry point for any user with no active local session on this device — authenticates through Clerk, which InstantDB is configured to trust as its auth provider.</p>
 
     <h2>Purpose</h2>
-    <p>Every deployment is a single marina's own subdomain (see <a href="../architecture.html">Architecture</a>), so there's no marina picker here — this screen only ever authenticates a <code>User</code> against the one InstantDB instance the subdomain already points to. There is no self-serve account creation: a user must already exist, created via <a href="admin-users.html">Admin → Users</a> by someone holding <code>manage_users</code>.</p>
+    <p>Every deployment is a single marina's own subdomain (see <a href="../architecture.html">Architecture</a>), so there's no marina picker here — this screen only ever authenticates a <code>User</code> against the one Clerk application (and one InstantDB instance) that subdomain already points to. There is no self-serve account creation: a user must already exist, created via <a href="admin-users.html">Admin → Users</a> by someone holding <code>manage_users</code>, which provisions them in both Clerk and as an InstantDB <code>User</code> record (<code>clerk_user_id</code> linking the two — see <a href="../data-model.html">Data Model</a>).</p>
 
     <h2>Data shown</h2>
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Marina branding</td><td>MarinaSettings</td><td>Name/logo, so the correct property is obvious before entering credentials.</td></tr>
-      <tr><td>Identifier field</td><td>User.email / User.phone</td><td>Whichever the chosen auth provider uses as the primary identifier — see open question below.</td></tr>
+      <tr><td>Identifier field</td><td>Clerk sign-in form</td><td>Rendered via Clerk's own hosted/embedded sign-in component; identifier and challenge (email/password, magic link, or OTP) are configured per marina in that marina's Clerk dashboard, not hand-built here.</td></tr>
     </table>
 
     <h2>Actions</h2>
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
-      <tr><td>Sign in</td><td>None (this <em>is</em> the gate)</td><td>Submits the identifier plus whatever credential/challenge the auth provider requires; on success, establishes a local InstantDB session for that <code>User</code> and routes to the <a href="dashboard.html">Dashboard</a>.</td></tr>
-      <tr><td>Resend / forgot credential</td><td>None</td><td>Standard recovery flow, provider-dependent.</td></tr>
-      <tr><td>Switch to a different user</td><td>Shown only when this device already has at least one signed-in session</td><td>Routes to <a href="user-switch.html">User Switch</a> instead of a fresh sign-in.</td></tr>
+      <tr><td>Sign in</td><td>None (this <em>is</em> the gate)</td><td>Handled by Clerk; on success, Clerk issues a session, InstantDB verifies it via its Clerk integration, and the app routes to the <a href="dashboard.html">Dashboard</a>.</td></tr>
+      <tr><td>Resend / forgot credential</td><td>None</td><td>Standard Clerk recovery flow for whichever challenge method is configured.</td></tr>
+      <tr><td>Switch to a different user</td><td>Shown only when this device already has at least one signed-in Clerk session</td><td>Routes to <a href="user-switch.html">User Switch</a>, backed by Clerk's multi-session support, instead of a fresh sign-in.</td></tr>
     </table>
-
-    <div class="note">
-      <strong>Open implementation detail.</strong> The exact auth provider and its challenge mechanism (password, magic link, OTP) is not yet finalized — see <a href="../architecture.html">Architecture — Authentication</a>. This page's field set will follow whatever that provider requires.
-    </div>
 
     <h2>States &amp; edge cases</h2>
     <ul>

@@ -80,13 +80,13 @@
       <strong>Design implication.</strong> Because sync is automatic, nothing in the data model should assume a strict global ordering of events at write time. Where sequence matters (e.g. an Activity Log), it's derived from timestamps rather than from write order.
     </div>
 
-    <h2>Authentication</h2>
-    <p>Auth is handled through an InstantDB-compatible auth provider rather than a bespoke system, so session and identity management stays consistent with the rest of the local-first data layer.</p>
+    <h2>Authentication — Clerk</h2>
+    <p><strong>Resolved: Clerk</strong>, using its native InstantDB integration. Clerk issues the session; InstantDB is configured to trust Clerk as an external auth provider (verifying Clerk's session JWT against a Clerk JWT template registered on the InstantDB app), so every InstantDB permission rule still evaluates against a real, verified identity rather than a client-asserted one.</p>
     <ul>
-      <li><strong>Personal devices</strong> — a user's phone or tablet stays signed in as that user.</li>
-      <li><strong>Shared devices</strong> — some hardware (e.g. a tablet mounted at the security desk) is used by whoever is on shift. The auth flow supports switching the active user on a shared device without requiring a full sign-out/sign-in cycle for routine handoffs, since shift changes happen daily and need to be fast.</li>
+      <li><strong>Personal devices</strong> — a user's phone or tablet stays signed in as that user via a normal Clerk session (email/password, magic link, or OTP — configurable per marina in Clerk's dashboard).</li>
+      <li><strong>Shared devices</strong> — some hardware (e.g. a tablet mounted at the security desk) is used by whoever is on shift. This is handled by Clerk's <strong>multi-session</strong> support: several users can each have an authenticated session active on the same device at once, and switching which one is "active" (<code>setActive()</code>) is instant — no full sign-out/sign-in cycle — which is exactly the fast daily-handoff requirement. See <a href="pages/user-switch.html">User Switch</a>.</li>
     </ul>
-    <p>The specific provider and the shared-device switching mechanism are an open implementation decision — noted here as a requirement the chosen provider must satisfy, not yet finalized.</p>
+    <p>Per-marina isolation extends to auth: each marina gets its own Clerk application/instance, consistent with the rest of the stack having no shared infrastructure across marinas.</p>
 
     <h2>Telephony — Twilio Functions</h2>
     <p>The Twilio↔InstantDB bridge is implemented as <strong>Twilio Functions</strong> — Twilio's own serverless functions product — deployed directly into each marina's Twilio account rather than as a bespoke Node server we host and operate. Same narrow job, no infrastructure of our own to provision, patch, or scale:</p>

@@ -95,7 +95,7 @@
       <li><strong>Frontend</strong> — a static site, deployed per-marina to its own Netlify site and subdomain.</li>
       <li><strong>Database</strong> — InstantDB, giving the app local-first storage and automatic sync with no custom offline logic to build.</li>
       <li><strong>Telephony</strong> — Twilio Functions per marina integrating Twilio for calls and SMS, writing directly into that marina's InstantDB instance. No dedicated server to host.</li>
-      <li><strong>Auth</strong> — an InstantDB-compatible auth provider, supporting both personal devices and shared shift devices.</li>
+      <li><strong>Auth</strong> — Clerk, via its native InstantDB integration, supporting both personal devices and (via Clerk's multi-session support) shared shift devices.</li>
     </ul>
 
     <h2>How to read this document set</h2>
