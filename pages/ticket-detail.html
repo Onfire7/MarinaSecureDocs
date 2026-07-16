@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ticket Detail — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Tickets · Page Specification</span>
+    <h1>Ticket Detail</h1>
+    <p class="lede">Full view of one maintenance ticket — description, priority, status, assignment, and whatever it's attached to.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="ticket-queue.html">Ticket queue</a>, an Incident's linked-tickets list, a checklist item that raised it, or any attachment target's ticket list (Location, Boat, Asset, etc.).</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Title, description</td><td>Ticket.title / description</td><td>Description is rich-text (markdown).</td></tr>
+      <tr><td>Priority, status</td><td>Ticket.priority / status</td><td></td></tr>
+      <tr><td>Created by / assigned to</td><td>Ticket.created_by / assigned_to</td><td></td></tr>
+      <tr><td>Attachment target</td><td>Ticket.attached_to</td><td>Links to the relevant Location/Checkpoint/Boat/Contact/Asset detail page.</td></tr>
+      <tr><td>Source incident</td><td>Ticket.source_incident</td><td>Link visible only with <code>view_incidents</code> — otherwise the ticket shows no indication it came from one, per <a href="../data-model.html">Data Model</a>.</td></tr>
+      <tr><td>Auto-generated flag</td><td>Ticket.auto_generated</td><td>Shown with which maintenance rule triggered it, when applicable.</td></tr>
+      <tr><td>Timestamps</td><td>Ticket.created_at / resolved_at</td><td></td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Take (self-assign)</td><td><code>assign_ticket_to_self</code></td><td>Only offered while unassigned.</td></tr>
+      <tr><td>Assign to someone else</td><td><code>assign_ticket_to_others</code></td><td>Available regardless of current assignment state — reassignment is still an assignment.</td></tr>
+      <tr><td>Change status / priority</td><td>None — unrestricted</td><td>Updating a ticket's own workflow state isn't gated the way assignment is; consistent with tickets generally being a low-friction, everyone-can-touch-them entity.</td></tr>
+      <tr><td>Add a note</td><td>Unrestricted</td><td>Opens <a href="new-note-dialog.html">New note dialog</a>, pre-attached to the ticket's own attachment target — tickets themselves don't carry a separate Note relationship distinct from what they're attached to.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No <code>view_incidents</code>, ticket has a source incident</strong> — the ticket is fully visible, just without any indication it originated from an incident; nothing about the ticket itself is hidden.</li>
+      <li><strong>Reassigning an already-assigned ticket</strong> — allowed with <code>assign_ticket_to_others</code>; the previous assignee isn't notified specially beyond normal activity visibility.</li>
+      <li><strong>Resolved ticket</strong> — <code>resolved_at</code> set when status reaches its terminal value (e.g. Complete); still editable afterward (status/priority changes aren't locked), unlike an Incident's author-lock behavior.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: fields stack vertically, assignment and status controls as a sticky action bar. Desktop: fields and actions visible together in a wider single view.</p>
+
+    <div class="page-foot">
+      <a href="ticket-queue.html">← Ticket Queue</a>
+      <a href="new-ticket-form.html">New Ticket Form →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

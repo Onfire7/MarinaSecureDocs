@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Incident Detail — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Incidents · Page Specification</span>
+    <h1>Incident Detail</h1>
+    <p class="lede">Full record of one incident — its original content, an addendum thread that stays open forever, and any tickets it spawned.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="incident-list.html">Incident list</a>, a linked ticket (with <code>view_incidents</code>), or a checklist item that raised it. Two distinct edit windows apply here, and getting them right matters: the incident's own content locks to its author at end of shift, but comments never lock for anyone holding <code>create_incidents</code>, per <a href="../workflows.html">Role Workflows</a>.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Title, type, details</td><td>Incident.title / type / details</td><td>Details is optional rich-text (markdown).</td></tr>
+      <tr><td>Status</td><td>Incident.status</td><td>Open / Under Review / Resolved / Closed, plus Custom.</td></tr>
+      <tr><td>Author, assignee</td><td>Incident.author / assigned_to</td><td>Assignee is optional.</td></tr>
+      <tr><td>Attachment target</td><td>Incident.attached_to</td><td>Links to the relevant Location/Checkpoint/Boat/Contact/Asset.</td></tr>
+      <tr><td>Addendums</td><td>IncidentComment, ordered by created_at</td><td>Author, body (markdown), timestamp — a permanent, append-only thread.</td></tr>
+      <tr><td>Linked tickets</td><td>Incident.linked_tickets</td><td>Each links to <a href="ticket-detail.html">Ticket detail</a>.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Edit the incident's original content</td><td>Must be the author, and only until the end of their shift</td><td>After that window, the original content locks regardless of who's viewing — including the author themselves.</td></tr>
+      <tr><td>Add a comment/addendum</td><td><code>create_incidents</code></td><td>Appends an <code>IncidentComment</code>; available forever, to anyone holding the permission, not just the original author.</td></tr>
+      <tr><td>Change status</td><td><code>create_incidents</code></td><td>Same gate as commenting — status is treated as part of the ongoing incident-handling permission, not the author-locked original content.</td></tr>
+      <tr><td>Raise a ticket</td><td>None — unrestricted, same as any ticket creation</td><td>Opens <a href="new-ticket-form.html">New ticket form</a> with <code>source_incident</code> pre-set to this incident.</td></tr>
+      <tr><td>Assign the incident</td><td><code>create_incidents</code></td><td>No dedicated assignment permission for incidents (unlike tickets' self/others split) — reuses the same gate as commenting/status changes, since incidents don't have the same self-service queue dynamic tickets do.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Author's shift ends mid-edit</strong> — the lock takes effect the moment the shift ends, not when the author next reloads; an in-progress unsaved edit could be lost, so the app should warn before the boundary where practical.</li>
+      <li><strong>Non-author with <code>create_incidents</code></strong> — can comment and change status freely, but never edit the original title/type/details, even immediately after creation.</li>
+      <li><strong>No <code>view_incidents</code> but incident has a linked ticket</strong> — per <a href="ticket-detail.html">Ticket detail</a>, the ticket shows no indication of the incident at all; there's no partial-visibility state to handle here since this page is simply unreachable.</li>
+      <li><strong>Custom status</strong> — a marina-defined addition to the default four; behaves identically to the defaults once configured, no special-casing in the UI.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: content, comment thread, and linked tickets stack vertically. Desktop: comment thread can sit alongside the incident's own content rather than below it, since there's room to keep both visible while replying.</p>
+
+    <div class="page-foot">
+      <a href="incident-list.html">← Incident List</a>
+      <a href="new-incident-form.html">New Incident Form →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

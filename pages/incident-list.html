@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Incident List — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Incidents · Page Specification</span>
+    <h1>Incident List</h1>
+    <p class="lede">Every logged incident, gated entirely by <code>view_incidents</code> — the one entity in the app where visibility itself, not just some sub-detail, is a hard permission gate.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from the Incidents top-level nav item, which is itself only shown to users holding <code>view_incidents</code> (see <a href="../permissions.html">Permissions</a>). Unlike tickets, there is no "everyone sees the list, some actions are gated" split here — without the permission, incidents don't exist as far as the UI is concerned.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Title, type, status</td><td>Incident.title / type / status</td><td>Status: Open / Under Review / Resolved / Closed, plus a marina's Custom option.</td></tr>
+      <tr><td>Author</td><td>Incident.author</td><td></td></tr>
+      <tr><td>Attachment target</td><td>Incident.attached_to</td><td>Location, Checkpoint, Boat, Contact, or Asset.</td></tr>
+      <tr><td>Assignee</td><td>Incident.assigned_to</td><td>Nullable — assignment is optional on incidents, unlike tickets.</td></tr>
+      <tr><td>Created</td><td>Incident.created_at</td><td></td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Open an incident</td><td><code>view_incidents</code></td><td>Navigates to <a href="incident-detail.html">Incident detail</a>.</td></tr>
+      <tr><td>Log a new incident</td><td><code>create_incidents</code></td><td>Opens <a href="new-incident-form.html">New incident form</a>.</td></tr>
+      <tr><td>Filter by status / type</td><td>None beyond <code>view_incidents</code></td><td>Client-side filter over the subscribed query.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No <code>view_incidents</code></strong> — the Incidents nav item itself doesn't appear; this page is unreachable, not shown-but-empty.</li>
+      <li><strong><code>create_incidents</code> without <code>view_incidents</code></strong> — a legal but unusual combination: this user could log an incident (via a direct link from a checklist, say) without being able to browse the list afterward. Rare in practice, since most roles that create incidents also need to see them.</li>
+      <li><strong>Empty list</strong> — plain empty state; a marina with no open incidents is a good sign, not an error.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: single filterable list. Desktop: sortable table with filters always visible, matching the pattern used on <a href="ticket-queue.html">Ticket queue</a>.</p>
+
+    <div class="page-foot">
+      <a href="new-ticket-form.html">← New Ticket Form</a>
+      <a href="incident-detail.html">Incident Detail →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

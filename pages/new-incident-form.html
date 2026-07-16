@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New Incident Form — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Incidents · Page Specification</span>
+    <h1>New Incident Form</h1>
+    <p class="lede">Log an incident on the move — short title required, everything else optional, gated by <code>create_incidents</code>.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="incident-list.html">Incident list</a>, a checkpoint check-in, or mid-checklist. Deliberately lightweight — per <a href="../workflows.html">Role Workflows</a>, a guard needs to be able to log something fast, on a dark dock, without a long form standing between them and getting back to the round.</p>
+
+    <h2>Data shown / form fields</h2>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+      <tr><td>Title</td><td>Text, required</td><td>Short by design.</td></tr>
+      <tr><td>Type</td><td>Select, from IncidentType — expandable</td><td>A new type can be added inline if none fit; the list grows per marina rather than being fixed.</td></tr>
+      <tr><td>Details</td><td>Rich text (markdown), optional</td><td>Lightweight WYSIWYG.</td></tr>
+      <tr><td>Attachment target</td><td>Location / Checkpoint / Boat / Contact / Asset</td><td>Pre-filled when opened from a specific context (e.g. the current checkpoint); otherwise the shared <a href="attachment-target-picker.html">Attachment-target picker</a>.</td></tr>
+      <tr><td>Assignee</td><td>Select, optional</td><td></td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Submit</td><td><code>create_incidents</code></td><td>Creates the <code>Incident</code> with <code>author</code> = current user, default status Open. Routes to <a href="incident-detail.html">Incident detail</a> on success.</td></tr>
+      <tr><td>Add a new incident type inline</td><td><code>create_incidents</code> (same gate — no separate permission for expanding the type list)</td><td>Creates an <code>IncidentType</code> record on the fly, available to all future incidents at this marina.</td></tr>
+      <tr><td>Raise a linked ticket immediately</td><td>None — ticket creation is unrestricted</td><td>Optional shortcut to also open <a href="new-ticket-form.html">New ticket form</a> pre-linked, without leaving this flow first.</td></tr>
+      <tr><td>Cancel</td><td>None</td><td>Closes without creating an incident.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No <code>create_incidents</code></strong> — this form (and every entry point into it) is unreachable; there is no way to log an incident without the permission.</li>
+      <li><strong>Offline</strong> — writes locally like any other InstantDB record; fully available on a dark dock with no signal, per <a href="../architecture.html">Architecture</a>.</li>
+      <li><strong>No attachment target available</strong> — an attachment target is required, same rule as tickets; there's no unattached incident.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: a short, single-column form optimized for speed — this is the field-use case the screen is built for. Desktop: the same fields, with more room for the rich-text details editor.</p>
+
+    <div class="page-foot">
+      <a href="incident-detail.html">← Incident Detail</a>
+      <a href="index.html">Page Specifications →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>
