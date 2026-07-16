@@ -52,13 +52,16 @@
     </ol>
 
     <h3>GPS as a background update</h3>
-    <p>While GPS is pending, a small, unobtrusive indicator (e.g. a subtle pill near the header — "Saving location…") signals that something is still happening, without blocking any interaction: checklist items, notes, and incidents all work normally while it's showing. Once GPS resolves, the indicator clears — silently if the check-in lands within radius, or replaced by the same "outside radius" flag described under Data shown if it doesn't. If GPS never resolves within a reasonable timeout (location services disabled, unusually poor signal), the indicator settles into an "unavailable" state rather than spinning indefinitely; <code>gps_at_checkin</code> and <code>within_radius</code> simply stay null, which is an accepted terminal state, not an error.</p>
+    <p>While GPS is pending, a small, unobtrusive indicator (e.g. a subtle pill near the header — generic "Saving…" copy, not "Saving location…"; see note below) signals that something is still happening, without blocking any interaction: checklist items, notes, and incidents all work normally while it's showing. Once GPS resolves, the indicator clears — silently if the check-in lands within radius, or replaced by the same "outside radius" flag described under Data shown if it doesn't. If GPS never resolves within a reasonable timeout (location services disabled, unusually poor signal), the indicator settles into an "unavailable" state rather than spinning indefinitely; <code>gps_at_checkin</code> and <code>within_radius</code> simply stay null, which is an accepted terminal state, not an error.</p>
+    <div class="note">
+      <strong>Indicator copy stays generic.</strong> Background-save indicators like this one should say only that something is still saving ("Saving…"), not what — never name the specific field or subsystem (e.g. not "Saving location…" or "Saving GPS…"). This keeps the pattern reusable verbatim for any other field that ends up saving asynchronously in the background, without a spec-by-spec rewrite of the copy.
+    </div>
 
     <h2>Data shown</h2>
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Checkpoint name &amp; location</td><td>Checkpoint.name, Checkpoint.location</td><td></td></tr>
-      <tr><td>GPS pending indicator</td><td>Check-In.gps_at_checkin / within_radius = null</td><td>Small, unobtrusive "Saving location…" pill, shown only while GPS hasn't resolved yet; never blocks the rest of the screen.</td></tr>
+      <tr><td>GPS pending indicator</td><td>Check-In.gps_at_checkin / within_radius = null</td><td>Small, unobtrusive "Saving…" pill (generic copy — see note below), shown only while GPS hasn't resolved yet; never blocks the rest of the screen.</td></tr>
       <tr><td>GPS validation result</td><td>Check-In.within_radius</td><td>Shown only once resolved and flagged false — otherwise the pending indicator just clears silently.</td></tr>
       <tr><td>Applicable checklist(s)</td><td>Checkpoint.checklist_templates, trigger-evaluated</td><td>Zero, one, or more.</td></tr>
     </table>
