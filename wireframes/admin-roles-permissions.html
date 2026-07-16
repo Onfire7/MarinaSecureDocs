@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Admin Roles & Permissions — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+  .wf-matrix { border-collapse: collapse; font-size: 0.72rem; }
+  .wf-matrix th, .wf-matrix td { border: 1px solid var(--wf-line); padding: 5px 8px; text-align: center; }
+  .wf-matrix th { font-family: var(--wf-mono); font-weight: 600; background: var(--wf-fill); }
+  .wf-matrix td:first-child, .wf-matrix th:first-child { text-align: left; font-family: var(--wf-mono); }
+  .cell-allow { color: var(--wf-good); font-weight: 700; }
+  .cell-deny { color: var(--wf-bad); font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/admin-roles-permissions.html">Page Spec: Roles &amp; Permissions →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="admin-users.html">← Users</a>
+      <a href="admin-checklist-templates.html">Next: Checklist Templates →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Admin · Wireframe</span>
+  <h1 class="wf-h1">Roles &amp; Permissions</h1>
+  <p class="wf-lede">The trinary matrix: ✓ Allow / ✕ Deny / blank Undefined, per role × permission. Desktop is the primary surface — mobile falls back to a per-role list instead of the full grid.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled) — matrix editor</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <table class="wf-matrix">
+            <tr><th>Permission</th><th>Security</th><th>Trainee</th><th>Office</th><th>Maintenance</th><th>Manager</th></tr>
+            <tr><td>create_incidents</td><td class="cell-allow">✓</td><td></td><td></td><td></td><td class="cell-allow">✓</td></tr>
+            <tr><td>view_incidents</td><td class="cell-allow">✓</td><td></td><td></td><td></td><td class="cell-allow">✓</td></tr>
+            <tr><td>assign_ticket_to_self</td><td></td><td></td><td></td><td class="cell-allow">✓</td><td class="cell-allow">✓</td></tr>
+            <tr><td>assign_ticket_to_others</td><td class="cell-allow">✓</td><td class="cell-deny">✕</td><td></td><td></td><td class="cell-allow">✓</td></tr>
+            <tr><td>view_calls</td><td></td><td></td><td class="cell-allow">✓</td><td></td><td class="cell-allow">✓</td></tr>
+            <tr><td>place_calls</td><td></td><td></td><td class="cell-allow">✓</td><td></td><td class="cell-allow">✓</td></tr>
+            <tr><td>manage_locations</td><td></td><td></td><td></td><td></td><td class="cell-allow">✓</td></tr>
+          </table>
+          <div class="wf-annotation">Trainee's Deny on assign_ticket_to_others cancels Security's Allow for anyone holding both roles — Deny always wins.</div>
+          <div class="wf-actions" style="margin-top:10px;"><div class="wf-button">+ Add Role</div><div class="wf-button">Duplicate</div><div class="wf-button">Delete</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px — per-role fallback</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <div class="wf-appbar-back">←</div>
+          <span class="wf-appbar-title">Trainee</span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-field"><span class="wf-field-label">assign_ticket_to_others</span><div class="wf-field-value"><span class="wf-badge wf-badge-bad">Deny</span></div></div>
+          <div class="wf-field"><span class="wf-field-label">create_incidents</span><div class="wf-field-value"><span class="wf-badge">Undefined</span></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="admin-checklist-templates.html">Next: Checklist Templates →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

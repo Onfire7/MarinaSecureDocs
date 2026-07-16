@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Admin Location Types & Locations Setup — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/admin-locations.html">Page Spec: Location Types &amp; Locations Setup →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="admin-checklist-templates.html">← Checklist Templates</a>
+      <a href="admin-tours.html">Next: Tours Setup →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Admin · Wireframe</span>
+  <h1 class="wf-h1">Location Types &amp; Locations Setup</h1>
+  <p class="wf-lede">Three nested concerns: the type system, the actual location instances (with the mixed-use reservation toggle), and — the piece carried since Reservations — map upload and rectangle plotting, scoped to root Locations.</p>
+
+  <div class="wf-frames">
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled) — Location editor</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <div class="wf-grid-2">
+            <div>
+              <div class="wf-field"><span class="wf-field-label">Name / Type / Parent</span><div class="wf-field-value">Slip 14 · Slip · Dock C</div></div>
+              <div class="wf-field"><span class="wf-field-label">Reservation enabled</span><div class="wf-field-value">☐ off — this Slip is long-term leased</div></div>
+              <div class="wf-field"><span class="wf-field-label">Reservation enabled — Slip 15</span><div class="wf-field-value">☑ on · Public</div></div>
+              <div class="wf-annotation">Mixed-use dock: each Slip's toggle is independent — this is what lets short-term and long-term Slips sit side by side under the same Dock.</div>
+            </div>
+            <div>
+              <div class="wf-section-title">Checkpoints on Slip 14</div>
+              <div class="wf-card">Slip 14 marker — GPS radius: default (15m)</div>
+              <div class="wf-actions"><div class="wf-button">+ Add Checkpoint</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-frames" style="margin-top:24px;">
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled) — Map upload &amp; plotting</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <div class="wf-actions" style="margin-bottom:10px;">
+            <div class="wf-select" style="width:auto;">Map: Harborview Marina (root overview) ▾</div>
+            <div class="wf-button">+ Upload New Map</div>
+          </div>
+          <div class="wf-field"><span class="wf-field-label">Scope — required</span><div class="wf-select">Root Location: Harborview Marina</div></div>
+          <div class="wf-map-placeholder" style="min-height:260px;">
+            <div class="wf-map-rect" style="top:15%; left:10%; width:110px; height:38px; border-style:dashed;">Slip 14<br>drag to place</div>
+            <div class="wf-map-rect" style="top:15%; left:32%; width:100px; height:36px;">Slip 15</div>
+            <div class="wf-map-rect" style="top:55%; left:20%; width:120px; height:36px;">Cabin 3</div>
+            <div class="wf-map-rect" style="top:55%; left:55%; width:100px; height:36px;">Building A →</div>
+          </div>
+          <div class="wf-annotation">Slip 14's rectangle here is a dashed drag-in-progress state. The same Location can also be plotted separately on Dock C's own detail map, at different coordinates.</div>
+          <div class="wf-actions" style="margin-top:10px;"><div class="wf-button">Unplot Selected</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-section" style="margin-top:24px;">
+    <div class="wf-section-title">Notes</div>
+    <div class="wf-annotation">No root Location exists yet → the scope picker for a new overview map has nothing appropriate to offer; admin must create one first (e.g. a "Marina" type with no parent).</div>
+    <div class="wf-annotation">Multiple root Locations (multi-property marina) → each gets its own overview map; the schematic map viewer shows a chooser between them.</div>
+    <div class="wf-annotation">Turning reservation_enabled on for a Location with an active Lease shows a warning, not a block — same symmetric warning going the other direction from Lease Detail.</div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="admin-tours.html">Next: Tours Setup →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

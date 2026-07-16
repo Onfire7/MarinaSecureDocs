@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Admin Users — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/admin-users.html">Page Spec: Users →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="admin-home.html">← Admin Home</a>
+      <a href="admin-roles-permissions.html">Next: Roles &amp; Permissions →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Admin · Wireframe</span>
+  <h1 class="wf-h1">Users</h1>
+  <p class="wf-lede">Desktop is the primary surface — an office/desk workflow. Deactivating the last manage_users holder is blocked outright.</p>
+
+  <div class="wf-frames">
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <div class="wf-actions" style="margin-bottom:10px;"><div class="wf-input" style="flex:1;">Search…</div><div class="wf-button wf-button-primary">+ Invite User <span class="wf-gate">manage_users</span></div></div>
+          <table class="wf-table">
+            <tr><th>Name</th><th>Email/Phone</th><th>Roles</th><th>Status</th></tr>
+            <tr><td>Maria Alvarez</td><td>malvarez@harborview.example</td><td>Security</td><td><span class="wf-badge wf-badge-good">Active</span></td></tr>
+            <tr><td>Devon Kim</td><td>dkim@harborview.example</td><td>Office, Maintenance</td><td><span class="wf-badge wf-badge-good">Active</span></td></tr>
+            <tr><td>J. Ruiz</td><td>jruiz@harborview.example</td><td>Maintenance</td><td><span class="wf-badge">Pending invite</span></td></tr>
+            <tr><td style="opacity:0.5;">Sam Torres</td><td style="opacity:0.5;">storres@harborview.example</td><td style="opacity:0.5;">Security</td><td><span class="wf-badge wf-badge-bad">Deactivated</span></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-section" style="margin-top:24px;">
+    <div class="wf-annotation">Deactivating the last manage_users holder is blocked outright, with an explanation — not just warned.</div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="admin-roles-permissions.html">Next: Roles &amp; Permissions →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

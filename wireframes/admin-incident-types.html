@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Admin Incident Types — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/admin-incident-types.html">Page Spec: Incident Types →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="admin-tours.html">← Tours Setup</a>
+      <a href="admin-assets.html">Next: Asset Categories &amp; Maintenance Rules →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Admin · Wireframe</span>
+  <h1 class="wf-h1">Incident Types</h1>
+  <p class="wf-lede">Reuses create_incidents — the same permission that lets any user add a type inline from New Incident Form. Mostly a cleanup tool for merging near-duplicates.</p>
+
+  <div class="wf-frames">
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <table class="wf-table">
+            <tr><th>Name</th><th>Usage</th><th></th></tr>
+            <tr><td>Safety</td><td>14 incidents</td><td>Rename</td></tr>
+            <tr><td>Security</td><td>8 incidents</td><td>Rename</td></tr>
+            <tr><td>Saftey <span class="wf-badge wf-badge-warn">near-duplicate</span></td><td>2 incidents</td><td>Merge into "Safety"</td></tr>
+          </table>
+          <div class="wf-actions" style="margin-top:12px;"><div class="wf-button">+ Add Type <span class="wf-gate">create_incidents</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="admin-assets.html">Next: Asset Categories &amp; Maintenance Rules →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

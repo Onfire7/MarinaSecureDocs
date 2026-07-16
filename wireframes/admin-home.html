@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Admin Home — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/admin-home.html">Page Spec: Admin Home →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="shift-report.html">← Shift Report</a>
+      <a href="admin-users.html">Next: Users →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Admin · Wireframe</span>
+  <h1 class="wf-h1">Admin Home / Section Picker</h1>
+  <p class="wf-lede">Nav item appears for anyone holding any manage_* permission; each tile independently gated by its own permission — some may be grayed out even when Admin itself is visible.</p>
+
+  <div class="wf-frames">
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px — tiles stack vertically</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <span class="wf-appbar-title">Admin</span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-card"><div class="wf-card-title">Users</div><div class="wf-gate">manage_users</div></div>
+          <div class="wf-card"><div class="wf-card-title">Marina Settings</div><div class="wf-gate">manage_marina_settings</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-desktop-body">
+          <aside class="wf-sidenav">
+            <div class="wf-sidenav-brand">MarinaSecure</div>
+            <a class="wf-sidenav-item">Home</a>
+            <a class="wf-sidenav-item">Checklists</a>
+            <a class="wf-sidenav-item">Locations</a>
+            <a class="wf-sidenav-item">Comms</a>
+            <a class="wf-sidenav-item">Tickets</a>
+            <a class="wf-sidenav-item">Incidents</a>
+            <a class="wf-sidenav-item">Reservations</a>
+            <a class="wf-sidenav-item">Boats</a>
+            <a class="wf-sidenav-item">Owners</a>
+            <a class="wf-sidenav-item">Contacts</a>
+            <a class="wf-sidenav-item">Activity Log</a>
+            <a class="wf-sidenav-item">Reports</a>
+            <a class="wf-sidenav-item current">Admin</a>
+          </aside>
+          <div class="wf-content">
+            <div class="wf-grid-3">
+              <div class="wf-card"><div class="wf-card-title">Users</div><div class="wf-gate">manage_users</div></div>
+              <div class="wf-card"><div class="wf-card-title">Roles &amp; Permissions</div><div class="wf-gate">manage_roles</div></div>
+              <div class="wf-card"><div class="wf-card-title">Checklist Templates</div><div class="wf-gate">manage_checklists</div></div>
+              <div class="wf-card"><div class="wf-card-title">Location Types &amp; Locations</div><div class="wf-gate">manage_locations</div></div>
+              <div class="wf-card"><div class="wf-card-title">Tours</div><div class="wf-gate">manage_locations</div></div>
+              <div class="wf-card"><div class="wf-card-title">Incident Types</div><div class="wf-gate">create_incidents</div></div>
+              <div class="wf-card"><div class="wf-card-title">Asset Categories &amp; Rules</div><div class="wf-gate">manage_assets</div></div>
+              <div class="wf-card"><div class="wf-card-title">SMS Templates</div><div class="wf-gate">manage_marina_settings</div></div>
+              <div class="wf-card"><div class="wf-card-title">Marina Settings</div><div class="wf-gate">manage_marina_settings</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="admin-users.html">Next: Users →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

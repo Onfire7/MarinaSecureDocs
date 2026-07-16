@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Admin Marina Settings — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/admin-marina-settings.html">Page Spec: Marina Settings →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="admin-sms-templates.html">← SMS Templates</a>
+      <a href="index.html">Back to Wireframes index →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Admin · Wireframe</span>
+  <h1 class="wf-h1">Marina Settings</h1>
+  <p class="wf-lede">The single settings record per marina. Last screen in the set — an infrequent configuration task, not a field workflow, so no special mobile treatment.</p>
+
+  <div class="wf-frames">
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <div class="wf-grid-2">
+            <div>
+              <div class="wf-field"><span class="wf-field-label">GPS validation radius default</span><div class="wf-input">15 m</div></div>
+              <div class="wf-field"><span class="wf-field-label">Activity Log retention</span><div class="wf-input">180 days</div></div>
+              <div class="wf-field"><span class="wf-field-label">Call recording / transcription</span><div class="wf-field-value">☑ Recording &nbsp; ☐ Transcription</div></div>
+              <div class="wf-field"><span class="wf-field-label">Allow overlapping reservations</span><div class="wf-field-value">☐ off (default — blocks)</div></div>
+            </div>
+            <div>
+              <div class="wf-field">
+                <span class="wf-field-label">Shift report recipients</span>
+                <div class="wf-input" style="border-color:var(--wf-warn);"></div>
+                <div class="wf-badge wf-badge-warn" style="margin-top:4px;">Empty — reports will compile but have nowhere to send</div>
+              </div>
+              <div class="wf-field">
+                <span class="wf-field-label">Phone lines</span>
+                <div class="wf-card">Office — (555) 019-0000</div>
+                <div class="wf-card">Security — (555) 019-0001 → skips to security menu</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-section" style="margin-top:24px;">
+    <div class="wf-annotation">The empty-recipients warning shown above appears only inline next to this field — nowhere else in the app.</div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="index.html">Back to Wireframes index →</a></div>
+  </div>
+
+</div>
+</body>
+</html>
