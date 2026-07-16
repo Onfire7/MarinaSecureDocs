@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — User Switch — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/user-switch.html">Page Spec: User Switch →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="sign-in.html">← Sign In</a>
+      <a href="dashboard.html">Next: Dashboard →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Access · Wireframe</span>
+  <h1 class="wf-h1">User Switch</h1>
+  <p class="wf-lede">Mobile-first — the shared-device case. Desktop renders the same layout unmodified per the page spec, so one frame stands in for both.</p>
+
+  <div class="wf-frames">
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Any width — 375px shown</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <span class="wf-appbar-title">Switch User</span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-section-title">Signed in on this device</div>
+          <div class="wf-card" style="display:flex; align-items:center; gap:10px;">
+            <div class="wf-photo-placeholder" style="width:36px; height:36px; min-height:0; flex-shrink:0;"></div>
+            <div>
+              <div class="wf-card-title">Maria Alvarez</div>
+              <div class="wf-card-meta">Security · last active 6h ago</div>
+            </div>
+          </div>
+          <div class="wf-card" style="display:flex; align-items:center; gap:10px;">
+            <div class="wf-photo-placeholder" style="width:36px; height:36px; min-height:0; flex-shrink:0;"></div>
+            <div>
+              <div class="wf-card-title">Devon Kim</div>
+              <div class="wf-card-meta">Office</div>
+            </div>
+          </div>
+          <div class="wf-annotation">Tapping a name calls Clerk's <code>setActive()</code> for that existing session — no credential re-entry — then opens Dashboard.</div>
+          <div class="wf-divider"></div>
+          <div class="wf-actions" style="flex-direction:column;">
+            <div class="wf-button">+ Add Another User</div>
+          </div>
+          <div class="wf-annotation">Removing a user's session from this device: self unrestricted, removing someone else's requires <span class="wf-gate">manage_users</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="dashboard.html">Next: Dashboard →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

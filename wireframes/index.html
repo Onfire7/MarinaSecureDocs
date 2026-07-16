@@ -36,19 +36,139 @@
 
   <main class="content">
     <span class="eyebrow">Specifications</span>
-    <span class="doc-status">Planned — not yet written</span>
+    <span class="doc-status">In progress — Access, Home complete</span>
     <h1>Wireframes</h1>
     <p class="lede">Low-fidelity HTML wireframes for every page listed in <a href="../pages/index.html">Page Specifications</a>, sharing a single stylesheet (<code>wireframes/shared/styles.css</code>) so every screen is visually consistent without any of them being a finished design.</p>
 
     <div class="note">
-      <strong>Sequenced after page specs.</strong> Wireframes are most useful once the page specs they illustrate are settled — building them in parallel risks redoing layout work as specs change. Once <a href="../pages/index.html">Page Specifications</a> is reviewed and confirmed, wireframes will follow the same structure: one HTML file per screen, plus mobile and desktop states where navigation patterns diverge (see <a href="../architecture.html">Architecture</a>).
+      <strong>Status.</strong> Access and Home are written and linked below. The remaining groups follow the same page list as <a href="../pages/index.html">Page Specifications</a> — flag anything that should change before continuing.
     </div>
 
-    <h2>What these will (and won't) show</h2>
+    <h2>Conventions</h2>
     <ul>
-      <li>Layout, information hierarchy, and navigation structure for each screen, at both mobile and desktop breakpoints where they differ meaningfully.</li>
-      <li>Placeholder content that reflects real field names and data shapes from the <a href="../data-model.html">Data Model</a> — not lorem ipsum.</li>
-      <li>Deliberately <strong>not</strong> final visual design — no brand styling, illustration, or polish. That's a separate design pass once the underlying structure is agreed on.</li>
+      <li><strong>Two device frames per screen</strong> — a 375px mobile frame and a ~940px desktop frame (standing in for 1280px), shown side by side wherever the two layouts genuinely diverge. Where the page spec says a screen renders identically at any width (most dialogs), a single frame stands in for both, noted explicitly.</li>
+      <li><strong>Real content, not lorem ipsum</strong> — field labels and sample values are drawn from the <a href="../data-model.html">Data Model</a> (e.g. "Slip 14," "Jump Pack A"), not filler text.</li>
+      <li><strong>Grayscale only, one exception</strong> — no brand color or type; three muted functional colors (green/amber/red) are used solely for status semantics (ticket priority, reservation status, GPS validation), never decoratively.</li>
+      <li><strong><span class="tag">🔒 permission</span> tags</strong> — a dashed pill directly on a wireframe element marks it as conditionally visible/enabled, naming the permission that gates it (e.g. <code>view_incidents</code>) — the same gates documented in the corresponding page spec, shown in place rather than only in prose.</li>
+      <li><strong>Dashed annotation boxes</strong> — italic call-outs beside non-obvious elements, explaining behavior a static mockup can't otherwise show (an async state, a disabled control, a redirect).</li>
+      <li><strong>Dialogs render as a floating card</strong> over a dimmed backdrop rather than a full frame, to distinguish them from full-page screens at a glance.</li>
+    </ul>
+
+    <h2>Page list</h2>
+
+    <h3>Access</h3>
+    <ul>
+      <li><a href="sign-in.html">Sign in</a></li>
+      <li><a href="user-switch.html">User switch</a></li>
+    </ul>
+
+    <h3>Home</h3>
+    <ul>
+      <li><a href="dashboard.html">Dashboard</a></li>
+    </ul>
+
+    <h3>Checklists &amp; Tours</h3>
+    <ul>
+      <li>Checklist list</li>
+      <li>Active checklist</li>
+      <li>Checkpoint check-in screen</li>
+      <li>Manual check-in dialog</li>
+      <li>Tour progress view</li>
+      <li>Checklist detail</li>
+    </ul>
+
+    <h3>Locations</h3>
+    <ul>
+      <li>Location list / map view</li>
+      <li>Location detail</li>
+      <li>Checkpoint detail</li>
+    </ul>
+
+    <h3>Comms</h3>
+    <ul>
+      <li>Comms home</li>
+      <li>Active call panel/pop-up</li>
+      <li>Missed calls / unread SMS detail view</li>
+      <li>New call dialog</li>
+      <li>SMS thread</li>
+      <li>New SMS dialog</li>
+      <li>Chat room</li>
+      <li>New chat room / invite screen</li>
+    </ul>
+
+    <h3>Tickets</h3>
+    <ul>
+      <li>Ticket queue</li>
+      <li>Ticket detail</li>
+      <li>New ticket form</li>
+    </ul>
+
+    <h3>Incidents</h3>
+    <ul>
+      <li>Incident list</li>
+      <li>Incident detail</li>
+      <li>New incident form</li>
+    </ul>
+
+    <h3>Reservations</h3>
+    <ul>
+      <li>Reservation calendar/list</li>
+      <li>Reservation detail</li>
+      <li>New reservation form</li>
+      <li>Reservation check-in / check-out dialog</li>
+    </ul>
+
+    <h3>Boats</h3>
+    <ul>
+      <li>Boat list</li>
+      <li>Boat detail</li>
+    </ul>
+
+    <h3>Owners &amp; Contacts</h3>
+    <ul>
+      <li>Owner/Contact list</li>
+      <li>Owner/Contact detail</li>
+      <li>Nameless-contact name prompt &amp; merge dialog</li>
+      <li>Lease detail</li>
+    </ul>
+
+    <h3>Assets</h3>
+    <ul>
+      <li>Asset list</li>
+      <li>Asset detail</li>
+      <li>Checkout / return dialog</li>
+      <li>Meter update dialog</li>
+    </ul>
+
+    <h3>Shared dialogs</h3>
+    <ul>
+      <li>New note dialog</li>
+      <li>Attachment-target picker</li>
+    </ul>
+
+    <h3>Activity Log</h3>
+    <ul>
+      <li>Activity Log</li>
+    </ul>
+
+    <h3>Reports</h3>
+    <ul>
+      <li>Reports home</li>
+      <li>Shift report</li>
+    </ul>
+
+    <h3>Admin</h3>
+    <ul>
+      <li>Admin home / section picker</li>
+      <li>Users</li>
+      <li>Roles &amp; Permissions</li>
+      <li>Checklist Templates</li>
+      <li>Location Types &amp; Locations setup</li>
+      <li>Tours setup</li>
+      <li>Incident Types</li>
+      <li>Asset categories &amp; maintenance rules</li>
+      <li>SMS Templates</li>
+      <li>Marina Settings</li>
     </ul>
 
     <div class="page-foot">

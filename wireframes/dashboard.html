@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Dashboard — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/dashboard.html">Page Spec: Dashboard →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="user-switch.html">← User Switch</a>
+      <a href="checklist-list.html">Next: Checklist List →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Home · Wireframe</span>
+  <h1 class="wf-h1">Dashboard</h1>
+  <p class="wf-lede">Role-adaptive, user-customizable cards. Mobile stacks them in the user's saved order; desktop arranges them in a grid. Shown here for a user holding Security + Office roles, with <code>view_calls</code>/<code>view_sms</code>/<code>view_incidents</code> but not <code>manage_*</code>.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <span class="wf-appbar-title">Home</span>
+          <div class="wf-appbar-actions"><div class="wf-appbar-icon"></div></div>
+        </div>
+        <div class="wf-content">
+          <div class="wf-card">
+            <div class="wf-card-meta">CLOCK</div>
+            <div class="wf-card-title">7:42 PM · Tue Jul 15</div>
+          </div>
+          <div class="wf-card">
+            <div class="wf-card-meta">SHIFT</div>
+            <div class="wf-card-title">No active shift</div>
+            <div class="wf-actions"><div class="wf-button wf-button-primary">Start Shift</div></div>
+          </div>
+          <div class="wf-card">
+            <div class="wf-card-meta">MISSED COMMS <span class="wf-gate">view_calls / view_sms</span></div>
+            <div class="wf-card-title">2 missed calls · 1 unread text</div>
+          </div>
+          <div class="wf-card">
+            <div class="wf-card-meta">INCIDENT SUMMARY <span class="wf-gate">view_incidents</span></div>
+            <div class="wf-card-title">3 open</div>
+          </div>
+          <div class="wf-card">
+            <div class="wf-card-meta">UPCOMING RESERVATIONS</div>
+            <div class="wf-card-title">Cabin 3 — checks in tomorrow</div>
+          </div>
+          <div class="wf-annotation">Edit-layout mode: show/hide/reorder any card the user is permissioned for; "reset to role defaults" always available.</div>
+        </div>
+        <div class="wf-tabbar">
+          <div class="wf-tab current"><div class="wf-tab-icon"></div>Home</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Checklists</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Locations</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Comms</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Other</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-desktop-body">
+          <aside class="wf-sidenav">
+            <div class="wf-sidenav-brand">MarinaSecure</div>
+            <a class="wf-sidenav-item current">Home</a>
+            <a class="wf-sidenav-item">Checklists</a>
+            <a class="wf-sidenav-item">Locations</a>
+            <a class="wf-sidenav-item">Comms</a>
+            <a class="wf-sidenav-item">Tickets</a>
+            <a class="wf-sidenav-item">Incidents</a>
+            <a class="wf-sidenav-item">Reservations</a>
+            <a class="wf-sidenav-item">Boats</a>
+            <a class="wf-sidenav-item">Owners</a>
+            <a class="wf-sidenav-item">Contacts</a>
+            <a class="wf-sidenav-item">Activity Log</a>
+            <a class="wf-sidenav-item">Reports</a>
+          </aside>
+          <div class="wf-content">
+            <div class="wf-grid-3">
+              <div class="wf-card">
+                <div class="wf-card-meta">CLOCK</div>
+                <div class="wf-card-title">7:42 PM · Tue Jul 15</div>
+              </div>
+              <div class="wf-card">
+                <div class="wf-card-meta">SHIFT</div>
+                <div class="wf-card-title">No active shift</div>
+                <div class="wf-actions"><div class="wf-button wf-button-primary">Start Shift</div></div>
+              </div>
+              <div class="wf-card">
+                <div class="wf-card-meta">MISSED COMMS <span class="wf-gate">view_calls / view_sms</span></div>
+                <div class="wf-card-title">2 missed calls · 1 unread text</div>
+              </div>
+              <div class="wf-card">
+                <div class="wf-card-meta">INCIDENT SUMMARY <span class="wf-gate">view_incidents</span></div>
+                <div class="wf-card-title">3 open</div>
+              </div>
+              <div class="wf-card">
+                <div class="wf-card-meta">UPCOMING RESERVATIONS</div>
+                <div class="wf-card-title">Cabin 3 — checks in tomorrow</div>
+              </div>
+              <div class="wf-card" style="border-style:dashed; color:var(--wf-mute); display:flex; align-items:center; justify-content:center;">+ Add card</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-section" style="margin-top:24px;">
+    <div class="wf-section-title">Notes</div>
+    <div class="wf-annotation">Ticket summary and Admin-shortcut cards omitted here — this user holds no ticket-relevant role emphasis and no manage_* permission, so Admin never appears in nav either.</div>
+    <div class="wf-annotation">Card gating reuses existing data permissions (view_incidents, view_calls, etc.) — no card-specific permissions exist.</div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="checklist-list.html">Next: Checklist List →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Sign In — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/sign-in.html">Page Spec: Sign In →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="user-switch.html">Next: User Switch →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Access · Wireframe</span>
+  <h1 class="wf-h1">Sign In</h1>
+  <p class="wf-lede">Single-column form, identical at any viewport width — no mobile/desktop divergence per the page spec, so one frame stands in for both.</p>
+
+  <div class="wf-frames">
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Any width — 375px shown</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-content" style="display:flex; flex-direction:column; justify-content:center; min-height:520px;">
+          <div class="wf-section" style="text-align:center; margin-bottom:28px;">
+            <div class="wf-card-title" style="font-size:1.1rem;">Harborview Marina</div>
+            <div class="wf-card-meta">MarinaSecure</div>
+          </div>
+          <div class="wf-field">
+            <span class="wf-field-label">Email or phone</span>
+            <div class="wf-input">jsmith@harborview.example</div>
+          </div>
+          <div class="wf-field">
+            <span class="wf-field-label">Credential (per Clerk provider config)</span>
+            <div class="wf-input">••••••••</div>
+          </div>
+          <div class="wf-actions" style="flex-direction:column;">
+            <div class="wf-button wf-button-primary" style="text-align:center;">Sign In</div>
+          </div>
+          <div class="wf-annotation" style="text-align:center; margin-top:16px;">Resend / forgot credential — Clerk-provided recovery flow</div>
+          <div class="wf-annotation" style="text-align:center;">"Switch user" link appears here only if this device already has another signed-in session (Clerk multi-session) → routes to User Switch instead</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-section" style="margin-top:24px;">
+    <div class="wf-section-title">Notes</div>
+    <div class="wf-annotation">First sign-in on a device requires connectivity; once signed in, later launches skip straight past this screen to the Dashboard.</div>
+    <div class="wf-annotation">Deactivated-user and wrong-credential errors are identical — no hint about which is the case.</div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="user-switch.html">Next: User Switch →</a></div>
+  </div>
+
+</div>
+</body>
+</html>
