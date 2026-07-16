@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Attachment-Target Picker — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Shared Dialogs · Page Specification</span>
+    <h1>Attachment-Target Picker</h1>
+    <p class="lede">A shared sub-dialog, reused by Notes, Incidents, and Tickets whenever the attachment target isn't already implied by where the flow was opened from — search across all five valid target types and pick exactly one.</p>
+
+    <h2>Purpose</h2>
+    <p>Rather than each of <a href="new-note-dialog.html">New note dialog</a>, <a href="new-incident-form.html">New incident form</a>, and <a href="new-ticket-form.html">New ticket form</a> building its own target search, they all delegate to this one component when opened without a pre-filled context (e.g. from the Incidents nav item directly, rather than from a specific Location's detail page). Returns a single selection back to whichever flow opened it — it never creates or edits anything itself.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Type filter</td><td>Fixed set: Location, Checkpoint, Boat, Contact, Asset</td><td>Matches the attachment pattern in <a href="../data-model.html">Data Model</a> exactly — this picker is the one place that fixed list is enumerated as UI, everywhere else it's just "the attachment target."</td></tr>
+      <tr><td>Search results</td><td>Unified fuzzy search across all five entity types, or scoped to one via the type filter</td><td>Each result's visibility follows that entity type's own gating (e.g. a Contact result requires <code>view_owner</code> to appear) — the picker doesn't surface anything the user couldn't otherwise see.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Select a result</td><td>Same as that result's own visibility gate</td><td>Returns the selection to the calling flow (Note/Incident/Ticket form) and closes.</td></tr>
+      <tr><td>Cancel</td><td>None</td><td>Closes with no selection; the calling flow's attachment target stays unset.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No results</strong> — plain empty state, scoped to whichever type filter is active.</li>
+      <li><strong>User can't see any of the five types</strong> — a theoretical edge case (would require lacking <code>view_owner</code> and having no unrestricted types visible, though Location/Checkpoint/Boat/Asset are themselves unrestricted to view) — in practice always has something to search, since only the Contact type carries a view gate here.</li>
+      <li><strong>Reused across three different callers</strong> — the picker itself has no memory of which one opened it beyond returning to that flow; it's a stateless selection component.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: full-screen search. Desktop: a smaller modal or inline dropdown, since there's more surrounding context already visible in the calling form.</p>
+
+    <div class="page-foot">
+      <a href="new-note-dialog.html">← New Note Dialog</a>
+      <a href="activity-log.html">Activity Log Feed →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

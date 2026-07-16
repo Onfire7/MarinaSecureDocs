@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shift Report — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Reports · Page Specification</span>
+    <h1>Shift Report</h1>
+    <p class="lede">View a compiled end-of-shift report, and resend it if needed.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="reports-home.html">Reports home</a>. Shows the same content that was (or will be) emailed to the marina's <code>MarinaSettings.shift_report_recipients</code>, per <a href="../architecture.html">Architecture — Shift report delivery</a>.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Guard, shift window</td><td>Shift.guard / started_at / ended_at</td><td></td></tr>
+      <tr><td>Delivery status</td><td>Shift.report_sent_at</td><td>Null means not yet sent — either still within the shift, or waiting on the scheduled backstop sweep if the shift ended offline.</td></tr>
+      <tr><td>Compiled content</td><td>Check-ins, checklists, incidents, and tickets whose timestamps fall within the shift's window</td><td>Same compilation logic used for the actual email — association by timestamp, not a direct Shift reference, per <a href="../data-model.html">Data Model — Shift</a>.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Resend</td><td>The shift's own guard, or <code>view_reports</code></td><td>Calls the same <code>POST /reports/shift/:shiftId/send</code> Netlify Function used for the original on-demand send (see <a href="../api-structure.html">API Structure</a>) — it compiles fresh from current data and hands off to the Twilio Function to actually send via SendGrid and update <code>report_sent_at</code>.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Not yet sent</strong> — shown with a pending indicator rather than a blank delivery-status field; the content itself is still fully viewable, compiled live from current data regardless of whether the email has gone out.</li>
+      <li><strong>Resend while offline</strong> — disabled, since the send path ultimately depends on Twilio SendGrid (an online-only action, per <a href="../architecture.html">Architecture</a>); the report content remains viewable offline.</li>
+      <li><strong>Content changes after the shift ends</strong> (e.g. a late incident comment) — viewing this page always compiles fresh, so it can show more than what the original email contained; a resend captures that current state, not the original snapshot.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Same read-only layout on both; no divergent interaction pattern beyond the app's general responsive treatment.</p>
+
+    <div class="page-foot">
+      <a href="reports-home.html">← Reports Home</a>
+      <a href="index.html">Page Specifications →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

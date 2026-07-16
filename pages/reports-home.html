@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reports Home — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Reports · Page Specification</span>
+    <h1>Reports Home</h1>
+    <p class="lede">The landing point for the Reports top-level nav item — gated entirely by <code>view_reports</code>.</p>
+
+    <h2>Purpose</h2>
+    <p>Per <a href="../workflows.html">Role Workflows</a>, a Marina Manager/Owner leans on this section day to day for shift summaries, incident history, ticket throughput, and call logs — an oversight view across the marina, distinct from the Activity Log's raw chronological feed.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Section</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Shift reports</td><td>Shift, most recent first</td><td>Guard, date, <code>report_sent_at</code> status; each links to <a href="shift-report.html">Shift report</a>.</td></tr>
+      <tr><td>Incident history</td><td>Incident, aggregated</td><td>Counts and trends by type/status over a selected date range.</td></tr>
+      <tr><td>Ticket throughput</td><td>Ticket, aggregated</td><td>Created vs. resolved counts over a selected date range.</td></tr>
+      <tr><td>Call logs</td><td>Call / SMSThread, aggregated</td><td>Volume over a selected date range; individual call/text detail still lives in <a href="comms-home.html">Comms</a>, not duplicated here.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Open a shift report</td><td><code>view_reports</code></td><td>Navigates to <a href="shift-report.html">Shift report</a>.</td></tr>
+      <tr><td>Adjust date range</td><td><code>view_reports</code></td><td>Applies to the aggregate sections; shift reports are browsed by list, not range-filtered the same way.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No <code>view_reports</code></strong> — the Reports nav item doesn't appear; this page is unreachable, matching the same all-or-nothing pattern as <a href="incident-list.html">Incident list</a>'s <code>view_incidents</code> gate.</li>
+      <li><strong>Aggregate sections independent of entity-level permissions</strong> — <code>view_reports</code> is its own gate; a user holding it sees the incident-history aggregate even without <code>view_incidents</code>, since a report is a summary, not a browse of the underlying records. This is a deliberate, narrow exception to the entry-level scoping used on <a href="activity-log.html">Activity Log feed</a> — worth confirming with the implementing team before build, since it means aggregate counts can reveal more than the detail screens they're counting.</li>
+      <li><strong>No shifts yet</strong> — empty state for a brand-new marina.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: sections stack vertically, each collapsible. Desktop: sections arrange in a grid so several are visible at once, similar to the Dashboard's card layout.</p>
+
+    <div class="page-foot">
+      <a href="activity-log.html">← Activity Log Feed</a>
+      <a href="shift-report.html">Shift Report →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

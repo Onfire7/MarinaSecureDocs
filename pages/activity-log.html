@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activity Log Feed — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Activity Log · Page Specification</span>
+    <h1>Activity Log Feed</h1>
+    <p class="lede">A chronological, filterable feed of nearly every database change at the marina — immutable, generated at write time, and scoped per entry to whatever permission governs its subject.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from the Activity Log top-level nav item. There's no single "view activity log" permission; per <a href="../workflows.html">Role Workflows</a>, a manager's Activity Log is "scoped to whatever they have permission to see." Concretely: an entry whose <code>subject</code> is an Incident requires <code>view_incidents</code> to appear; a Call requires <code>view_calls</code>; a Contact requires <code>view_owner</code>; and so on down the same permission each entity type already uses elsewhere. Entries about unrestricted entities (Tickets, Locations, Reservations, Boats, Assets, Notes) are visible to everyone.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Event type</td><td>ActivityLogEntry.event_type</td><td>e.g. "ticket.created," "incident.status_changed."</td></tr>
+      <tr><td>Actor</td><td>ActivityLogEntry.actor</td><td>Nullable for system-generated events (e.g. a scheduled maintenance ticket); shown as "System" rather than blank.</td></tr>
+      <tr><td>Subject</td><td>ActivityLogEntry.subject</td><td>Links to that record's own detail page.</td></tr>
+      <tr><td>Summary</td><td>ActivityLogEntry.summary</td><td>Human-readable, generated at write time.</td></tr>
+      <tr><td>Timestamp</td><td>ActivityLogEntry.timestamp</td><td></td></tr>
+      <tr><td>Protected flag</td><td>ActivityLogEntry.protected</td><td>Visible only to <code>manage_marina_settings</code> holders, the same permission that governs the retention policy this flag exempts an entry from.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Filter by entity type / actor / date range</td><td>Same per-entry gating as viewing</td><td>Client-side filter over the subscribed query; a filter can't surface an entry the user couldn't otherwise see.</td></tr>
+      <tr><td>Open a subject</td><td>Same per-entry gating</td><td>Navigates to that record's detail page.</td></tr>
+      <tr><td>Mark/unmark an entry Protected</td><td><code>manage_marina_settings</code></td><td>Reuses the retention-policy permission rather than introducing a dedicated one, consistent with the avoid-permission-bloat principle established for Dashboard cards.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Entry subject the user can't see</strong> — omitted from the feed entirely, not shown redacted — the same "omit, don't partially reveal" rule used everywhere else in the app.</li>
+      <li><strong>Entry about the Activity Log itself</strong> — never occurs; per <a href="../architecture.html">Architecture</a>, the Activity Log doesn't log its own writes.</li>
+      <li><strong>High-frequency, low-value changes</strong> — excluded at write time per marina/entity-specific rules (see <a href="../architecture.html">Architecture — Activity Log generation</a>), not filtered out here; this feed shows everything that was actually logged.</li>
+      <li><strong>Retention purge</strong> — entries older than the marina's configured window disappear from this feed once the scheduled purge runs, except Protected ones, which persist indefinitely.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: a single filterable chronological list. Desktop: filters always visible alongside a denser list, similar to <a href="ticket-queue.html">Ticket queue</a> and <a href="incident-list.html">Incident list</a>.</p>
+
+    <div class="page-foot">
+      <a href="attachment-target-picker.html">← Attachment-Target Picker</a>
+      <a href="reports-home.html">Reports Home →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>
