@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Active Checklist — Marina Ops Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">Marina&nbsp;Ops</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Checklists &amp; Tours · Page Specification</span>
+    <h1>Active Checklist</h1>
+    <p class="lede">Item-by-item completion of an in-progress Checklist instance — the most interaction-heavy screen in the app, since it hosts all five item-type behaviors.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="checklist-list.html">Checklist list</a>, a checkpoint scan/manual check-in, or a Location-Based Check item opening a nested instance. Walks the user through <code>Checklist.items</code> (via <code>ChecklistItemResult</code>) in order, recording a <code>result</code> per item and writing it locally-first (see <a href="../architecture.html">Architecture — Database</a>) — nothing here requires connectivity.</p>
+
+    <h2>Item-type behavior</h2>
+    <table>
+      <tr><th>Type</th><th>Interaction</th><th>Writes</th></tr>
+      <tr><td>Simple Check</td><td>Tap to mark complete.</td><td><code>result</code> = boolean true; <code>completed_at</code> set.</td></tr>
+      <tr><td>Verify Task</td><td>Confirm done, or reject with a written reason, or reject and immediately raise a linked ticket. If the template's config flags it, a rejection first prompts the guard to attempt the task themselves before finalizing the rejection.</td><td><code>result</code> = Confirmed / Rejected-Reason / Rejected-Ticket; <code>linked_ticket</code> set if a ticket was raised.</td></tr>
+      <tr><td>Door Check</td><td>Select observed state. Mismatch vs. expected → prompted to correct (open/close/lock/unlock) and select again. Second mismatch → note or ticket required; the app will not let a mismatch pass silently.</td><td><code>result</code> includes observed state plus retry history; <code>linked_ticket</code> set if raised on second mismatch.</td></tr>
+      <tr><td>Location-Based Check</td><td>Opens a nested sub-checklist scoped to a specific Location; returns to the parent item list on completion.</td><td>Nested Checklist instance, same schema, referenced from the parent item's result.</td></tr>
+      <tr><td>Meter Reading</td><td>Select the asset (fixed by the template, or user-selected at runtime — e.g. "select your patrol vehicle") and enter its current value.</td><td>Creates an <code>AssetMeterReading</code> (source = Checklist item) and updates <code>Asset.meter_reading</code>; may trigger a maintenance-rule Ticket inline on write, per <a href="../api-structure.html">API Structure</a>.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Complete an item</td><td>Must be <code>assigned_to</code>, or hold the assigned role</td><td>Per item-type table above; advances to the next item.</td></tr>
+      <tr><td>Add a note mid-checklist</td><td><code>create_incidents</code> not required — notes are unrestricted</td><td>Opens <a href="new-note-dialog.html">New note dialog</a>, attached to the checklist's location context if one applies.</td></tr>
+      <tr><td>Log an incident mid-checklist</td><td><code>create_incidents</code></td><td>Opens <a href="new-incident-form.html">New incident form</a>.</td></tr>
+      <tr><td>Submit / complete the checklist</td><td>All items resolved</td><td>Sets <code>status</code> = Complete, <code>completed_at</code> = now. If this is the shift's <code>end_of_shift_checklist</code>, also sets <code>Shift.ended_at</code> and fires the on-demand shift-report call (see <a href="../architecture.html">Architecture — Shift report delivery</a>).</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Offline throughout</strong> — every write here is local-first; leaving and resuming later (even after reconnecting) preserves exact progress with no special handling.</li>
+      <li><strong>Ticket creation from a failed item</strong> — the resulting <code>Ticket.source_incident</code> stays null (this isn't an incident-sourced ticket) but <code>ChecklistItemResult.linked_ticket</code> connects it back; see <a href="../data-model.html">Data Model</a>.</li>
+      <li><strong>Abandoning mid-checklist</strong> — status stays In Progress indefinitely; it simply reappears on <a href="checklist-list.html">Checklist list</a> until finished.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: one item presented full-screen at a time, swipe/tap to advance — matches the "phone on a dark dock" usage pattern. Desktop: the full item list is visible at once with each item expanding inline, since a desk-bound user reviewing or completing a checklist benefits from seeing the whole sequence.</p>
+
+    <div class="page-foot">
+      <a href="checklist-list.html">← Checklist List</a>
+      <a href="checkpoint-checkin.html">Checkpoint Check-In →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

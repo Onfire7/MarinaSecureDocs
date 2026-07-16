@@ -120,18 +120,13 @@
       <tr><td><code>manage_roles</code></td><td>Creating, editing, duplicating, and deleting roles and their permission settings.</td></tr>
       <tr><td><code>place_calls</code></td><td>Initiating outbound calls/SMS from the Comms section.</td></tr>
       <tr><td><code>view_reports</code></td><td>Access to the Reports section.</td></tr>
+      <tr><td><code>view_all_chats</code></td><td>Seeing every chat room, not just ones you're invited to.</td></tr>
+      <tr><td><code>manage_assets</code></td><td>Creating/editing assets, maintenance rules, and checkout records.</td></tr>
+      <tr><td><code>manage_locations</code></td><td>Creating/editing locations, location types, and checkpoints.</td></tr>
+      <tr><td><code>manage_reservations</code></td><td>Creating/editing reservations and overriding status/dates.</td></tr>
+      <tr><td><code>manage_marina_settings</code></td><td>Editing the MarinaSettings record: retention policy, GPS defaults, phone lines, recording toggle.</td></tr>
     </table>
-
-    <div class="note">
-      <strong>Permissions identified during workflow design, pending confirmation.</strong> A few additional permissions surfaced while writing out <a href="workflows.html">Role Workflows</a> and the page specs, implied by features but not yet in the explicit list above. Flagging them here rather than silently adding them:
-      <ul style="margin-bottom:0;">
-        <li><code>view_all_chats</code> — see every chat room, not just ones you're invited to (explicitly mentioned in the Comms requirements).</li>
-        <li><code>manage_assets</code> — create/edit assets, maintenance rules, and checkout records.</li>
-        <li><code>manage_locations</code> — create/edit locations, location types, and checkpoints.</li>
-        <li><code>manage_reservations</code> — create/edit reservations and override status/dates.</li>
-        <li><code>manage_marina_settings</code> — the MarinaSettings record: retention policy, GPS defaults, phone lines, recording toggle.</li>
-      </ul>
-    </div>
+    <p>The last five were identified while writing out <a href="workflows.html">Role Workflows</a> and the page specs — implied by features but not present in the original list — and are now confirmed as part of the fixed catalog.</p>
 
     <h2>Ticket creation is not gated</h2>
     <p>Per the original requirement, every role can create a maintenance ticket by default — there is deliberately no <code>create_ticket</code> permission in the list above. If a future need arises to restrict this for a specific marina, it would need to be added as a new permission rather than repurposing an existing one, since the current design treats ticket creation as a baseline capability of the system rather than a gated one.</p>

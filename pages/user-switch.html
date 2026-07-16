@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>User Switch — Marina Ops Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">Marina&nbsp;Ops</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Access · Page Specification</span>
+    <h1>User Switch</h1>
+    <p class="lede">Fast handoff on a shared device — a tablet mounted at the security desk, used by whoever is on shift — without a full sign-out/sign-in cycle.</p>
+
+    <h2>Purpose</h2>
+    <p>Shift changes happen daily and need to be fast. This screen exists so a shared device can hold multiple users' local sessions at once and let the incoming user pick themselves from a short list rather than typing full credentials every handoff. Personal devices never see this screen in practice — they only ever hold one user's session (see <a href="../architecture.html">Architecture — Authentication</a>).</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Recent users on this device</td><td>Local session store</td><td>Users who have previously signed in on this specific device, most recent first.</td></tr>
+      <tr><td>Name / avatar</td><td>User.name</td><td></td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Select a listed user</td><td>None</td><td>Prompts a lightweight re-authentication challenge (mechanism depends on the chosen auth provider — see note below), then makes that user's session active and routes to the <a href="dashboard.html">Dashboard</a>.</td></tr>
+      <tr><td>Add another user</td><td>None</td><td>Routes to <a href="sign-in.html">Sign In</a> for a user not yet listed on this device; on success, that user is added to the device's list for future switches.</td></tr>
+      <tr><td>Remove a user from this device</td><td>None (self) / <code>manage_users</code> (removing someone else's session)</td><td>Clears that user's local session from the device entirely — used when someone leaves the marina or a device is being repurposed.</td></tr>
+    </table>
+
+    <div class="note">
+      <strong>Open implementation detail.</strong> The exact re-authentication challenge for switching (PIN, biometric, short password) is not yet finalized — it's a requirement on whichever InstantDB-compatible auth provider is chosen, not a design decision made here. See <a href="../architecture.html">Architecture — Authentication</a>.
+    </div>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No users yet on this device</strong> — the list is empty and the screen effectively becomes Sign In (or presents it directly).</li>
+      <li><strong>Switching mid-active-checklist</strong> — the outgoing user's in-progress local state is per-user, so it's preserved and simply not shown while another user's session is active; it reappears on their own checklist list next time they switch back in.</li>
+      <li><strong>Offline switch</strong> — works fully offline once a user has previously authenticated on this device, since the local session and InstantDB's local data are already present.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Shared devices are overwhelmingly tablets mounted at a fixed post, so this screen is designed tablet-first — large tap targets, a short vertical list. The same screen serves a desktop shared workstation identically; there's no meaningfully different desktop layout to design for here.</p>
+
+    <div class="page-foot">
+      <a href="sign-in.html">← Sign In</a>
+      <a href="dashboard.html">Dashboard →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

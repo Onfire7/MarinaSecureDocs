@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Marina Ops Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">Marina&nbsp;Ops</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Home · Page Specification</span>
+    <h1>Dashboard</h1>
+    <p class="lede">The Home landing screen — role-adaptive, showing only what's relevant to the roles the signed-in user actually holds.</p>
+
+    <h2>Purpose</h2>
+    <p>There's no single "home" layout — the dashboard is a set of independent cards, each gated by role/permission, that assemble differently per user. A user holding both Security and Office sees both the shift card and the comms card; a pure Maintenance user sees neither. See <a href="../workflows.html">Role Workflows</a> for the narrative behind each card.</p>
+
+    <h2>Cards, by relevance</h2>
+    <table>
+      <tr><th>Card</th><th>Shown when</th><th>Content</th></tr>
+      <tr><td>Shift</td><td>Any user (primarily Security)</td><td>Start Shift button if no active <code>Shift</code>; while active, elapsed time, current tour progress summary, and either an End Shift button or a prompt to complete the end-of-shift checklist (see Actions below).</td></tr>
+      <tr><td>Ticket summary</td><td>Holds any ticket-related permission, or Maintenance role</td><td>Counts by priority/status from the <a href="ticket-queue.html">Ticket queue</a>; tap-through to the full queue.</td></tr>
+      <tr><td>Incident summary</td><td><code>view_incidents</code></td><td>Recent/open incident counts; tap-through to the <a href="incident-list.html">Incident list</a>.</td></tr>
+      <tr><td>Missed comms badge</td><td><code>place_calls</code> or Office role</td><td>Running count of missed calls + unread SMS; tap opens <a href="missed-comms-detail.html">Missed calls/unread SMS detail</a>.</td></tr>
+      <tr><td>Upcoming reservations</td><td>Office/Manager roles</td><td>Reservations with an <code>expected_checkin</code> in the near term, shown as a short list — see <a href="../data-model.html">Data Model — Reservation</a>.</td></tr>
+      <tr><td>Admin shortcuts</td><td>Any <code>manage_*</code> permission</td><td>Quick links into the relevant <a href="admin-home.html">Admin</a> sub-sections.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Start Shift</td><td>None — available to any user</td><td>Creates a <code>Shift</code> record (<code>guard</code> = current user, <code>started_at</code> = now). May itself be configured as a checklist trigger (Clock In) — if so, the triggered checklist opens immediately.</td></tr>
+      <tr><td>End Shift (manual button)</td><td>None; only shown when the marina has <strong>not</strong> configured an end-of-shift checklist</td><td>Sets <code>Shift.ended_at</code>, then calls the shift-report Netlify Function on-demand (see <a href="../architecture.html">Architecture — Shift report delivery</a>).</td></tr>
+      <tr><td>Complete end-of-shift checklist</td><td>None; shown instead of the manual button when a template is configured</td><td>Opens the <a href="active-checklist.html">Active checklist</a> flow; submitting it sets <code>Shift.ended_at</code> and triggers the report the same way.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No roles with any dashboard card</strong> — shouldn't occur in practice (every role maps to at least one card), but the fallback is a minimal card showing only account info and nav.</li>
+      <li><strong>Shift ended offline</strong> — the dashboard reflects <code>ended_at</code> immediately (local write); the report itself sends once connectivity returns and the scheduled backstop sweep picks it up, per <a href="../architecture.html">Architecture</a>.</li>
+      <li><strong>Multiple active tours/checklists</strong> — the shift card summarizes only; full detail lives on <a href="checklist-list.html">Checklist list</a> and <a href="tour-progress.html">Tour progress</a>.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: cards stack vertically, ordered by relevance to the user's primary role, with the Shift card pinned to the top for Security. Desktop: cards arrange in a grid so several are visible without scrolling, and the layout leans toward an efficient overview rather than a single prioritized stack — see <a href="../architecture.html">Architecture — Frontend</a> for the general mobile/desktop divergence principle.</p>
+
+    <div class="page-foot">
+      <a href="user-switch.html">← User Switch</a>
+      <a href="checklist-list.html">Checklist List →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

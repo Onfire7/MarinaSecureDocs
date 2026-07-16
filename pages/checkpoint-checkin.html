@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checkpoint Check-In — Marina Ops Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">Marina&nbsp;Ops</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Checklists &amp; Tours · Page Specification</span>
+    <h1>Checkpoint Check-In Screen</h1>
+    <p class="lede">What opens when a guard taps their phone against an NFC tag or scans a QR code at a checkpoint — the checkpoint's own <code>guid_url</code>.</p>
+
+    <h2>Purpose</h2>
+    <p>This URL is the checkpoint, functionally: it's bound 1:1 to a <code>Checkpoint</code> record and is the only way this screen is reached. On load it immediately logs the visit and surfaces whatever's relevant right now, per <a href="../workflows.html">Role Workflows — Checking in at a checkpoint</a>.</p>
+
+    <h2>On-load sequence</h2>
+    <ol>
+      <li>Capture device GPS.</li>
+      <li>Create a Check-In record: <code>checkpoint</code>, <code>user</code> (current session), <code>timestamp</code>, <code>method</code> = Scanned, <code>gps_at_checkin</code>, and <code>within_radius</code> computed against <code>Checkpoint.gps_validation_radius</code> (falling back to <code>MarinaSettings.gps_validation_radius_default</code>).</li>
+      <li>Evaluate <code>Checkpoint.checklist_templates</code> against their trigger conditions (time of day, season, etc.) to find which apply right now.</li>
+      <li>Present the matching checklist(s) for completion, and/or a place to add a note or log an incident even if none apply.</li>
+    </ol>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Checkpoint name &amp; location</td><td>Checkpoint.name, Checkpoint.location</td><td></td></tr>
+      <tr><td>GPS validation result</td><td>Check-In.within_radius</td><td>Shown only if flagged false — otherwise the check-in proceeds silently.</td></tr>
+      <tr><td>Applicable checklist(s)</td><td>Checkpoint.checklist_templates, trigger-evaluated</td><td>Zero, one, or more.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Begin an applicable checklist</td><td>Must be signed in</td><td>Routes into <a href="active-checklist.html">Active checklist</a> for that instance.</td></tr>
+      <tr><td>Add a note / log an incident with no checklist</td><td><code>create_incidents</code> for incidents; notes unrestricted</td><td>Opens the relevant dialog, pre-attached to this checkpoint.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Not signed in</strong> — the URL still opens (it's a public deep link), but routes to <a href="sign-in.html">Sign In</a> or <a href="user-switch.html">User Switch</a> first, then resumes the check-in flow.</li>
+      <li><strong>GPS outside the checkpoint's radius</strong> — the check-in still records (<code>within_radius</code> = false); it isn't blocked, but is flagged for later review, matching the data model's spoof-guard-not-spoof-block design.</li>
+      <li><strong>Multiple applicable checklists</strong> — presented as a short list to work through in sequence rather than merged into one.</li>
+      <li><strong>Offline scan</strong> — the Check-In write succeeds locally and syncs on reconnect, identical to any other InstantDB write.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile-only in practice — this screen exists to be opened by a phone tapping an NFC tag or scanning a QR code in the field. No meaningful desktop variant is designed; if opened on desktop (e.g. testing a checkpoint's URL) it renders the same content without any field-specific chrome.</p>
+
+    <div class="page-foot">
+      <a href="active-checklist.html">← Active Checklist</a>
+      <a href="manual-checkin-dialog.html">Manual Check-In Dialog →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>
