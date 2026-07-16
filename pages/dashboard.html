@@ -37,20 +37,25 @@
   <main class="content">
     <span class="eyebrow">Home · Page Specification</span>
     <h1>Dashboard</h1>
-    <p class="lede">The Home landing screen — role-adaptive, showing only what's relevant to the roles the signed-in user actually holds.</p>
+    <p class="lede">The Home landing screen — a customizable set of cards. Roles determine a sensible default arrangement; each user can then show, hide, and reorder any card they have access to.</p>
 
     <h2>Purpose</h2>
-    <p>There's no single "home" layout — the dashboard is a set of independent cards, each gated by role/permission, that assemble differently per user. A user holding both Security and Office sees both the shift card and the comms card; a pure Maintenance user sees neither. See <a href="../workflows.html">Role Workflows</a> for the narrative behind each card.</p>
+    <p>There's no single fixed "home" layout, but there's also no free-for-all: a card is only ever available to add if the user holds whatever permission already governs the data that card displays. Roles come into it only as a starting point — each role ships with a default set of cards, shown in a default order, reflecting what that role most needs to see immediately. A user is free to depart from that default (hide a card they don't care about, add one they're permissioned for but whose role doesn't default to it, reorder the whole stack); the role-derived arrangement is just what a new or unconfigured user sees first. See <a href="../workflows.html">Role Workflows</a> for the narrative behind each card.</p>
 
-    <h2>Cards, by relevance</h2>
+    <div class="note">
+      <strong>Card permissions reuse data permissions — no card-specific gates.</strong> A card's visibility requirement is exactly whatever permission already controls the underlying data it reads (e.g. Incident summary requires <code>view_incidents</code> because it reads Incident records — the same gate that applies everywhere else Incidents are shown). No new "can see this card" permission is introduced for any card; where the fixed permission catalog has no dedicated view-gate for a card's data (tickets, reservations — see <a href="../permissions.html">Permissions</a>), the card itself requires none, and some cards (a clock) read no gated data at all and are simply always available.
+    </div>
+
+    <h2>Available cards</h2>
     <table>
-      <tr><th>Card</th><th>Shown when</th><th>Content</th></tr>
-      <tr><td>Shift</td><td>Any user (primarily Security)</td><td>Start Shift button if no active <code>Shift</code>; while active, elapsed time, current tour progress summary, and either an End Shift button or a prompt to complete the end-of-shift checklist (see Actions below).</td></tr>
-      <tr><td>Ticket summary</td><td>Holds any ticket-related permission, or Maintenance role</td><td>Counts by priority/status from the <a href="ticket-queue.html">Ticket queue</a>; tap-through to the full queue.</td></tr>
-      <tr><td>Incident summary</td><td><code>view_incidents</code></td><td>Recent/open incident counts; tap-through to the <a href="incident-list.html">Incident list</a>.</td></tr>
-      <tr><td>Missed comms badge</td><td><code>place_calls</code> or Office role</td><td>Running count of missed calls + unread SMS; tap opens <a href="missed-comms-detail.html">Missed calls/unread SMS detail</a>.</td></tr>
-      <tr><td>Upcoming reservations</td><td>Office/Manager roles</td><td>Reservations with an <code>expected_checkin</code> in the near term, shown as a short list — see <a href="../data-model.html">Data Model — Reservation</a>.</td></tr>
-      <tr><td>Admin shortcuts</td><td>Any <code>manage_*</code> permission</td><td>Quick links into the relevant <a href="admin-home.html">Admin</a> sub-sections.</td></tr>
+      <tr><th>Card</th><th>Requires</th><th>Default for</th><th>Content</th></tr>
+      <tr><td>Clock</td><td>None — reads no marina data</td><td>All roles</td><td>Current time/date. Purely a utility card (useful for logging accurate times by eye); not gated by anything, since there's no underlying data access to gate.</td></tr>
+      <tr><td>Shift</td><td>None — starting/ending a shift isn't permission-gated (see <a href="../permissions.html">Permissions</a>)</td><td>Security</td><td>Start Shift button if no active <code>Shift</code>; while active, elapsed time, current tour progress summary, and either an End Shift button or a prompt to complete the end-of-shift checklist (see Actions below).</td></tr>
+      <tr><td>Ticket summary</td><td>None — there is no dedicated ticket-view permission in the fixed catalog, consistent with ticket creation also being unrestricted</td><td>Maintenance, Office</td><td>Counts by priority/status from the <a href="ticket-queue.html">Ticket queue</a>; tap-through to the full queue.</td></tr>
+      <tr><td>Incident summary</td><td><code>view_incidents</code></td><td>Security, Marina Manager/Owner</td><td>Recent/open incident counts; tap-through to the <a href="incident-list.html">Incident list</a>.</td></tr>
+      <tr><td>Missed comms badge</td><td><code>place_calls</code></td><td>Office</td><td>Running count of missed calls + unread SMS; tap opens <a href="missed-comms-detail.html">Missed calls/unread SMS detail</a>.</td></tr>
+      <tr><td>Upcoming reservations</td><td>None — no dedicated view permission exists for reservations in the fixed catalog</td><td>Office, Marina Manager/Owner</td><td>Reservations with an <code>expected_checkin</code> in the near term, shown as a short list — see <a href="../data-model.html">Data Model — Reservation</a>.</td></tr>
+      <tr><td>Admin shortcuts</td><td>Any <code>manage_*</code> permission</td><td>Marina Manager/Owner</td><td>Quick links into the relevant <a href="admin-home.html">Admin</a> sub-sections.</td></tr>
     </table>
 
     <h2>Actions</h2>
@@ -59,17 +64,22 @@
       <tr><td>Start Shift</td><td>None — available to any user</td><td>Creates a <code>Shift</code> record (<code>guard</code> = current user, <code>started_at</code> = now). May itself be configured as a checklist trigger (Clock In) — if so, the triggered checklist opens immediately.</td></tr>
       <tr><td>End Shift (manual button)</td><td>None; only shown when the marina has <strong>not</strong> configured an end-of-shift checklist</td><td>Sets <code>Shift.ended_at</code>, then calls the shift-report Netlify Function on-demand (see <a href="../architecture.html">Architecture — Shift report delivery</a>).</td></tr>
       <tr><td>Complete end-of-shift checklist</td><td>None; shown instead of the manual button when a template is configured</td><td>Opens the <a href="active-checklist.html">Active checklist</a> flow; submitting it sets <code>Shift.ended_at</code> and triggers the report the same way.</td></tr>
+      <tr><td>Show / hide a card</td><td>Only cards the user currently holds the required permission for are offerable — see Available cards above</td><td>Toggles that card's visibility for this user only; persisted as a per-user preference, independent of anyone else's layout.</td></tr>
+      <tr><td>Reorder cards</td><td>Same as above — only applies to cards currently visible to the user</td><td>Drag-and-drop (desktop) or long-press-and-drag (mobile) to change card order; persisted per-user.</td></tr>
+      <tr><td>Reset to role defaults</td><td>None</td><td>Discards the user's saved layout and recomputes the default show/hide/order set from the roles they currently hold.</td></tr>
     </table>
 
     <h2>States &amp; edge cases</h2>
     <ul>
-      <li><strong>No roles with any dashboard card</strong> — shouldn't occur in practice (every role maps to at least one card), but the fallback is a minimal card showing only account info and nav.</li>
+      <li><strong>No cards available at all</strong> — shouldn't occur in practice (the Clock card requires no permission and is always offerable), but the fallback is a minimal view showing only account info and nav.</li>
+      <li><strong>Permission revoked for a currently-shown card</strong> — if a role change removes the permission a visible card depends on, that card drops out of the layout automatically on next load; it isn't left visible-but-broken, and it isn't restored automatically if the permission is later regranted (the user re-adds it, or resets to role defaults).</li>
+      <li><strong>New role granted</strong> — does not retroactively rearrange an already-customized layout; the newly-available cards simply become addable. Only a fresh, never-customized user (or an explicit "reset to role defaults") picks up a role's default arrangement wholesale.</li>
       <li><strong>Shift ended offline</strong> — the dashboard reflects <code>ended_at</code> immediately (local write); the report itself sends once connectivity returns and the scheduled backstop sweep picks it up, per <a href="../architecture.html">Architecture</a>.</li>
       <li><strong>Multiple active tours/checklists</strong> — the shift card summarizes only; full detail lives on <a href="checklist-list.html">Checklist list</a> and <a href="tour-progress.html">Tour progress</a>.</li>
     </ul>
 
     <h2>Mobile vs. desktop</h2>
-    <p>Mobile: cards stack vertically, ordered by relevance to the user's primary role, with the Shift card pinned to the top for Security. Desktop: cards arrange in a grid so several are visible without scrolling, and the layout leans toward an efficient overview rather than a single prioritized stack — see <a href="../architecture.html">Architecture — Frontend</a> for the general mobile/desktop divergence principle.</p>
+    <p>Mobile: cards stack vertically in the user's saved order (defaulting to role order for an uncustomized user), with the Shift card pinned to the top for Security by default. Desktop: cards arrange in a grid so several are visible without scrolling, still following the same saved order/visibility — see <a href="../architecture.html">Architecture — Frontend</a> for the general mobile/desktop divergence principle. Show/hide/reorder controls are reachable from an edit mode on both, though drag targets are naturally larger on mobile.</p>
 
     <div class="page-foot">
       <a href="user-switch.html">← User Switch</a>

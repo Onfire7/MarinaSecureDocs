@@ -60,6 +60,7 @@
         <tr><td>roles</td><td>ref[] → Role</td><td>A user may hold multiple roles simultaneously.</td></tr>
         <tr><td>active</td><td>boolean</td><td>Deactivated users are hidden from assignment pickers but preserved for historical records.</td></tr>
         <tr><td>contact</td><td>ref → Contact</td><td>Optional link so a User can also be reached as a Contact (e.g. for asset checkout).</td></tr>
+        <tr><td>dashboard_layout</td><td>structured, nullable</td><td>Ordered list of <code>{card, visible}</code> pairs for the <a href="pages/dashboard.html">Dashboard</a>. Null means "use the default derived from this user's current roles" — only set once a user actually customizes their layout.</td></tr>
       </table>
     </div>
 
