@@ -40,12 +40,12 @@
     <p class="lede">A single conversation with a Contact — full message history, plus a template picker for common replies.</p>
 
     <h2>Purpose</h2>
-    <p>Reached from <a href="comms-home.html">Comms Home</a> or <a href="missed-comms-detail.html">Missed Comms Detail</a>. One thread per Contact-per-line, per <a href="../data-model.html">Data Model — SMSThread</a>; opening it marks it read.</p>
+    <p>Reached from <a href="comms-home.html">Comms Home</a> or <a href="missed-comms-detail.html">Missed Comms Detail</a>, both of which already gate the link by <code>view_sms</code> — this screen is unreachable without it. One thread per Contact-per-line, per <a href="../data-model.html">Data Model — SMSThread</a>; opening it marks it read. Sending is a separate gate, <code>place_calls</code>, so a user can have one without the other.</p>
 
     <h2>Data shown</h2>
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
-      <tr><td>Messages</td><td>SMSMessage, ordered by timestamp</td><td>Direction, body, sender (for outbound), timestamp.</td></tr>
+      <tr><td>Messages</td><td>SMSMessage, ordered by timestamp</td><td>Direction, body, sender (for outbound), timestamp. Requires <code>view_sms</code> to reach this screen at all.</td></tr>
       <tr><td>Thread contact</td><td>SMSThread.contact</td><td>Name always shown; phone/email require <code>view_contact</code>.</td></tr>
       <tr><td>Template picker</td><td>SMSTemplate, scope Global or Personal (owner = self)</td><td>Global templates are marina-wide (managed in <a href="admin-sms-templates.html">Admin → SMS Templates</a>); Personal ones are managed by their owner from Comms.</td></tr>
     </table>
@@ -60,8 +60,9 @@
 
     <h2>States &amp; edge cases</h2>
     <ul>
-      <li><strong>Offline</strong> — history already synced to InstantDB is fully viewable; sending is unavailable, since SMS is a Twilio (online-only) action — the composer reflects this honestly rather than silently queuing, per <a href="../architecture.html">Architecture</a>.</li>
-      <li><strong>No <code>place_calls</code></strong> — thread history is still viewable; only the composer/send action is hidden, matching <a href="comms-home.html">Comms Home</a>'s view-vs-initiate split.</li>
+      <li><strong>Offline</strong> — history already synced to InstantDB is fully viewable (given <code>view_sms</code>); sending is unavailable, since SMS is a Twilio (online-only) action — the composer reflects this honestly rather than silently queuing, per <a href="../architecture.html">Architecture</a>.</li>
+      <li><strong><code>view_sms</code> without <code>place_calls</code></strong> — thread history is fully viewable; only the composer/send action is hidden, matching <a href="comms-home.html">Comms Home</a>'s view-vs-initiate split.</li>
+      <li><strong><code>place_calls</code> without <code>view_sms</code></strong> — this user can send a first message via <a href="new-sms-dialog.html">New SMS dialog</a>, but can't subsequently open the resulting thread to see the reply; an unusual combination, but a legal one under the trinary permission model.</li>
       <li><strong>No templates configured</strong> — the picker is simply empty; typing a message from scratch is unaffected.</li>
     </ul>
 

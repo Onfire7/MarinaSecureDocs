@@ -40,14 +40,14 @@
     <p class="lede">The landing point for the Comms top-level nav item — recent calls, texts, and chat rooms in one place, and the entry point for starting any of the three.</p>
 
     <h2>Purpose</h2>
-    <p>An overview, not a permission gate: viewing call and SMS history has no dedicated permission in the fixed catalog (same reasoning as tickets and reservations — see <a href="../permissions.html">Permissions</a>), only <em>initiating</em> a call or SMS requires <code>place_calls</code>. Chat rooms are the one section here with real visibility scoping — a user only sees rooms they're invited to, unless they hold <code>view_all_chats</code>.</p>
+    <p>Three independently-gated sections sharing one screen: <code>view_calls</code> controls the calls section, <code>view_sms</code> controls the texts section, and chat room visibility is invite-based (or <code>view_all_chats</code>). None of these three overlap with <code>place_calls</code>, which gates only <em>initiating</em> a call or SMS — a marina can have staff who see call/text history without being able to place calls, or who can place calls but can't browse past ones, per <a href="../permissions.html">Permissions</a>.</p>
 
     <h2>Data shown</h2>
     <table>
-      <tr><th>Section</th><th>Source</th><th>Notes</th></tr>
-      <tr><td>Recent calls</td><td>Call, most recent first</td><td>Direction, matched Contact (gated by <code>view_owner</code>/<code>view_contact</code> the same as everywhere a Contact appears), line, time, duration or missed flag.</td></tr>
-      <tr><td>Recent texts</td><td>SMSThread, ordered by <code>last_message_at</code></td><td>Contact, line, last message preview, unread indicator.</td></tr>
-      <tr><td>Chat rooms</td><td>ChatRoom where the user is <code>created_by</code>, in <code>invited_users</code>, or holds a role in <code>invited_roles</code> — or all rooms, with <code>view_all_chats</code></td><td>Title, most recent activity.</td></tr>
+      <tr><th>Section</th><th>Requires</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Recent calls</td><td><code>view_calls</code></td><td>Call, most recent first</td><td>Direction, matched Contact (gated by <code>view_owner</code>/<code>view_contact</code> the same as everywhere a Contact appears), line, time, duration or missed flag.</td></tr>
+      <tr><td>Recent texts</td><td><code>view_sms</code></td><td>SMSThread, ordered by <code>last_message_at</code></td><td>Contact, line, last message preview, unread indicator.</td></tr>
+      <tr><td>Chat rooms</td><td>Invited, or <code>view_all_chats</code></td><td>ChatRoom where the user is <code>created_by</code>, in <code>invited_users</code>, or holds a role in <code>invited_roles</code> — or all rooms, with <code>view_all_chats</code></td><td>Title, most recent activity.</td></tr>
     </table>
 
     <h2>Actions</h2>
@@ -56,15 +56,17 @@
       <tr><td>Start a call</td><td><code>place_calls</code></td><td>Opens <a href="new-call-dialog.html">New call dialog</a>.</td></tr>
       <tr><td>Start a text</td><td><code>place_calls</code></td><td>Opens <a href="new-sms-dialog.html">New SMS dialog</a>.</td></tr>
       <tr><td>Start a chat room</td><td>Unrestricted — any user</td><td>Opens <a href="new-chat-room.html">New chat room / invite screen</a>.</td></tr>
-      <tr><td>Open a call entry</td><td>None</td><td>Expands inline — matched contact, notes, recording/transcript if enabled — rather than a separate call-detail page; a live call instead surfaces via <a href="active-call-panel.html">Active call panel</a>.</td></tr>
-      <tr><td>Open a text thread</td><td>None</td><td>Navigates to <a href="sms-thread.html">SMS thread</a>; marks it read.</td></tr>
+      <tr><td>Open a call entry</td><td><code>view_calls</code></td><td>Expands inline — matched contact, notes, recording/transcript if enabled — rather than a separate call-detail page; a live call instead surfaces via <a href="active-call-panel.html">Active call panel</a>.</td></tr>
+      <tr><td>Open a text thread</td><td><code>view_sms</code></td><td>Navigates to <a href="sms-thread.html">SMS thread</a>; marks it read.</td></tr>
       <tr><td>Open a chat room</td><td>Must be invited, or hold <code>view_all_chats</code></td><td>Navigates to <a href="chat-room.html">Chat room</a>.</td></tr>
     </table>
 
     <h2>States &amp; edge cases</h2>
     <ul>
-      <li><strong>No <code>place_calls</code></strong> — the start-call and start-text actions are hidden entirely, but existing call/text history is still visible; a marina can have staff who need call context (e.g. reviewing a call log) without being able to place calls themselves.</li>
-      <li><strong>Empty sections</strong> — each of the three sections has its own empty state rather than hiding the whole section.</li>
+      <li><strong>No <code>view_calls</code></strong> — the calls section (and its tab, on mobile) is omitted entirely, not shown empty; starting a new call is still possible with <code>place_calls</code> even without it, since the two are independent.</li>
+      <li><strong>No <code>view_sms</code></strong> — same treatment for the texts section.</li>
+      <li><strong>No <code>place_calls</code></strong> — the start-call and start-text actions are hidden, but existing history stays visible to anyone holding <code>view_calls</code>/<code>view_sms</code>; a marina can have staff who need call/text context without being able to place calls themselves.</li>
+      <li><strong>Empty sections</strong> (as opposed to gated-off ones) — each has its own empty state rather than hiding the whole section.</li>
       <li><strong>Not invited to any chat room and no <code>view_all_chats</code></strong> — the chat section shows only the "start a room" action with nothing listed, rather than being hidden outright.</li>
     </ul>
 

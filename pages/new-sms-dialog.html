@@ -62,6 +62,7 @@
       <li><strong>Contact/line pair already has a thread</strong> — sending routes into that existing thread rather than anything appearing duplicated; there is no way to intentionally create a second thread for the same pairing.</li>
       <li><strong>Offline</strong> — disabled the same way as <a href="sms-thread.html">SMS thread</a>'s composer, since sending requires Twilio connectivity.</li>
       <li><strong>No <code>place_calls</code></strong> — this dialog is unreachable; every entry point to it is gated the same way.</li>
+      <li><strong>No <code>view_sms</code></strong> — sending still works with <code>place_calls</code> alone, but routing into the resulting thread on success (see Actions) will fail the same way opening any thread does without <code>view_sms</code> — see <a href="sms-thread.html">SMS thread</a>.</li>
     </ul>
 
     <h2>Mobile vs. desktop</h2>

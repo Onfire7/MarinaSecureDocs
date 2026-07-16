@@ -40,27 +40,30 @@
     <p class="lede">What opens when the floating Missed Comms Badge is tapped — every missed call and unread text in one combined view, including voicemail playback.</p>
 
     <h2>Purpose</h2>
-    <p>The Missed Comms Badge (see <a href="dashboard.html">Dashboard</a>) is a floating, always-visible count of missed calls plus unread SMS, per <a href="../workflows.html">Role Workflows</a>. This screen is what it opens into — a combined worklist for catching up, not a permanent home for call/text history (that's <a href="comms-home.html">Comms Home</a>).</p>
+    <p>The Missed Comms Badge (see <a href="dashboard.html">Dashboard</a>) is a floating, always-visible count of missed calls plus unread SMS, per <a href="../workflows.html">Role Workflows</a>. This screen is what it opens into — a combined worklist for catching up, not a permanent home for call/text history (that's <a href="comms-home.html">Comms Home</a>). Its two halves are gated independently: <code>view_calls</code> for missed calls, <code>view_sms</code> for unread texts, same as the sections they mirror on Comms Home.</p>
 
     <h2>Data shown</h2>
     <table>
-      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
-      <tr><td>Missed calls</td><td>Call.missed = true</td><td>Contact, line, time; voicemail playback inline if <code>Call.voicemail_url</code> is set.</td></tr>
-      <tr><td>Unread texts</td><td>SMSThread.unread = true</td><td>Contact, line, last message preview.</td></tr>
+      <tr><th>Field</th><th>Requires</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Missed calls</td><td><code>view_calls</code></td><td>Call.missed = true</td><td>Contact, line, time; voicemail playback inline if <code>Call.voicemail_url</code> is set.</td></tr>
+      <tr><td>Unread texts</td><td><code>view_sms</code></td><td>SMSThread.unread = true</td><td>Contact, line, last message preview.</td></tr>
     </table>
 
     <h2>Actions</h2>
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
-      <tr><td>Play a voicemail</td><td>None</td><td>Inline playback of <code>Call.voicemail_url</code>.</td></tr>
-      <tr><td>Open a missed call</td><td>None</td><td>Expands inline the same way as on <a href="comms-home.html">Comms Home</a> — matched contact, notes, recording/transcript if enabled.</td></tr>
-      <tr><td>Call back</td><td><code>place_calls</code></td><td>Opens <a href="new-call-dialog.html">New call dialog</a> pre-filled with the contact/number.</td></tr>
-      <tr><td>Open an unread thread</td><td>None</td><td>Navigates to <a href="sms-thread.html">SMS thread</a>; marks <code>SMSThread.unread</code> = false on open.</td></tr>
+      <tr><td>Play a voicemail</td><td><code>view_calls</code></td><td>Inline playback of <code>Call.voicemail_url</code>.</td></tr>
+      <tr><td>Open a missed call</td><td><code>view_calls</code></td><td>Expands inline the same way as on <a href="comms-home.html">Comms Home</a> — matched contact, notes, recording/transcript if enabled.</td></tr>
+      <tr><td>Call back</td><td><code>place_calls</code></td><td>Opens <a href="new-call-dialog.html">New call dialog</a> pre-filled with the contact/number. Independent of <code>view_calls</code> — a user could plausibly call back from the badge count alone without full history access, though in practice the two are usually held together.</td></tr>
+      <tr><td>Open an unread thread</td><td><code>view_sms</code></td><td>Navigates to <a href="sms-thread.html">SMS thread</a>; marks <code>SMSThread.unread</code> = false on open.</td></tr>
       <tr><td>Text back</td><td><code>place_calls</code></td><td>Opens the relevant <a href="sms-thread.html">SMS thread</a> composer directly.</td></tr>
     </table>
 
     <h2>States &amp; edge cases</h2>
     <ul>
+      <li><strong>No <code>view_calls</code></strong> — the missed-calls half is omitted; a badge count sourced only from unread SMS still shows if the user holds <code>view_sms</code>.</li>
+      <li><strong>No <code>view_sms</code></strong> — same treatment, mirrored, for the unread-texts half.</li>
+      <li><strong>Neither permission</strong> — the badge itself has nothing to show and doesn't appear (see <a href="dashboard.html">Dashboard</a>).</li>
       <li><strong>Nothing missed or unread</strong> — empty state; the badge itself wouldn't be showing a count in this case, so this is mostly reached via direct navigation rather than the badge.</li>
       <li><strong>Marking read is one-way from here</strong> — opening a thread clears its unread flag; there's no "mark unread" action on this screen (that's a property of engaging with the thread, not something manually toggled).</li>
       <li><strong>Recording/transcription disabled</strong> — same as elsewhere, that section is simply omitted, not shown empty.</li>
