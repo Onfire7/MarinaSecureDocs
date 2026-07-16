@@ -36,12 +36,12 @@
 
   <main class="content">
     <span class="eyebrow">Specifications</span>
-    <span class="doc-status">In progress — all but Admin complete</span>
+    <span class="doc-status">Complete</span>
     <h1>Page Specifications</h1>
     <p class="lede">A detailed spec for every screen in the application: purpose, data displayed, actions available, permission gating, and mobile/desktop behavior, grouped to match top-level navigation.</p>
 
     <div class="note">
-      <strong>Status.</strong> Every group is written and linked below except Admin, which is still the proposed scope below — flag anything that should be added, split differently, or dropped before it's written. Admin's Location Types &amp; Locations setup page still needs the map upload/plotting UI noted under Reservations.
+      <strong>Status.</strong> All 55 screens/dialogs across every group are written and linked below. Next: <a href="../wireframes/index.html">Wireframes</a>, sequenced after this set per its own note.
     </div>
 
     <h2>Page list</h2>
@@ -108,7 +108,7 @@
       <li><a href="reservation-checkin-checkout.html">Reservation check-in / check-out dialog</a> (sets target status per its configuration)</li>
     </ul>
     <div class="note">
-      <strong>Map-plotting data model resolved; Admin UI still to write.</strong> <code>MarinaMap</code> (a marina-wide master map, plus optional per-parent-Location detail maps) and <code>LocationMapPlacement</code> (a join entity, since one Location can be plotted on multiple maps at different coordinates) now back both this screen's map view and the still-unwritten schematic map mode on <a href="location-list.html">Location list / map view</a> — one set of plotted rectangles, two different color overlays (reservation status here, occupancy/type there). Reservation eligibility is unrelated to any of this: it's the existing per-Location <code>reservation_enabled</code> toggle, which is what makes a mixed-use dock work (some Slips reservable short-term, others long-term leased, side by side — see <a href="../data-model.html">Data Model — Location</a>). Still to write: the upload + plotting UI in Admin's Location Types &amp; Locations setup (below).
+      <strong>Map-plotting fully specified.</strong> <code>MarinaMap</code> (a marina-wide master map, plus optional per-parent-Location detail maps) and <code>LocationMapPlacement</code> (a join entity, since one Location can be plotted on multiple maps at different coordinates) back this screen's map view and the schematic map mode on <a href="location-list.html">Location list / map view</a> — one set of plotted rectangles, two different color overlays (reservation status here, occupancy/type there). Reservation eligibility is unrelated to any of this: it's the existing per-Location <code>reservation_enabled</code> toggle, which is what makes a mixed-use dock work (some Slips reservable short-term, others long-term leased, side by side — see <a href="../data-model.html">Data Model — Location</a>). The upload + plotting UI lives in Admin's <a href="admin-locations.html">Location Types &amp; Locations setup</a>.
     </div>
 
     <h3>Boats</h3>
@@ -152,16 +152,16 @@
 
     <h3>Admin</h3>
     <ul>
-      <li>Admin home / section picker</li>
-      <li>Users</li>
-      <li>Roles &amp; Permissions (trinary matrix editor)</li>
-      <li>Checklist Templates (builder)</li>
-      <li>Location Types &amp; Locations setup (incl. checkpoint setup: GUID URL, NFC/QR, GPS radius; will also need marina map upload + plotting each Location as a rectangle on it, per the Reservations map-view note above)</li>
-      <li>Tours setup</li>
-      <li>Incident Types</li>
-      <li>Asset categories &amp; maintenance rules</li>
-      <li>SMS Templates (global; personal templates managed from Comms)</li>
-      <li>Marina Settings (GPS default, retention, recording/transcription, phone lines, shift report recipients)</li>
+      <li><a href="admin-home.html">Admin home / section picker</a></li>
+      <li><a href="admin-users.html">Users</a></li>
+      <li><a href="admin-roles-permissions.html">Roles &amp; Permissions</a> (trinary matrix editor)</li>
+      <li><a href="admin-checklist-templates.html">Checklist Templates</a> (builder)</li>
+      <li><a href="admin-locations.html">Location Types &amp; Locations setup</a> (incl. checkpoint setup: GUID URL, NFC/QR, GPS radius; and the marina map upload + plotting UI, resolving the note carried since Reservations)</li>
+      <li><a href="admin-tours.html">Tours setup</a></li>
+      <li><a href="admin-incident-types.html">Incident Types</a></li>
+      <li><a href="admin-assets.html">Asset categories &amp; maintenance rules</a></li>
+      <li><a href="admin-sms-templates.html">SMS Templates</a> (global; personal templates managed from Comms)</li>
+      <li><a href="admin-marina-settings.html">Marina Settings</a> (GPS default, retention, recording/transcription, phone lines, shift report recipients)</li>
     </ul>
 
     <div class="page-foot">

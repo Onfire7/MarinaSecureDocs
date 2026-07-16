@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Location Types &amp; Locations Setup — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Admin · Page Specification</span>
+    <h1>Location Types &amp; Locations Setup</h1>
+    <p class="lede">Define the marina's location hierarchy, lay out its actual docks/slips/buildings, configure checkpoints, and — the piece deferred since Reservations — upload maps and plot locations onto them.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="admin-home.html">Admin Home</a>, gated by <code>manage_locations</code>. Three nested concerns live here: the type system (what kinds of location exist and how they nest), the actual location instances (the marina's real docks and slips), and now the map-plotting layer that backs the schematic map views on <a href="location-list.html">Location list</a> and <a href="reservation-list.html">Reservation calendar/list</a>.</p>
+
+    <h2>Location types</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Name</td><td>LocationType.name</td><td>e.g. "Dock," "Slip," "Cabin," "Building," "RV Site" — not a fixed list.</td></tr>
+      <tr><td>Valid parent types</td><td>LocationType.valid_parent_types</td><td>Which type(s) this type may nest under; a type may allow more than one.</td></tr>
+      <tr><td>Allows reservations</td><td>LocationType.allows_reservations</td><td>The type-level capability flag — whether Locations of this type <em>can</em> be made reservation-enabled at all, per <a href="../data-model.html">Data Model</a>.</td></tr>
+    </table>
+
+    <h2>Locations</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Name, type, parent</td><td>Location fields</td><td>Parent must match one of the type's valid_parent_types.</td></tr>
+      <tr><td>Reservation toggle</td><td>Location.reservation_enabled + reservation_visibility</td><td>The per-location toggle that makes mixed-use possible — set independently per Slip, per <a href="../data-model.html">Data Model — Location</a>. Only offered when the type's <code>allows_reservations</code> is on.</td></tr>
+      <tr><td>Post-reservation status</td><td>Location.post_reservation_status</td><td>Only relevant when reservation-enabled.</td></tr>
+      <tr><td>GPS coordinates</td><td>Location.gps_coordinates</td><td>Real-world lat/lng, used for the geographic pin map and as the default for any Checkpoint here.</td></tr>
+      <tr><td>Checkpoints</td><td>Checkpoint.location = this Location</td><td>Each checkpoint's GUID URL (auto-generated), GPS radius override, and applicable checklist templates.</td></tr>
+    </table>
+
+    <h2>Map upload &amp; plotting</h2>
+    <p>Per the note carried since Reservations, backed by <code>MarinaMap</code> and <code>LocationMapPlacement</code> in <a href="../data-model.html">Data Model</a>:</p>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Map name &amp; image</td><td>MarinaMap.name / image</td><td>Uploaded layout/diagram — a schematic, not a real-world map.</td></tr>
+      <tr><td>Scope</td><td>MarinaMap.scope</td><td>Null for the one marina-wide master map; set to a parent Location for a detail map showing just that parent's children.</td></tr>
+      <tr><td>Plotted rectangles</td><td>LocationMapPlacement (location, map, rect)</td><td>Drag-and-place a rectangle per Location onto the selected map's image; a Location can be plotted on more than one map (e.g. small on the master map, precise on its parent's detail map) with independent coordinates on each.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Create / edit a LocationType</td><td><code>manage_locations</code></td><td></td></tr>
+      <tr><td>Create / edit a Location</td><td><code>manage_locations</code></td><td>Including the reservation toggle and post-reservation status.</td></tr>
+      <tr><td>Add / edit a Checkpoint</td><td><code>manage_locations</code></td><td>GUID URL is generated automatically on creation, not user-entered; GPS radius override defaults to the marina-wide default from <a href="admin-marina-settings.html">Marina Settings</a>.</td></tr>
+      <tr><td>Upload a map</td><td><code>manage_locations</code></td><td>Creates a <code>MarinaMap</code>; only one master map (scope = null) is expected, though the data model doesn't hard-enforce that — the implementing team should confirm whether to block creating a second master map or leave it a marina-configuration convention, matching how <a href="lease-detail.html">Lease detail</a> handles the reservation/lease split.</td></tr>
+      <tr><td>Plot a Location on a map</td><td><code>manage_locations</code></td><td>Drag-and-place (or click-and-resize) a rectangle; creates/updates the corresponding <code>LocationMapPlacement</code>.</td></tr>
+      <tr><td>Unplot a Location from a map</td><td><code>manage_locations</code></td><td>Removes just that one <code>LocationMapPlacement</code> — a Location plotted on multiple maps stays on the others.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Deleting a LocationType with existing Locations</strong> — should be blocked or require reassigning those Locations first; deleting the type out from under them would leave orphaned records.</li>
+      <li><strong>Location not yet plotted on any map</strong> — fine; it simply doesn't appear in the schematic map view mode until plotted, per <a href="location-list.html">Location list</a>.</li>
+      <li><strong>Detail map for a parent with no children yet</strong> — allowed to create ahead of time; just has nothing to plot until child Locations exist.</li>
+      <li><strong>Reservation toggle turned off while a Reservation is active</strong> — the existing Reservation isn't retroactively invalidated; only future booking through <a href="new-reservation-form.html">New reservation form</a> is affected, since that form's target picker only offers currently-enabled locations.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Desktop is the primary surface, especially for map plotting, which needs precise drag-and-place interaction and screen width to see the whole layout at once. Mobile supports viewing and light field edits (status labels, a checkpoint's GPS override) but not the map-plotting workflow.</p>
+
+    <div class="page-foot">
+      <a href="admin-checklist-templates.html">← Checklist Templates</a>
+      <a href="admin-tours.html">Tours Setup →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

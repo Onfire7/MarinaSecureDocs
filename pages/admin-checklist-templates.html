@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Checklist Templates — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Admin · Page Specification</span>
+    <h1>Checklist Templates</h1>
+    <p class="lede">Build and manage the reusable templates that generate real Checklists — items, triggers, and assignment, for Global and Role-restricted templates.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="admin-home.html">Admin Home</a>, gated by <code>manage_checklists</code> for Global and Role-restricted templates. Personal templates are a deliberate exception — per <a href="../permissions.html">Permissions</a>, they're always editable by their own creator regardless of this permission, so this screen also surfaces a user's own Personal templates even without <code>manage_checklists</code>.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Name, visibility</td><td>ChecklistTemplate.name / visibility</td><td>Global / Role-restricted / Personal.</td></tr>
+      <tr><td>Trigger</td><td>ChecklistTemplate.trigger_type / trigger_config</td><td>Clock In/Out, Scheduled Time, Checkpoint Visit, Incident Type, or Manual — each with its own config shape (e.g. a schedule expression, or a checkpoint + time-of-day/season condition).</td></tr>
+      <tr><td>Assignment</td><td>ChecklistTemplate.assignment_mode</td><td>To the triggering user, or to a specified Role.</td></tr>
+      <tr><td>Items</td><td>ChecklistTemplate.items → ChecklistTemplateItem, ordered</td><td>Each item's type (one of the 5), label, and type-specific config.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Create / edit a Global or Role-restricted template</td><td><code>manage_checklists</code></td><td></td></tr>
+      <tr><td>Create / edit one's own Personal template</td><td>Unrestricted for the creator, regardless of <code>manage_checklists</code></td><td>Not editable by anyone else, including <code>manage_checklists</code> holders.</td></tr>
+      <tr><td>Add / reorder / remove an item</td><td>Same as editing the template</td><td>Item type is fixed once added within this builder session but can be deleted and re-added as a different type.</td></tr>
+      <tr><td>Configure a Door Check's expected state, a Verify Task's retry-prompt flag, a Location-Based Check's nested checklist, or a Meter Reading's asset selection</td><td>Same as editing the template</td><td>Type-specific config, per <a href="../data-model.html">Data Model — ChecklistTemplateItem</a>.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Editing a Personal template as its non-creator</strong> — never offered, even to a <code>manage_checklists</code> holder; the permission's own description explicitly carves this out.</li>
+      <li><strong>Deleting a template with in-progress Checklist instances</strong> — existing instances are unaffected (a <code>Checklist</code> references its originating template but doesn't require the template to still exist for the instance's own data to remain valid); only future triggers stop generating new instances.</li>
+      <li><strong>Scheduled-time trigger with an unusual schedule</strong> — evaluated by the <code>checklist-triggers</code> Netlify Scheduled Function, per <a href="../api-structure.html">API Structure</a>; this screen just authors the <code>trigger_config</code>, it doesn't run it.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Desktop is the primary surface for building a template's item sequence, given the amount of configuration per item. Mobile supports viewing and light edits, but authoring a new multi-item template is a desk task.</p>
+
+    <div class="page-foot">
+      <a href="admin-roles-permissions.html">← Roles &amp; Permissions</a>
+      <a href="admin-locations.html">Location Types &amp; Locations Setup →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

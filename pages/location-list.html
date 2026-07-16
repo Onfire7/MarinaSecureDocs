@@ -37,13 +37,13 @@
   <main class="content">
     <span class="eyebrow">Locations · Page Specification</span>
     <h1>Location List / Map View</h1>
-    <p class="lede">Browse the marina's full location hierarchy — docks, slips, buildings, RV sites, whatever the marina has defined — as a flat filterable list or as pins on a real-world map.</p>
+    <p class="lede">Browse the marina's full location hierarchy — docks, slips, buildings, RV sites, whatever the marina has defined — as a flat filterable list, pins on a real-world map, or a schematic layout map.</p>
 
     <h2>Purpose</h2>
-    <p>The landing point for the Locations top-level nav item. A list/map toggle over the same underlying set of <code>Location</code> records, filtered by <code>LocationType</code> and <code>status</code>. This screen is for finding and navigating to a location, not for defining the location hierarchy itself — creating location types and locations happens in <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>, gated by <code>manage_locations</code>.</p>
+    <p>The landing point for the Locations top-level nav item. A list/map toggle over the same underlying set of <code>Location</code> records, filtered by <code>LocationType</code> and <code>status</code>. This screen is for finding and navigating to a location, not for defining the location hierarchy itself — creating location types and locations happens in <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>, gated by <code>manage_locations</code>, which is also where the schematic map's upload/plotting lives.</p>
 
     <div class="note">
-      <strong>This is the geographic pin map, not the schematic map view.</strong> The map mode described in this spec plots each Location's real-world <code>gps_coordinates</code> on a live map (pins) — the same coordinates used for checkpoint GPS validation. A second, schematic map view is also planned for this screen: an admin-uploaded layout image (<code>MarinaMap</code>) with each Location plotted as a color-coded rectangle (<code>LocationMapPlacement</code>) — the same underlying capability the Reservation calendar/list uses for its own map view, just with an occupancy/type overlay here instead of a reservation-status one. See <a href="../data-model.html">Data Model</a> and the note under Reservations in <a href="index.html">Page Specifications</a>. That view mode is still to be designed and added to this page; the geographic pin map described below doesn't depend on it.
+      <strong>Two different maps.</strong> <em>Geographic map</em> mode plots each Location's real-world <code>gps_coordinates</code> as pins on a live map — the same coordinates used for checkpoint GPS validation. <em>Schematic map</em> mode instead renders an admin-uploaded <code>MarinaMap</code> image with each Location plotted as a color-coded rectangle (<code>LocationMapPlacement</code>) — the same underlying capability the Reservation calendar/list uses for its own map view, just with an occupancy/type overlay here instead of a reservation-status one. See <a href="../data-model.html">Data Model</a>.
     </div>
 
     <h2>Data shown</h2>
@@ -52,17 +52,19 @@
       <tr><td>Name / label</td><td>Location.name</td><td></td></tr>
       <tr><td>Type</td><td>Location.type → LocationType.name</td><td></td></tr>
       <tr><td>Parent breadcrumb</td><td>Location.parent, walked recursively</td><td>e.g. "Dock C → Slip 14."</td></tr>
-      <tr><td>Status</td><td>Location.status</td><td>Occupied / Vacant / Reserved / Out of Service, plus admin-defined additions; shown as a colored pill in both list and map modes.</td></tr>
+      <tr><td>Status</td><td>Location.status</td><td>Occupied / Vacant / Reserved / Out of Service, plus admin-defined additions; shown as a colored pill in list mode and as each rectangle's/pin's color in both map modes.</td></tr>
       <tr><td>Current boat</td><td>Location.current_boat → Boat.name</td><td>Slip-type locations only; nullable.</td></tr>
-      <tr><td>GPS pin</td><td>Location.gps_coordinates</td><td>Map mode only; a location with no coordinates is omitted from the map but still appears in the list.</td></tr>
+      <tr><td>GPS pin</td><td>Location.gps_coordinates</td><td>Geographic map mode only; a location with no coordinates is omitted from that map but still appears in the list.</td></tr>
+      <tr><td>Plotted rectangle</td><td>LocationMapPlacement.rect on the active MarinaMap</td><td>Schematic map mode only; a location not yet plotted on the currently-selected map is omitted from it but still appears in the list.</td></tr>
     </table>
 
     <h2>Actions</h2>
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
-      <tr><td>Toggle List / Map view</td><td>None</td><td>Switches presentation of the same filtered result set.</td></tr>
+      <tr><td>Toggle List / Geographic Map / Schematic Map</td><td>None</td><td>Three presentations of the same filtered result set.</td></tr>
+      <tr><td>Drill into a parent Location's detail map</td><td>None</td><td>Schematic mode only, and only where a <code>MarinaMap</code> scoped to that parent exists — otherwise the master map is as far in as it goes, matching <a href="reservation-list.html">Reservation calendar/list</a>'s map view.</td></tr>
       <tr><td>Filter by type / status</td><td>None</td><td>Client-side filter over the subscribed query.</td></tr>
-      <tr><td>Open a location</td><td>None</td><td>Navigates to <a href="location-detail.html">Location detail</a>.</td></tr>
+      <tr><td>Open a location</td><td>None</td><td>Navigates to <a href="location-detail.html">Location detail</a>, from a list row, a map pin, or a schematic rectangle.</td></tr>
       <tr><td>Change a location's status</td><td><code>manage_locations</code></td><td>Inline quick-edit from the list (e.g. marking a slip Out of Service) — reuses the same permission as full location editing rather than introducing a separate status-change permission, per <a href="../permissions.html">Permissions</a>.</td></tr>
       <tr><td>Add a location</td><td><code>manage_locations</code></td><td>Shortcut into <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>, where creation actually happens.</td></tr>
     </table>
@@ -70,13 +72,15 @@
     <h2>States &amp; edge cases</h2>
     <ul>
       <li><strong>No locations defined yet</strong> — empty state; for a user with <code>manage_locations</code>, it prompts straight into Admin setup, otherwise a plain "nothing here yet" message.</li>
-      <li><strong>Location with no GPS coordinates</strong> — present in list mode, silently excluded from map mode rather than shown mislocated.</li>
+      <li><strong>Location with no GPS coordinates</strong> — present in list mode, silently excluded from geographic map mode rather than shown mislocated.</li>
+      <li><strong>Location not plotted on any schematic map</strong> — same treatment: present in list mode, silently excluded from schematic map mode rather than shown at a guessed position.</li>
+      <li><strong>No <code>MarinaMap</code> exists yet</strong> — schematic mode has nothing to render; falls back to list mode, or is simply omitted from the view toggle until an admin uploads at least the master map.</li>
       <li><strong>Deep hierarchy</strong> — nesting depth isn't fixed (a type's <code>valid_parent_types</code> can chain arbitrarily); the list view supports drilling down (parent → children) rather than assuming a flat two-level dock/slip structure.</li>
       <li><strong>Current boat changes</strong> — reflects live; when a boat moves slips (see <a href="../data-model.html">Data Model — Boat</a>), this list updates immediately via InstantDB subscription, with the move itself preserved in the Activity Log rather than a location history table.</li>
     </ul>
 
     <h2>Mobile vs. desktop</h2>
-    <p>Mobile: list is the default view; hierarchy is drill-down (tap Dock C to see its Slips) rather than a long flat list, and map opens full-screen when toggled. Desktop: list and map can sit side by side, with filters always visible and the full hierarchy browsable without drilling down screen by screen.</p>
+    <p>Mobile: list is the default view; hierarchy is drill-down (tap Dock C to see its Slips) rather than a long flat list, and either map opens full-screen when toggled. Desktop: list and either map can sit side by side, with filters always visible and the full hierarchy browsable without drilling down screen by screen.</p>
 
     <div class="page-foot">
       <a href="checklist-detail.html">← Checklist Detail</a>

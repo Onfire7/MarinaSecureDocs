@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Roles &amp; Permissions — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Admin · Page Specification</span>
+    <h1>Roles &amp; Permissions</h1>
+    <p class="lede">The trinary permission matrix editor — every role down one axis, every permission across the other, each cell an Allow / Deny / Undefined toggle.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="admin-home.html">Admin Home</a>, gated by <code>manage_roles</code>. This is the one screen that directly edits the mechanism described in <a href="../permissions.html">Permissions</a> — it doesn't compute effective permissions itself (that happens per-request everywhere else in the app), it just edits the per-role Allow/Deny/Undefined settings that feed that computation.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Roles</td><td>Role.name</td><td>Columns (or rows, depending on layout) across the matrix; marinas start with the five defaults (Security, Maintenance, Office, Marina Manager, Owner) and can add/duplicate/remove freely.</td></tr>
+      <tr><td>Permissions</td><td>The fixed catalog</td><td>Every permission in <a href="../permissions.html">Permissions</a>, no more and no fewer — this screen can't add a new permission, only assign the existing ones.</td></tr>
+      <tr><td>Matrix cells</td><td>Role.permissions map</td><td>Each cell cycles through Allow (✓) / Deny (✕) / Undefined (blank), matching the trinary model exactly.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Toggle a cell</td><td><code>manage_roles</code></td><td>Cycles Allow → Deny → Undefined → Allow.</td></tr>
+      <tr><td>Add a role</td><td><code>manage_roles</code></td><td>Creates a new <code>Role</code> with every permission defaulted to Undefined.</td></tr>
+      <tr><td>Duplicate a role</td><td><code>manage_roles</code></td><td>Copies an existing role's full permission map as a starting point — e.g. a "Trainee" role cloned from Security, then denying a few permissions explicitly, per the worked example in <a href="../permissions.html">Permissions</a>.</td></tr>
+      <tr><td>Delete a role</td><td><code>manage_roles</code></td><td>Any user still holding the deleted role simply loses whatever it granted; if it was their only role, they lose all role-gated access until reassigned.</td></tr>
+      <tr><td>Rename a role</td><td><code>manage_roles</code></td><td></td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Removing <code>manage_roles</code> from every role, including one's own</strong> — same lockout risk as deactivating the last <code>manage_users</code> holder on <a href="admin-users.html">Users</a>; should warn before allowing it, pending implementation-team confirmation.</li>
+      <li><strong>Large matrix</strong> — with the full permission catalog (19 entries) and an arbitrary number of custom roles, the matrix can get wide; horizontal scroll with sticky role/permission headers is expected on smaller viewports.</li>
+      <li><strong>Live effect</strong> — a permission change here takes effect immediately for every affected user's next action; there's no publish/staging step.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Desktop is the primary surface — a matrix editor genuinely needs the screen width. Mobile falls back to a per-role, per-permission list view (pick a role, see/edit its permissions one at a time) rather than attempting the full grid.</p>
+
+    <div class="page-foot">
+      <a href="admin-users.html">← Users</a>
+      <a href="admin-checklist-templates.html">Checklist Templates →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

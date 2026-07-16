@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — SMS Templates — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Admin · Page Specification</span>
+    <h1>SMS Templates</h1>
+    <p class="lede">Marina-wide reply templates for common texts — Global scope only; Personal templates are managed from Comms itself, not here.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="admin-home.html">Admin Home</a>, gated by <code>manage_marina_settings</code> — reused as the closest fit, since there's no dedicated template-management permission in the fixed catalog and this is fundamentally marina-wide configuration content. Personal-scope templates are each user's own and are managed inline from <a href="sms-thread.html">SMS thread</a>, unaffected by this permission.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Label, body</td><td>SMSTemplate.label / body</td><td>Global scope only on this screen — <code>SMSTemplate.scope</code> = Global.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Create / edit / delete a Global template</td><td><code>manage_marina_settings</code></td><td>Immediately available to every user's template picker in <a href="sms-thread.html">SMS thread</a> and <a href="new-sms-dialog.html">New SMS dialog</a>.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No Global templates yet</strong> — the SMS composer's template picker simply has nothing to offer beyond any Personal templates the individual user has made.</li>
+      <li><strong>Deleting a template mid-use</strong> — doesn't retroactively change any already-sent message; those are plain <code>SMSMessage</code> text, not a live reference to the template.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Same simple list-and-form layout on both; no meaningful layout divergence beyond the app's general responsive treatment.</p>
+
+    <div class="page-foot">
+      <a href="admin-assets.html">← Asset Categories &amp; Maintenance Rules</a>
+      <a href="admin-marina-settings.html">Marina Settings →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

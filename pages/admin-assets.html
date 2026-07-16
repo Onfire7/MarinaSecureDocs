@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Asset Categories &amp; Maintenance Rules — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Admin · Page Specification</span>
+    <h1>Asset Categories &amp; Maintenance Rules</h1>
+    <p class="lede">Configure the groupings assets fall into, and the rules that auto-generate maintenance tickets from meter or time thresholds.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="admin-home.html">Admin Home</a>, gated by <code>manage_assets</code>. Complements <a href="asset-detail.html">Asset detail</a>, which shows a given asset's rules read-only and lets that same permission holder log status/checkout/meter activity day to day — this screen is specifically where the rules themselves get authored.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Categories</td><td>Distinct values of Asset.category</td><td>Admin-defined groupings; not a separate entity, just the set of strings currently in use plus the ability to add new ones for future assets.</td></tr>
+      <tr><td>Maintenance rules</td><td>Asset.maintenance_rules, per asset</td><td>e.g. "every 3,000 miles" or "every 90 days since last completed."</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Add / rename a category</td><td><code>manage_assets</code></td><td>Renaming updates every asset currently using that category label.</td></tr>
+      <tr><td>Add a maintenance rule to an asset</td><td><code>manage_assets</code></td><td>Meter-based (needs <code>has_meter</code> = true) or time-based; a meterless asset can only take time-based rules.</td></tr>
+      <tr><td>Edit / remove a rule</td><td><code>manage_assets</code></td><td></td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Meter-based rule on a meterless asset</strong> — not offered as an option; the form only shows rule types the asset's <code>has_meter</code> flag actually supports.</li>
+      <li><strong>Rule triggers immediately on save</strong> — if the asset's current meter/elapsed-time already exceeds the new rule's threshold, the next scheduled evaluation (per <a href="../api-structure.html">API Structure — scheduled: maintenance-ticket-generation</a>) generates a ticket right away rather than waiting for the next meter reading.</li>
+      <li><strong>Category with no assets</strong> — allowed to exist (created ahead of assets that will use it) or to persist after its last asset is recategorized; not automatically cleaned up.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Same form-and-list layout on both; no meaningful layout divergence beyond the app's general responsive treatment.</p>
+
+    <div class="page-foot">
+      <a href="admin-incident-types.html">← Incident Types</a>
+      <a href="admin-sms-templates.html">SMS Templates →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

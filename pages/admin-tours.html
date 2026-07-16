@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Tours Setup — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Admin · Page Specification</span>
+    <h1>Tours Setup</h1>
+    <p class="lede">Define which checkpoints make up a security tour, and how the app sequences them.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="admin-home.html">Admin Home</a>, gated by <code>manage_locations</code> — reused rather than introducing a dedicated Tours permission, since a Tour is fundamentally a composition of Checkpoints, which already fall under this permission's scope.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Name</td><td>Tour.name</td><td></td></tr>
+      <tr><td>Mode</td><td>Tour.mode</td><td>Linear / Freeform / Randomized — see <a href="../workflows.html">Role Workflows</a> for the guard-facing behavior each implies.</td></tr>
+      <tr><td>Checkpoints</td><td>Tour.checkpoints</td><td>Ordered for Linear mode; an unordered set for Freeform/Randomized.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Create / edit a Tour</td><td><code>manage_locations</code></td><td></td></tr>
+      <tr><td>Reorder checkpoints</td><td><code>manage_locations</code></td><td>Only meaningful for Linear mode; drag-to-reorder.</td></tr>
+      <tr><td>Add / remove a checkpoint</td><td><code>manage_locations</code></td><td>Only existing Checkpoints (defined in <a href="admin-locations.html">Location Types &amp; Locations setup</a>) can be added — this screen doesn't create new checkpoints itself.</td></tr>
+      <tr><td>Change mode</td><td><code>manage_locations</code></td><td>Switching to/from Linear discards or requires establishing an order, since Freeform/Randomized don't carry one.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Checkpoint belongs to multiple Tours</strong> — allowed; <code>Checkpoint.tours</code> is a list, so the same physical checkpoint can participate in more than one tour definition.</li>
+      <li><strong>Empty Tour</strong> — a Tour with zero checkpoints is valid to save but not meaningfully assignable to a shift; the implementing team should decide whether to warn on save.</li>
+      <li><strong>Randomized mode with very few checkpoints</strong> — the unpredictability the mode is meant to provide degrades with a small set; not blocked, just a natural limitation of the marina's own layout.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Desktop is the primary surface for reordering a Linear tour's checkpoint sequence. Mobile supports viewing and simple field edits (name, mode) but not drag-reordering a long checkpoint list.</p>
+
+    <div class="page-foot">
+      <a href="admin-locations.html">← Location Types &amp; Locations Setup</a>
+      <a href="admin-incident-types.html">Incident Types →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

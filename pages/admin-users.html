@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Users — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Admin · Page Specification</span>
+    <h1>Users</h1>
+    <p class="lede">Invite, edit, deactivate, and assign roles to every user at the marina — gated by <code>manage_users</code>.</p>
+
+    <h2>Purpose</h2>
+    <p>The only way new users enter the system, per <a href="sign-in.html">Sign In</a> — there's no self-serve account creation. Inviting a user here provisions them in both Clerk and as an InstantDB <code>User</code> record, linked by <code>clerk_user_id</code>, per <a href="../architecture.html">Architecture — Authentication</a>.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Name, email/phone</td><td>User.name / email / phone</td><td></td></tr>
+      <tr><td>Roles</td><td>User.roles</td><td>Shown as tags; a user can hold multiple.</td></tr>
+      <tr><td>Active</td><td>User.active</td><td>Deactivated users are visually distinct and excluded from assignment pickers elsewhere in the app, but stay listed here for historical reference.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Invite a user</td><td><code>manage_users</code></td><td>Collects name and email/phone, triggers Clerk's invitation flow, and creates the corresponding <code>User</code> record once accepted.</td></tr>
+      <tr><td>Edit a user</td><td><code>manage_users</code></td><td>Name, contact info, role assignment.</td></tr>
+      <tr><td>Deactivate / reactivate</td><td><code>manage_users</code></td><td>Toggles <code>User.active</code>; does not delete the record, preserving it for historical Activity Log entries, past assignments, etc.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Deactivating the last <code>manage_users</code> holder</strong> — the app should warn before locking the marina out of user management entirely; the implementing team should confirm whether to hard-block this.</li>
+      <li><strong>Removing all roles from a user</strong> — allowed; that user simply loses access to every role-gated feature until reassigned, without being deactivated outright.</li>
+      <li><strong>Pending invitation not yet accepted</strong> — shown with a distinct status, separate from active/deactivated.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: a searchable list. Desktop: a sortable table with role tags and status visible without opening each user — this is squarely an office/desk workflow, so desktop is the primary case here.</p>
+
+    <div class="page-foot">
+      <a href="admin-home.html">← Admin Home</a>
+      <a href="admin-roles-permissions.html">Roles &amp; Permissions →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Marina Settings — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Admin · Page Specification</span>
+    <h1>Marina Settings</h1>
+    <p class="lede">The single settings record that lets one codebase serve very differently-run properties — GPS defaults, retention, recording, phone lines, and the shift report distribution list.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="admin-home.html">Admin Home</a>, gated by <code>manage_marina_settings</code>. Edits the one <code>MarinaSettings</code> record per marina, per <a href="../data-model.html">Data Model</a> — there's exactly one, not a list.</p>
+
+    <h2>Data shown / form fields</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>GPS validation radius default</td><td>MarinaSettings.gps_validation_radius_default</td><td>Fallback used by any Checkpoint without its own override, per <a href="admin-locations.html">Location Types &amp; Locations setup</a>.</td></tr>
+      <tr><td>Activity Log retention</td><td>MarinaSettings.activity_log_retention_days</td><td>Entries older than this are eligible for purge by the <code>activity-log-retention</code> Scheduled Function unless flagged <strong>Protected</strong>, per <a href="../api-structure.html">API Structure</a>.</td></tr>
+      <tr><td>Call recording / transcription toggles</td><td>MarinaSettings.call_recording_enabled / call_transcription_enabled</td><td>Governs whether <a href="active-call-panel.html">Active Call Panel</a> and call history ever show a recording/transcript at all.</td></tr>
+      <tr><td>Shift report recipients</td><td>MarinaSettings.shift_report_recipients</td><td>Email distribution list, per <a href="../architecture.html">Architecture — Shift report delivery</a>.</td></tr>
+      <tr><td>Phone lines</td><td>MarinaSettings.phone_lines</td><td>Each line's Twilio number, label, and routing behavior (e.g. a Security line skipping straight to a security menu).</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Edit any field</td><td><code>manage_marina_settings</code></td><td>Takes effect immediately — there's no publish/staging step, matching <a href="admin-roles-permissions.html">Roles &amp; Permissions</a>' live-effect behavior.</td></tr>
+      <tr><td>Add / edit / remove a phone line</td><td><code>manage_marina_settings</code></td><td>Adding a line requires the underlying Twilio number to already exist on the marina's Twilio account; this screen configures the app's record of it, not Twilio itself.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Lowering the retention window</strong> — takes effect on the next scheduled purge, not retroactively instantaneously; existing entries older than the new window are purged (unless Protected) at that next run, not the moment the setting is saved.</li>
+      <li><strong>Removing the last phone line</strong> — leaves the marina with no Twilio-routed number; calling/texting features have nothing to route through until a line is reconfigured. Should warn before allowing, pending implementation-team confirmation.</li>
+      <li><strong>Empty shift report recipients</strong> — the shift-report Twilio Function still runs and compiles the report, it simply has nowhere to send it; the implementing team should confirm whether to surface a warning here rather than let reports silently go nowhere.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Same form layout on both; this is an infrequent configuration task, not a field or high-frequency workflow, so no special mobile treatment beyond the app's general responsive behavior.</p>
+
+    <div class="page-foot">
+      <a href="admin-sms-templates.html">← SMS Templates</a>
+      <a href="index.html">Page Specifications →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

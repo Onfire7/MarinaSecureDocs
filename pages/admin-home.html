@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Home — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Admin · Page Specification</span>
+    <h1>Admin Home / Section Picker</h1>
+    <p class="lede">The gateway into every configuration screen — visible in nav only to a user holding at least one <code>manage_*</code> permission, showing only the sub-sections they can actually open.</p>
+
+    <h2>Purpose</h2>
+    <p>Per <a href="../permissions.html">Permissions — Admin visibility</a>: the Admin nav item itself appears for anyone holding any <code>manage_*</code> permission, but each sub-section listed here is independently gated by its own corresponding permission — a user might see Admin at all only because they hold <code>manage_assets</code>, and find every other tile grayed out or absent.</p>
+
+    <h2>Sub-sections, by permission</h2>
+    <table>
+      <tr><th>Tile</th><th>Requires</th></tr>
+      <tr><td><a href="admin-users.html">Users</a></td><td><code>manage_users</code></td></tr>
+      <tr><td><a href="admin-roles-permissions.html">Roles &amp; Permissions</a></td><td><code>manage_roles</code></td></tr>
+      <tr><td><a href="admin-checklist-templates.html">Checklist Templates</a></td><td><code>manage_checklists</code></td></tr>
+      <tr><td><a href="admin-locations.html">Location Types &amp; Locations</a></td><td><code>manage_locations</code></td></tr>
+      <tr><td><a href="admin-tours.html">Tours</a></td><td><code>manage_locations</code> — reused; a Tour is fundamentally a checkpoint composition, and checkpoints already fall under this permission</td></tr>
+      <tr><td><a href="admin-incident-types.html">Incident Types</a></td><td><code>create_incidents</code> — reused; the same permission already lets a user add a new type inline from <a href="new-incident-form.html">New incident form</a></td></tr>
+      <tr><td><a href="admin-assets.html">Asset Categories &amp; Maintenance Rules</a></td><td><code>manage_assets</code></td></tr>
+      <tr><td><a href="admin-sms-templates.html">SMS Templates</a></td><td><code>manage_marina_settings</code> — reused, as the closest fit; there's no dedicated template-management permission in the fixed catalog</td></tr>
+      <tr><td><a href="admin-marina-settings.html">Marina Settings</a></td><td><code>manage_marina_settings</code></td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Open a tile</td><td>That tile's own permission</td><td>Navigates to the relevant sub-section.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Holds exactly one <code>manage_*</code> permission</strong> — Admin appears in nav with exactly one usable tile; the rest are simply absent, not shown disabled.</li>
+      <li><strong>Holds none</strong> — Admin doesn't appear in nav at all, and this page is unreachable.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: tiles stack as a vertical list. Desktop: a grid, similar to the Dashboard's card layout.</p>
+
+    <div class="page-foot">
+      <a href="shift-report.html">← Shift Report</a>
+      <a href="admin-users.html">Users →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>
