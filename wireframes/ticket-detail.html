@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Ticket Detail — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/ticket-detail.html">Page Spec: Ticket Detail →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="ticket-queue.html">← Ticket Queue</a>
+      <a href="new-ticket-form.html">Next: New Ticket Form →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Tickets · Wireframe</span>
+  <h1 class="wf-h1">Ticket Detail</h1>
+  <p class="wf-lede">Mobile: stacked fields, sticky action bar. Desktop: everything in one wide view.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <div class="wf-appbar-back">←</div>
+          <span class="wf-appbar-title">Bilge pump not working</span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-field"><span class="wf-field-label">Priority / Status</span><div class="wf-field-value"><span class="wf-badge wf-badge-bad">Urgent</span> <span class="wf-badge">Open</span></div></div>
+          <div class="wf-field"><span class="wf-field-label">Location</span><div class="wf-field-value">Slip 14 → Location Detail</div></div>
+          <div class="wf-field"><span class="wf-field-label">Description</span><div class="wf-field-value">Owner reports pump not cycling on float switch test.</div></div>
+          <div class="wf-field"><span class="wf-field-label">Source incident</span><div class="wf-field-value"><span class="wf-gate">view_incidents</span> — omitted here if not held</div></div>
+        </div>
+        <div class="wf-actions" style="padding:10px 14px; border-top:1px solid var(--wf-line);">
+          <div class="wf-button wf-button-primary">Take <span class="wf-gate">assign_ticket_to_self</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <div class="wf-grid-2">
+            <div>
+              <div class="wf-field"><span class="wf-field-label">Priority / Status</span><div class="wf-field-value"><span class="wf-badge wf-badge-bad">Urgent</span> <span class="wf-badge">Open</span></div></div>
+              <div class="wf-field"><span class="wf-field-label">Location</span><div class="wf-field-value">Slip 14</div></div>
+              <div class="wf-field"><span class="wf-field-label">Description</span><div class="wf-field-value">Owner reports pump not cycling on float switch test.</div></div>
+            </div>
+            <div>
+              <div class="wf-field"><span class="wf-field-label">Created by / assigned to</span><div class="wf-field-value">R. Delgado (via Office) / —</div></div>
+              <div class="wf-actions">
+                <div class="wf-button">Take</div>
+                <div class="wf-button">Assign <span class="wf-gate">assign_ticket_to_others</span></div>
+                <div class="wf-select" style="width:auto;">Status: Open ▾</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="new-ticket-form.html">Next: New Ticket Form →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

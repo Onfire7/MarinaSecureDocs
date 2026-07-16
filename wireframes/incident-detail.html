@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Incident Detail — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/incident-detail.html">Page Spec: Incident Detail →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="incident-list.html">← Incident List</a>
+      <a href="new-incident-form.html">Next: New Incident Form →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Incidents · Wireframe</span>
+  <h1 class="wf-h1">Incident Detail</h1>
+  <p class="wf-lede">Two edit windows: original content author-locked at shift end; comments never lock for anyone holding create_incidents.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <div class="wf-appbar-back">←</div>
+          <span class="wf-appbar-title">Unattended cooler on dock</span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-field"><span class="wf-field-label">Status</span><div class="wf-field-value"><span class="wf-badge">Open</span> <span class="wf-gate">create_incidents to change</span></div></div>
+          <div class="wf-field"><span class="wf-field-label">Details</span><div class="wf-field-value">Left near Slip 12 since ~6 PM, no owner nearby.</div></div>
+          <div class="wf-field"><span class="wf-field-label">Author</span><div class="wf-field-value">M. Alvarez — editable until shift ends</div></div>
+          <div class="wf-section-title">Addendums</div>
+          <div class="wf-card"><div class="wf-card-meta">D. Kim · 8:40 PM</div>"Owner notified, retrieving now."</div>
+          <div class="wf-actions"><div class="wf-input" style="flex:1;">Add a comment…</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <div class="wf-grid-2">
+            <div>
+              <div class="wf-field"><span class="wf-field-label">Status</span><div class="wf-field-value"><span class="wf-badge">Open</span></div></div>
+              <div class="wf-field"><span class="wf-field-label">Details</span><div class="wf-field-value">Left near Slip 12 since ~6 PM, no owner nearby.</div></div>
+              <div class="wf-field"><span class="wf-field-label">Linked tickets</span><div class="wf-field-value">"Cooler retrieval" — Low</div></div>
+            </div>
+            <div>
+              <div class="wf-section-title">Addendums (always open to create_incidents)</div>
+              <div class="wf-card"><div class="wf-card-meta">D. Kim · 8:40 PM</div>"Owner notified, retrieving now."</div>
+              <div class="wf-actions"><div class="wf-input" style="flex:1;">Add a comment…</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="new-incident-form.html">Next: New Incident Form →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

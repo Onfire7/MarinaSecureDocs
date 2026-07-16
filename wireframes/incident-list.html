@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Incident List — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/incident-list.html">Page Spec: Incident List →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="new-ticket-form.html">← New Ticket Form</a>
+      <a href="incident-detail.html">Next: Incident Detail →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Incidents · Wireframe</span>
+  <h1 class="wf-h1">Incident List</h1>
+  <p class="wf-lede">Gated entirely by view_incidents — the one entity in the app where visibility itself, not just a sub-action, is a hard permission gate.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <span class="wf-appbar-title">Incidents <span class="wf-gate">view_incidents</span></span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-card">
+            <div class="wf-card-title">Unattended cooler on dock</div>
+            <div class="wf-card-meta">Open · Dock C · M. Alvarez</div>
+          </div>
+          <div class="wf-card">
+            <div class="wf-card-title">Gate left unlocked</div>
+            <div class="wf-card-meta">Under Review · Main Gate</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <table class="wf-table">
+            <tr><th>Title</th><th>Type</th><th>Status</th><th>Author</th><th>Location</th></tr>
+            <tr><td>Unattended cooler on dock</td><td>Safety</td><td><span class="wf-badge">Open</span></td><td>M. Alvarez</td><td>Dock C</td></tr>
+            <tr><td>Gate left unlocked</td><td>Security</td><td><span class="wf-badge wf-badge-warn">Under Review</span></td><td>M. Alvarez</td><td>Main Gate</td></tr>
+          </table>
+          <div class="wf-actions" style="margin-top:12px;"><div class="wf-button wf-button-primary">+ Log Incident <span class="wf-gate">create_incidents</span></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="incident-detail.html">Next: Incident Detail →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

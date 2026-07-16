@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Ticket Queue — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/ticket-queue.html">Page Spec: Ticket Queue →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="new-chat-room.html">← New Chat Room</a>
+      <a href="ticket-detail.html">Next: Ticket Detail →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Tickets · Wireframe</span>
+  <h1 class="wf-h1">Ticket Queue</h1>
+  <p class="wf-lede">Unrestricted to view — every role sees the queue. Assignment actions are what's gated.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <span class="wf-appbar-title">Tickets</span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-card">
+            <div class="wf-card-title">Bilge pump not working</div>
+            <div class="wf-card-meta"><span class="wf-badge wf-badge-bad">Urgent</span> Slip 14 · Unassigned</div>
+            <div class="wf-actions"><div class="wf-button">Take <span class="wf-gate">assign_ticket_to_self</span></div></div>
+          </div>
+          <div class="wf-card">
+            <div class="wf-card-title">Dock cleat loose</div>
+            <div class="wf-card-meta"><span class="wf-badge wf-badge-warn">Medium</span> Dock C · Assigned: J. Ruiz</div>
+          </div>
+        </div>
+        <div class="wf-tabbar">
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Home</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Checklists</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Locations</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Comms</div>
+          <div class="wf-tab current"><div class="wf-tab-icon"></div>Other</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-desktop-body">
+          <aside class="wf-sidenav">
+            <div class="wf-sidenav-brand">MarinaSecure</div>
+            <a class="wf-sidenav-item">Home</a>
+            <a class="wf-sidenav-item">Checklists</a>
+            <a class="wf-sidenav-item">Locations</a>
+            <a class="wf-sidenav-item">Comms</a>
+            <a class="wf-sidenav-item current">Tickets</a>
+            <a class="wf-sidenav-item">Incidents</a>
+            <a class="wf-sidenav-item">Reservations</a>
+            <a class="wf-sidenav-item">Boats</a>
+            <a class="wf-sidenav-item">Owners</a>
+            <a class="wf-sidenav-item">Contacts</a>
+            <a class="wf-sidenav-item">Activity Log</a>
+            <a class="wf-sidenav-item">Reports</a>
+          </aside>
+          <div class="wf-content">
+            <table class="wf-table">
+              <tr><th>Priority</th><th>Title</th><th>Location</th><th>Assignee</th><th></th></tr>
+              <tr><td><span class="wf-badge wf-badge-bad">Urgent</span></td><td>Bilge pump not working</td><td>Slip 14</td><td>—</td><td><span class="wf-button" style="padding:3px 8px;">Take</span> <span class="wf-button" style="padding:3px 8px;">Assign</span></td></tr>
+              <tr><td><span class="wf-badge wf-badge-warn">Medium</span></td><td>Dock cleat loose</td><td>Dock C</td><td>J. Ruiz</td><td>—</td></tr>
+              <tr><td><span class="wf-badge">Low</span></td><td>Jump Pack A — needs charging</td><td>Asset</td><td>—</td><td>auto-generated</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="ticket-detail.html">Next: Ticket Detail →</a></div>
+  </div>
+
+</div>
+</body>
+</html>
