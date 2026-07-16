@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMS Thread — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Comms · Page Specification</span>
+    <h1>SMS Thread</h1>
+    <p class="lede">A single conversation with a Contact — full message history, plus a template picker for common replies.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="comms-home.html">Comms Home</a> or <a href="missed-comms-detail.html">Missed Comms Detail</a>. One thread per Contact-per-line, per <a href="../data-model.html">Data Model — SMSThread</a>; opening it marks it read.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Messages</td><td>SMSMessage, ordered by timestamp</td><td>Direction, body, sender (for outbound), timestamp.</td></tr>
+      <tr><td>Thread contact</td><td>SMSThread.contact</td><td>Name always shown; phone/email require <code>view_contact</code>.</td></tr>
+      <tr><td>Template picker</td><td>SMSTemplate, scope Global or Personal (owner = self)</td><td>Global templates are marina-wide (managed in <a href="admin-sms-templates.html">Admin → SMS Templates</a>); Personal ones are managed by their owner from Comms.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Send a message</td><td><code>place_calls</code></td><td>Calls the Twilio Function's <code>POST /sms/send</code>, optionally sourced from a template; the Function sends via Twilio and creates the outbound <code>SMSMessage</code> itself, per the Twilio-source-of-truth rule.</td></tr>
+      <tr><td>Pick a template</td><td><code>place_calls</code> (same gate as sending)</td><td>Populates the composer with the template body, still editable before sending.</td></tr>
+      <tr><td>Manage personal templates</td><td>Unrestricted for one's own templates</td><td>Add/edit/remove Personal-scope <code>SMSTemplate</code> records from here; Global templates are read-only from this screen.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Offline</strong> — history already synced to InstantDB is fully viewable; sending is unavailable, since SMS is a Twilio (online-only) action — the composer reflects this honestly rather than silently queuing, per <a href="../architecture.html">Architecture</a>.</li>
+      <li><strong>No <code>place_calls</code></strong> — thread history is still viewable; only the composer/send action is hidden, matching <a href="comms-home.html">Comms Home</a>'s view-vs-initiate split.</li>
+      <li><strong>No templates configured</strong> — the picker is simply empty; typing a message from scratch is unaffected.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: full-screen conversation, standard messaging-app layout. Desktop: can sit alongside <a href="comms-home.html">Comms Home</a>'s thread list in a split view, similar to an email client.</p>
+
+    <div class="page-foot">
+      <a href="new-call-dialog.html">← New Call Dialog</a>
+      <a href="new-sms-dialog.html">New SMS Dialog →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

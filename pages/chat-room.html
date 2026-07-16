@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat Room — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Comms · Page Specification</span>
+    <h1>Chat Room</h1>
+    <p class="lede">One internal, topic-based conversation — entirely separate from calls and SMS, with no database relationship linking the two.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="comms-home.html">Comms Home</a>. Per <a href="../workflows.html">Role Workflows — Comms: chat rooms</a>, any user can start a room and invite specific users and/or roles into it; this page is where that room's conversation actually happens.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Title / topic</td><td>ChatRoom.title / topic</td><td></td></tr>
+      <tr><td>Messages</td><td>ChatMessage, ordered by timestamp</td><td>Author, body, attachments, timestamp.</td></tr>
+      <tr><td>Entity preview cards</td><td>ChatMessage.body, parsed for Location/Asset/Contact/etc. URLs</td><td>Rendered inline for display only — pasting a URL is link parsing, not a stored relationship, per <a href="../data-model.html">Data Model</a>.</td></tr>
+      <tr><td>Invited users / roles</td><td>ChatRoom.invited_users / invited_roles</td><td><code>invited_roles</code> is a live reference to Role, not a snapshot — a user granted that role after the room was created gains access to it immediately, without being re-invited.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Send a message</td><td>Must be invited (directly or via role), or hold <code>view_all_chats</code></td><td>Creates a <code>ChatMessage</code>; a <code>view_all_chats</code> holder who isn't actually invited can read but sending as a non-participant is a judgment call left to the marina's own norms, not a hard technical gate beyond visibility.</td></tr>
+      <tr><td>Attach a file/image</td><td>Same as sending</td><td>Stored on <code>ChatMessage.attachments</code>.</td></tr>
+      <tr><td>Paste an entity URL</td><td>Same as sending</td><td>Auto-renders a preview card; purely cosmetic, no relationship written.</td></tr>
+      <tr><td>Manage invitees</td><td>Room creator</td><td>Add/remove invited users or roles after creation; not gated by a new permission — ownership of the room is the gate, consistent with avoiding permission bloat (see <a href="../permissions.html">Permissions</a>).</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Not invited, no <code>view_all_chats</code></strong> — the room isn't reachable or listed anywhere; there's no "request access" path.</li>
+      <li><strong>Offline</strong> — chat is ordinary InstantDB data, not a Twilio action, so it works fully offline (send, read, attach) and syncs on reconnect, unlike SMS.</li>
+      <li><strong>Role membership changes mid-room</strong> — a user removed from an <code>invited_roles</code> role loses access to the room going forward, but past messages they sent remain (their authorship doesn't get retracted).</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: full-screen single room. Desktop: room list and active room can sit side by side, matching typical chat-app conventions.</p>
+
+    <div class="page-foot">
+      <a href="new-sms-dialog.html">← New SMS Dialog</a>
+      <a href="new-chat-room.html">New Chat Room / Invite Screen →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

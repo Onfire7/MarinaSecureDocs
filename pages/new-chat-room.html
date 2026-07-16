@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New Chat Room / Invite Screen — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Comms · Page Specification</span>
+    <h1>New Chat Room / Invite Screen</h1>
+    <p class="lede">Create a topic-based chat room and choose who's in it — specific users, whole roles, or both.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="comms-home.html">Comms Home</a>. Room creation itself is unrestricted — any user can start one, per <a href="../workflows.html">Role Workflows</a> — since chat is a coordination tool, not a data-access surface that needs gating.</p>
+
+    <h2>Data shown / form fields</h2>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+      <tr><td>Title</td><td>Text, required</td><td>ChatRoom.title</td></tr>
+      <tr><td>Topic</td><td>Text, optional</td><td>ChatRoom.topic</td></tr>
+      <tr><td>Invite users</td><td>Multi-select</td><td>ChatRoom.invited_users</td></tr>
+      <tr><td>Invite roles</td><td>Multi-select</td><td>ChatRoom.invited_roles — a live reference, so anyone later granted that role gains access automatically (see <a href="chat-room.html">Chat Room</a>).</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Create</td><td>Unrestricted — any user</td><td>Creates the <code>ChatRoom</code> with <code>created_by</code> = self, then navigates into <a href="chat-room.html">Chat Room</a>. Selecting zero invitees is allowed — a valid personal scratch room, not an error.</td></tr>
+      <tr><td>Cancel</td><td>None</td><td>Closes without creating a room.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No invitees selected</strong> — still creates the room; the creator can always add invitees later from within <a href="chat-room.html">Chat Room</a>.</li>
+      <li><strong>Inviting a role with no current holders</strong> — allowed; the room simply has no participants from that role yet until someone is granted it.</li>
+      <li><strong>Duplicate-sounding titles</strong> — not deduplicated or blocked; titles are freeform labels, not identifiers.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Same form-style screen on both; no meaningful layout divergence beyond the app's general responsive treatment.</p>
+
+    <div class="page-foot">
+      <a href="chat-room.html">← Chat Room</a>
+      <a href="index.html">Page Specifications →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

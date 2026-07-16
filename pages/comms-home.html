@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comms Home — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Comms · Page Specification</span>
+    <h1>Comms Home</h1>
+    <p class="lede">The landing point for the Comms top-level nav item — recent calls, texts, and chat rooms in one place, and the entry point for starting any of the three.</p>
+
+    <h2>Purpose</h2>
+    <p>An overview, not a permission gate: viewing call and SMS history has no dedicated permission in the fixed catalog (same reasoning as tickets and reservations — see <a href="../permissions.html">Permissions</a>), only <em>initiating</em> a call or SMS requires <code>place_calls</code>. Chat rooms are the one section here with real visibility scoping — a user only sees rooms they're invited to, unless they hold <code>view_all_chats</code>.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Section</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Recent calls</td><td>Call, most recent first</td><td>Direction, matched Contact (gated by <code>view_owner</code>/<code>view_contact</code> the same as everywhere a Contact appears), line, time, duration or missed flag.</td></tr>
+      <tr><td>Recent texts</td><td>SMSThread, ordered by <code>last_message_at</code></td><td>Contact, line, last message preview, unread indicator.</td></tr>
+      <tr><td>Chat rooms</td><td>ChatRoom where the user is <code>created_by</code>, in <code>invited_users</code>, or holds a role in <code>invited_roles</code> — or all rooms, with <code>view_all_chats</code></td><td>Title, most recent activity.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Start a call</td><td><code>place_calls</code></td><td>Opens <a href="new-call-dialog.html">New call dialog</a>.</td></tr>
+      <tr><td>Start a text</td><td><code>place_calls</code></td><td>Opens <a href="new-sms-dialog.html">New SMS dialog</a>.</td></tr>
+      <tr><td>Start a chat room</td><td>Unrestricted — any user</td><td>Opens <a href="new-chat-room.html">New chat room / invite screen</a>.</td></tr>
+      <tr><td>Open a call entry</td><td>None</td><td>Expands inline — matched contact, notes, recording/transcript if enabled — rather than a separate call-detail page; a live call instead surfaces via <a href="active-call-panel.html">Active call panel</a>.</td></tr>
+      <tr><td>Open a text thread</td><td>None</td><td>Navigates to <a href="sms-thread.html">SMS thread</a>; marks it read.</td></tr>
+      <tr><td>Open a chat room</td><td>Must be invited, or hold <code>view_all_chats</code></td><td>Navigates to <a href="chat-room.html">Chat room</a>.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No <code>place_calls</code></strong> — the start-call and start-text actions are hidden entirely, but existing call/text history is still visible; a marina can have staff who need call context (e.g. reviewing a call log) without being able to place calls themselves.</li>
+      <li><strong>Empty sections</strong> — each of the three sections has its own empty state rather than hiding the whole section.</li>
+      <li><strong>Not invited to any chat room and no <code>view_all_chats</code></strong> — the chat section shows only the "start a room" action with nothing listed, rather than being hidden outright.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: calls, texts, and chat rooms as three switchable tabs to keep each list full-width and scannable. Desktop: the three sections can sit side by side in columns, since there's room to scan all of them without switching.</p>
+
+    <div class="page-foot">
+      <a href="checkpoint-detail.html">← Checkpoint Detail</a>
+      <a href="active-call-panel.html">Active Call Panel →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

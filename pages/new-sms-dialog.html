@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New SMS Dialog — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Comms · Page Specification</span>
+    <h1>New SMS Dialog</h1>
+    <p class="lede">Start a text conversation with a contact or number that doesn't already have a thread — or jump straight to the existing one if it does.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="comms-home.html">Comms Home</a>. Since an <code>SMSThread</code> is identified by contact + line (per <a href="../data-model.html">Data Model</a>), this dialog's real job is picking who and which line, then handing off to that thread rather than ever creating a second thread for the same pairing.</p>
+
+    <h2>Data shown / form fields</h2>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+      <tr><td>Contact</td><td>Search/select, or manual number entry</td><td></td></tr>
+      <tr><td>Line</td><td>Select, from <code>MarinaSettings.phone_lines</code></td><td></td></tr>
+      <tr><td>Message</td><td>Text, with the same template picker as <a href="sms-thread.html">SMS thread</a></td><td>Composed here so the first message can go out immediately on confirming the contact/line.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Send</td><td><code>place_calls</code></td><td>Calls the Twilio Function's <code>POST /sms/send</code>; the Function creates or appends to the matching <code>SMSThread</code> and creates the outbound <code>SMSMessage</code>. Routes into <a href="sms-thread.html">SMS thread</a> on success.</td></tr>
+      <tr><td>Cancel</td><td>None</td><td>Closes without sending.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Contact/line pair already has a thread</strong> — sending routes into that existing thread rather than anything appearing duplicated; there is no way to intentionally create a second thread for the same pairing.</li>
+      <li><strong>Offline</strong> — disabled the same way as <a href="sms-thread.html">SMS thread</a>'s composer, since sending requires Twilio connectivity.</li>
+      <li><strong>No <code>place_calls</code></strong> — this dialog is unreachable; every entry point to it is gated the same way.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Same form-style dialog on both; no meaningful layout divergence beyond the app's general responsive treatment.</p>
+
+    <div class="page-foot">
+      <a href="sms-thread.html">← SMS Thread</a>
+      <a href="chat-room.html">Chat Room →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>
