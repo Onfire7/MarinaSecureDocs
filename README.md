@@ -1,6 +1,6 @@
 # MarinaSecureDocs
 
-Implementation documentation for the Marina Ops platform, written for the developers building the application — architecture, data model, permissions, per-role functional requirements, API structure, page specifications, and wireframes.
+Implementation documentation for the MarinaSecure platform, written for the developers building the application — architecture, data model, permissions, per-role functional requirements, API structure, page specifications, and wireframes.
 
 **Start here:** open `index.html`, or browse the rendered docs via GitHub Pages:
 
