@@ -37,7 +37,7 @@
   <main class="content">
     <span class="eyebrow">Access · Page Specification</span>
     <h1>User Switch</h1>
-    <p class="lede">Fast handoff on a shared device — a tablet mounted at the security desk, used by whoever is on shift — without a full sign-out/sign-in cycle.</p>
+    <p class="lede">Fast handoff on a shared device — a tablet at the security desk, or just as often a phone passed between guards at shift change — without a full sign-out/sign-in cycle.</p>
 
     <h2>Purpose</h2>
     <p>Shift changes happen daily and need to be fast. This screen is the UI for Clerk's <strong>multi-session</strong> support: a shared device can hold several users' authenticated Clerk sessions simultaneously, and the incoming user picks themselves from a short list rather than typing full credentials every handoff — switching is just calling Clerk's <code>setActive()</code> against their existing session. Personal devices never see this screen in practice — they only ever hold one active Clerk session (see <a href="../architecture.html">Architecture — Authentication</a>).</p>
@@ -65,7 +65,7 @@
     </ul>
 
     <h2>Mobile vs. desktop</h2>
-    <p>Shared devices are overwhelmingly tablets mounted at a fixed post, so this screen is designed tablet-first — large tap targets, a short vertical list. The same screen serves a desktop shared workstation identically; there's no meaningfully different desktop layout to design for here.</p>
+    <p>Shared devices are overwhelmingly phones and tablets, not desktops — a phone handed off between guards at shift change, or a tablet mounted at a fixed post — so this screen is designed mobile-first: large tap targets, a short vertical list that works one-handed on a phone screen just as well as on a tablet. A shared desktop workstation is rarer but served by the same layout unmodified; there's no meaningfully different desktop treatment to design for here.</p>
 
     <div class="page-foot">
       <a href="sign-in.html">← Sign In</a>
