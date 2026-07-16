@@ -40,21 +40,26 @@
     <p class="lede">What opens when a guard taps their phone against an NFC tag or scans a QR code at a checkpoint — the checkpoint's own <code>guid_url</code>.</p>
 
     <h2>Purpose</h2>
-    <p>This URL is the checkpoint, functionally: it's bound 1:1 to a <code>Checkpoint</code> record and is the only way this screen is reached. On load it immediately logs the visit and surfaces whatever's relevant right now, per <a href="../workflows.html">Role Workflows — Checking in at a checkpoint</a>.</p>
+    <p>This URL is the checkpoint, functionally: it's bound 1:1 to a <code>Checkpoint</code> record and is the only way this screen is reached. On load it immediately logs the visit and surfaces whatever's relevant right now, per <a href="../workflows.html">Role Workflows — Checking in at a checkpoint</a>. GPS capture happens in the background rather than gating any of this — see below.</p>
 
     <h2>On-load sequence</h2>
+    <p>GPS acquisition is the one step here that can take anywhere from under a second to several seconds depending on signal, so it's deliberately taken off the critical path — the guard is never staring at a spinner waiting for it:</p>
     <ol>
-      <li>Capture device GPS.</li>
-      <li>Create a Check-In record: <code>checkpoint</code>, <code>user</code> (current session), <code>timestamp</code>, <code>method</code> = Scanned, <code>gps_at_checkin</code>, and <code>within_radius</code> computed against <code>Checkpoint.gps_validation_radius</code> (falling back to <code>MarinaSettings.gps_validation_radius_default</code>).</li>
+      <li>Create a Check-In record immediately: <code>checkpoint</code>, <code>user</code> (current session), <code>timestamp</code>, <code>method</code> = Scanned, with <code>gps_at_checkin</code> and <code>within_radius</code> both left null/pending. This is a local-first InstantDB write, so it completes practically instantly regardless of connectivity.</li>
       <li>Evaluate <code>Checkpoint.checklist_templates</code> against their trigger conditions (time of day, season, etc.) to find which apply right now.</li>
-      <li>Present the matching checklist(s) for completion, and/or a place to add a note or log an incident even if none apply.</li>
+      <li>Present the matching checklist(s) for completion, and/or a place to add a note or log an incident even if none apply — the guard can start working immediately, before GPS has resolved.</li>
+      <li>In parallel with steps 2–3, request device GPS. Once it resolves, update the <em>same</em> Check-In record with <code>gps_at_checkin</code> and <code>within_radius</code> (computed against <code>Checkpoint.gps_validation_radius</code>, falling back to <code>MarinaSettings.gps_validation_radius_default</code>).</li>
     </ol>
+
+    <h3>GPS as a background update</h3>
+    <p>While GPS is pending, a small, unobtrusive indicator (e.g. a subtle pill near the header — "Saving location…") signals that something is still happening, without blocking any interaction: checklist items, notes, and incidents all work normally while it's showing. Once GPS resolves, the indicator clears — silently if the check-in lands within radius, or replaced by the same "outside radius" flag described under Data shown if it doesn't. If GPS never resolves within a reasonable timeout (location services disabled, unusually poor signal), the indicator settles into an "unavailable" state rather than spinning indefinitely; <code>gps_at_checkin</code> and <code>within_radius</code> simply stay null, which is an accepted terminal state, not an error.</p>
 
     <h2>Data shown</h2>
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Checkpoint name &amp; location</td><td>Checkpoint.name, Checkpoint.location</td><td></td></tr>
-      <tr><td>GPS validation result</td><td>Check-In.within_radius</td><td>Shown only if flagged false — otherwise the check-in proceeds silently.</td></tr>
+      <tr><td>GPS pending indicator</td><td>Check-In.gps_at_checkin / within_radius = null</td><td>Small, unobtrusive "Saving location…" pill, shown only while GPS hasn't resolved yet; never blocks the rest of the screen.</td></tr>
+      <tr><td>GPS validation result</td><td>Check-In.within_radius</td><td>Shown only once resolved and flagged false — otherwise the pending indicator just clears silently.</td></tr>
       <tr><td>Applicable checklist(s)</td><td>Checkpoint.checklist_templates, trigger-evaluated</td><td>Zero, one, or more.</td></tr>
     </table>
 
@@ -68,9 +73,11 @@
     <h2>States &amp; edge cases</h2>
     <ul>
       <li><strong>Not signed in</strong> — the URL still opens (it's a public deep link), but routes to <a href="sign-in.html">Sign In</a> or <a href="user-switch.html">User Switch</a> first, then resumes the check-in flow.</li>
-      <li><strong>GPS outside the checkpoint's radius</strong> — the check-in still records (<code>within_radius</code> = false); it isn't blocked, but is flagged for later review, matching the data model's spoof-guard-not-spoof-block design.</li>
+      <li><strong>GPS outside the checkpoint's radius</strong> — once GPS resolves, the check-in record updates to <code>within_radius</code> = false; it isn't blocked (the check-in already exists and the guard may already be mid-checklist), but is flagged for later review, matching the data model's spoof-guard-not-spoof-block design.</li>
+      <li><strong>GPS never resolves</strong> — after a reasonable timeout, the pending indicator settles to "unavailable" and the Check-In record simply keeps <code>gps_at_checkin</code>/<code>within_radius</code> null. The check-in itself is still valid; it's just unvalidated, same as a manual check-in with no GPS (see <a href="manual-checkin-dialog.html">Manual Check-In Dialog</a>).</li>
+      <li><strong>User navigates into a checklist before GPS resolves</strong> — expected and unblocked by design; the pending indicator follows along (or the resulting flag appears) regardless of which sub-screen the guard has moved to, since it's tied to the Check-In record, not this particular screen.</li>
       <li><strong>Multiple applicable checklists</strong> — presented as a short list to work through in sequence rather than merged into one.</li>
-      <li><strong>Offline scan</strong> — the Check-In write succeeds locally and syncs on reconnect, identical to any other InstantDB write.</li>
+      <li><strong>Offline scan</strong> — both the initial Check-In write and the later GPS update succeed locally and sync on reconnect, identical to any other InstantDB write; GPS itself is a device capability and doesn't require connectivity to resolve.</li>
     </ul>
 
     <h2>Mobile vs. desktop</h2>

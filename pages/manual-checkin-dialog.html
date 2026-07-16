@@ -52,14 +52,14 @@
     <h2>Actions</h2>
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
-      <tr><td>Submit</td><td>Reason required</td><td>Creates a Check-In record identical in shape to a scanned one, except <code>method</code> = Manual and <code>reason</code> set. GPS is still captured and validated against the checkpoint's radius the same way. Proceeds into whatever applicable checklist(s) exist, same as <a href="checkpoint-checkin.html">Checkpoint Check-In</a>.</td></tr>
+      <tr><td>Submit</td><td>Reason required</td><td>Immediately creates a Check-In record identical in shape to a scanned one, except <code>method</code> = Manual and <code>reason</code> set — <code>gps_at_checkin</code>/<code>within_radius</code> start null and GPS resolves in the background exactly as on <a href="checkpoint-checkin.html">Checkpoint Check-In</a>, with the same unobtrusive pending indicator. Proceeds immediately into whatever applicable checklist(s) exist, without waiting on GPS.</td></tr>
       <tr><td>Cancel</td><td>None</td><td>Closes without creating a record.</td></tr>
     </table>
 
     <h2>States &amp; edge cases</h2>
     <ul>
       <li><strong>No reason entered</strong> — submit stays disabled; this is the one hard validation rule on the dialog.</li>
-      <li><strong>GPS unavailable</strong> (e.g. device location services off) — <code>gps_at_checkin</code> is left null and <code>within_radius</code> cannot be computed; the check-in still records, flagged for review rather than blocked.</li>
+      <li><strong>GPS unavailable</strong> (e.g. device location services off) — the pending indicator settles to "unavailable" after a timeout; <code>gps_at_checkin</code> is left null and <code>within_radius</code> cannot be computed, but the check-in still stands, same as <a href="checkpoint-checkin.html">Checkpoint Check-In</a>.</li>
       <li><strong>Offline</strong> — writes locally like any other check-in.</li>
     </ul>
 
