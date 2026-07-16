@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Checklist Detail — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/checklist-detail.html">Page Spec: Checklist Detail →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="tour-progress.html">← Tour Progress View</a>
+      <a href="location-list.html">Next: Location List / Map View →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Checklists &amp; Tours · Wireframe</span>
+  <h1 class="wf-h1">Checklist Detail</h1>
+  <p class="wf-lede">Read-only, completed instance. No edit actions anywhere — an immutable historical record.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <div class="wf-appbar-back">←</div>
+          <span class="wf-appbar-title">Fuel Shed — Nightly Check</span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-field"><span class="wf-field-label">Assigned to / completed</span><div class="wf-field-value">Maria Alvarez · 8:14 PM</div></div>
+          <div class="wf-card">
+            <div class="wf-badge">Door Check</div>
+            <div class="wf-card-title">Fuel Shed Door</div>
+            <div class="wf-card-meta">Observed Locked (matched) — no retry needed</div>
+          </div>
+          <div class="wf-card">
+            <div class="wf-badge">Verify Task</div>
+            <div class="wf-card-title">Trash cans emptied</div>
+            <div class="wf-card-meta">Rejected — reason: "not done, left note for day crew"</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <div class="wf-field"><span class="wf-field-label">Assigned to / completed</span><div class="wf-field-value">Maria Alvarez · 8:14 PM</div></div>
+          <table class="wf-table">
+            <tr><th>Item</th><th>Type</th><th>Result</th><th>Linked ticket</th></tr>
+            <tr><td>Fuel Shed Door</td><td>Door Check</td><td>Locked (matched)</td><td>—</td></tr>
+            <tr><td>Trash cans emptied</td><td>Verify Task</td><td>Rejected — reason given</td><td>—</td></tr>
+            <tr><td>Boathouse interior</td><td>Location-Based</td><td>Nested checklist complete</td><td>—</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="location-list.html">Next: Location List / Map View →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

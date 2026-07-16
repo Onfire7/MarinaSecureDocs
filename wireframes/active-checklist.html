@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Active Checklist — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/active-checklist.html">Page Spec: Active Checklist →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="checklist-list.html">← Checklist List</a>
+      <a href="checkpoint-checkin.html">Next: Checkpoint Check-In →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Checklists &amp; Tours · Wireframe</span>
+  <h1 class="wf-h1">Active Checklist</h1>
+  <p class="wf-lede">Mobile: one item full-screen at a time — shown here mid Door Check mismatch-correction. Desktop: the full item list expanded inline at once.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <div class="wf-appbar-back">←</div>
+          <span class="wf-appbar-title">Dock C Gate — Night Check</span>
+        </div>
+        <div class="wf-content" style="min-height:480px; display:flex; flex-direction:column;">
+          <div class="wf-card-meta" style="margin-bottom:10px;">Item 2 of 5</div>
+          <div class="wf-card" style="flex:1;">
+            <div class="wf-badge" style="margin-bottom:8px;">Door Check</div>
+            <div class="wf-card-title">Fuel Shed Door</div>
+            <div class="wf-field-label" style="margin-top:12px;">Expected: Locked</div>
+            <div class="wf-badge wf-badge-bad" style="margin:6px 0;">Observed: Unlocked — mismatch</div>
+            <div class="wf-annotation">First mismatch → prompt to correct (lock the door), then select again. Second mismatch → note or ticket required, no silent pass.</div>
+            <div class="wf-actions" style="flex-direction:column; margin-top:14px;">
+              <div class="wf-button wf-button-primary">I corrected it — select state again</div>
+              <div class="wf-button">Add note</div>
+              <div class="wf-button">Raise a ticket</div>
+            </div>
+          </div>
+          <div class="wf-annotation" style="margin-top:10px;">GPS-pending "Saving…" pill (generic copy) may still be showing from check-in — doesn't block this flow.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <div class="wf-section-title">Dock C Gate — Night Check</div>
+          <div class="wf-grid-2">
+            <div class="wf-card">
+              <div class="wf-badge">Simple Check</div>
+              <div class="wf-card-title">Gate latch secure</div>
+              <div class="wf-actions"><div class="wf-button wf-button-primary">✓ Mark complete</div></div>
+            </div>
+            <div class="wf-card">
+              <div class="wf-badge">Door Check</div>
+              <div class="wf-card-title">Fuel Shed Door</div>
+              <div class="wf-badge wf-badge-bad" style="margin:4px 0;">Observed: Unlocked — mismatch</div>
+              <div class="wf-actions"><div class="wf-button">Correct &amp; re-check</div></div>
+            </div>
+            <div class="wf-card">
+              <div class="wf-badge">Verify Task</div>
+              <div class="wf-card-title">Trash cans emptied</div>
+              <div class="wf-actions">
+                <div class="wf-button">Confirm</div>
+                <div class="wf-button">Reject — reason</div>
+                <div class="wf-button">Reject — raise ticket</div>
+              </div>
+            </div>
+            <div class="wf-card">
+              <div class="wf-badge">Location-Based Check</div>
+              <div class="wf-card-title">Boathouse interior</div>
+              <div class="wf-card-meta">Opens nested sub-checklist scoped to Boathouse</div>
+            </div>
+            <div class="wf-card">
+              <div class="wf-badge">Meter Reading</div>
+              <div class="wf-card-title">Patrol vehicle mileage</div>
+              <div class="wf-field"><span class="wf-field-label">Asset</span><div class="wf-select">Security Truck #2</div></div>
+              <div class="wf-field"><span class="wf-field-label">Reading</span><div class="wf-input">18,204</div></div>
+            </div>
+          </div>
+          <div class="wf-actions" style="margin-top:16px;">
+            <div class="wf-button wf-button-disabled">Submit Checklist — 3 items remaining</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-section" style="margin-top:24px;">
+    <div class="wf-section-title">Notes</div>
+    <div class="wf-annotation">Submitting the end-of-shift checklist (if this is one) sets Shift.ended_at and fires the on-demand shift-report call.</div>
+    <div class="wf-annotation">Every write here is local-first — fully usable offline.</div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="checkpoint-checkin.html">Next: Checkpoint Check-In →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

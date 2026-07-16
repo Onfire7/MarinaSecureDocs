@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Manual Check-In Dialog — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/manual-checkin-dialog.html">Page Spec: Manual Check-In Dialog →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="checkpoint-checkin.html">← Checkpoint Check-In</a>
+      <a href="tour-progress.html">Next: Tour Progress View →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Checklists &amp; Tours · Wireframe</span>
+  <h1 class="wf-h1">Manual Check-In Dialog</h1>
+  <p class="wf-lede">Fallback when a checkpoint's tag/QR is unreadable. Same dialog at any width — shown once, as a floating card over the app it interrupts.</p>
+
+  <div class="wf-frames">
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Any width — dialog overlay</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-frame-dialog-backdrop">
+          <div class="wf-dialog-card">
+            <div class="wf-card-title" style="margin-bottom:10px;">Manual Check-In</div>
+            <div class="wf-field">
+              <span class="wf-field-label">Checkpoint</span>
+              <div class="wf-select">Fuel Shed (nearby)</div>
+            </div>
+            <div class="wf-field">
+              <span class="wf-field-label">Reason — required</span>
+              <div class="wf-textarea">NFC tag damaged, scanning QR sticker instead</div>
+            </div>
+            <div class="wf-actions">
+              <div class="wf-button wf-button-primary">Submit</div>
+              <div class="wf-button">Cancel</div>
+            </div>
+            <div class="wf-annotation">Submit disabled until Reason is filled — the one hard validation rule. GPS still captured in the background exactly as on the scanned flow.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="tour-progress.html">Next: Tour Progress View →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Tour Progress View — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/tour-progress.html">Page Spec: Tour Progress View →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="manual-checkin-dialog.html">← Manual Check-In Dialog</a>
+      <a href="checklist-detail.html">Next: Checklist Detail →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Checklists &amp; Tours · Wireframe</span>
+  <h1 class="wf-h1">Tour Progress View</h1>
+  <p class="wf-lede">Security-only. Display differs sharply by mode — Randomized deliberately withholds the full route. Mobile is primary (field use); desktop adds a larger map for a manager watching live.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <div class="wf-appbar-back">←</div>
+          <span class="wf-appbar-title">Evening Round <span class="wf-gate">Security</span></span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-badge">Randomized</div>
+          <div class="wf-annotation">Only the next available checkpoint is shown — not the full remaining set — so patrol patterns stay unpredictable.</div>
+          <div class="wf-card" style="margin-top:10px;">
+            <div class="wf-card-meta">NEXT CHECKPOINT</div>
+            <div class="wf-card-title">Dock C Gate</div>
+            <div class="wf-actions"><div class="wf-button">View on map</div></div>
+          </div>
+          <div class="wf-card-meta" style="margin-top:8px;">4 checkpoints remaining (count only)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled) — Linear mode, manager view</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <div class="wf-grid-2">
+            <div>
+              <div class="wf-badge">Linear</div>
+              <table class="wf-table" style="margin-top:8px;">
+                <tr><th></th><th>Checkpoint</th></tr>
+                <tr><td class="wf-badge-good" style="border-radius:0;">✓</td><td>Main Gate</td></tr>
+                <tr><td class="wf-badge-good" style="border-radius:0;">✓</td><td>Boathouse</td></tr>
+                <tr><td style="font-weight:700;">→</td><td><strong>Dock C Gate</strong> (next)</td></tr>
+                <tr><td></td><td>Fuel Shed</td></tr>
+                <tr><td></td><td>RV Lot</td></tr>
+              </table>
+            </div>
+            <div>
+              <div class="wf-map-placeholder">
+                <div class="wf-map-rect" style="top:20%; left:15%; width:60px; height:24px;">Dock C<br>Gate</div>
+                <div class="wf-map-rect" style="top:50%; left:55%; width:60px; height:24px;">Fuel<br>Shed</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-section" style="margin-top:24px;">
+    <div class="wf-section-title">Notes</div>
+    <div class="wf-annotation">Freeform mode: full checkpoint set shown, marked visited/remaining, no forced order.</div>
+    <div class="wf-annotation">Progress derives from check-ins timestamped within the current Shift window — resets fresh every shift, no separate "reset" action.</div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="checklist-detail.html">Next: Checklist Detail →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

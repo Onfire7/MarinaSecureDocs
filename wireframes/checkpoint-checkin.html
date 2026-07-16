@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Checkpoint Check-In — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/checkpoint-checkin.html">Page Spec: Checkpoint Check-In →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="active-checklist.html">← Active Checklist</a>
+      <a href="manual-checkin-dialog.html">Next: Manual Check-In Dialog →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Checklists &amp; Tours · Wireframe</span>
+  <h1 class="wf-h1">Checkpoint Check-In Screen</h1>
+  <p class="wf-lede">What the checkpoint's NFC/QR URL opens. Responsive rather than mobile-only (tablets/hybrid laptops with NFC are real too), but there's no dedicated app chrome — the check-in record saves immediately and the applicable checklist(s) show right away, GPS resolving in the background.</p>
+
+  <div class="wf-frames">
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile / tablet / hybrid laptop — 375px shown</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <span class="wf-appbar-title">Fuel Shed — Checkpoint</span>
+          <div class="wf-badge">Saving…</div>
+        </div>
+        <div class="wf-content">
+          <div class="wf-annotation">"Saving…" pill above is the generic, non-specific background-save indicator — never names "GPS" or "location." Clears silently once resolved, or flips to an "outside radius" flag if the check-in lands outside the configured GPS radius.</div>
+          <div class="wf-section-title">Applicable now</div>
+          <div class="wf-card">
+            <div class="wf-card-title">Fuel Shed — Nightly Safety Check</div>
+            <div class="wf-card-meta">Trigger: this checkpoint, 8 PM–6 AM</div>
+            <div class="wf-actions"><div class="wf-button wf-button-primary">Begin Checklist</div></div>
+          </div>
+          <div class="wf-divider"></div>
+          <div class="wf-actions">
+            <div class="wf-button">+ Add note</div>
+            <div class="wf-button">+ Log incident</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-section" style="margin-top:24px;">
+    <div class="wf-section-title">Notes</div>
+    <div class="wf-annotation">Reload-safe: the URL is rewritten with the created Check-In's ID right after creation, so a refresh resumes rather than duplicates.</div>
+    <div class="wf-annotation">Tab auto-closes once every triggered checklist is Complete, or after 10 minutes idle with nothing unfinished — with a focus-triggered retry if the browser initially refuses to close the tab.</div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="manual-checkin-dialog.html">Next: Manual Check-In Dialog →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

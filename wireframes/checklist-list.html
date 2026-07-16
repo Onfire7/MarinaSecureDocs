@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Checklist List — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/checklist-list.html">Page Spec: Checklist List →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="dashboard.html">← Dashboard</a>
+      <a href="active-checklist.html">Next: Active Checklist →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Checklists &amp; Tours · Wireframe</span>
+  <h1 class="wf-h1">Checklist List</h1>
+  <p class="wf-lede">Mine / assigned-to-my-role checklists, plus a Tours tab for Security. Mobile: chip filters over a single list. Desktop: sortable table with the Tours panel alongside instead of a tab switch.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <span class="wf-appbar-title">Checklists</span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-actions">
+            <div class="wf-badge">All</div>
+            <div class="wf-badge wf-badge-warn">In Progress</div>
+            <div class="wf-badge">Not Started</div>
+            <div class="wf-badge">Complete</div>
+            <div class="wf-badge" style="margin-left:auto;">Tours <span class="wf-gate">Security</span></div>
+          </div>
+          <div class="wf-divider"></div>
+          <div class="wf-card">
+            <div class="wf-card-title">Start of Shift — Vehicle</div>
+            <div class="wf-card-meta">Trigger: Clock In · <span class="wf-badge wf-badge-warn">In Progress</span></div>
+          </div>
+          <div class="wf-card">
+            <div class="wf-card-title">Dock C Gate — Night Check</div>
+            <div class="wf-card-meta">Trigger: Checkpoint: Dock C Gate · Not Started</div>
+          </div>
+          <div class="wf-card" style="opacity:0.6;">
+            <div class="wf-card-title">Fuel Shed — Weekly</div>
+            <div class="wf-card-meta">Complete · Tue 6:02 AM</div>
+          </div>
+        </div>
+        <div class="wf-tabbar">
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Home</div>
+          <div class="wf-tab current"><div class="wf-tab-icon"></div>Checklists</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Locations</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Comms</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Other</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-desktop-body">
+          <aside class="wf-sidenav">
+            <div class="wf-sidenav-brand">MarinaSecure</div>
+            <a class="wf-sidenav-item">Home</a>
+            <a class="wf-sidenav-item current">Checklists</a>
+            <a class="wf-sidenav-item">Locations</a>
+            <a class="wf-sidenav-item">Comms</a>
+            <a class="wf-sidenav-item">Tickets</a>
+            <a class="wf-sidenav-item">Incidents</a>
+            <a class="wf-sidenav-item">Reservations</a>
+            <a class="wf-sidenav-item">Boats</a>
+            <a class="wf-sidenav-item">Owners</a>
+            <a class="wf-sidenav-item">Contacts</a>
+            <a class="wf-sidenav-item">Activity Log</a>
+            <a class="wf-sidenav-item">Reports</a>
+          </aside>
+          <div class="wf-content">
+            <div class="wf-grid-2">
+              <div>
+                <table class="wf-table">
+                  <tr><th>Template</th><th>Status</th><th>Trigger</th><th>Started</th></tr>
+                  <tr><td>Start of Shift — Vehicle</td><td><span class="wf-badge wf-badge-warn">In Progress</span></td><td>Clock In</td><td>7:40 PM</td></tr>
+                  <tr><td>Dock C Gate — Night Check</td><td><span class="wf-badge">Not Started</span></td><td>Checkpoint: Dock C Gate</td><td>—</td></tr>
+                  <tr><td>Fuel Shed — Weekly</td><td><span class="wf-badge wf-badge-good">Complete</span></td><td>Scheduled 6 AM</td><td>Tue 6:02 AM</td></tr>
+                </table>
+              </div>
+              <div>
+                <div class="wf-section-title">Tours <span class="wf-gate">Security</span></div>
+                <div class="wf-card">
+                  <div class="wf-card-title">Evening Round — Linear</div>
+                  <div class="wf-card-meta">Next: Dock C Gate</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="active-checklist.html">Next: Active Checklist →</a></div>
+  </div>
+
+</div>
+</body>
+</html>
