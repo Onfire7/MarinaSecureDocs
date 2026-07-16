@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Reports Home — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/reports-home.html">Page Spec: Reports Home →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="activity-log.html">← Activity Log Feed</a>
+      <a href="shift-report.html">Next: Shift Report →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Reports · Wireframe</span>
+  <h1 class="wf-h1">Reports Home</h1>
+  <p class="wf-lede">Aggregate sections (counts/trends only) live under view_reports alone, even without the underlying entity permission — the rule that makes this different from the Activity Log's per-entry gating.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <span class="wf-appbar-title">Reports <span class="wf-gate">view_reports</span></span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-card"><div class="wf-card-meta">SHIFT REPORTS</div><div class="wf-card-title">3 this week</div></div>
+          <div class="wf-card"><div class="wf-card-meta">INCIDENT HISTORY</div><div class="wf-card-title">7 open, 12 resolved (30d)</div></div>
+          <div class="wf-card"><div class="wf-card-meta">TICKET THROUGHPUT</div><div class="wf-card-title">22 created / 18 resolved (30d)</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <div class="wf-grid-3">
+            <div class="wf-card"><div class="wf-card-meta">SHIFT REPORTS</div><div class="wf-card-title">3 this week</div></div>
+            <div class="wf-card"><div class="wf-card-meta">INCIDENT HISTORY</div><div class="wf-card-title">counts only — no titles</div></div>
+            <div class="wf-card"><div class="wf-card-meta">TICKET THROUGHPUT</div><div class="wf-card-title">22 / 18 (30d)</div></div>
+            <div class="wf-card"><div class="wf-card-meta">CALL LOGS</div><div class="wf-card-title">volume only — no caller identity</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-section" style="margin-top:24px;">
+    <div class="wf-annotation">Any future detail drill-down (e.g. "most active incidents" list) must hide without that record's own permission — only pure counts get the view_reports-alone exception.</div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="shift-report.html">Next: Shift Report →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

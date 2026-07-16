@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Activity Log Feed — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/activity-log.html">Page Spec: Activity Log Feed →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="attachment-target-picker.html">← Attachment-Target Picker</a>
+      <a href="reports-home.html">Next: Reports Home →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Activity Log · Wireframe</span>
+  <h1 class="wf-h1">Activity Log Feed</h1>
+  <p class="wf-lede">Every entry is gated by whatever permission governs its subject's entity type — no single blanket permission.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <span class="wf-appbar-title">Activity Log</span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-card"><div class="wf-card-meta">ticket.created · M. Alvarez · 8:14 PM</div>"Bilge pump not working" — Slip 14</div>
+          <div class="wf-card"><div class="wf-card-meta">incident.status_changed <span class="wf-gate">view_incidents</span> · D. Kim · 6:02 PM</div>"Gate left unlocked" → Under Review</div>
+          <div class="wf-card"><div class="wf-card-meta">ticket.created · System · 5:00 AM</div>Jump Pack A — auto-generated (meter rule)</div>
+        </div>
+        <div class="wf-tabbar">
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Home</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Checklists</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Locations</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Comms</div>
+          <div class="wf-tab current"><div class="wf-tab-icon"></div>Other</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <div class="wf-actions" style="margin-bottom:10px;">
+            <div class="wf-select" style="width:auto;">Entity type ▾</div>
+            <div class="wf-select" style="width:auto;">Actor ▾</div>
+            <div class="wf-select" style="width:auto;">Date range ▾</div>
+          </div>
+          <table class="wf-table">
+            <tr><th>Event</th><th>Actor</th><th>Subject</th><th>Summary</th><th>Time</th><th>Protected</th></tr>
+            <tr><td>ticket.created</td><td>M. Alvarez</td><td>Slip 14</td><td>"Bilge pump not working"</td><td>8:14 PM</td><td><span class="wf-gate">manage_marina_settings</span></td></tr>
+            <tr><td>incident.status_changed</td><td>D. Kim</td><td>Gate incident</td><td>→ Under Review</td><td>6:02 PM</td><td>—</td></tr>
+            <tr><td>ticket.created</td><td>System</td><td>Jump Pack A</td><td>auto-generated</td><td>5:00 AM</td><td>—</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-section" style="margin-top:24px;">
+    <div class="wf-annotation">Entries whose subject the viewer can't see are omitted from the feed entirely, not shown redacted.</div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="reports-home.html">Next: Reports Home →</a></div>
+  </div>
+
+</div>
+</body>
+</html>
