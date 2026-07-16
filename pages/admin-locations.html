@@ -61,12 +61,12 @@
     </table>
 
     <h2>Map upload &amp; plotting</h2>
-    <p>Per the note carried since Reservations, backed by <code>MarinaMap</code> and <code>LocationMapPlacement</code> in <a href="../data-model.html">Data Model</a>:</p>
+    <p>Per the note carried since Reservations, backed by <code>MarinaMap</code> and <code>LocationMapPlacement</code> in <a href="../data-model.html">Data Model</a>. Every map is scoped to a Location — there's no unscoped "master map." A marina's overview map is scoped to a <strong>root Location</strong> (a Location with no parent) representing the property itself; a marina must create at least one such root Location before it can upload its first map. Multiple root Locations are supported, for a marina that manages more than one physical property as one instance — each gets its own overview map rather than forcing everything onto a single image.</p>
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Map name &amp; image</td><td>MarinaMap.name / image</td><td>Uploaded layout/diagram — a schematic, not a real-world map.</td></tr>
-      <tr><td>Scope</td><td>MarinaMap.scope</td><td>Null for the one marina-wide master map; set to a parent Location for a detail map showing just that parent's children.</td></tr>
-      <tr><td>Plotted rectangles</td><td>LocationMapPlacement (location, map, rect)</td><td>Drag-and-place a rectangle per Location onto the selected map's image; a Location can be plotted on more than one map (e.g. small on the master map, precise on its parent's detail map) with independent coordinates on each.</td></tr>
+      <tr><td>Scope</td><td>MarinaMap.scope</td><td>Required — a root Location for an overview map, or any other Location for a detail map showing just its children.</td></tr>
+      <tr><td>Plotted rectangles</td><td>LocationMapPlacement (location, map, rect)</td><td>Drag-and-place a rectangle per Location onto the selected map's image; a Location can be plotted on more than one map (e.g. small on a root-level overview, precise on its parent's detail map) with independent coordinates on each.</td></tr>
     </table>
 
     <h2>Actions</h2>
@@ -75,7 +75,7 @@
       <tr><td>Create / edit a LocationType</td><td><code>manage_locations</code></td><td></td></tr>
       <tr><td>Create / edit a Location</td><td><code>manage_locations</code></td><td>Including the reservation toggle and post-reservation status.</td></tr>
       <tr><td>Add / edit a Checkpoint</td><td><code>manage_locations</code></td><td>GUID URL is generated automatically on creation, not user-entered; GPS radius override defaults to the marina-wide default from <a href="admin-marina-settings.html">Marina Settings</a>.</td></tr>
-      <tr><td>Upload a map</td><td><code>manage_locations</code></td><td>Creates a <code>MarinaMap</code>; only one master map (scope = null) is expected, though the data model doesn't hard-enforce that — the implementing team should confirm whether to block creating a second master map or leave it a marina-configuration convention, matching how <a href="lease-detail.html">Lease detail</a> handles the reservation/lease split.</td></tr>
+      <tr><td>Upload a map</td><td><code>manage_locations</code></td><td>Creates a <code>MarinaMap</code>; the upload form requires picking a Location to scope it to before the upload completes — there's no way to create an unscoped map. Any Location can be picked, but a root Location (no parent) is the natural choice for an overview map.</td></tr>
       <tr><td>Plot a Location on a map</td><td><code>manage_locations</code></td><td>Drag-and-place (or click-and-resize) a rectangle; creates/updates the corresponding <code>LocationMapPlacement</code>.</td></tr>
       <tr><td>Unplot a Location from a map</td><td><code>manage_locations</code></td><td>Removes just that one <code>LocationMapPlacement</code> — a Location plotted on multiple maps stays on the others.</td></tr>
     </table>
@@ -85,6 +85,8 @@
       <li><strong>Deleting a LocationType with existing Locations</strong> — should be blocked or require reassigning those Locations first; deleting the type out from under them would leave orphaned records.</li>
       <li><strong>Location not yet plotted on any map</strong> — fine; it simply doesn't appear in the schematic map view mode until plotted, per <a href="location-list.html">Location list</a>.</li>
       <li><strong>Detail map for a parent with no children yet</strong> — allowed to create ahead of time; just has nothing to plot until child Locations exist.</li>
+      <li><strong>No root Location exists yet</strong> — the map upload form's scope picker has nothing appropriate to offer for an overview map; the admin needs to create at least one top-level Location (e.g. a "Marina" or "Property" type with no parent) first. Detail maps scoped to non-root Locations aren't blocked by this — only an overview map needs a root.</li>
+      <li><strong>Multiple root Locations, each with a map</strong> — the schematic map view (<a href="location-list.html">Location list</a>, <a href="reservation-list.html">Reservation calendar/list</a>) presents them as a top-level choice before drilling in, rather than picking one arbitrarily.</li>
       <li><strong>Reservation toggle turned off while a Reservation is active</strong> — the existing Reservation isn't retroactively invalidated; only future booking through <a href="new-reservation-form.html">New reservation form</a> is affected, since that form's target picker only offers currently-enabled locations.</li>
     </ul>
 

@@ -112,8 +112,12 @@
         <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
         <tr><td>name</td><td>text</td><td>e.g. "Marina Overview," "Dock C Detail."</td></tr>
         <tr><td>image</td><td>file</td><td>The uploaded layout/diagram, admin-provided — not a real-world map. Plotted rectangle coordinates (see <code>LocationMapPlacement</code>) are relative to this image.</td></tr>
-        <tr><td>scope</td><td>ref → Location, nullable</td><td>Null = the marina-wide <strong>master map</strong>. Set = a <strong>detail map</strong> scoped to that parent Location, typically zoomed in on just its direct children (e.g. Dock C's own map, showing only Dock C's Slips) — for when the master map alone isn't detailed enough to plot every location legibly.</td></tr>
+        <tr><td>scope</td><td>ref → Location, required</td><td>Every map is scoped to some Location — there's no unscoped/nullable "master map" special case. A marina's overview map is simply the map scoped to a <strong>root Location</strong> (a Location with no <code>parent</code>) that represents the marina/property itself; a more detailed map for one area is scoped to whichever Location it zooms in on (e.g. Dock C's own map, showing only Dock C's children). See "Root Locations" below.</td></tr>
       </table>
+    </div>
+
+    <div class="note">
+      <strong>Root Locations.</strong> A root Location is simply a <code>Location</code> with <code>parent</code> = null. Every marina needs at least one, representing the property itself (e.g. a <code>LocationType</code> like "Marina" or "Property," admin-defined like any other type), before it can upload an overview map — the map has to be scoped to <em>something</em>, and this is that something. A marina that manages more than one physical property as a single instance creates one root Location per property instead of forcing everything onto one image or fabricating a shared parent that doesn't really exist — this is the deliberate replacement for what used to be a single implicit "master map." When browsing the schematic map (<a href="pages/location-list.html">Location list</a> or <a href="pages/reservation-list.html">Reservation calendar/list</a>), the app enumerates root Locations that have a map attached: exactly one opens straight to it; more than one presents them as a top-level choice before drilling in.
     </div>
 
     <div class="schema-entity">
@@ -124,7 +128,7 @@
         <tr><td>map</td><td>ref → MarinaMap</td><td></td></tr>
         <tr><td>rect</td><td>structured (x, y, width, height)</td><td>Position and size of this Location's rectangle, in the map image's coordinate space.</td></tr>
       </table>
-      <p style="padding:0 18px 16px; margin:0; font-size:0.9rem; color:var(--slate);">A join entity rather than a field on <code>Location</code>, because the same Location can be plotted on more than one map at different coordinates — e.g. Slip 14 gets a small rectangle on the marina-wide master map <em>and</em> a separate, more precisely-placed rectangle on Dock C's own detail map. This same plotting powers both the schematic Location map view and the Reservations map view (see <a href="pages/location-list.html">Page Specifications</a>) — one shared capability, two different overlays (occupancy/type on one, reservation status on the other) drawn on top of the same rectangles.</p>
+      <p style="padding:0 18px 16px; margin:0; font-size:0.9rem; color:var(--slate);">A join entity rather than a field on <code>Location</code>, because the same Location can be plotted on more than one map at different coordinates — e.g. Slip 14 gets a small rectangle on the property's root-level overview map <em>and</em> a separate, more precisely-placed rectangle on Dock C's own detail map. This same plotting powers both the schematic Location map view and the Reservations map view (see <a href="pages/location-list.html">Page Specifications</a>) — one shared capability, two different overlays (occupancy/type on one, reservation status on the other) drawn on top of the same rectangles.</p>
     </div>
 
     <div class="schema-entity">

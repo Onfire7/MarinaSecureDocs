@@ -53,13 +53,14 @@
     </table>
 
     <h2>Map view</h2>
-    <p>A schematic view built on <code>MarinaMap</code> + <code>LocationMapPlacement</code> (see <a href="../data-model.html">Data Model</a>): the same plotted rectangles used by <a href="location-list.html">Location list / map view</a>'s own schematic mode, here color-coded by <em>reservation</em> status instead of occupancy — e.g. green for vacant/available, amber for an upcoming reservation, red for currently checked in — and each rectangle labeled with the location's name. Starts on the marina-wide master map; drilling into a parent Location (where one exists) switches to that Location's own detail map, zoomed in on just its children. Asset-target reservations (a jump pack, not a Location) have no rectangle to plot and so only ever appear in the list/calendar view, not on the map.</p>
+    <p>A schematic view built on <code>MarinaMap</code> + <code>LocationMapPlacement</code> (see <a href="../data-model.html">Data Model</a>): the same plotted rectangles used by <a href="location-list.html">Location list / map view</a>'s own schematic mode, here color-coded by <em>reservation</em> status instead of occupancy — e.g. green for vacant/available, amber for an upcoming reservation, red for currently checked in — and each rectangle labeled with the location's name. Starts on the marina's root-level overview map (or a chooser between them, for a multi-property marina with more than one root Location); drilling into a parent Location (where one exists) switches to that Location's own detail map, zoomed in on just its children. Asset-target reservations (a jump pack, not a Location) have no rectangle to plot and so only ever appear in the list/calendar view, not on the map.</p>
 
     <h2>Actions</h2>
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
       <tr><td>Toggle List / Calendar / Map view</td><td>None</td><td>Same underlying filtered result set, three presentations.</td></tr>
-      <tr><td>Drill into a parent Location's detail map</td><td>None</td><td>Only available where a <code>MarinaMap</code> scoped to that parent exists; otherwise the master map is as far in as it goes.</td></tr>
+      <tr><td>Switch between root-level maps</td><td>None</td><td>Only shown when the marina has more than one root Location with a map attached; otherwise map mode opens straight to the one root map.</td></tr>
+      <tr><td>Drill into a parent Location's detail map</td><td>None</td><td>Only available where a <code>MarinaMap</code> scoped to that parent exists; otherwise the current map is as far in as it goes.</td></tr>
       <tr><td>Open a reservation</td><td>None</td><td>Navigates to <a href="reservation-detail.html">Reservation detail</a>, from either the list/calendar row or by tapping its map rectangle.</td></tr>
       <tr><td>Create a reservation</td><td><code>manage_reservations</code></td><td>Opens <a href="new-reservation-form.html">New reservation form</a>.</td></tr>
       <tr><td>Filter by target type / status / date range</td><td>None</td><td>Client-side filter over the subscribed query.</td></tr>

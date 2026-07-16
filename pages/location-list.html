@@ -62,7 +62,8 @@
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
       <tr><td>Toggle List / Geographic Map / Schematic Map</td><td>None</td><td>Three presentations of the same filtered result set.</td></tr>
-      <tr><td>Drill into a parent Location's detail map</td><td>None</td><td>Schematic mode only, and only where a <code>MarinaMap</code> scoped to that parent exists — otherwise the master map is as far in as it goes, matching <a href="reservation-list.html">Reservation calendar/list</a>'s map view.</td></tr>
+      <tr><td>Drill into a parent Location's detail map</td><td>None</td><td>Schematic mode only, and only where a <code>MarinaMap</code> scoped to that parent exists — otherwise the current map is as far in as it goes, matching <a href="reservation-list.html">Reservation calendar/list</a>'s map view.</td></tr>
+      <tr><td>Switch between root-level maps</td><td>None</td><td>Only shown when the marina has more than one root Location with a map attached (multi-property setups) — a top-level chooser before drilling into either one's overview. With exactly one root map, schematic mode opens straight to it.</td></tr>
       <tr><td>Filter by type / status</td><td>None</td><td>Client-side filter over the subscribed query.</td></tr>
       <tr><td>Open a location</td><td>None</td><td>Navigates to <a href="location-detail.html">Location detail</a>, from a list row, a map pin, or a schematic rectangle.</td></tr>
       <tr><td>Change a location's status</td><td><code>manage_locations</code></td><td>Inline quick-edit from the list (e.g. marking a slip Out of Service) — reuses the same permission as full location editing rather than introducing a separate status-change permission, per <a href="../permissions.html">Permissions</a>.</td></tr>
@@ -74,7 +75,8 @@
       <li><strong>No locations defined yet</strong> — empty state; for a user with <code>manage_locations</code>, it prompts straight into Admin setup, otherwise a plain "nothing here yet" message.</li>
       <li><strong>Location with no GPS coordinates</strong> — present in list mode, silently excluded from geographic map mode rather than shown mislocated.</li>
       <li><strong>Location not plotted on any schematic map</strong> — same treatment: present in list mode, silently excluded from schematic map mode rather than shown at a guessed position.</li>
-      <li><strong>No <code>MarinaMap</code> exists yet</strong> — schematic mode has nothing to render; falls back to list mode, or is simply omitted from the view toggle until an admin uploads at least the master map.</li>
+      <li><strong>No <code>MarinaMap</code> exists yet</strong> — schematic mode has nothing to render; falls back to list mode, or is simply omitted from the view toggle until an admin uploads at least one root-level overview map, per <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>.</li>
+      <li><strong>Multiple root Locations with maps (multi-property marina)</strong> — schematic mode opens to a top-level chooser between them rather than guessing which one to show; a single-root marina never sees this extra step.</li>
       <li><strong>Deep hierarchy</strong> — nesting depth isn't fixed (a type's <code>valid_parent_types</code> can chain arbitrarily); the list view supports drilling down (parent → children) rather than assuming a flat two-level dock/slip structure.</li>
       <li><strong>Current boat changes</strong> — reflects live; when a boat moves slips (see <a href="../data-model.html">Data Model — Boat</a>), this list updates immediately via InstantDB subscription, with the move itself preserved in the Activity Log rather than a location history table.</li>
     </ul>
