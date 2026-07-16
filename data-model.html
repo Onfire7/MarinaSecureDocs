@@ -85,7 +85,7 @@
         <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
         <tr><td>name</td><td>text</td><td>e.g. "Dock," "Slip," "Cabin," "Building," "RV Site."</td></tr>
         <tr><td>valid_parent_types</td><td>ref[] → LocationType</td><td>Which type(s) a Location of this type may nest under. A type may allow more than one valid parent.</td></tr>
-        <tr><td>allows_reservations</td><td>boolean</td><td>Whether Locations of this type can be configured to accept reservations.</td></tr>
+        <tr><td>allows_reservations</td><td>boolean</td><td>Whether Locations of this type <em>can</em> be configured to accept reservations at all — a type-level capability flag. Whether a specific Location of that type actually does is a separate, per-instance toggle (see <code>Location.reservation_enabled</code> below).</td></tr>
       </table>
     </div>
 
@@ -97,12 +97,34 @@
         <tr><td>type</td><td>ref → LocationType</td><td></td></tr>
         <tr><td>parent</td><td>ref → Location</td><td>Optional; must match one of type's valid_parent_types.</td></tr>
         <tr><td>status</td><td>enum</td><td>Occupied / Vacant / Reserved / Out of Service, plus admin-defined additions.</td></tr>
-        <tr><td>reservation_enabled</td><td>boolean</td><td>Whether this specific Location accepts reservations (public or internal-only — see Reservation below).</td></tr>
+        <tr><td>reservation_enabled</td><td>boolean</td><td>Whether <em>this specific</em> Location accepts reservations at all. A simple per-location toggle in that location's own settings, deliberately independent of its siblings — this is what makes mixed-use possible: on a single Dock, the front half of Slips can have this on (short-term rentals) while the back half have it off and are tied to a Lease instead (long-term). Only meaningful when the Location's <code>type.allows_reservations</code> is true.</td></tr>
+        <tr><td>reservation_visibility</td><td>enum: Public / Internal, only when reservation_enabled</td><td>Public reservations carry the full rate/deposit/balance and early-checkin/late-checkout fields; Internal ones hide all of that (staff-only bookings, no billing) — see Reservation below.</td></tr>
         <tr><td>post_reservation_status</td><td>ref → status value</td><td>What status this Location is set to when a reservation completes (e.g. a Cabin → "Needs Cleaning").</td></tr>
-        <tr><td>gps_coordinates</td><td>lat/lng</td><td>Used as the default position for any Checkpoint at this location.</td></tr>
+        <tr><td>gps_coordinates</td><td>lat/lng</td><td>Real-world coordinates, used as the default position for any Checkpoint at this location and for the geographic (pin) map view. Distinct from a Location's plotted position on a schematic <code>MarinaMap</code> — see below.</td></tr>
         <tr><td>current_boat</td><td>ref → Boat</td><td>Applicable to Slip-type locations; nullable.</td></tr>
         <tr><td>notes</td><td>ref[] → Note</td><td>Attachment target.</td></tr>
       </table>
+    </div>
+
+    <div class="schema-entity">
+      <div class="head"><span>MarinaMap</span><span class="tag">admin-defined</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>name</td><td>text</td><td>e.g. "Marina Overview," "Dock C Detail."</td></tr>
+        <tr><td>image</td><td>file</td><td>The uploaded layout/diagram, admin-provided — not a real-world map. Plotted rectangle coordinates (see <code>LocationMapPlacement</code>) are relative to this image.</td></tr>
+        <tr><td>scope</td><td>ref → Location, nullable</td><td>Null = the marina-wide <strong>master map</strong>. Set = a <strong>detail map</strong> scoped to that parent Location, typically zoomed in on just its direct children (e.g. Dock C's own map, showing only Dock C's Slips) — for when the master map alone isn't detailed enough to plot every location legibly.</td></tr>
+      </table>
+    </div>
+
+    <div class="schema-entity">
+      <div class="head"><span>LocationMapPlacement</span><span class="tag">join</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>location</td><td>ref → Location</td><td></td></tr>
+        <tr><td>map</td><td>ref → MarinaMap</td><td></td></tr>
+        <tr><td>rect</td><td>structured (x, y, width, height)</td><td>Position and size of this Location's rectangle, in the map image's coordinate space.</td></tr>
+      </table>
+      <p style="padding:0 18px 16px; margin:0; font-size:0.9rem; color:var(--slate);">A join entity rather than a field on <code>Location</code>, because the same Location can be plotted on more than one map at different coordinates — e.g. Slip 14 gets a small rectangle on the marina-wide master map <em>and</em> a separate, more precisely-placed rectangle on Dock C's own detail map. This same plotting powers both the schematic Location map view and the Reservations map view (see <a href="pages/location-list.html">Page Specifications</a>) — one shared capability, two different overlays (occupancy/type on one, reservation status on the other) drawn on top of the same rectangles.</p>
     </div>
 
     <div class="schema-entity">
@@ -278,7 +300,8 @@
         <tr><td>meter_reading</td><td>number</td><td>Current reading; updatable directly from the asset page.</td></tr>
         <tr><td>maintenance_rules</td><td>structured[]</td><td>e.g. "every 3,000 miles" or "every 90 days since last completed" — each rule auto-generates a Ticket when triggered (scheduling mechanism: see <a href="architecture.html">Architecture</a>).</td></tr>
         <tr><td>checkoutable</td><td>boolean</td><td>Whether this asset supports checkout/return.</td></tr>
-        <tr><td>reservation_enabled</td><td>boolean</td><td>Whether this asset accepts Reservations (public or internal-only).</td></tr>
+        <tr><td>reservation_enabled</td><td>boolean</td><td>Whether this asset accepts Reservations at all.</td></tr>
+        <tr><td>reservation_visibility</td><td>enum: Public / Internal, only when reservation_enabled</td><td>Same Public/Internal distinction as <code>Location.reservation_visibility</code> — see Reservation below.</td></tr>
         <tr><td>post_return_status</td><td>ref → status value</td><td>What status to set when the asset is checked back in — whether returning from a plain checkout or completing a Reservation (e.g. Jump Pack → "Needs Charging").</td></tr>
         <tr><td>current_status</td><td>text</td><td>Denormalized latest value from AssetStatusLog, for fast display.</td></tr>
       </table>
@@ -309,8 +332,8 @@
         <tr><td>status</td><td>enum</td><td>Requested / Confirmed / Checked In / Checked Out / Cancelled.</td></tr>
         <tr><td>expected_checkin / expected_checkout</td><td>date</td><td></td></tr>
         <tr><td>actual_checkin / actual_checkout</td><td>datetime</td><td>Setting actual_checkin (guest arrives / asset goes out) is what changes the target's status; setting actual_checkout (guest leaves / asset returned) sets the target to its configured post-reservation status. An upcoming reservation changes nothing — it's displayed alongside the target's status instead.</td></tr>
-        <tr><td>early_checkin / late_checkout</td><td>boolean or datetime</td><td>Ignored/hidden for internal-only reservations.</td></tr>
-        <tr><td>rate / deposit / balance</td><td>currency</td><td>Ignored/hidden for internal-only reservations.</td></tr>
+        <tr><td>early_checkin / late_checkout</td><td>boolean or datetime</td><td>Ignored/hidden when the target's <code>reservation_visibility</code> is Internal.</td></tr>
+        <tr><td>rate / deposit / balance</td><td>currency</td><td>Ignored/hidden when the target's <code>reservation_visibility</code> is Internal.</td></tr>
       </table>
     </div>
 
