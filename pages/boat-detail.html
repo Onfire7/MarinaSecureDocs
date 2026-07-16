@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boat Detail — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Boats · Page Specification</span>
+    <h1>Boat Detail</h1>
+    <p class="lede">Everything about one boat — owners in succession order, authorized users, current slip, and its lease if it has one.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="boat-list.html">Boat list</a>, <a href="location-detail.html">Location detail</a> (a Slip's current boat), or a Reservation/Ticket/Incident/Note pointing at it.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Name, description, length/make/model</td><td>Boat fields</td><td></td></tr>
+      <tr><td>Registration number</td><td>Boat.registration_number</td><td></td></tr>
+      <tr><td>Owners</td><td>Boat.owners (ordered)</td><td>Requires <code>view_owner</code> for names; <code>view_contact</code> additionally for phone/email. Order shown explicitly as succession — who to contact first.</td></tr>
+      <tr><td>Authorized users</td><td>Boat.authorized_users</td><td>Same gating as owners.</td></tr>
+      <tr><td>Current slip</td><td>Boat.current_slip</td><td>Links to <a href="location-detail.html">Location detail</a>; nullable.</td></tr>
+      <tr><td>Lease</td><td>Lease where location = current_slip</td><td>Requires <code>view_lease</code>; omitted entirely without it.</td></tr>
+      <tr><td>Notes, incidents, tickets</td><td>attached_to = this Boat</td><td>Same gating as everywhere else these appear (incidents require <code>view_incidents</code>; tickets and notes unrestricted).</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Edit boat details</td><td><code>edit_owner_contact</code></td><td>Same permission as boat creation on <a href="boat-list.html">Boat list</a>.</td></tr>
+      <tr><td>Reassign current slip</td><td><code>edit_owner_contact</code></td><td>Updates <code>Boat.current_slip</code>; the move itself is preserved via the Activity Log rather than a slip-history table, per <a href="../data-model.html">Data Model</a>.</td></tr>
+      <tr><td>Add a note</td><td>Unrestricted</td><td>Opens <a href="new-note-dialog.html">New note dialog</a>, pre-attached to this Boat.</td></tr>
+      <tr><td>Log an incident</td><td><code>create_incidents</code></td><td>Opens <a href="new-incident-form.html">New incident form</a>, pre-attached.</td></tr>
+      <tr><td>Create a ticket</td><td>Unrestricted</td><td>Opens <a href="new-ticket-form.html">New ticket form</a>, pre-attached.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No <code>view_owner</code></strong> — owners and authorized users sections are both omitted entirely, matching the gating used on <a href="location-detail.html">Location detail</a>.</li>
+      <li><strong>No current slip</strong> — shown as an explicit "unassigned" state rather than an empty field, since a boat with no slip is a meaningfully different situation from one whose slip just isn't loaded yet.</li>
+      <li><strong>No lease, or no <code>view_lease</code></strong> — the lease section is omitted either way; the UI doesn't distinguish "no lease exists" from "you can't see it."</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: sections stack vertically, collapsible. Desktop: sections visible together in a wider layout, matching the pattern used on <a href="location-detail.html">Location detail</a>.</p>
+
+    <div class="page-foot">
+      <a href="boat-list.html">← Boat List</a>
+      <a href="index.html">Page Specifications →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

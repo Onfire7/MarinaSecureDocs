@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New Reservation Form — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Reservations · Page Specification</span>
+    <h1>New Reservation Form</h1>
+    <p class="lede">Book a reservable Location or Asset for a contact — gated by <code>manage_reservations</code>.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="reservation-list.html">Reservation calendar/list</a>, or directly from a reservable Location/Asset's detail page. The target picker only ever offers Locations with <code>reservation_enabled</code> on and Assets with the same — nothing else is selectable, which is what keeps a mixed-use Dock's leased Slips out of this flow entirely.</p>
+
+    <h2>Data shown / form fields</h2>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+      <tr><td>Target</td><td>Select — reservable Locations and Assets only</td><td>Pre-filled when opened from a specific Location/Asset's context.</td></tr>
+      <tr><td>Contact</td><td>Search/select, or create new</td><td>Same contact picker used elsewhere (see <a href="contact-list.html">Owner/Contact list</a>).</td></tr>
+      <tr><td>Expected check-in / check-out</td><td>Date</td><td></td></tr>
+      <tr><td>Rate / deposit</td><td>Currency</td><td>Shown only if the selected target's <code>reservation_visibility</code> is Public; the field group itself appears/disappears as the target selection changes.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Submit</td><td><code>manage_reservations</code></td><td>Creates the <code>Reservation</code> with status Requested (or Confirmed, if the marina's workflow skips the request step — an admin-configurable default, not modeled as a separate field). Routes to <a href="reservation-detail.html">Reservation detail</a> on success.</td></tr>
+      <tr><td>Cancel</td><td>None</td><td>Closes without creating a reservation.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Target not reservation-enabled</strong> — never appears in the picker; there's no way to attempt booking a non-reservable Location or Asset from here.</li>
+      <li><strong>Overlapping dates on the same target</strong> — flagged as a warning rather than blocked outright, since a marina may legitimately want to overbook and sort it out manually (e.g. a waitlist scenario); this is a judgment call for the implementing team to confirm before build.</li>
+      <li><strong>No <code>manage_reservations</code></strong> — this form is unreachable; every entry point to it is gated the same way.</li>
+      <li><strong>Internal-only target</strong> — rate/deposit fields never appear, and the resulting reservation has no billing surface anywhere downstream.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Same form on both; the target picker on desktop can optionally show the schematic map from <a href="reservation-list.html">Reservation calendar/list</a> for point-and-click selection, since there's room for it — mobile sticks to a search/select list.</p>
+
+    <div class="page-foot">
+      <a href="reservation-detail.html">← Reservation Detail</a>
+      <a href="reservation-checkin-checkout.html">Reservation Check-In / Check-Out Dialog →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

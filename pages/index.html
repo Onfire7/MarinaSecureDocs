@@ -36,12 +36,12 @@
 
   <main class="content">
     <span class="eyebrow">Specifications</span>
-    <span class="doc-status">In progress — Access, Home, Checklists &amp; Tours, Locations, Comms, Tickets &amp; Incidents complete</span>
+    <span class="doc-status">In progress — Access, Home, Checklists &amp; Tours, Locations, Comms, Tickets &amp; Incidents, Reservations &amp; Boats complete</span>
     <h1>Page Specifications</h1>
     <p class="lede">A detailed spec for every screen in the application: purpose, data displayed, actions available, permission gating, and mobile/desktop behavior, grouped to match top-level navigation.</p>
 
     <div class="note">
-      <strong>Status.</strong> Access, Home, Checklists &amp; Tours, Locations, Comms, and Tickets &amp; Incidents are written and linked below. The remaining groups are still the proposed scope — flag anything that should be added, split differently, or dropped before those are written.
+      <strong>Status.</strong> Access, Home, Checklists &amp; Tours, Locations, Comms, Tickets &amp; Incidents, and Reservations &amp; Boats are written and linked below. The remaining groups are still the proposed scope — flag anything that should be added, split differently, or dropped before those are written.
     </div>
 
     <h2>Page list</h2>
@@ -102,19 +102,19 @@
 
     <h3>Reservations</h3>
     <ul>
-      <li>Reservation calendar/list — will also need a <strong>map view</strong>: a table vs. map toggle, where the map is an admin-uploaded marina layout image with each reservable Location plotted as a rectangle, color-coded by status and labeled with the location's name (a slip diagram, not a GPS map — see note below)</li>
-      <li>Reservation detail</li>
-      <li>New reservation form</li>
-      <li>Reservation check-in / check-out dialog (sets target status per its configuration)</li>
+      <li><a href="reservation-list.html">Reservation calendar/list</a> — includes the <strong>map view</strong>: a list/calendar/map toggle, where the map renders each reservable Location's plotted rectangle (see <code>MarinaMap</code>/<code>LocationMapPlacement</code> in <a href="../data-model.html">Data Model</a>) color-coded by reservation status and labeled with the location's name</li>
+      <li><a href="reservation-detail.html">Reservation detail</a></li>
+      <li><a href="new-reservation-form.html">New reservation form</a></li>
+      <li><a href="reservation-checkin-checkout.html">Reservation check-in / check-out dialog</a> (sets target status per its configuration)</li>
     </ul>
     <div class="note">
-      <strong>Data model resolved: <code>MarinaMap</code> + <code>LocationMapPlacement</code>.</strong> Admin uploads a marina layout image and plots each Location onto it as a rectangle — distinct from the existing GPS <code>gps_coordinates</code> on Location, which is real-world lat/lng, not a schematic diagram. There's a single marina-wide <strong>master map</strong> (<code>MarinaMap.scope</code> = null), plus optional <strong>detail maps</strong> scoped to a parent Location (e.g. a zoomed-in map for just Dock C's Slips, when the master map alone can't show every location legibly). A Location can be plotted on more than one map at different coordinates, which is why placement is its own join entity rather than a field on Location — see <a href="../data-model.html">Data Model</a>. This same plotting is shared infrastructure: it powers both a schematic map view on <a href="location-list.html">Location list / map view</a> (occupancy/type overlay) and the Reservation calendar/list's map view (reservation-status overlay, rectangles labeled by name) — one set of plotted rectangles, two different color overlays. Reservation eligibility itself is unrelated to any of this: it's the existing per-Location <code>reservation_enabled</code> toggle (type-gated by <code>LocationType.allows_reservations</code>), which is exactly what supports a mixed-use dock — some Slips reservable short-term, others long-term leased, side by side. Still to write: the upload + plotting UI in Admin's Location Types &amp; Locations setup (below), and the map view itself on both Reservations and Location list.
+      <strong>Map-plotting data model resolved; Admin UI still to write.</strong> <code>MarinaMap</code> (a marina-wide master map, plus optional per-parent-Location detail maps) and <code>LocationMapPlacement</code> (a join entity, since one Location can be plotted on multiple maps at different coordinates) now back both this screen's map view and the still-unwritten schematic map mode on <a href="location-list.html">Location list / map view</a> — one set of plotted rectangles, two different color overlays (reservation status here, occupancy/type there). Reservation eligibility is unrelated to any of this: it's the existing per-Location <code>reservation_enabled</code> toggle, which is what makes a mixed-use dock work (some Slips reservable short-term, others long-term leased, side by side — see <a href="../data-model.html">Data Model — Location</a>). Still to write: the upload + plotting UI in Admin's Location Types &amp; Locations setup (below).
     </div>
 
     <h3>Boats</h3>
     <ul>
-      <li>Boat list</li>
-      <li>Boat detail (owners, authorized users, current slip, lease link)</li>
+      <li><a href="boat-list.html">Boat list</a></li>
+      <li><a href="boat-detail.html">Boat detail</a> (owners, authorized users, current slip, lease link)</li>
     </ul>
 
     <h3>Owners &amp; Contacts</h3>

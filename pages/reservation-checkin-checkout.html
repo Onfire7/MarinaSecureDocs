@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reservation Check-In / Check-Out Dialog — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Reservations · Page Specification</span>
+    <h1>Reservation Check-In / Check-Out Dialog</h1>
+    <p class="lede">Marks a reservation's actual arrival or departure — and, as a side effect, moves the target into whatever status that implies.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="reservation-detail.html">Reservation detail</a>. Deliberately a separate dialog rather than an inline date edit, because setting <code>actual_checkin</code>/<code>actual_checkout</code> has a real side effect on the target's <code>status</code> that a plain field edit shouldn't casually trigger — see <a href="../data-model.html">Data Model — Reservation</a>.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Reservation summary</td><td>Reservation.contact / target / expected dates</td><td>Read-only context for the action being taken.</td></tr>
+      <tr><td>Actual date/time</td><td>Set on submit</td><td>Defaults to now; editable for backfilling a check-in/out that happened earlier.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Check in</td><td><code>manage_reservations</code></td><td>Sets <code>actual_checkin</code> and <code>status</code> = Checked In. The target's own <code>status</code> updates to reflect occupancy (e.g. a Slip → Occupied) — this is the one moment an <em>upcoming</em> reservation actually changes the target's status, per <a href="../data-model.html">Data Model</a>.</td></tr>
+      <tr><td>Check out</td><td><code>manage_reservations</code></td><td>Sets <code>actual_checkout</code> and <code>status</code> = Checked Out. The target moves to its configured <code>post_reservation_status</code> (e.g. Cabin → "Needs Cleaning," Jump Pack → "Needs Charging," via <code>Asset.post_return_status</code> for asset targets).</td></tr>
+      <tr><td>Cancel</td><td>None</td><td>Closes without changing anything.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Check-in before expected date</strong> — allowed; for a Public reservation this is what <code>early_checkin</code> represents, recorded alongside rather than blocking the action.</li>
+      <li><strong>Check-out after expected date</strong> — same treatment via <code>late_checkout</code>, Public reservations only.</li>
+      <li><strong>Checking in an Asset target</strong> — identical flow; "the target's status" means <code>Asset.current_status</code> for an Asset, same mechanics as a Location's <code>status</code>.</li>
+      <li><strong>Backfilling</strong> — an admin correcting history (e.g. logging a check-in that happened over the phone without the app open) sets an actual date/time in the past; the target-status side effect still applies at the moment of saving, not retroactively.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Same dialog on both; no meaningful layout divergence beyond the app's general responsive treatment.</p>
+
+    <div class="page-foot">
+      <a href="new-reservation-form.html">← New Reservation Form</a>
+      <a href="boat-list.html">Boat List →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

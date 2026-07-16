@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reservation Calendar / List — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Reservations · Page Specification</span>
+    <h1>Reservation Calendar / List</h1>
+    <p class="lede">Every reservation across every reservable Location and Asset — cabins, RV sites, slips, jump packs, whatever a marina has enabled — viewed as a calendar/list, or as a schematic map with color-coded slip rectangles.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from the Reservations top-level nav item. One screen serves every reservable target type uniformly: <code>Reservation.target</code> is a Location or an Asset, and this list doesn't care which — a cabin booking and a jump-pack checkout-by-reservation look the same here beyond their target's type label. A location only ever appears as a possible target if its own <code>reservation_enabled</code> is on, which is what makes a mixed-use Dock work (some Slips bookable here, others tied to a Lease and simply absent from this screen) — see <a href="../data-model.html">Data Model — Location</a>.</p>
+
+    <h2>List / calendar view</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Target</td><td>Reservation.target → Location or Asset</td><td>Name and type label (e.g. "Slip 14," "Cabin 3," "Jump Pack A").</td></tr>
+      <tr><td>Contact</td><td>Reservation.contact</td><td>Name always shown; phone/email require <code>view_contact</code>.</td></tr>
+      <tr><td>Status</td><td>Reservation.status</td><td>Requested / Confirmed / Checked In / Checked Out / Cancelled.</td></tr>
+      <tr><td>Dates</td><td>expected/actual checkin/checkout</td><td>Calendar view groups by date range; list view sorts by <code>expected_checkin</code>.</td></tr>
+      <tr><td>Rate / deposit / balance</td><td>Reservation.rate / deposit / balance</td><td>Shown only when the target's <code>reservation_visibility</code> is Public; hidden entirely for Internal reservations.</td></tr>
+    </table>
+
+    <h2>Map view</h2>
+    <p>A schematic view built on <code>MarinaMap</code> + <code>LocationMapPlacement</code> (see <a href="../data-model.html">Data Model</a>): the same plotted rectangles used by <a href="location-list.html">Location list / map view</a>'s own schematic mode, here color-coded by <em>reservation</em> status instead of occupancy — e.g. green for vacant/available, amber for an upcoming reservation, red for currently checked in — and each rectangle labeled with the location's name. Starts on the marina-wide master map; drilling into a parent Location (where one exists) switches to that Location's own detail map, zoomed in on just its children. Asset-target reservations (a jump pack, not a Location) have no rectangle to plot and so only ever appear in the list/calendar view, not on the map.</p>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Toggle List / Calendar / Map view</td><td>None</td><td>Same underlying filtered result set, three presentations.</td></tr>
+      <tr><td>Drill into a parent Location's detail map</td><td>None</td><td>Only available where a <code>MarinaMap</code> scoped to that parent exists; otherwise the master map is as far in as it goes.</td></tr>
+      <tr><td>Open a reservation</td><td>None</td><td>Navigates to <a href="reservation-detail.html">Reservation detail</a>, from either the list/calendar row or by tapping its map rectangle.</td></tr>
+      <tr><td>Create a reservation</td><td><code>manage_reservations</code></td><td>Opens <a href="new-reservation-form.html">New reservation form</a>.</td></tr>
+      <tr><td>Filter by target type / status / date range</td><td>None</td><td>Client-side filter over the subscribed query.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No dedicated view permission</strong> — same as tickets and reservations elsewhere in the app, browsing this screen is unrestricted; only creating/editing requires <code>manage_reservations</code>, per <a href="../permissions.html">Permissions</a>.</li>
+      <li><strong>Location not yet plotted on any map</strong> — still fully usable in list/calendar view; simply absent from the map view until an admin plots it, per <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>.</li>
+      <li><strong>Upcoming reservation vs. current status</strong> — a target's map rectangle color reflects both: its current occupancy status and, distinctly, an "upcoming" indicator if a reservation is confirmed but not yet active — matching the "displayed alongside, not replacing" rule from <a href="../data-model.html">Data Model — Reservation</a>.</li>
+      <li><strong>Mixed-use dock</strong> — on the map, a Dock's detail map shows only its reservable children; Slips with <code>reservation_enabled</code> off (leased long-term) don't get a rectangle here at all, since they're not part of this screen's dataset.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: list view by default, calendar and map as full-screen alternate modes reached via a toggle. Desktop: calendar or map can sit alongside a filterable list, similar to the split used on <a href="location-list.html">Location list</a>.</p>
+
+    <div class="page-foot">
+      <a href="new-incident-form.html">← New Incident Form</a>
+      <a href="reservation-detail.html">Reservation Detail →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boat List — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Boats · Page Specification</span>
+    <h1>Boat List</h1>
+    <p class="lede">Every boat kept at the marina, searchable by name, owner, or slip.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from the Boats top-level nav item. Boat visibility itself is unrestricted, same as tickets and reservations; what's gated is the owner/contact detail a boat links to, per <a href="../permissions.html">Permissions</a>.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Name, make/model, length</td><td>Boat.name / make / model / length</td><td></td></tr>
+      <tr><td>Current slip</td><td>Boat.current_slip</td><td>Nullable — a boat isn't required to have a current slip (e.g. hauled out, or newly added before assignment).</td></tr>
+      <tr><td>Owner</td><td>Boat.owners[0] (first in succession order)</td><td>Name only requires <code>view_owner</code>; omitted entirely without it.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Open a boat</td><td>None</td><td>Navigates to <a href="boat-detail.html">Boat detail</a>.</td></tr>
+      <tr><td>Add a boat</td><td><code>edit_owner_contact</code></td><td>Boats are owner/contact-adjacent records, so creation reuses this permission rather than introducing a dedicated one, per the avoid-permission-bloat principle established for Dashboard cards.</td></tr>
+      <tr><td>Search / filter</td><td>None</td><td>By name, owner (if <code>view_owner</code>), or slip.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No <code>view_owner</code></strong> — the owner column is omitted entirely from the list, not shown blank.</li>
+      <li><strong>Boat with no current slip</strong> — shown plainly with an empty slip field, not hidden from the list.</li>
+      <li><strong>Multiple owners</strong> — list view shows only the first (succession order); full ownership order lives on <a href="boat-detail.html">Boat detail</a>.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: single searchable list. Desktop: sortable table with slip and owner columns visible without opening each boat.</p>
+
+    <div class="page-foot">
+      <a href="reservation-checkin-checkout.html">← Reservation Check-In / Check-Out Dialog</a>
+      <a href="boat-detail.html">Boat Detail →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

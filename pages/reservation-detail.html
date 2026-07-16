@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reservation Detail — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Reservations · Page Specification</span>
+    <h1>Reservation Detail</h1>
+    <p class="lede">Full record of one reservation — contact, target, dates, and (for Public reservations only) the billing fields.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="reservation-list.html">Reservation calendar/list</a>, or from the target Location/Asset's own detail page (an upcoming reservation shown alongside current status, per <a href="../data-model.html">Data Model</a>).</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Contact</td><td>Reservation.contact</td><td>Name always shown; phone/email require <code>view_contact</code>.</td></tr>
+      <tr><td>Target</td><td>Reservation.target</td><td>Links to <a href="location-detail.html">Location detail</a> or <a href="asset-detail.html">Asset detail</a>, whichever applies.</td></tr>
+      <tr><td>Status</td><td>Reservation.status</td><td>Requested / Confirmed / Checked In / Checked Out / Cancelled.</td></tr>
+      <tr><td>Expected / actual dates</td><td>expected_checkin/checkout, actual_checkin/checkout</td><td>Actual dates are nullable until check-in/out happens, per <a href="reservation-checkin-checkout.html">Reservation Check-In / Check-Out Dialog</a>.</td></tr>
+      <tr><td>Early check-in / late check-out</td><td>Reservation.early_checkin / late_checkout</td><td>Shown only when the target's <code>reservation_visibility</code> is Public.</td></tr>
+      <tr><td>Rate / deposit / balance</td><td>Reservation.rate / deposit / balance</td><td>Same Public-only gating — entirely absent from the layout for an Internal reservation, not shown as zero/blank.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Edit reservation details</td><td><code>manage_reservations</code></td><td>Covers contact, dates, rate/deposit/balance (where applicable) — anything short of actually checking in/out.</td></tr>
+      <tr><td>Override status/dates</td><td><code>manage_reservations</code></td><td>Manually setting status or dates outside the normal check-in/out flow (e.g. correcting a mistake) — explicitly called out in <a href="../permissions.html">Permissions</a> as part of this permission's scope.</td></tr>
+      <tr><td>Check in / check out</td><td><code>manage_reservations</code></td><td>Opens <a href="reservation-checkin-checkout.html">Reservation Check-In / Check-Out Dialog</a> rather than editing <code>actual_checkin</code>/<code>actual_checkout</code> inline, since that action also has to update the target's status.</td></tr>
+      <tr><td>Cancel</td><td><code>manage_reservations</code></td><td>Sets status to Cancelled; does not delete the record.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Internal reservation</strong> — the whole billing section (early/late fields, rate/deposit/balance) is omitted from the layout, not shown empty, per <code>reservation_visibility</code>.</li>
+      <li><strong>No <code>manage_reservations</code></strong> — the reservation is still fully viewable (subject to <code>view_contact</code> for contact detail); every edit/check-in-out action is hidden.</li>
+      <li><strong>Cancelled reservation</strong> — remains visible in history; a target's status/upcoming-indicator no longer reflects it once cancelled.</li>
+      <li><strong>Asset target</strong> — identical layout to a Location target, just linking to <a href="asset-detail.html">Asset detail</a> instead; the reservation model doesn't distinguish the two beyond the target reference itself.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Same layout on both — fields stack vertically on mobile, sit in a wider single view on desktop; no divergent interaction pattern beyond the app's general responsive treatment.</p>
+
+    <div class="page-foot">
+      <a href="reservation-list.html">← Reservation Calendar / List</a>
+      <a href="new-reservation-form.html">New Reservation Form →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>
