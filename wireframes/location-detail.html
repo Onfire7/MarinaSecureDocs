@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Location Detail — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/location-detail.html">Page Spec: Location Detail →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="location-list.html">← Location List / Map View</a>
+      <a href="checkpoint-detail.html">Next: Checkpoint Detail →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Locations · Wireframe</span>
+  <h1 class="wf-h1">Location Detail</h1>
+  <p class="wf-lede">Mobile: collapsible stacked sections. Desktop: everything visible at once. Owner/lease sections are omitted entirely (not shown locked) without the gating permission.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <div class="wf-appbar-back">←</div>
+          <span class="wf-appbar-title">Slip 14</span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-field"><span class="wf-field-label">Type / parent</span><div class="wf-field-value">Slip · Dock C</div></div>
+          <div class="wf-field"><span class="wf-field-label">Status</span><div class="wf-field-value"><span class="wf-badge wf-badge-bad">Occupied</span> <span class="wf-badge wf-badge-warn">Upcoming reservation Jul 20</span></div></div>
+          <div class="wf-field"><span class="wf-field-label">Current boat</span><div class="wf-field-value">Second Wind</div></div>
+          <div class="wf-section">
+            <div class="wf-section-title">Owner <span class="wf-gate">view_owner</span></div>
+            <div class="wf-card-meta">R. Delgado <span class="wf-gate">view_contact for phone/email</span></div>
+          </div>
+          <div class="wf-section">
+            <div class="wf-section-title">Checkpoints</div>
+            <div class="wf-card"><div class="wf-card-title">Slip 14 marker</div></div>
+          </div>
+          <div class="wf-actions">
+            <div class="wf-button">+ Note</div>
+            <div class="wf-button">+ Incident</div>
+            <div class="wf-button">+ Ticket</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <div class="wf-grid-2">
+            <div>
+              <div class="wf-field"><span class="wf-field-label">Type / parent</span><div class="wf-field-value">Slip · Dock C</div></div>
+              <div class="wf-field"><span class="wf-field-label">Status</span><div class="wf-field-value"><span class="wf-badge wf-badge-bad">Occupied</span> <span class="wf-badge wf-badge-warn">Upcoming Jul 20</span> <span class="wf-gate">manage_locations to edit</span></div></div>
+              <div class="wf-field"><span class="wf-field-label">Current boat</span><div class="wf-field-value">Second Wind → Boat Detail</div></div>
+              <div class="wf-field"><span class="wf-field-label">Owner</span><div class="wf-field-value">R. Delgado <span class="wf-gate">view_owner</span></div></div>
+              <div class="wf-field"><span class="wf-field-label">Lease</span><div class="wf-field-value"><span class="wf-gate">view_lease</span> — none / omitted here · "Add a lease" available <span class="wf-gate">manage_lease</span></div></div>
+            </div>
+            <div>
+              <div class="wf-section-title">Checkpoints, Notes, Incidents, Tickets</div>
+              <table class="wf-table">
+                <tr><th>Type</th><th>Summary</th></tr>
+                <tr><td>Checkpoint</td><td>Slip 14 marker</td></tr>
+                <tr><td>Note</td><td>"Owner requested pump-out Tues"</td></tr>
+                <tr><td>Ticket</td><td>Dock cleat loose — Medium</td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-section" style="margin-top:24px;">
+    <div class="wf-section-title">Notes</div>
+    <div class="wf-annotation">Toggling reservation-enabled here with an active Lease present triggers a warning (not a block) — same in Admin's Location setup.</div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="checkpoint-detail.html">Next: Checkpoint Detail →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

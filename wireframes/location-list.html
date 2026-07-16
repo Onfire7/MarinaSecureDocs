@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Location List / Map View — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/location-list.html">Page Spec: Location List / Map View →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="checklist-detail.html">← Checklist Detail</a>
+      <a href="location-detail.html">Next: Location Detail →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Locations · Wireframe</span>
+  <h1 class="wf-h1">Location List / Map View</h1>
+  <p class="wf-lede">Three presentations of the same filtered set: list, geographic pin map, and schematic map. The schematic mode shares its plotted rectangles with the Reservations map view, just with an occupancy/type color overlay instead of reservation status.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px — List mode</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <span class="wf-appbar-title">Locations</span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-actions">
+            <div class="wf-badge">List</div>
+            <div class="wf-badge">Pin Map</div>
+            <div class="wf-badge">Schematic</div>
+          </div>
+          <div class="wf-divider"></div>
+          <div class="wf-card">
+            <div class="wf-card-title">Dock C</div>
+            <div class="wf-card-meta">4 slips</div>
+          </div>
+          <div class="wf-card" style="margin-left:16px;">
+            <div class="wf-card-title">Slip 14</div>
+            <div class="wf-card-meta"><span class="wf-badge wf-badge-bad">Occupied</span> · Boat: Second Wind</div>
+          </div>
+          <div class="wf-card" style="margin-left:16px;">
+            <div class="wf-card-title">Slip 15</div>
+            <div class="wf-card-meta"><span class="wf-badge wf-badge-good">Vacant</span></div>
+          </div>
+        </div>
+        <div class="wf-tabbar">
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Home</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Checklists</div>
+          <div class="wf-tab current"><div class="wf-tab-icon"></div>Locations</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Comms</div>
+          <div class="wf-tab"><div class="wf-tab-icon"></div>Other</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled) — Schematic map mode</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-desktop-body">
+          <aside class="wf-sidenav">
+            <div class="wf-sidenav-brand">MarinaSecure</div>
+            <a class="wf-sidenav-item">Home</a>
+            <a class="wf-sidenav-item">Checklists</a>
+            <a class="wf-sidenav-item current">Locations</a>
+            <a class="wf-sidenav-item">Comms</a>
+            <a class="wf-sidenav-item">Tickets</a>
+            <a class="wf-sidenav-item">Incidents</a>
+            <a class="wf-sidenav-item">Reservations</a>
+            <a class="wf-sidenav-item">Boats</a>
+            <a class="wf-sidenav-item">Owners</a>
+            <a class="wf-sidenav-item">Contacts</a>
+            <a class="wf-sidenav-item">Activity Log</a>
+            <a class="wf-sidenav-item">Reports</a>
+          </aside>
+          <div class="wf-content">
+            <div class="wf-actions" style="margin-bottom:10px;">
+              <div class="wf-badge">List</div>
+              <div class="wf-badge">Pin Map</div>
+              <div class="wf-badge wf-badge-good">Schematic ●</div>
+              <div class="wf-select" style="width:auto; margin-left:auto;">Root: Harborview Marina ▾</div>
+            </div>
+            <div class="wf-map-placeholder" style="min-height:280px;">
+              <div class="wf-map-rect" style="top:15%; left:10%; width:100px; height:36px; background:var(--wf-bad-bg); border-color:var(--wf-bad);">Slip 14<br>Occupied</div>
+              <div class="wf-map-rect" style="top:15%; left:30%; width:100px; height:36px; background:var(--wf-good-bg); border-color:var(--wf-good);">Slip 15<br>Vacant</div>
+              <div class="wf-map-rect" style="top:55%; left:20%; width:120px; height:36px; background:var(--wf-warn-bg); border-color:var(--wf-warn);">Cabin 3<br>Out of Service</div>
+              <div class="wf-map-rect" style="top:55%; left:55%; width:100px; height:36px;">Building A<br>(→ detail map)</div>
+            </div>
+            <div class="wf-annotation">Tapping "Building A" drills into its own detail MarinaMap, scoped to just its children — only shown where one exists.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-section" style="margin-top:24px;">
+    <div class="wf-section-title">Notes</div>
+    <div class="wf-annotation">Geographic Pin Map mode (not pictured) plots real gps_coordinates on a live map — distinct data source from the schematic mode's LocationMapPlacement rectangles.</div>
+    <div class="wf-annotation">Multiple root Locations (multi-property marina) → a chooser appears before the schematic map, instead of the root selector shown here.</div>
+    <div class="wf-annotation">Inline status quick-edit and "Add a location" both require <span class="wf-gate">manage_locations</span>.</div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="location-detail.html">Next: Location Detail →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Checkpoint Detail — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/checkpoint-detail.html">Page Spec: Checkpoint Detail →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="location-detail.html">← Location Detail</a>
+      <a href="comms-home.html">Next: Comms Home →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Locations · Wireframe</span>
+  <h1 class="wf-h1">Checkpoint Detail</h1>
+  <p class="wf-lede">Read-oriented reference/audit view — same layout at any width, so a single frame stands in.</p>
+
+  <div class="wf-frames">
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Any width — 375px shown</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <div class="wf-appbar-back">←</div>
+          <span class="wf-appbar-title">Fuel Shed Checkpoint</span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-field"><span class="wf-field-label">Location</span><div class="wf-field-value">Fuel Shed → Location Detail</div></div>
+          <div class="wf-field">
+            <span class="wf-field-label">GUID URL</span>
+            <div class="wf-input">marinasecure.app/c/8f2a...</div>
+            <div class="wf-photo-placeholder" style="width:80px; height:80px; min-height:0; margin-top:6px;">QR</div>
+          </div>
+          <div class="wf-field"><span class="wf-field-label">GPS radius</span><div class="wf-field-value">15m (marina default) — not overridden</div></div>
+          <div class="wf-section">
+            <div class="wf-section-title">Applicable templates</div>
+            <div class="wf-card"><div class="wf-card-title">Nightly Safety Check</div><div class="wf-card-meta">8 PM – 6 AM</div></div>
+          </div>
+          <div class="wf-section">
+            <div class="wf-section-title">Recent check-ins</div>
+            <table class="wf-table">
+              <tr><th>Guard</th><th>Time</th><th>Method</th><th>GPS</th></tr>
+              <tr><td>M. Alvarez</td><td>Tonight 8:14 PM</td><td>Scanned</td><td><span class="wf-badge wf-badge-good">OK</span></td></tr>
+              <tr><td>M. Alvarez</td><td>Yesterday 8:09 PM</td><td>Manual</td><td>—</td></tr>
+            </table>
+          </div>
+          <div class="wf-actions">
+            <div class="wf-button">Copy URL</div>
+            <div class="wf-button">Edit <span class="wf-gate">manage_locations</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="comms-home.html">Next: Comms Home →</a></div>
+  </div>
+
+</div>
+</body>
+</html>
