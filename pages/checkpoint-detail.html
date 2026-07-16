@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checkpoint Detail — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Locations · Page Specification</span>
+    <h1>Checkpoint Detail</h1>
+    <p class="lede">A read-oriented reference view of a single Checkpoint — its identity, GPS validation setup, associated checklists/tours, and recent check-in history — reached from the Location it belongs to.</p>
+
+    <h2>Purpose</h2>
+    <p>Distinct from two other checkpoint-related screens: <a href="checkpoint-checkin.html">Checkpoint Check-In</a> is the guard-facing scan target (what the NFC/QR URL opens in the field), and <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a> is where a checkpoint's configuration is actually edited. This page is for looking a checkpoint up and reviewing its recent activity — e.g. an office user or manager checking "has this checkpoint been visited lately, and from where."</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Name &amp; location</td><td>Checkpoint.name, Checkpoint.location</td><td>Location links back to <a href="location-detail.html">Location detail</a>.</td></tr>
+      <tr><td>GUID URL</td><td>Checkpoint.guid_url</td><td>Copyable link; a QR preview of the same URL is shown alongside it (the physical tag/code is generated from this, not stored separately).</td></tr>
+      <tr><td>GPS validation radius</td><td>Checkpoint.gps_validation_radius, falling back to MarinaSettings.gps_validation_radius_default</td><td>Shown with an indicator of whether this checkpoint overrides the marina default or inherits it.</td></tr>
+      <tr><td>Applicable checklist templates</td><td>Checkpoint.checklist_templates</td><td>Each links to <a href="admin-checklist-templates.html">Admin → Checklist Templates</a>; shown with its trigger condition (time of day, season, etc.) so it's clear which applies when.</td></tr>
+      <tr><td>Tours</td><td>Checkpoint.tours</td><td>Which Tours include this checkpoint, and each one's mode (Linear / Freeform / Randomized).</td></tr>
+      <tr><td>Recent check-ins</td><td>Check-In records for this checkpoint</td><td>Most recent first: guard, timestamp, method (Scanned/Manual), and GPS validation result — an audit trail for patrol compliance review.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Copy / share GUID URL</td><td>None</td><td>Copies the link — useful for re-printing a lost QR code via whatever process regenerates the physical tag.</td></tr>
+      <tr><td>Edit checkpoint configuration</td><td><code>manage_locations</code></td><td>Routes to <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>; this page itself has no inline edit form.</td></tr>
+      <tr><td>View full check-in history</td><td>None beyond normal visibility</td><td>Routes to <a href="activity-log.html">Activity Log</a>, pre-filtered to this checkpoint, for anything beyond the short recent list shown here.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No check-ins yet</strong> — a new checkpoint shows an empty recent-activity state rather than an error.</li>
+      <li><strong>No applicable checklist templates configured</strong> — shown plainly; a checkpoint is valid without one (a guard can still check in and just add a note/incident, per <a href="checkpoint-checkin.html">Checkpoint Check-In</a>).</li>
+      <li><strong>GPS radius override vs. default</strong> — always disambiguated in the UI so it's never ambiguous which value is actually in effect for spoof validation.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Same content and layout on both — this is a reference/review screen rather than a field tool, so there's no strong mobile-specific interaction pattern to design for beyond the app's general responsive treatment.</p>
+
+    <div class="page-foot">
+      <a href="location-detail.html">← Location Detail</a>
+      <a href="index.html">Page Specifications →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

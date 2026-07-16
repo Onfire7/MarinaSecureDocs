@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Location List / Map View — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Locations · Page Specification</span>
+    <h1>Location List / Map View</h1>
+    <p class="lede">Browse the marina's full location hierarchy — docks, slips, buildings, RV sites, whatever the marina has defined — as a flat filterable list or as pins on a real-world map.</p>
+
+    <h2>Purpose</h2>
+    <p>The landing point for the Locations top-level nav item. A list/map toggle over the same underlying set of <code>Location</code> records, filtered by <code>LocationType</code> and <code>status</code>. This screen is for finding and navigating to a location, not for defining the location hierarchy itself — creating location types and locations happens in <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>, gated by <code>manage_locations</code>.</p>
+
+    <div class="note">
+      <strong>This map is geographic, not the planned Reservations slip diagram.</strong> The map mode here plots each Location's real-world <code>gps_coordinates</code> on a live map (pins), the same coordinates used for checkpoint GPS validation. It's a different thing from the schematic marina-layout map planned for the Reservations calendar/list (an uploaded diagram image with each location plotted as a color-coded rectangle) — see the note under Reservations in <a href="index.html">Page Specifications</a>. That feature is still to be designed; this page doesn't depend on it.
+    </div>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Name / label</td><td>Location.name</td><td></td></tr>
+      <tr><td>Type</td><td>Location.type → LocationType.name</td><td></td></tr>
+      <tr><td>Parent breadcrumb</td><td>Location.parent, walked recursively</td><td>e.g. "Dock C → Slip 14."</td></tr>
+      <tr><td>Status</td><td>Location.status</td><td>Occupied / Vacant / Reserved / Out of Service, plus admin-defined additions; shown as a colored pill in both list and map modes.</td></tr>
+      <tr><td>Current boat</td><td>Location.current_boat → Boat.name</td><td>Slip-type locations only; nullable.</td></tr>
+      <tr><td>GPS pin</td><td>Location.gps_coordinates</td><td>Map mode only; a location with no coordinates is omitted from the map but still appears in the list.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Toggle List / Map view</td><td>None</td><td>Switches presentation of the same filtered result set.</td></tr>
+      <tr><td>Filter by type / status</td><td>None</td><td>Client-side filter over the subscribed query.</td></tr>
+      <tr><td>Open a location</td><td>None</td><td>Navigates to <a href="location-detail.html">Location detail</a>.</td></tr>
+      <tr><td>Change a location's status</td><td><code>manage_locations</code></td><td>Inline quick-edit from the list (e.g. marking a slip Out of Service) — reuses the same permission as full location editing rather than introducing a separate status-change permission, per <a href="../permissions.html">Permissions</a>.</td></tr>
+      <tr><td>Add a location</td><td><code>manage_locations</code></td><td>Shortcut into <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>, where creation actually happens.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No locations defined yet</strong> — empty state; for a user with <code>manage_locations</code>, it prompts straight into Admin setup, otherwise a plain "nothing here yet" message.</li>
+      <li><strong>Location with no GPS coordinates</strong> — present in list mode, silently excluded from map mode rather than shown mislocated.</li>
+      <li><strong>Deep hierarchy</strong> — nesting depth isn't fixed (a type's <code>valid_parent_types</code> can chain arbitrarily); the list view supports drilling down (parent → children) rather than assuming a flat two-level dock/slip structure.</li>
+      <li><strong>Current boat changes</strong> — reflects live; when a boat moves slips (see <a href="../data-model.html">Data Model — Boat</a>), this list updates immediately via InstantDB subscription, with the move itself preserved in the Activity Log rather than a location history table.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: list is the default view; hierarchy is drill-down (tap Dock C to see its Slips) rather than a long flat list, and map opens full-screen when toggled. Desktop: list and map can sit side by side, with filters always visible and the full hierarchy browsable without drilling down screen by screen.</p>
+
+    <div class="page-foot">
+      <a href="checklist-detail.html">← Checklist Detail</a>
+      <a href="location-detail.html">Location Detail →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

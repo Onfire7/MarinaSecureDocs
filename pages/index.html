@@ -36,12 +36,12 @@
 
   <main class="content">
     <span class="eyebrow">Specifications</span>
-    <span class="doc-status">In progress — Access, Home, Checklists &amp; Tours complete</span>
+    <span class="doc-status">In progress — Access, Home, Checklists &amp; Tours, Locations complete</span>
     <h1>Page Specifications</h1>
     <p class="lede">A detailed spec for every screen in the application: purpose, data displayed, actions available, permission gating, and mobile/desktop behavior, grouped to match top-level navigation.</p>
 
     <div class="note">
-      <strong>Status.</strong> Access, Home, and Checklists &amp; Tours are written and linked below. The remaining groups are still the proposed scope — flag anything that should be added, split differently, or dropped before those are written.
+      <strong>Status.</strong> Access, Home, Checklists &amp; Tours, and Locations are written and linked below. The remaining groups are still the proposed scope — flag anything that should be added, split differently, or dropped before those are written.
     </div>
 
     <h2>Page list</h2>
@@ -69,9 +69,9 @@
 
     <h3>Locations</h3>
     <ul>
-      <li>Location list / map view</li>
-      <li>Location detail (status, current boat, checkpoints, notes, incidents, tickets)</li>
-      <li>Checkpoint detail (within a location)</li>
+      <li><a href="location-list.html">Location list / map view</a></li>
+      <li><a href="location-detail.html">Location detail</a> (status, current boat, checkpoints, notes, incidents, tickets)</li>
+      <li><a href="checkpoint-detail.html">Checkpoint detail</a> (within a location)</li>
     </ul>
 
     <h3>Comms</h3>
@@ -102,11 +102,14 @@
 
     <h3>Reservations</h3>
     <ul>
-      <li>Reservation calendar/list</li>
+      <li>Reservation calendar/list — will also need a <strong>map view</strong>: a table vs. map toggle, where the map is an admin-uploaded marina layout image with each reservable Location plotted as a rectangle, color-coded by status and labeled with the location's name (a slip diagram, not a GPS map — see note below)</li>
       <li>Reservation detail</li>
       <li>New reservation form</li>
       <li>Reservation check-in / check-out dialog (sets target status per its configuration)</li>
     </ul>
+    <div class="note">
+      <strong>Planned: uploadable marina map with plotted locations.</strong> Admin needs a way to upload a marina layout image and plot each Location onto it as a rectangle (position + size in image coordinates) — distinct from the existing GPS <code>gps_coordinates</code> on Location, which is real-world lat/lng used for checkpoint validation, not a schematic diagram. Once plotted, the Reservation calendar/list's map view renders those rectangles color-coded by the location's current/reservation status, each labeled with its name — a slip map, not a pin map. Deferred until this page spec is written; likely needs the upload + plotting UI added to Admin's Location Types &amp; Locations setup (see below), and new fields on <code>Location</code> (map reference, plotted rect) in the <a href="../data-model.html">Data Model</a>.
+    </div>
 
     <h3>Boats</h3>
     <ul>
@@ -153,7 +156,7 @@
       <li>Users</li>
       <li>Roles &amp; Permissions (trinary matrix editor)</li>
       <li>Checklist Templates (builder)</li>
-      <li>Location Types &amp; Locations setup (incl. checkpoint setup: GUID URL, NFC/QR, GPS radius)</li>
+      <li>Location Types &amp; Locations setup (incl. checkpoint setup: GUID URL, NFC/QR, GPS radius; will also need marina map upload + plotting each Location as a rectangle on it, per the Reservations map-view note above)</li>
       <li>Tours setup</li>
       <li>Incident Types</li>
       <li>Asset categories &amp; maintenance rules</li>

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Location Detail — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Locations · Page Specification</span>
+    <h1>Location Detail</h1>
+    <p class="lede">Everything tied to a single Location — status, current boat, checkpoints, notes, incidents, and tickets — with owner/contact/lease visibility governed by the same permissions used everywhere else those show up.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="location-list.html">Location list / map view</a>, a checkpoint scan's context, or any link/preview card pointing at a location (chat, tickets, incidents). Acts as the hub for anything associated with this physical place, per the attachable-entities pattern in <a href="../data-model.html">Data Model</a>.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Name, type, parent breadcrumb</td><td>Location.name/type/parent</td><td></td></tr>
+      <tr><td>Status</td><td>Location.status</td><td>Plus an upcoming reservation shown alongside it if <code>reservation_enabled</code> — the reservation itself doesn't change this value until it activates, per <a href="../data-model.html">Data Model — Reservation</a>.</td></tr>
+      <tr><td>Current boat</td><td>Location.current_boat → Boat</td><td>Slip-type locations only; links to <a href="boat-detail.html">Boat detail</a>. Field is absent entirely for location types that don't carry a boat (e.g. a Building).</td></tr>
+      <tr><td>Owner / contact summary</td><td>Boat.owners, gated</td><td><code>view_owner</code> shows that an owner exists and their name; <code>view_contact</code> additionally reveals phone/email. Without <code>view_owner</code>, this section is omitted entirely rather than shown locked — matching the security-role variance described in <a href="../workflows.html">Role Workflows</a>.</td></tr>
+      <tr><td>Lease summary</td><td>Lease (by Location)</td><td>Gated by <code>view_lease</code>; omitted entirely without it.</td></tr>
+      <tr><td>Checkpoints at this location</td><td>Checkpoint.location</td><td>List, each linking to <a href="checkpoint-detail.html">Checkpoint detail</a>.</td></tr>
+      <tr><td>Child locations</td><td>Location.parent (reverse)</td><td>e.g. a Dock's detail page lists its Slips.</td></tr>
+      <tr><td>Notes</td><td>Note.attached_to = this Location</td><td></td></tr>
+      <tr><td>Incidents</td><td>Incident.attached_to = this Location</td><td>Gated by <code>view_incidents</code>; omitted entirely without it.</td></tr>
+      <tr><td>Tickets</td><td>Ticket.attached_to = this Location</td><td>Unrestricted — ticket visibility has no dedicated permission gate.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Change status</td><td><code>manage_locations</code></td><td>Same status-edit path as <a href="location-list.html">Location list</a>.</td></tr>
+      <tr><td>Add a checkpoint</td><td><code>manage_locations</code></td><td>Shortcut into <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>.</td></tr>
+      <tr><td>Add a note</td><td>Unrestricted</td><td>Opens <a href="new-note-dialog.html">New note dialog</a>, pre-attached to this Location.</td></tr>
+      <tr><td>Log an incident</td><td><code>create_incidents</code></td><td>Opens <a href="new-incident-form.html">New incident form</a>, pre-attached.</td></tr>
+      <tr><td>Create a ticket</td><td>Unrestricted</td><td>Opens <a href="new-ticket-form.html">New ticket form</a>, pre-attached.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Vacant slip, no boat</strong> — current-boat field shows an empty state rather than being hidden, so it's clear the slip is simply unoccupied, not that the field doesn't apply.</li>
+      <li><strong>Location type without <code>current_boat</code> relevance</strong> — the field is omitted from the layout entirely for that type, not shown blank.</li>
+      <li><strong>Owner exists but user lacks <code>view_owner</code></strong> — the owner section doesn't appear at all; there's no indication to that user that an owner even exists, consistent with the permission's purpose.</li>
+      <li><strong>Reservation upcoming but not yet active</strong> — shown as a distinct "upcoming" indicator next to (not replacing) the current status pill.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: sections stack vertically and collapse by default (checkpoints, notes, incidents, tickets each expandable) to keep the initial view scannable. Desktop: sections are visible simultaneously in a wider layout, since there's room to show status, boat/owner info, and the associated-record lists without collapsing anything.</p>
+
+    <div class="page-foot">
+      <a href="location-list.html">← Location List / Map View</a>
+      <a href="checkpoint-detail.html">Checkpoint Detail →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>
