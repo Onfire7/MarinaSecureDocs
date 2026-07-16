@@ -84,7 +84,7 @@
     </ul>
 
     <h2>Mobile vs. desktop</h2>
-    <p>Mobile-only in practice — this screen exists to be opened by a phone tapping an NFC tag or scanning a QR code in the field. No meaningful desktop variant is designed; if opened on desktop (e.g. testing a checkpoint's URL) it renders the same content without any field-specific chrome.</p>
+    <p>Phone is the primary case — tapping an NFC tag or scanning a QR code in the field — but the screen is built responsively rather than mobile-only: NFC-capable tablets and hybrid laptops are a real, if less common, way this gets opened (a guard using a rugged tablet for rounds, or a hybrid laptop with NFC at a fixed post that still moves between checkpoints). It is not designed for a permanently-placed desktop workstation, since nothing about a fixed desktop ever taps an NFC tag or scans a QR code — that case is only reachable by pasting the URL directly (e.g. testing a checkpoint's link), and renders the same content without any field-specific chrome. Layout scales from a single-column phone view up through tablet/hybrid-laptop widths using the same breakpoint approach as the rest of the app (see <a href="../architecture.html">Architecture — Frontend</a>), rather than assuming one fixed viewport size.</p>
 
     <div class="page-foot">
       <a href="active-checklist.html">← Active Checklist</a>
