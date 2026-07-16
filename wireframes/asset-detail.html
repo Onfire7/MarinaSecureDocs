@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Asset Detail — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/asset-detail.html">Page Spec: Asset Detail →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="asset-list.html">← Asset List</a>
+      <a href="asset-checkout-dialog.html">Next: Checkout / Return Dialog →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Assets · Wireframe</span>
+  <h1 class="wf-h1">Asset Detail</h1>
+  <p class="wf-lede">Status log, meter, maintenance rules, checkout log all in one view.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <div class="wf-appbar-back">←</div>
+          <span class="wf-appbar-title">Security Truck #2</span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-field"><span class="wf-field-label">Current status</span><div class="wf-field-value"><span class="wf-badge wf-badge-good">In Service</span></div></div>
+          <div class="wf-field"><span class="wf-field-label">Meter</span><div class="wf-field-value">18,204 mi</div></div>
+          <div class="wf-field"><span class="wf-field-label">Maintenance rule</span><div class="wf-field-value">Every 3,000 mi — next due at 18,000 (overdue)</div></div>
+          <div class="wf-actions">
+            <div class="wf-button">Log status <span class="wf-gate">manage_assets</span></div>
+            <div class="wf-button">Update meter</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <div class="wf-grid-2">
+            <div>
+              <div class="wf-field"><span class="wf-field-label">Current status</span><div class="wf-field-value"><span class="wf-badge wf-badge-good">In Service</span></div></div>
+              <div class="wf-field"><span class="wf-field-label">Meter</span><div class="wf-field-value">18,204 mi</div></div>
+              <div class="wf-actions"><div class="wf-button">Log status</div><div class="wf-button">Update meter</div><div class="wf-button">Check out</div></div>
+            </div>
+            <div>
+              <div class="wf-section-title">Checkout log</div>
+              <table class="wf-table">
+                <tr><th>To</th><th>Out</th><th>In</th></tr>
+                <tr><td>M. Alvarez</td><td>Jul 14, 7 PM</td><td>Jul 15, 7 AM</td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="asset-checkout-dialog.html">Next: Checkout / Return Dialog →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

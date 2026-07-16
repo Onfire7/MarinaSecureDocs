@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Asset List — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/asset-list.html">Page Spec: Asset List →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="lease-detail.html">← Lease Detail</a>
+      <a href="asset-detail.html">Next: Asset Detail →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Assets · Wireframe</span>
+  <h1 class="wf-h1">Asset List</h1>
+  <p class="wf-lede">Unrestricted to view; manage_assets gates creation/editing.</p>
+
+  <div class="wf-frames">
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <span class="wf-appbar-title">Assets</span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-card"><div class="wf-card-title">Security Truck #2</div><div class="wf-card-meta">18,204 mi · <span class="wf-badge wf-badge-good">In Service</span></div></div>
+          <div class="wf-card"><div class="wf-card-title">Jump Pack A</div><div class="wf-card-meta">Checked out to J. Torres</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <table class="wf-table">
+            <tr><th>Name</th><th>Category</th><th>Status</th><th>Meter</th><th>Checked out?</th></tr>
+            <tr><td>Security Truck #2</td><td>Vehicle</td><td><span class="wf-badge wf-badge-good">In Service</span></td><td>18,204 mi</td><td>—</td></tr>
+            <tr><td>Jump Pack A</td><td>Equipment</td><td><span class="wf-badge wf-badge-warn">Checked Out</span></td><td>—</td><td>J. Torres</td></tr>
+          </table>
+          <div class="wf-actions" style="margin-top:12px;"><div class="wf-button">+ Add Asset <span class="wf-gate">manage_assets</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="asset-detail.html">Next: Asset Detail →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

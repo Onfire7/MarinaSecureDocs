@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Owner / Contact Detail — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/contact-detail.html">Page Spec: Owner / Contact Detail →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="contact-list.html">← Owner / Contact List</a>
+      <a href="nameless-contact-merge.html">Next: Nameless-Contact Merge →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Owners &amp; Contacts · Wireframe</span>
+  <h1 class="wf-h1">Owner / Contact Detail</h1>
+  <p class="wf-lede">Boats, leases, and comms history each carry their own gate.</p>
+
+  <div class="wf-frames">
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <div class="wf-appbar-back">←</div>
+          <span class="wf-appbar-title">R. Delgado</span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-field"><span class="wf-field-label">Phone / Email <span class="wf-gate">view_contact</span></span><div class="wf-field-value">(555) 019-2244 · r.delgado@example.com</div></div>
+          <div class="wf-field"><span class="wf-field-label">Boats owned</span><div class="wf-field-value">Second Wind — Slip 14</div></div>
+          <div class="wf-field"><span class="wf-field-label">Leases <span class="wf-gate">view_lease</span></span><div class="wf-field-value">omitted here without permission</div></div>
+          <div class="wf-actions"><div class="wf-button">Call <span class="wf-gate">place_calls</span></div><div class="wf-button">Text</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <div class="wf-grid-2">
+            <div>
+              <div class="wf-field"><span class="wf-field-label">Phone / Email</span><div class="wf-field-value">(555) 019-2244 · r.delgado@example.com</div></div>
+              <div class="wf-field"><span class="wf-field-label">Boats owned / authorized</span><div class="wf-field-value">Second Wind (owner)</div></div>
+              <div class="wf-actions"><div class="wf-button">Merge with another contact <span class="wf-gate">edit_owner_contact</span></div></div>
+            </div>
+            <div>
+              <div class="wf-section-title">Call / SMS history</div>
+              <div class="wf-card-meta"><span class="wf-gate">view_calls</span> / <span class="wf-gate">view_sms</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="nameless-contact-merge.html">Next: Nameless-Contact Merge →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Owner / Contact List — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/contact-list.html">Page Spec: Owner / Contact List →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="boat-detail.html">← Boat Detail</a>
+      <a href="contact-detail.html">Next: Owner / Contact Detail →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Owners &amp; Contacts · Wireframe</span>
+  <h1 class="wf-h1">Owner / Contact List</h1>
+  <p class="wf-lede">Nameless contacts (auto-created from unmatched calls) get a distinct visual treatment flagging they still need a name.</p>
+
+  <div class="wf-frames">
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Mobile — 375px</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-appbar">
+          <span class="wf-appbar-title">Owners &amp; Contacts <span class="wf-gate">view_owner</span></span>
+        </div>
+        <div class="wf-content">
+          <div class="wf-input" style="margin-bottom:10px;">Search name or phone…</div>
+          <div class="wf-card"><div class="wf-card-title">R. Delgado</div><div class="wf-card-meta">(555) 019-2244 <span class="wf-gate">view_contact</span> · Owns: Second Wind</div></div>
+          <div class="wf-card" style="border-style:dashed;"><div class="wf-card-title" style="color:var(--wf-warn);">(555) 083-1190 — needs a name</div><div class="wf-card-meta">Auto-created from inbound call</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Desktop — 1280px (scaled)</span>
+      <div class="wf-frame wf-frame-desktop">
+        <div class="wf-content">
+          <table class="wf-table">
+            <tr><th>Name</th><th>Phone</th><th>Linked boats</th></tr>
+            <tr><td>R. Delgado</td><td>(555) 019-2244</td><td>Second Wind</td></tr>
+            <tr><td style="color:var(--wf-warn);">— needs a name —</td><td>(555) 083-1190</td><td>—</td></tr>
+          </table>
+          <div class="wf-actions" style="margin-top:12px;"><div class="wf-button">+ Add Contact <span class="wf-gate">edit_owner_contact</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="contact-detail.html">Next: Owner / Contact Detail →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

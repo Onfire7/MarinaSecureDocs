@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Checkout / Return Dialog — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/asset-checkout-dialog.html">Page Spec: Checkout / Return Dialog →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="asset-detail.html">← Asset Detail</a>
+      <a href="meter-update-dialog.html">Next: Meter Update Dialog →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Assets · Wireframe</span>
+  <h1 class="wf-h1">Checkout / Return Dialog</h1>
+  <p class="wf-lede">Two modes depending on whether the asset is currently checked out. Same at any width.</p>
+
+  <div class="wf-frames">
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Any width — 375px shown — Check out mode</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-frame-dialog-backdrop">
+          <div class="wf-dialog-card">
+            <div class="wf-card-title">Check Out — Jump Pack A <span class="wf-gate">manage_assets</span></div>
+            <div class="wf-field"><span class="wf-field-label">Checking out to</span><div class="wf-select">J. Torres (defaults to self)</div></div>
+            <div class="wf-field"><span class="wf-field-label">Time out</span><div class="wf-field-value">Now</div></div>
+            <div class="wf-actions"><div class="wf-button wf-button-primary">Check Out</div><div class="wf-button">Cancel</div></div>
+            <div class="wf-annotation">Return mode replaces this when the asset already has an open checkout — applies post_return_status automatically (e.g. → "Needs Charging").</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="meter-update-dialog.html">Next: Meter Update Dialog →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

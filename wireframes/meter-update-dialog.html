@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Meter Update Dialog — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/meter-update-dialog.html">Page Spec: Meter Update Dialog →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="asset-checkout-dialog.html">← Checkout / Return Dialog</a>
+      <a href="new-note-dialog.html">Next: New Note Dialog →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Assets · Wireframe</span>
+  <h1 class="wf-h1">Meter Update Dialog</h1>
+  <p class="wf-lede">A lower reading than current triggers a warning and requires a reason before Save enables.</p>
+
+  <div class="wf-frames">
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Any width — 375px shown</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-frame-dialog-backdrop">
+          <div class="wf-dialog-card">
+            <div class="wf-card-title">Update Meter <span class="wf-gate">manage_assets</span></div>
+            <div class="wf-field-value">Current: 18,204 mi</div>
+            <div class="wf-field"><span class="wf-field-label">New reading</span><div class="wf-input">17,900</div></div>
+            <div class="wf-badge wf-badge-warn" style="margin:6px 0;">Lower than current — reason required</div>
+            <div class="wf-field"><span class="wf-field-label">Reason for lower reading</span><div class="wf-textarea">Odometer replaced during service</div></div>
+            <div class="wf-actions"><div class="wf-button wf-button-primary">Save</div><div class="wf-button">Cancel</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-section" style="margin-top:24px;">
+    <div class="wf-annotation">Meterless asset: form offers only "add hours" (incremental), never "set reading."</div>
+    <div class="wf-annotation">Save evaluates maintenance rules inline — a due rule creates an auto_generated Ticket immediately.</div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="new-note-dialog.html">Next: New Note Dialog →</a></div>
+  </div>
+
+</div>
+</body>
+</html>

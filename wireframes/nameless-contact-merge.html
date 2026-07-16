@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Nameless-Contact Name Prompt & Merge Dialog — MarinaSecure Docs</title>
+<link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-topbar">
+    <div class="wf-crumbs">
+      <a href="index.html">← Wireframes</a>
+      <a href="../pages/nameless-contact-merge.html">Page Spec: Nameless-Contact Merge →</a>
+    </div>
+    <div class="wf-nextprev">
+      <a href="contact-detail.html">← Owner / Contact Detail</a>
+      <a href="lease-detail.html">Next: Lease Detail →</a>
+    </div>
+  </div>
+
+  <span class="wf-eyebrow">Owners &amp; Contacts · Wireframe</span>
+  <h1 class="wf-h1">Nameless-Contact Name Prompt &amp; Merge Dialog</h1>
+  <p class="wf-lede">Prompts a name first, then surfaces similar existing contacts to prevent a duplicate. Same at any width.</p>
+
+  <div class="wf-frames">
+    <div class="wf-frame-block">
+      <span class="wf-frame-label">Any width — 375px shown</span>
+      <div class="wf-frame wf-frame-mobile">
+        <div class="wf-frame-dialog-backdrop">
+          <div class="wf-dialog-card">
+            <div class="wf-card-title">Who is this?</div>
+            <div class="wf-card-meta">(555) 083-1190</div>
+            <div class="wf-field"><span class="wf-field-label">Name</span><div class="wf-input">Torres</div></div>
+            <div class="wf-divider"></div>
+            <div class="wf-field-label">Similar existing contacts</div>
+            <div class="wf-card"><div class="wf-card-title">J. Torres</div><div class="wf-card-meta">Slip 22 authorized user</div><div class="wf-actions"><div class="wf-button wf-button-primary">Merge into this</div></div></div>
+            <div class="wf-actions"><div class="wf-button">None of these — save as new</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-section" style="margin-top:24px;">
+    <div class="wf-annotation">Merge sets merged_into on the source record; the phone number keeps matching to it, but display resolves through to the canonical contact everywhere.</div>
+  </div>
+
+  <div class="wf-topbar" style="margin-top:32px; border-bottom:none; border-top:1px solid var(--wf-line); padding-top:16px;">
+    <span></span>
+    <div class="wf-nextprev"><a href="lease-detail.html">Next: Lease Detail →</a></div>
+  </div>
+
+</div>
+</body>
+</html>
