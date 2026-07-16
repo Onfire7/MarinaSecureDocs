@@ -57,6 +57,21 @@
       <strong>Indicator copy stays generic.</strong> Background-save indicators like this one should say only that something is still saving ("Saving…"), not what — never name the specific field or subsystem (e.g. not "Saving location…" or "Saving GPS…"). This keeps the pattern reusable verbatim for any other field that ends up saving asynchronously in the background, without a spec-by-spec rewrite of the copy.
     </div>
 
+    <h2>Avoiding duplicate check-ins &amp; tab pileup</h2>
+    <p>Because this screen is reached by re-opening the same URL every visit, two related failure modes need explicit handling: a reload accidentally logging a second check-in, and — on a device where the app isn't installed — old check-in tabs piling up over the course of a shift.</p>
+
+    <h3>Duplicate check-in on reload</h3>
+    <p>Immediately after step 1 creates the Check-In record, the tab rewrites its own URL via <code>history.replaceState</code> to include that record's ID (e.g. <code>?checkin=&lt;id&gt;</code>), without a full navigation. Any subsequent load of this same tab — a manual refresh, the OS resuming a backgrounded tab — sees that ID and resumes the existing Check-In and its checklist state instead of creating a new one. As a safety net for cases where that URL state doesn't survive (a different device, the param getting stripped), the write path also checks for an existing Check-In for this checkpoint + user within the last few minutes before creating a new one, resuming it if found rather than duplicating.</p>
+
+    <h3>Tab pileup (not installed as a PWA)</h3>
+    <p>When the app is installed, an NFC tap or QR scan reopens the existing app window rather than spawning a new browser tab, which avoids this problem at the root. Where it isn't installed, each tab instead tries to close itself once it's no longer needed, rather than being left to accumulate:</p>
+    <ul>
+      <li><strong>On completion</strong> — once every Checklist this check-in triggered (<code>Checklist.triggered_by</code> referencing it) reaches Complete, or, if none applied, once the guard has had the chance to add a note/incident, the tab calls <code>window.close()</code>.</li>
+      <li><strong>On a 10-minute idle timeout</strong> — if the tab has been open more than 10 minutes with nothing left unfinished, it attempts the same close.</li>
+      <li><strong>On reactivation, as a fallback</strong> — browsers only allow a script to close a tab it also opened, and a tab launched by an OS-level NFC/QR intent may or may not qualify depending on platform. Where <code>window.close()</code> is silently refused, the same completion/idle check re-runs every time the tab regains focus, so a tab that couldn't close itself right away closes the next time the guard actually looks at it — old tabs cascade closed one at a time as they're encountered, rather than needing a manual mass-cleanup.</li>
+      <li><strong>If never revisited</strong> — a tab that can't close and is never reactivated simply redirects to the Dashboard once its completion/idle condition is met, so anything left behind at least shows something current rather than a dead checkpoint screen.</li>
+    </ul>
+
     <h2>Data shown</h2>
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
@@ -81,6 +96,8 @@
       <li><strong>User navigates into a checklist before GPS resolves</strong> — expected and unblocked by design; the pending indicator follows along (or the resulting flag appears) regardless of which sub-screen the guard has moved to, since it's tied to the Check-In record, not this particular screen.</li>
       <li><strong>Multiple applicable checklists</strong> — presented as a short list to work through in sequence rather than merged into one.</li>
       <li><strong>Offline scan</strong> — both the initial Check-In write and the later GPS update succeed locally and sync on reconnect, identical to any other InstantDB write; GPS itself is a device capability and doesn't require connectivity to resolve.</li>
+      <li><strong>Reload before the URL rewrite lands</strong> — a reload in the brief window before <code>history.replaceState</code> completes falls back to the time-window dedupe check rather than the URL check; either path resumes the same Check-In instead of duplicating it.</li>
+      <li><strong>Tab won't close</strong> — if the browser refuses <code>window.close()</code> (a tab it didn't itself open), it isn't retried in a loop; it waits for the next focus/visibility event or falls back to redirecting to the Dashboard, per "Avoiding duplicate check-ins &amp; tab pileup" above.</li>
     </ul>
 
     <h2>Mobile vs. desktop</h2>

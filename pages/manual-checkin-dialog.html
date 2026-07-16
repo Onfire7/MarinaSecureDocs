@@ -61,6 +61,7 @@
       <li><strong>No reason entered</strong> — submit stays disabled; this is the one hard validation rule on the dialog.</li>
       <li><strong>GPS unavailable</strong> (e.g. device location services off) — the pending indicator settles to "unavailable" after a timeout; <code>gps_at_checkin</code> is left null and <code>within_radius</code> cannot be computed, but the check-in still stands, same as <a href="checkpoint-checkin.html">Checkpoint Check-In</a>.</li>
       <li><strong>Offline</strong> — writes locally like any other check-in.</li>
+      <li><strong>No duplicate-check-in or tab-pileup handling needed here</strong> — those concerns on <a href="checkpoint-checkin.html">Checkpoint Check-In</a> exist because that screen is reached by re-opening a URL; this dialog is opened from within an already-running app session and closes back into it on submit, so there's no separate tab to dedupe or clean up.</li>
     </ul>
 
     <h2>Mobile vs. desktop</h2>
