@@ -1,0 +1,515 @@
+/* ============================================================
+   MarinaSecure — application styles
+   Light, calm, utilitarian. Palette derived from the wireframe
+   set but tinted toward a harbor blue-gray for the real app.
+   ============================================================ */
+
+:root {
+  --bg: #f3f4f2;
+  --panel: #ffffff;
+  --line: #d4d7d2;
+  --line-lt: #e4e6e2;
+  --ink: #23272a;
+  --mute: #6d746f;
+  --fill: #e9ebe7;
+
+  --accent: #2f5d7c;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3ecf2;
+
+  --good: #4f7a49;
+  --good-bg: #e5efe2;
+  --warn: #a07a2c;
+  --warn-bg: #f3e9d1;
+  --bad: #a84f40;
+  --bad-bg: #f4e0da;
+
+  --radius: 8px;
+  --shadow: 0 1px 2px rgba(30, 40, 45, 0.06), 0 2px 8px rgba(30, 40, 45, 0.04);
+  --font:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+
+  --sidenav-w: 216px;
+  --tabbar-h: 58px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+a {
+  color: var(--accent);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+}
+
+/* ---------- Buttons & inputs ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 9px 16px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn:hover {
+  background: var(--fill);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.btn-primary:hover {
+  background: #274e69;
+}
+.btn-danger {
+  color: var(--bad);
+  border-color: var(--bad);
+  background: var(--panel);
+}
+.btn-danger:hover {
+  background: var(--bad-bg);
+}
+.btn-quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--mute);
+}
+.btn-quiet:hover {
+  background: var(--fill);
+  color: var(--ink);
+}
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 0.82rem;
+  border-radius: 6px;
+}
+.btn-block {
+  width: 100%;
+}
+
+/* ---------- Cards ---------- */
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line-lt);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+}
+.card-kicker {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.card-title {
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+.card-meta {
+  color: var(--mute);
+  font-size: 0.86rem;
+}
+
+/* ---------- Badges ---------- */
+
+.badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 650;
+  border-radius: 999px;
+  padding: 2px 9px;
+  background: var(--fill);
+  color: var(--mute);
+}
+.badge-good {
+  background: var(--good-bg);
+  color: var(--good);
+}
+.badge-warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.badge-bad {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+.badge-accent {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* ---------- App shell ---------- */
+
+.shell {
+  display: flex;
+  min-height: 100%;
+}
+
+.sidenav {
+  width: var(--sidenav-w);
+  flex-shrink: 0;
+  background: var(--panel);
+  border-right: 1px solid var(--line-lt);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+.sidenav-brand {
+  font-weight: 750;
+  font-size: 1.02rem;
+  padding: 18px 18px 6px;
+}
+.sidenav-marina {
+  color: var(--mute);
+  font-size: 0.8rem;
+  padding: 0 18px 14px;
+  border-bottom: 1px solid var(--line-lt);
+}
+.sidenav nav {
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+}
+.sidenav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.94rem;
+}
+.sidenav-item:hover {
+  background: var(--fill);
+}
+.sidenav-item.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 650;
+}
+.sidenav-footer {
+  border-top: 1px solid var(--line-lt);
+  padding: 12px 14px;
+  font-size: 0.86rem;
+}
+.sidenav-user {
+  font-weight: 650;
+  margin-bottom: 2px;
+}
+.sidenav-roles {
+  color: var(--mute);
+  font-size: 0.78rem;
+  margin-bottom: 8px;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: 22px 26px 80px;
+  max-width: 1180px;
+}
+
+/* Mobile app bar + tab bar */
+
+.appbar {
+  display: none;
+}
+
+.tabbar {
+  display: none;
+}
+
+@media (max-width: 899px) {
+  .sidenav {
+    display: none;
+  }
+  .main {
+    padding: 14px 14px calc(var(--tabbar-h) + 24px);
+  }
+  .appbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line-lt);
+    padding: 12px 16px;
+    font-weight: 700;
+  }
+  .tabbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    display: flex;
+    background: var(--panel);
+    border-top: 1px solid var(--line-lt);
+    height: var(--tabbar-h);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    font-size: 0.68rem;
+    color: var(--mute);
+    text-decoration: none;
+  }
+  .tab.active {
+    color: var(--accent);
+    font-weight: 650;
+  }
+  .tab-icon {
+    font-size: 1.05rem;
+    line-height: 1;
+  }
+}
+
+/* ---------- Page scaffolding ---------- */
+
+.page-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.page-title {
+  font-size: 1.35rem;
+  font-weight: 720;
+}
+.page-sub {
+  color: var(--mute);
+  font-size: 0.9rem;
+}
+
+.grid-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+@media (min-width: 900px) {
+  .grid-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.spread {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.muted {
+  color: var(--mute);
+}
+.small {
+  font-size: 0.84rem;
+}
+
+.divider {
+  border: 0;
+  border-top: 1px solid var(--line-lt);
+  margin: 14px 0;
+}
+
+/* ---------- Auth screens ---------- */
+
+.auth-screen {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  gap: 20px;
+}
+.auth-brand {
+  text-align: center;
+}
+.auth-brand .marina-name {
+  font-size: 1.25rem;
+  font-weight: 720;
+}
+.auth-brand .product {
+  color: var(--mute);
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+}
+
+/* User switch */
+
+.session-list {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.session-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  background: var(--panel);
+  border: 1px solid var(--line-lt);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  cursor: pointer;
+}
+.session-item:hover {
+  border-color: var(--accent);
+}
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---------- Dashboard ---------- */
+
+.dash-clock {
+  font-size: 1.5rem;
+  font-weight: 720;
+  font-variant-numeric: tabular-nums;
+}
+.dash-count {
+  font-size: 1.5rem;
+  font-weight: 720;
+}
+.card-edit-controls {
+  display: flex;
+  gap: 4px;
+}
+.card-hidden {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+/* ---------- Placeholder pages ---------- */
+
+.placeholder {
+  border: 1.5px dashed var(--line);
+  border-radius: var(--radius);
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--mute);
+}
+.placeholder .big {
+  font-size: 1.1rem;
+  font-weight: 650;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+/* ---------- Config-missing screen ---------- */
+
+.config-missing {
+  max-width: 560px;
+  margin: 10vh auto;
+  padding: 0 20px;
+}
+.config-missing code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  background: var(--fill);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.config-missing pre {
+  background: var(--panel);
+  border: 1px solid var(--line-lt);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+}
