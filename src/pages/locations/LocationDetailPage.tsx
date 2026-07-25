@@ -1,9 +1,11 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { db, id } from "../../lib/db";
+import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import { NoteDialog } from "../shared/NoteDialog";
+import type { AttachmentTarget } from "../../lib/attachments";
 import {
   STANDARD_STATUSES,
   breadcrumb,
@@ -109,6 +111,12 @@ export function LocationDetailPage() {
     compareNames(a.name, b.name),
   );
 
+  const selfTarget: AttachmentTarget = {
+    type: "location",
+    id: location.id,
+    label: location.name,
+  };
+
   return (
     <div>
       <div className="page-head">
@@ -127,12 +135,18 @@ export function LocationDetailPage() {
             <button
               type="button"
               className="btn btn-sm"
-              onClick={() => navigate("/incidents")}
+              onClick={() =>
+                navigate("/incidents/new", { state: { target: selfTarget } })
+              }
             >
               + Incident
             </button>
           )}
-          <button type="button" className="btn btn-sm" onClick={() => navigate("/tickets")}>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => navigate("/tickets/new", { state: { target: selfTarget } })}
+          >
             + Ticket
           </button>
         </div>
@@ -344,11 +358,7 @@ export function LocationDetailPage() {
       </div>
 
       {showNoteDialog && (
-        <NewNoteDialog
-          locationId={location.id}
-          locationName={location.name}
-          onClose={() => setShowNoteDialog(false)}
-        />
+        <NoteDialog target={selfTarget} onClose={() => setShowNoteDialog(false)} />
       )}
     </div>
   );
@@ -378,65 +388,5 @@ function Section({
       <summary className="section-title">{title}</summary>
       <div className="stack" style={{ gap: 8, marginTop: 8 }}>{children}</div>
     </details>
-  );
-}
-
-// Minimal location-scoped note entry — the full shared New Note dialog (with
-// the attachment-target picker) arrives with the Shared dialogs group; this
-// one is always pre-attached to the current location.
-function NewNoteDialog({
-  locationId,
-  locationName,
-  onClose,
-}: {
-  locationId: string;
-  locationName: string;
-  onClose: () => void;
-}) {
-  const current = useCurrent();
-  const [body, setBody] = useState("");
-
-  const save = async () => {
-    await db.transact(
-      db.tx.notes[id()]
-        .update({ body: body.trim(), createdAt: Date.now() })
-        .link({
-          location: locationId,
-          ...(current.user ? { author: current.user.id } : {}),
-        }),
-    );
-    onClose();
-  };
-
-  return (
-    <div className="dialog-backdrop" onClick={onClose}>
-      <div className="dialog-card" onClick={(e) => e.stopPropagation()}>
-        <div className="card-title" style={{ marginBottom: 10 }}>
-          New note — {locationName}
-        </div>
-        <div className="field">
-          <textarea
-            className="textarea"
-            rows={4}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="What's worth noting about this location?"
-          />
-        </div>
-        <div className="row">
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={!body.trim()}
-            onClick={() => void save()}
-          >
-            Save note
-          </button>
-          <button type="button" className="btn btn-quiet" onClick={onClose}>
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }

@@ -1,5 +1,5 @@
 // MarinaSecure — InstantDB schema.
-// Mirrors the entities in docs/data-model.html (main branch: data-model.html).
+// Mirrors the entities in docs/data-model.html.
 // Field names are camelCase here; the docs use snake_case for the same fields.
 //
 // Conventions:
