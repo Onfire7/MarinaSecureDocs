@@ -45,7 +45,11 @@ src/
     home/                Dashboard + card registry
     checklists/          Checklist list, Active/Detail checklist, Tours,
                          Checkpoint check-in (+ manual dialog)
-    shared/              placeholders, More menu, config screen
+    locations/           Location list/maps, Location detail, Checkpoint detail
+    tickets/             Ticket queue, Ticket detail, New ticket form
+    incidents/           Incident list, Incident detail, New incident form
+    shared/              placeholders, More menu, config screen,
+                         attachment-target picker, note dialog
   styles/app.css         design tokens + component styles
 ```
 
@@ -59,9 +63,17 @@ src/
   meter-based maintenance tickets), Checklist detail, Checkpoint check-in
   (GPS-in-background, dedupe, tab-close), Manual check-in dialog, Tour
   progress (Linear/Freeform/Randomized)
+- ✅ Locations group: Location list (hierarchy/pin map/schematic map),
+  Location detail (boat/vehicle occupancy, gated owner/lease sections),
+  Checkpoint detail (audit view)
+- ✅ Tickets group: priority-sorted queue with inline take/assign, Ticket
+  detail, New ticket form (attachment-target picker)
+- ✅ Incidents group: permission-gated list, Incident detail (author-locked
+  original + permanent addendum thread, linked tickets), New incident form
+  (inline type creation, optional raise-linked-ticket)
 - ⬜ Everything else renders a placeholder — see the docs' page-spec list for
-  the remaining groups (Locations, Comms, Tickets, Incidents, Reservations,
-  Boats, Owners & Contacts, Assets, Activity Log, Reports, Admin), plus
-  InstantDB permission rules, Netlify Functions (shift report + scheduled
-  jobs — including scheduled-trigger Checklist generation and time-based
-  maintenance rules), and Twilio Functions (telephony bridge).
+  the remaining groups (Comms, Reservations, Boats & Vehicles, Owners &
+  Contacts, Assets, Activity Log, Reports, Admin), plus InstantDB permission
+  rules, Netlify Functions (shift report + scheduled jobs — including
+  scheduled-trigger Checklist generation and time-based maintenance rules),
+  and Twilio Functions (telephony bridge).

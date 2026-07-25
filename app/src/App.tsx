@@ -20,6 +20,12 @@ import { CheckpointCheckinPage } from "./pages/checklists/CheckpointCheckinPage"
 import { LocationListPage } from "./pages/locations/LocationListPage";
 import { LocationDetailPage } from "./pages/locations/LocationDetailPage";
 import { CheckpointDetailPage } from "./pages/locations/CheckpointDetailPage";
+import { TicketQueuePage } from "./pages/tickets/TicketQueuePage";
+import { TicketDetailPage } from "./pages/tickets/TicketDetailPage";
+import { NewTicketPage } from "./pages/tickets/NewTicketPage";
+import { IncidentListPage } from "./pages/incidents/IncidentListPage";
+import { IncidentDetailPage } from "./pages/incidents/IncidentDetailPage";
+import { NewIncidentPage } from "./pages/incidents/NewIncidentPage";
 
 export default function App() {
   const missing = missingConfig();
@@ -56,14 +62,12 @@ export default function App() {
               path="/comms/*"
               element={<PlaceholderPage title="Comms" spec="comms-home" />}
             />
-            <Route
-              path="/tickets/*"
-              element={<PlaceholderPage title="Tickets" spec="ticket-queue" />}
-            />
-            <Route
-              path="/incidents/*"
-              element={<PlaceholderPage title="Incidents" spec="incident-list" />}
-            />
+            <Route path="/tickets" element={<TicketQueuePage />} />
+            <Route path="/tickets/new" element={<NewTicketPage />} />
+            <Route path="/tickets/:id" element={<TicketDetailPage />} />
+            <Route path="/incidents" element={<IncidentListPage />} />
+            <Route path="/incidents/new" element={<NewIncidentPage />} />
+            <Route path="/incidents/:id" element={<IncidentDetailPage />} />
             <Route
               path="/reservations/*"
               element={<PlaceholderPage title="Reservations" spec="reservation-list" />}
