@@ -1,6 +1,6 @@
 interface Props {
   title: string;
-  /** Doc filename under pages/ on the docs site, e.g. "ticket-queue". */
+  /** Doc filename under docs/pages/, e.g. "ticket-queue". */
   spec?: string;
 }
 
@@ -18,7 +18,7 @@ export function PlaceholderPage({ title, spec }: Props) {
         {spec ? (
           <>
             {" "}
-            (<code>pages/{spec}.html</code> in the docs)
+            (<code>docs/pages/{spec}.html</code>)
           </>
         ) : null}
         {" "}— implementation is coming in a later increment.
