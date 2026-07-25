@@ -43,6 +43,10 @@ const _schema = i.schema({
     locationTypes: i.entity({
       name: i.string(),
       allowsReservations: i.boolean(),
+      // Optional (not required) so rows created before these flags existed
+      // stay valid; absent = false.
+      hasBoat: i.boolean().optional(),
+      hasVehicle: i.boolean().optional(),
     }),
     locations: i.entity({
       name: i.string(),
@@ -57,7 +61,16 @@ const _schema = i.schema({
       name: i.string(),
     }),
     locationMapPlacements: i.entity({
-      rect: i.json<{ x: number; y: number; width: number; height: number }>(),
+      // Center point + dimensions as percentages (0–100) of the map image,
+      // rotation in degrees clockwise — a plotted slip can sit at whatever
+      // angle the dock actually runs.
+      placement: i.json<{
+        cx: number;
+        cy: number;
+        width: number;
+        height: number;
+        rotation: number;
+      }>(),
     }),
     checkpoints: i.entity({
       name: i.string(),
@@ -197,6 +210,11 @@ const _schema = i.schema({
       registrationNumber: i.string().optional(),
       ownerOrder: i.json<string[]>().optional(), // contact ids, order of succession
     }),
+    vehicles: i.entity({
+      description: i.string(), // primary label — staff often know a vehicle by sight
+      plateNumber: i.string().indexed().optional(),
+      ownerOrder: i.json<string[]>().optional(), // contact ids, order of succession
+    }),
     leases: i.entity({
       startDate: i.date().indexed().optional(),
       endDate: i.date().indexed().optional(),
@@ -312,6 +330,11 @@ const _schema = i.schema({
       forward: { on: "locations", has: "one", label: "currentBoat" },
       reverse: { on: "boats", has: "one", label: "currentSlip" },
     },
+    locationCurrentVehicle: {
+      // Mirrors currentBoat for types with hasVehicle (RV sites, parking, mixed-use).
+      forward: { on: "locations", has: "one", label: "currentVehicle" },
+      reverse: { on: "vehicles", has: "one", label: "currentLocation" },
+    },
     marinaMapImage: {
       forward: { on: "marinaMaps", has: "one", label: "image" },
       reverse: { on: "$files", has: "one", label: "marinaMap" },
@@ -414,6 +437,10 @@ const _schema = i.schema({
       forward: { on: "notes", has: "one", label: "asset" },
       reverse: { on: "assets", has: "many", label: "notes" },
     },
+    noteVehicle: {
+      forward: { on: "notes", has: "one", label: "vehicle" },
+      reverse: { on: "vehicles", has: "many", label: "notes" },
+    },
 
     // incidents
     incidentType: {
@@ -447,6 +474,10 @@ const _schema = i.schema({
     incidentAsset: {
       forward: { on: "incidents", has: "one", label: "asset" },
       reverse: { on: "assets", has: "many", label: "incidents" },
+    },
+    incidentVehicle: {
+      forward: { on: "incidents", has: "one", label: "vehicle" },
+      reverse: { on: "vehicles", has: "many", label: "incidents" },
     },
     incidentCommentIncident: {
       forward: { on: "incidentComments", has: "one", label: "incident" },
@@ -489,6 +520,10 @@ const _schema = i.schema({
     ticketAsset: {
       forward: { on: "tickets", has: "one", label: "asset" },
       reverse: { on: "assets", has: "many", label: "tickets" },
+    },
+    ticketVehicle: {
+      forward: { on: "tickets", has: "one", label: "vehicle" },
+      reverse: { on: "vehicles", has: "many", label: "tickets" },
     },
 
     // assets
@@ -543,6 +578,10 @@ const _schema = i.schema({
     boatAuthorizedUsers: {
       forward: { on: "boats", has: "many", label: "authorizedUsers" },
       reverse: { on: "contacts", has: "many", label: "authorizedBoats" },
+    },
+    vehicleOwners: {
+      forward: { on: "vehicles", has: "many", label: "owners" },
+      reverse: { on: "contacts", has: "many", label: "ownedVehicles" },
     },
     contactMergedInto: {
       forward: { on: "contacts", has: "one", label: "mergedInto" },

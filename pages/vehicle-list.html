@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vehicle List — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Boats &amp; Vehicles · Page Specification</span>
+    <h1>Vehicle List</h1>
+    <p class="lede">Every vehicle kept at the marina — RVs, trailers, cars in leased or reserved spots — searchable by description, plate number, owner, or location.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached alongside <a href="boat-list.html">Boat list</a> from the Boats &amp; Vehicles top-level nav item. Vehicles follow the Boat pattern throughout (see <a href="../data-model.html">Data Model — Vehicle</a>): unrestricted visibility for the vehicle itself, with owner/contact detail gated by the same permissions as everywhere else.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Description</td><td>Vehicle.description</td><td>The primary label — staff often only know a vehicle by sight, so this is freeform (e.g. "White Ford F-250").</td></tr>
+      <tr><td>Plate number</td><td>Vehicle.plate_number</td><td>Nullable — not always readable or known; shown plainly as "—" when absent.</td></tr>
+      <tr><td>Current location</td><td>Vehicle.current_location</td><td>Nullable — a vehicle isn't required to have one (e.g. departed, or newly recorded before assignment).</td></tr>
+      <tr><td>Owner</td><td>Vehicle.owners[0] (first in succession order)</td><td>Name only requires <code>view_owner</code>; omitted entirely without it. Owners are optional — a vehicle's owner may not be known.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Open a vehicle</td><td>None</td><td>Navigates to <a href="vehicle-detail.html">Vehicle detail</a>.</td></tr>
+      <tr><td>Add a vehicle</td><td><code>edit_owner_contact</code></td><td>Same permission as boat creation, per the avoid-permission-bloat principle — vehicles are owner/contact-adjacent records exactly as boats are.</td></tr>
+      <tr><td>Search / filter</td><td>None</td><td>By description, plate number, owner (if <code>view_owner</code>), or location.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No <code>view_owner</code></strong> — the owner column is omitted entirely from the list, not shown blank.</li>
+      <li><strong>Vehicle with no owner recorded</strong> — shown plainly; ownership isn't always known and is never mandatory.</li>
+      <li><strong>Vehicle with no plate number</strong> — shown plainly with an em-dash; the description carries identification weight instead.</li>
+      <li><strong>Vehicle with no current location</strong> — shown with an empty location field, not hidden from the list.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: single searchable list. Desktop: sortable table with plate, location, and owner columns visible without opening each vehicle — matching <a href="boat-list.html">Boat list</a>.</p>
+
+    <div class="page-foot">
+      <a href="boat-detail.html">← Boat Detail</a>
+      <a href="vehicle-detail.html">Vehicle Detail →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>
