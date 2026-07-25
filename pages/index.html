@@ -41,7 +41,7 @@
     <p class="lede">A detailed spec for every screen in the application: purpose, data displayed, actions available, permission gating, and mobile/desktop behavior, grouped to match top-level navigation.</p>
 
     <div class="note">
-      <strong>Status.</strong> All 55 screens/dialogs across every group are written and linked below. Next: <a href="../wireframes/index.html">Wireframes</a>, sequenced after this set per its own note.
+      <strong>Status.</strong> All 57 screens/dialogs across every group are written and linked below. Next: <a href="../wireframes/index.html">Wireframes</a>, sequenced after this set per its own note.
     </div>
 
     <h2>Page list</h2>
@@ -111,10 +111,12 @@
       <strong>Map-plotting fully specified.</strong> <code>MarinaMap</code> (every map required to be scoped to a Location — no unscoped "master map" special case — with a marina's overview map scoped to a <strong>root Location</strong> representing the property itself, and multiple root Locations supported for marinas managing more than one property as one instance) and <code>LocationMapPlacement</code> (a join entity, since one Location can be plotted on multiple maps at different coordinates) back this screen's map view and the schematic map mode on <a href="location-list.html">Location list / map view</a> — one set of plotted rectangles, two different color overlays (reservation status here, occupancy/type there). Reservation eligibility is unrelated to any of this: it's the existing per-Location <code>reservation_enabled</code> toggle, which is what makes a mixed-use dock work (some Slips reservable short-term, others long-term leased, side by side — see <a href="../data-model.html">Data Model — Location</a>). The upload + plotting UI lives in Admin's <a href="admin-locations.html">Location Types &amp; Locations setup</a>.
     </div>
 
-    <h3>Boats</h3>
+    <h3>Boats &amp; Vehicles</h3>
     <ul>
       <li><a href="boat-list.html">Boat list</a></li>
       <li><a href="boat-detail.html">Boat detail</a> (owners, authorized users, current slip, lease link)</li>
+      <li><a href="vehicle-list.html">Vehicle list</a> (description, plate, owner, current location)</li>
+      <li><a href="vehicle-detail.html">Vehicle detail</a> (owners optional — a vehicle's owner may not be known)</li>
     </ul>
 
     <h3>Owners &amp; Contacts</h3>

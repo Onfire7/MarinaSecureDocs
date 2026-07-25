@@ -47,8 +47,9 @@
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Name, type, parent breadcrumb</td><td>Location.name/type/parent</td><td></td></tr>
       <tr><td>Status</td><td>Location.status</td><td>Plus an upcoming reservation shown alongside it if <code>reservation_enabled</code> — the reservation itself doesn't change this value until it activates, per <a href="../data-model.html">Data Model — Reservation</a>.</td></tr>
-      <tr><td>Current boat</td><td>Location.current_boat → Boat</td><td>Slip-type locations only; links to <a href="boat-detail.html">Boat detail</a>. Field is absent entirely for location types that don't carry a boat (e.g. a Building).</td></tr>
-      <tr><td>Owner / contact summary</td><td>Boat.owners, gated</td><td><code>view_owner</code> shows that an owner exists and their name; <code>view_contact</code> additionally reveals phone/email. Without <code>view_owner</code>, this section is omitted entirely rather than shown locked — matching the security-role variance described in <a href="../workflows.html">Role Workflows</a>.</td></tr>
+      <tr><td>Current boat</td><td>Location.current_boat → Boat</td><td>Shown only when <code>type.has_boat</code>; links to <a href="boat-detail.html">Boat detail</a>. The field is absent entirely for location types without the flag (e.g. a Building).</td></tr>
+      <tr><td>Current vehicle</td><td>Location.current_vehicle → Vehicle</td><td>Shown only when <code>type.has_vehicle</code>; links to <a href="vehicle-detail.html">Vehicle detail</a>. A type may carry both flags (mixed-use leased locations) — whichever occupant is present is shown.</td></tr>
+      <tr><td>Owner / contact summary</td><td>Boat.owners / Vehicle.owners, gated</td><td><code>view_owner</code> shows that an owner exists and their name; <code>view_contact</code> additionally reveals phone/email. Without <code>view_owner</code>, this section is omitted entirely rather than shown locked — matching the security-role variance described in <a href="../workflows.html">Role Workflows</a>.</td></tr>
       <tr><td>Lease summary</td><td>Lease (by Location)</td><td>Gated by <code>view_lease</code>; omitted entirely without it.</td></tr>
       <tr><td>Checkpoints at this location</td><td>Checkpoint.location</td><td>List, each linking to <a href="checkpoint-detail.html">Checkpoint detail</a>.</td></tr>
       <tr><td>Child locations</td><td>Location.parent (reverse)</td><td>e.g. a Dock's detail page lists its Slips.</td></tr>
@@ -71,8 +72,9 @@
 
     <h2>States &amp; edge cases</h2>
     <ul>
-      <li><strong>Vacant slip, no boat</strong> — current-boat field shows an empty state rather than being hidden, so it's clear the slip is simply unoccupied, not that the field doesn't apply.</li>
-      <li><strong>Location type without <code>current_boat</code> relevance</strong> — the field is omitted from the layout entirely for that type, not shown blank.</li>
+      <li><strong>Vacant slip/site, no occupant</strong> — the current-boat/current-vehicle field shows an empty state rather than being hidden, so it's clear the location is simply unoccupied, not that the field doesn't apply.</li>
+      <li><strong>Location type without <code>has_boat</code>/<code>has_vehicle</code></strong> — the corresponding field is omitted from the layout entirely for that type, not shown blank.</li>
+      <li><strong>Occupant with no known owner</strong> — a boat or vehicle can exist with no owners recorded (ownership isn't always known); the owner section is simply absent, same as when the viewer lacks <code>view_owner</code>.</li>
       <li><strong>Owner exists but user lacks <code>view_owner</code></strong> — the owner section doesn't appear at all; there's no indication to that user that an owner even exists, consistent with the permission's purpose.</li>
       <li><strong>Reservation upcoming but not yet active</strong> — shown as a distinct "upcoming" indicator next to (not replacing) the current status pill.</li>
     </ul>

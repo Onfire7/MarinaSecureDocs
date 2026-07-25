@@ -46,7 +46,6 @@
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Name &amp; location</td><td>Checkpoint.name, Checkpoint.location</td><td>Location links back to <a href="location-detail.html">Location detail</a>.</td></tr>
-      <tr><td>GUID URL</td><td>Checkpoint.guid_url</td><td>Copyable link; a QR preview of the same URL is shown alongside it (the physical tag/code is generated from this, not stored separately).</td></tr>
       <tr><td>GPS validation radius</td><td>Checkpoint.gps_validation_radius, falling back to MarinaSettings.gps_validation_radius_default</td><td>Shown with an indicator of whether this checkpoint overrides the marina default or inherits it.</td></tr>
       <tr><td>Applicable checklist templates</td><td>Checkpoint.checklist_templates</td><td>Each links to <a href="admin-checklist-templates.html">Admin → Checklist Templates</a>; shown with its trigger condition (time of day, season, etc.) so it's clear which applies when.</td></tr>
       <tr><td>Tours</td><td>Checkpoint.tours</td><td>Which Tours include this checkpoint, and each one's mode (Linear / Freeform / Randomized).</td></tr>
@@ -56,8 +55,7 @@
     <h2>Actions</h2>
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
-      <tr><td>Copy / share GUID URL</td><td>None</td><td>Copies the link — useful for re-printing a lost QR code via whatever process regenerates the physical tag.</td></tr>
-      <tr><td>Edit checkpoint configuration</td><td><code>manage_locations</code></td><td>Routes to <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>; this page itself has no inline edit form.</td></tr>
+      <tr><td>Edit checkpoint configuration</td><td><code>manage_locations</code></td><td>Routes to <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>; this page itself has no inline edit form. Copying/sharing the checkpoint's <code>guid_url</code> (e.g. to re-print a lost tag) lives there too, not on this reference view.</td></tr>
       <tr><td>View full check-in history</td><td>None beyond normal visibility</td><td>Routes to <a href="activity-log.html">Activity Log</a>, pre-filtered to this checkpoint, for anything beyond the short recent list shown here.</td></tr>
     </table>
 

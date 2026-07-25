@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vehicle Detail — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Boats &amp; Vehicles · Page Specification</span>
+    <h1>Vehicle Detail</h1>
+    <p class="lede">Everything about one vehicle — description, plate number, owners in succession order, and its current location.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="vehicle-list.html">Vehicle list</a>, <a href="location-detail.html">Location detail</a> (a site's current vehicle), or a Ticket/Incident/Note pointing at it. Mirrors <a href="boat-detail.html">Boat detail</a> structurally — a Vehicle is an attachment target like a Boat, per <a href="../data-model.html">Data Model</a>.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Description</td><td>Vehicle.description</td><td></td></tr>
+      <tr><td>Plate number</td><td>Vehicle.plate_number</td><td>Nullable; shown plainly when absent.</td></tr>
+      <tr><td>Owners</td><td>Vehicle.owners (ordered)</td><td>Requires <code>view_owner</code> for names; <code>view_contact</code> additionally for phone/email. Order shown explicitly as succession — who to contact first. Optional: the section is absent when no owners are recorded, identical to lacking the permission.</td></tr>
+      <tr><td>Current location</td><td>Vehicle.current_location</td><td>Links to <a href="location-detail.html">Location detail</a>; nullable.</td></tr>
+      <tr><td>Notes, incidents, tickets</td><td>attached_to = this Vehicle</td><td>Same gating as everywhere else these appear (incidents require <code>view_incidents</code>; tickets and notes unrestricted).</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Edit vehicle details</td><td><code>edit_owner_contact</code></td><td>Same permission as vehicle creation on <a href="vehicle-list.html">Vehicle list</a>.</td></tr>
+      <tr><td>Reassign current location</td><td><code>edit_owner_contact</code></td><td>Updates <code>Vehicle.current_location</code>; the move is preserved via the Activity Log rather than a location-history table, matching boats.</td></tr>
+      <tr><td>Add a note</td><td>Unrestricted</td><td>Opens <a href="new-note-dialog.html">New note dialog</a>, pre-attached to this Vehicle.</td></tr>
+      <tr><td>Log an incident</td><td><code>create_incidents</code></td><td>Opens <a href="new-incident-form.html">New incident form</a>, pre-attached.</td></tr>
+      <tr><td>Create a ticket</td><td>Unrestricted</td><td>Opens <a href="new-ticket-form.html">New ticket form</a>, pre-attached.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>No <code>view_owner</code>, or no owners recorded</strong> — the owners section is omitted either way; the UI doesn't distinguish "unknown owner" from "you can't see it."</li>
+      <li><strong>No current location</strong> — shown as an explicit "unassigned" state rather than an empty field, matching <a href="boat-detail.html">Boat detail</a>.</li>
+      <li><strong>Only a plate, or only a description</strong> — either alone is a valid record; a guard noting "trailer, no plate, by the fuel dock" is exactly the kind of partial information this entity exists to hold.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Mobile: sections stack vertically, collapsible. Desktop: sections visible together in a wider layout, matching <a href="boat-detail.html">Boat detail</a> and <a href="location-detail.html">Location detail</a>.</p>
+
+    <div class="page-foot">
+      <a href="vehicle-list.html">← Vehicle List</a>
+      <a href="contact-list.html">Owner / Contact List →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

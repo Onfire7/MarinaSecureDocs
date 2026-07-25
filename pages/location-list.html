@@ -53,7 +53,7 @@
       <tr><td>Type</td><td>Location.type → LocationType.name</td><td></td></tr>
       <tr><td>Parent breadcrumb</td><td>Location.parent, walked recursively</td><td>e.g. "Dock C → Slip 14."</td></tr>
       <tr><td>Status</td><td>Location.status</td><td>Occupied / Vacant / Reserved / Out of Service, plus admin-defined additions; shown as a colored pill in list mode and as each rectangle's/pin's color in both map modes.</td></tr>
-      <tr><td>Current boat</td><td>Location.current_boat → Boat.name</td><td>Slip-type locations only; nullable.</td></tr>
+      <tr><td>Current boat / vehicle</td><td>Location.current_boat → Boat.name; Location.current_vehicle → Vehicle.description</td><td>Only for location types carrying <code>has_boat</code> / <code>has_vehicle</code>; nullable.</td></tr>
       <tr><td>GPS pin</td><td>Location.gps_coordinates</td><td>Geographic map mode only; a location with no coordinates is omitted from that map but still appears in the list.</td></tr>
       <tr><td>Plotted rectangle</td><td>LocationMapPlacement.rect on the active MarinaMap</td><td>Schematic map mode only; a location not yet plotted on the currently-selected map is omitted from it but still appears in the list.</td></tr>
     </table>
