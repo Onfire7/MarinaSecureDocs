@@ -1,4 +1,4 @@
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { SignIn, useAuth, useSessionList } from "@clerk/clerk-react";
 import { db } from "../../lib/db";
 
@@ -9,10 +9,14 @@ export function SignInPage() {
   const { isLoaded, isSignedIn } = useAuth();
   const { sessions } = useSessionList();
   const marinaName = useMarinaName();
+  const [searchParams] = useSearchParams();
+  // A public deep link (e.g. a checkpoint scan) that required sign-in first
+  // resumes here afterward instead of always landing on the Dashboard.
+  const returnTo = searchParams.get("returnTo");
 
   // Already has a valid session → this screen is skipped entirely.
   if (isLoaded && isSignedIn) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={returnTo || "/"} replace />;
   }
 
   const hasOtherSessions = (sessions ?? []).length > 0;

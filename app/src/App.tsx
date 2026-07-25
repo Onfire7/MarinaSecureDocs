@@ -13,6 +13,10 @@ import { DashboardPage } from "./pages/home/DashboardPage";
 import { MorePage } from "./pages/shared/MorePage";
 import { PlaceholderPage } from "./pages/shared/PlaceholderPage";
 import { ConfigMissingPage } from "./pages/shared/ConfigMissingPage";
+import { ChecklistListPage } from "./pages/checklists/ChecklistListPage";
+import { ChecklistRoute } from "./pages/checklists/ChecklistRoute";
+import { TourProgressPage } from "./pages/checklists/TourProgressPage";
+import { CheckpointCheckinPage } from "./pages/checklists/CheckpointCheckinPage";
 
 export default function App() {
   const missing = missingConfig();
@@ -30,13 +34,15 @@ export default function App() {
         <Routes>
           <Route path="/sign-in" element={<SignInPage />} />
           <Route path="/switch-user" element={<UserSwitchPage />} />
+          {/* Public deep link (NFC/QR): handles its own auth gate so an
+              unauthenticated scan can detour through Sign In and resume. */}
+          <Route path="/checkin/:guidUrl" element={<CheckpointCheckinPage />} />
           <Route element={<RequireAuth />}>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/more" element={<MorePage />} />
-            <Route
-              path="/checklists/*"
-              element={<PlaceholderPage title="Checklists & Tours" spec="checklist-list" />}
-            />
+            <Route path="/checklists" element={<ChecklistListPage />} />
+            <Route path="/checklists/tours/:tourId" element={<TourProgressPage />} />
+            <Route path="/checklists/:id" element={<ChecklistRoute />} />
             <Route
               path="/locations/*"
               element={<PlaceholderPage title="Locations" spec="location-list" />}

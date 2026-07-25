@@ -39,9 +39,12 @@ src/
     auth/                Clerk↔Instant session sync, current-user resolution
   layout/AppShell.tsx    desktop sidenav / mobile tab-bar shell
   routes/nav.ts          top-level sections + permission gating
+  hooks/                 cross-page hooks (e.g. mobile-breakpoint detection)
   pages/
     access/              Sign In, User Switch
     home/                Dashboard + card registry
+    checklists/          Checklist list, Active/Detail checklist, Tours,
+                         Checkpoint check-in (+ manual dialog)
     shared/              placeholders, More menu, config screen
   styles/app.css         design tokens + component styles
 ```
@@ -51,8 +54,14 @@ src/
 - ✅ Foundation: schema, auth, permissions, shell, routing
 - ✅ Access group: Sign In, User Switch
 - ✅ Home group: Dashboard (role-adaptive cards, edit mode)
+- ✅ Checklists & Tours group: Checklist list (+ Tours tab/panel), Active
+  Checklist (all 5 item types incl. nested Location-Based Checks and inline
+  meter-based maintenance tickets), Checklist detail, Checkpoint check-in
+  (GPS-in-background, dedupe, tab-close), Manual check-in dialog, Tour
+  progress (Linear/Freeform/Randomized)
 - ⬜ Everything else renders a placeholder — see the docs' page-spec list for
-  the remaining groups (Checklists & Tours, Locations, Comms, Tickets,
-  Incidents, Reservations, Boats, Owners & Contacts, Assets, Activity Log,
-  Reports, Admin), plus InstantDB permission rules, Netlify Functions
-  (shift report + scheduled jobs), and Twilio Functions (telephony bridge).
+  the remaining groups (Locations, Comms, Tickets, Incidents, Reservations,
+  Boats, Owners & Contacts, Assets, Activity Log, Reports, Admin), plus
+  InstantDB permission rules, Netlify Functions (shift report + scheduled
+  jobs — including scheduled-trigger Checklist generation and time-based
+  maintenance rules), and Twilio Functions (telephony bridge).
