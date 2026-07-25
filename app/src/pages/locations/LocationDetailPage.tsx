@@ -1,0 +1,442 @@
+import { useState } from "react";
+import type { ReactNode } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { db, id } from "../../lib/db";
+import { useCurrent } from "../../lib/auth/CurrentUserContext";
+import { useIsMobile } from "../../hooks/useIsMobile";
+import {
+  STANDARD_STATUSES,
+  breadcrumb,
+  compareNames,
+  statusBadgeClass,
+  statusLabel,
+} from "../../lib/locations";
+
+// Locations — Location Detail (see pages/location-detail.html).
+// The hub for everything attached to one physical place. Owner, lease, and
+// incident sections are omitted entirely (never shown locked) when the
+// viewer lacks the gating permission.
+export function LocationDetailPage() {
+  const { id: locationId } = useParams();
+  const current = useCurrent();
+  const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const canManage = current.can("manage_locations");
+  const [showNoteDialog, setShowNoteDialog] = useState(false);
+
+  const { data } = db.useQuery(
+    locationId
+      ? {
+          locations: {
+            $: { where: { id: locationId } },
+            type: {},
+            parent: {},
+            children: { type: {} },
+            currentBoat: { owners: {} },
+            currentVehicle: { owners: {} },
+            checkpoints: {},
+            notes: { author: {} },
+            incidents: {},
+            tickets: {},
+            leases: { lessees: {} },
+            reservations: {
+              $: { where: { status: { $in: ["requested", "confirmed"] } } },
+              contact: {},
+            },
+          },
+        }
+      : null,
+  );
+  const location = data?.locations?.[0];
+
+  const { data: crumbData } = db.useQuery({ locations: { parent: {} } });
+  const byId = new Map(
+    (crumbData?.locations ?? []).map((l) => [
+      l.id,
+      { name: l.name, parent: l.parent ? { id: l.parent.id } : null },
+    ]),
+  );
+
+  if (!location) {
+    return (
+      <div className="placeholder">
+        <div className="big">Loading…</div>
+      </div>
+    );
+  }
+
+  const crumbs = breadcrumb(location.parent?.id, byId);
+  // Presence of the field is driven by the type's flags; an occupant that
+  // exists anyway (data predating a flag change) still shows.
+  const carriesBoat = Boolean(location.type?.hasBoat || location.currentBoat);
+  const carriesVehicle = Boolean(location.type?.hasVehicle || location.currentVehicle);
+  // Owner section reflects whichever occupant is present (boat first).
+  const owners = [
+    ...(location.currentBoat?.owners ?? []),
+    ...(location.currentVehicle?.owners ?? []),
+  ];
+  const now = Date.now();
+  const activeLease = (location.leases ?? []).find(
+    (l) =>
+      (!l.startDate || new Date(l.startDate).getTime() <= now) &&
+      (!l.endDate || new Date(l.endDate).getTime() >= now),
+  );
+  const upcoming = (location.reservations ?? [])
+    .filter((r) => r.expectedCheckin && new Date(r.expectedCheckin).getTime() > now - 24 * 3600_000)
+    .sort(
+      (a, b) =>
+        new Date(a.expectedCheckin!).getTime() - new Date(b.expectedCheckin!).getTime(),
+    )[0];
+
+  const setStatus = (status: string) => {
+    void db.transact(db.tx.locations[location.id].update({ status }));
+  };
+
+  const toggleReservations = () => {
+    const enabling = !location.reservationEnabled;
+    if (enabling && activeLease) {
+      const ok = window.confirm(
+        "This location has an active lease. Enabling reservations alongside a lease is allowed but unusual — continue?",
+      );
+      if (!ok) return;
+    }
+    void db.transact(
+      db.tx.locations[location.id].update({ reservationEnabled: enabling }),
+    );
+  };
+
+  const children = [...(location.children ?? [])].sort((a, b) =>
+    compareNames(a.name, b.name),
+  );
+
+  return (
+    <div>
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">{location.name}</h1>
+          <div className="page-sub">
+            {location.type?.name}
+            {crumbs.length > 0 && ` · ${crumbs.join(" → ")}`}
+          </div>
+        </div>
+        <div className="row">
+          <button type="button" className="btn btn-sm" onClick={() => setShowNoteDialog(true)}>
+            + Note
+          </button>
+          {current.can("create_incidents") && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => navigate("/incidents")}
+            >
+              + Incident
+            </button>
+          )}
+          <button type="button" className="btn btn-sm" onClick={() => navigate("/tickets")}>
+            + Ticket
+          </button>
+        </div>
+      </div>
+
+      <div className={isMobile ? undefined : "grid-2"}>
+        <div>
+          <div className="field">
+            <span className="field-label">Status</span>
+            <div className="field-value row">
+              {canManage ? (
+                <select
+                  className="select select-inline"
+                  value={location.status}
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  {[...new Set([...STANDARD_STATUSES, location.status])].map((s) => (
+                    <option key={s} value={s}>
+                      {statusLabel(s)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className={statusBadgeClass(location.status)}>
+                  {statusLabel(location.status)}
+                </span>
+              )}
+              {upcoming && (
+                <span className="badge badge-warn">
+                  Upcoming reservation{" "}
+                  {new Date(upcoming.expectedCheckin!).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {location.type?.allowsReservations && canManage && (
+            <div className="field">
+              <span className="field-label">Reservations</span>
+              <label className="row" style={{ cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={location.reservationEnabled}
+                  onChange={toggleReservations}
+                />
+                <span className="small">
+                  {location.reservationEnabled ? "Enabled" : "Disabled"} for this location
+                </span>
+              </label>
+            </div>
+          )}
+
+          {carriesBoat && (
+            <div className="field">
+              <span className="field-label">Current boat</span>
+              <div className="field-value">
+                {location.currentBoat ? (
+                  <Link to="/boats">{location.currentBoat.name}</Link>
+                ) : (
+                  <span className="muted">Vacant — no boat</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {carriesVehicle && (
+            <div className="field">
+              <span className="field-label">Current vehicle</span>
+              <div className="field-value">
+                {location.currentVehicle ? (
+                  <Link to="/boats">
+                    {location.currentVehicle.description}
+                    {location.currentVehicle.plateNumber
+                      ? ` · ${location.currentVehicle.plateNumber}`
+                      : ""}
+                  </Link>
+                ) : (
+                  <span className="muted">Vacant — no vehicle</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {current.can("view_owner") && owners.length > 0 && (
+            <div className="field">
+              <span className="field-label">Owner{owners.length > 1 ? "s" : ""}</span>
+              <div className="field-value">
+                {owners.map((o) => (
+                  <div key={o.id}>
+                    {o.name ?? "Unnamed contact"}
+                    {current.can("view_contact") && (
+                      <span className="muted small">
+                        {o.phone ? ` · ${o.phone}` : ""}
+                        {o.email ? ` · ${o.email}` : ""}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {current.can("view_lease") && activeLease && (
+            <div className="field">
+              <span className="field-label">Lease</span>
+              <div className="field-value">
+                {(activeLease.lessees ?? []).map((c) => c.name ?? "Unnamed").join(", ") ||
+                  "Lease on file"}
+                <span className="muted small">
+                  {activeLease.endDate
+                    ? ` · through ${new Date(activeLease.endDate).toLocaleDateString()}`
+                    : " · open-ended"}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="stack">
+          <Section title={`Checkpoints (${(location.checkpoints ?? []).length})`} isMobile={isMobile}>
+            {(location.checkpoints ?? []).map((cp) => (
+              <Link key={cp.id} to={`/locations/checkpoints/${cp.id}`} className="card" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                <span className="card-title">{cp.name}</span>
+              </Link>
+            ))}
+            {(location.checkpoints ?? []).length === 0 && (
+              <span className="muted small">
+                None here.
+                {canManage && (
+                  <>
+                    {" "}
+                    <Link to="/admin">Add one in Admin →</Link>
+                  </>
+                )}
+              </span>
+            )}
+          </Section>
+
+          {children.length > 0 && (
+            <Section title={`Contains (${children.length})`} isMobile={isMobile}>
+              {children.map((c) => (
+                <Link key={c.id} to={`/locations/${c.id}`} className="card spread" style={{ textDecoration: "none", color: "inherit" }}>
+                  <span className="card-title">{c.name}</span>
+                  <span className={statusBadgeClass(c.status)}>{statusLabel(c.status)}</span>
+                </Link>
+              ))}
+            </Section>
+          )}
+
+          <Section title={`Notes (${(location.notes ?? []).length})`} isMobile={isMobile}>
+            {[...(location.notes ?? [])]
+              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+              .map((n) => (
+                <div key={n.id} className="card">
+                  <div className="small">{n.body}</div>
+                  <div className="card-meta">
+                    {n.author?.name ?? "—"} ·{" "}
+                    {new Date(n.createdAt).toLocaleString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </div>
+                </div>
+              ))}
+            {(location.notes ?? []).length === 0 && (
+              <span className="muted small">No notes yet.</span>
+            )}
+          </Section>
+
+          {current.can("view_incidents") && (
+            <Section title={`Incidents (${(location.incidents ?? []).length})`} isMobile={isMobile}>
+              {(location.incidents ?? []).map((i) => (
+                <Link key={i.id} to="/incidents" className="card spread" style={{ textDecoration: "none", color: "inherit" }}>
+                  <span>{i.title}</span>
+                  <span className="badge">{statusLabel(i.status)}</span>
+                </Link>
+              ))}
+              {(location.incidents ?? []).length === 0 && (
+                <span className="muted small">No incidents.</span>
+              )}
+            </Section>
+          )}
+
+          <Section title={`Tickets (${(location.tickets ?? []).length})`} isMobile={isMobile}>
+            {(location.tickets ?? []).map((t) => (
+              <Link key={t.id} to="/tickets" className="card spread" style={{ textDecoration: "none", color: "inherit" }}>
+                <span>{t.title}</span>
+                <span
+                  className={
+                    t.priority === "urgent" || t.priority === "high"
+                      ? "badge badge-bad"
+                      : "badge"
+                  }
+                >
+                  {statusLabel(t.priority)}
+                </span>
+              </Link>
+            ))}
+            {(location.tickets ?? []).length === 0 && (
+              <span className="muted small">No tickets.</span>
+            )}
+          </Section>
+        </div>
+      </div>
+
+      {showNoteDialog && (
+        <NewNoteDialog
+          locationId={location.id}
+          locationName={location.name}
+          onClose={() => setShowNoteDialog(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Mobile collapses sections by default to keep the initial view scannable;
+// desktop shows everything at once (see spec — Mobile vs. desktop).
+function Section({
+  title,
+  isMobile,
+  children,
+}: {
+  title: string;
+  isMobile: boolean;
+  children: ReactNode;
+}) {
+  if (!isMobile) {
+    return (
+      <div>
+        <div className="section-title">{title}</div>
+        <div className="stack" style={{ gap: 8 }}>{children}</div>
+      </div>
+    );
+  }
+  return (
+    <details className="section-collapse">
+      <summary className="section-title">{title}</summary>
+      <div className="stack" style={{ gap: 8, marginTop: 8 }}>{children}</div>
+    </details>
+  );
+}
+
+// Minimal location-scoped note entry — the full shared New Note dialog (with
+// the attachment-target picker) arrives with the Shared dialogs group; this
+// one is always pre-attached to the current location.
+function NewNoteDialog({
+  locationId,
+  locationName,
+  onClose,
+}: {
+  locationId: string;
+  locationName: string;
+  onClose: () => void;
+}) {
+  const current = useCurrent();
+  const [body, setBody] = useState("");
+
+  const save = async () => {
+    await db.transact(
+      db.tx.notes[id()]
+        .update({ body: body.trim(), createdAt: Date.now() })
+        .link({
+          location: locationId,
+          ...(current.user ? { author: current.user.id } : {}),
+        }),
+    );
+    onClose();
+  };
+
+  return (
+    <div className="dialog-backdrop" onClick={onClose}>
+      <div className="dialog-card" onClick={(e) => e.stopPropagation()}>
+        <div className="card-title" style={{ marginBottom: 10 }}>
+          New note — {locationName}
+        </div>
+        <div className="field">
+          <textarea
+            className="textarea"
+            rows={4}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="What's worth noting about this location?"
+          />
+        </div>
+        <div className="row">
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!body.trim()}
+            onClick={() => void save()}
+          >
+            Save note
+          </button>
+          <button type="button" className="btn btn-quiet" onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

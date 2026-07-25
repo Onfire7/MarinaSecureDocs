@@ -17,6 +17,9 @@ import { ChecklistListPage } from "./pages/checklists/ChecklistListPage";
 import { ChecklistRoute } from "./pages/checklists/ChecklistRoute";
 import { TourProgressPage } from "./pages/checklists/TourProgressPage";
 import { CheckpointCheckinPage } from "./pages/checklists/CheckpointCheckinPage";
+import { LocationListPage } from "./pages/locations/LocationListPage";
+import { LocationDetailPage } from "./pages/locations/LocationDetailPage";
+import { CheckpointDetailPage } from "./pages/locations/CheckpointDetailPage";
 
 export default function App() {
   const missing = missingConfig();
@@ -43,10 +46,12 @@ export default function App() {
             <Route path="/checklists" element={<ChecklistListPage />} />
             <Route path="/checklists/tours/:tourId" element={<TourProgressPage />} />
             <Route path="/checklists/:id" element={<ChecklistRoute />} />
+            <Route path="/locations" element={<LocationListPage />} />
             <Route
-              path="/locations/*"
-              element={<PlaceholderPage title="Locations" spec="location-list" />}
+              path="/locations/checkpoints/:id"
+              element={<CheckpointDetailPage />}
             />
+            <Route path="/locations/:id" element={<LocationDetailPage />} />
             <Route
               path="/comms/*"
               element={<PlaceholderPage title="Comms" spec="comms-home" />}

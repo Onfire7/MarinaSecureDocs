@@ -689,3 +689,87 @@ h3 {
   border-color: var(--good);
   background: var(--good-bg);
 }
+
+/* ---------- Locations: maps ---------- */
+
+.map-canvas {
+  position: relative;
+  min-height: 340px;
+  background: var(--panel);
+  border: 1px solid var(--line-lt);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.map-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+}
+.map-schematic {
+  min-height: 0;
+}
+.map-rect {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-align: center;
+  border: 1.5px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 2px;
+  overflow: hidden;
+}
+.map-rect:hover {
+  outline: 2px solid var(--accent);
+}
+.map-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 650;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.map-pin:hover {
+  outline: 2px solid var(--accent);
+  z-index: 2;
+}
+
+/* ---------- Inline controls & collapsible sections ---------- */
+
+.select-inline {
+  width: auto;
+  font-size: 0.82rem;
+  padding: 4px 8px;
+}
+.section-collapse {
+  border: 1px solid var(--line-lt);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 10px 12px;
+}
+.section-collapse > summary {
+  cursor: pointer;
+  list-style: none;
+  margin-bottom: 0;
+}
+.section-collapse > summary::-webkit-details-marker {
+  display: none;
+}
+.section-collapse > summary::after {
+  content: "▸";
+  float: right;
+  color: var(--mute);
+}
+.section-collapse[open] > summary::after {
+  content: "▾";
+}
