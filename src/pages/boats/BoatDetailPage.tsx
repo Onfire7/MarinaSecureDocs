@@ -1,0 +1,270 @@
+import { useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { db } from "../../lib/db";
+import { useCurrent } from "../../lib/auth/CurrentUserContext";
+import { compareNames } from "../../lib/locations";
+import { OwnersSection } from "./OwnersSection";
+import { TargetActivity } from "../shared/TargetActivity";
+
+// Boats & Vehicles — Boat Detail (see docs/pages/boat-detail.html).
+// Owner/authorized-user sections require view_owner (omitted entirely
+// without it, or when no owners are recorded); edits and slip reassignment
+// require edit_owner_contact.
+export function BoatDetailPage() {
+  const { id: boatId } = useParams();
+  const current = useCurrent();
+  const canEdit = current.can("edit_owner_contact");
+  const [editing, setEditing] = useState(false);
+
+  const { data } = db.useQuery(
+    boatId
+      ? {
+          boats: {
+            $: { where: { id: boatId } },
+            owners: {},
+            authorizedUsers: {},
+            currentSlip: { leases: { lessees: {} }, type: {} },
+            notes: { author: {} },
+            incidents: {},
+            tickets: {},
+          },
+          locations: { $: { where: { "type.hasBoat": true } } },
+        }
+      : null,
+  );
+  const boat = data?.boats?.[0];
+  const slipOptions = [...(data?.locations ?? [])].sort((a, b) =>
+    compareNames(a.name, b.name),
+  );
+
+  if (!boat) {
+    return (
+      <div className="placeholder">
+        <div className="big">Loading…</div>
+      </div>
+    );
+  }
+
+  const now = Date.now();
+  const activeLease = (boat.currentSlip?.leases ?? []).find(
+    (l) =>
+      (!l.startDate || new Date(l.startDate).getTime() <= now) &&
+      (!l.endDate || new Date(l.endDate).getTime() >= now),
+  );
+
+  const reassignSlip = (locationId: string) => {
+    if (!locationId) return;
+    // The move is preserved via the Activity Log rather than a history table.
+    void db.transact(db.tx.boats[boat.id].link({ currentSlip: locationId }));
+  };
+  const clearSlip = () => {
+    if (!boat.currentSlip) return;
+    void db.transact(db.tx.boats[boat.id].unlink({ currentSlip: boat.currentSlip.id }));
+  };
+
+  return (
+    <div>
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">{boat.name}</h1>
+          <div className="page-sub">
+            {[boat.make, boat.model, boat.length ? `${boat.length} ft` : null]
+              .filter(Boolean)
+              .join(" · ") || "No make/model recorded"}
+            {boat.registrationNumber && ` · Reg ${boat.registrationNumber}`}
+          </div>
+        </div>
+        {canEdit && !editing && (
+          <button type="button" className="btn btn-sm" onClick={() => setEditing(true)}>
+            Edit
+          </button>
+        )}
+      </div>
+
+      <div className="grid-2">
+        <div className="stack">
+          {editing ? (
+            <EditBoat
+              boat={boat}
+              onDone={() => setEditing(false)}
+            />
+          ) : (
+            boat.description && (
+              <div className="card">
+                <div className="small" style={{ whiteSpace: "pre-wrap" }}>{boat.description}</div>
+              </div>
+            )
+          )}
+
+          <div className="field">
+            <span className="field-label">Current slip</span>
+            <div className="field-value row">
+              {boat.currentSlip ? (
+                <Link to={`/locations/${boat.currentSlip.id}`}>{boat.currentSlip.name}</Link>
+              ) : (
+                <span className="muted">Unassigned</span>
+              )}
+              {canEdit && (
+                <>
+                  <select
+                    className="select select-inline"
+                    value=""
+                    onChange={(e) => reassignSlip(e.target.value)}
+                  >
+                    <option value="">Reassign…</option>
+                    {slipOptions
+                      .filter((l) => l.id !== boat.currentSlip?.id)
+                      .map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.name}
+                        </option>
+                      ))}
+                  </select>
+                  {boat.currentSlip && (
+                    <button type="button" className="btn btn-sm btn-quiet" onClick={clearSlip}>
+                      Haul out
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
+          {current.can("view_lease") && activeLease && (
+            <div className="field">
+              <span className="field-label">Lease</span>
+              <div className="field-value">
+                {(activeLease.lessees ?? []).map((c) => c.name ?? "Unnamed").join(", ") ||
+                  "Lease on file"}
+                <span className="muted small">
+                  {activeLease.endDate
+                    ? ` · through ${new Date(activeLease.endDate).toLocaleDateString()}`
+                    : " · open-ended"}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {current.can("view_owner") && (
+            <>
+              <OwnersSection
+                entityType="boats"
+                entityId={boat.id}
+                owners={boat.owners ?? []}
+                ownerOrder={boat.ownerOrder}
+              />
+              {(boat.authorizedUsers ?? []).length > 0 && (
+                <div>
+                  <div className="section-title">Authorized users</div>
+                  <div className="stack" style={{ gap: 6 }}>
+                    {(boat.authorizedUsers ?? []).map((c) => (
+                      <div key={c.id} className="card">
+                        {c.name ?? "Unnamed contact"}
+                        {current.can("view_contact") && (
+                          <span className="muted small">
+                            {c.phone ? ` · ${c.phone}` : ""}
+                            {c.email ? ` · ${c.email}` : ""}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <TargetActivity
+          target={{ type: "boat", id: boat.id, label: boat.name }}
+          notes={boat.notes ?? []}
+          incidents={boat.incidents ?? []}
+          tickets={boat.tickets ?? []}
+        />
+      </div>
+    </div>
+  );
+}
+
+function EditBoat({
+  boat,
+  onDone,
+}: {
+  boat: {
+    id: string;
+    name: string;
+    description?: string | null;
+    make?: string | null;
+    model?: string | null;
+    length?: number | null;
+    registrationNumber?: string | null;
+  };
+  onDone: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: boat.name,
+    description: boat.description ?? "",
+    make: boat.make ?? "",
+    model: boat.model ?? "",
+    length: boat.length != null ? String(boat.length) : "",
+    registrationNumber: boat.registrationNumber ?? "",
+  });
+
+  const save = async () => {
+    await db.transact(
+      db.tx.boats[boat.id].update({
+        name: form.name.trim(),
+        description: form.description.trim() || undefined,
+        make: form.make.trim() || undefined,
+        model: form.model.trim() || undefined,
+        length: form.length === "" ? undefined : Number(form.length),
+        registrationNumber: form.registrationNumber.trim() || undefined,
+      }),
+    );
+    onDone();
+  };
+
+  const field = (label: string, key: keyof typeof form, type = "text") => (
+    <div className="field">
+      <span className="field-label">{label}</span>
+      <input
+        className="input"
+        type={type}
+        value={form[key]}
+        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+      />
+    </div>
+  );
+
+  return (
+    <div className="card">
+      {field("Name", "name")}
+      {field("Make", "make")}
+      {field("Model", "model")}
+      {field("Length (ft)", "length", "number")}
+      {field("Registration number", "registrationNumber")}
+      <div className="field">
+        <span className="field-label">Description</span>
+        <textarea
+          className="textarea"
+          rows={3}
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+        />
+      </div>
+      <div className="row">
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          disabled={!form.name.trim()}
+          onClick={() => void save()}
+        >
+          Save
+        </button>
+        <button type="button" className="btn btn-quiet btn-sm" onClick={onDone}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}

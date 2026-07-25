@@ -207,7 +207,9 @@ export function LocationDetailPage() {
               <span className="field-label">Current boat</span>
               <div className="field-value">
                 {location.currentBoat ? (
-                  <Link to="/boats">{location.currentBoat.name}</Link>
+                  <Link to={`/boats/${location.currentBoat.id}`}>
+                    {location.currentBoat.name}
+                  </Link>
                 ) : (
                   <span className="muted">Vacant — no boat</span>
                 )}
@@ -220,7 +222,7 @@ export function LocationDetailPage() {
               <span className="field-label">Current vehicle</span>
               <div className="field-value">
                 {location.currentVehicle ? (
-                  <Link to="/boats">
+                  <Link to={`/vehicles/${location.currentVehicle.id}`}>
                     {location.currentVehicle.description}
                     {location.currentVehicle.plateNumber
                       ? ` · ${location.currentVehicle.plateNumber}`
