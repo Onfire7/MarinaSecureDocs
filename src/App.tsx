@@ -71,9 +71,10 @@ export default function App() {
         <Routes>
           <Route path="/sign-in" element={<SignInPage />} />
           <Route path="/switch-user" element={<UserSwitchPage />} />
-          {/* Public deep link (NFC/QR): handles its own auth gate so an
-              unauthenticated scan can detour through Sign In and resume. */}
-          <Route path="/checkin/:guidUrl" element={<CheckpointCheckinPage />} />
+          {/* Public deep link (NFC/QR): sits outside RequireAuth so an
+              unauthenticated scan still resolves, but supplies the
+              current-user context the check-in write needs. */}
+          <Route path="/checkin/:guidUrl" element={<CheckinRoute />} />
           <Route element={<RequireAuth />}>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/more" element={<MorePage />} />
@@ -134,6 +135,49 @@ export default function App() {
       </BrowserRouter>
     </ClerkProvider>
   );
+}
+
+/**
+ * Auth gate for the checkpoint deep link. Same Clerk requirement as the rest
+ * of the app, but it redirects through Sign In carrying a returnTo so the
+ * scan resumes afterward, rather than dumping the guard on the dashboard.
+ */
+function CheckinRoute() {
+  const { isLoaded, isSignedIn } = useAuth();
+  if (!isLoaded) return <Splash />;
+  if (!isSignedIn) {
+    const returnTo = `${window.location.pathname}${window.location.search}`;
+    return (
+      <Navigate to={`/sign-in?returnTo=${encodeURIComponent(returnTo)}`} replace />
+    );
+  }
+  return (
+    <CurrentUserProvider>
+      <CheckinGate />
+    </CurrentUserProvider>
+  );
+}
+
+// A Clerk identity with no marina User record can't be the author of a
+// check-in, so say so plainly instead of silently recording nothing.
+function CheckinGate() {
+  const current = useCurrent();
+  if (current.isLoading) return <Splash />;
+  if (current.unprovisioned) {
+    return (
+      <div className="auth-screen">
+        <div className="auth-brand">
+          <div className="marina-name">Unable to check in</div>
+          <div className="product">MarinaSecure</div>
+        </div>
+        <p className="muted" style={{ maxWidth: 380, textAlign: "center" }}>
+          This account can't access this marina, so the check-in wasn't
+          recorded. Check with a manager.
+        </p>
+      </div>
+    );
+  }
+  return <CheckpointCheckinPage />;
 }
 
 // Gate: Clerk session required, then the marina User record must resolve.

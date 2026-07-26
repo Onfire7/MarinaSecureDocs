@@ -1,26 +1,23 @@
 import { useEffect, useRef } from "react";
-import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useAuth } from "@clerk/clerk-react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { db } from "../../lib/db";
 import { useCheckpointVisit } from "./useCheckpointVisit";
 
 const IDLE_TIMEOUT_MS = 10 * 60_000;
 
 // Checklists & Tours — Checkpoint Check-In (see pages/checkpoint-checkin.html).
-// What a checkpoint's NFC/QR guid_url opens. Sits outside the normal
-// authenticated route tree since it's a public deep link — an unauthenticated
-// visit detours through Sign In / User Switch and resumes here afterward.
+// What a checkpoint's NFC/QR guid_url opens. CheckinRoute in App.tsx has
+// already established the Clerk session and the current-user context by the
+// time this renders — an unauthenticated scan detours through Sign In there
+// and resumes here afterward.
 export function CheckpointCheckinPage() {
   const { guidUrl } = useParams();
-  const { isLoaded, isSignedIn } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const resumeCheckInId = searchParams.get("checkin") ?? undefined;
 
   const { data, isLoading: cpLoading } = db.useQuery(
-    guidUrl && isSignedIn
-      ? { checkpoints: { $: { where: { guidUrl } }, location: {} } }
-      : null,
+    guidUrl ? { checkpoints: { $: { where: { guidUrl } }, location: {} } } : null,
   );
   const checkpoint = data?.checkpoints?.[0];
 
@@ -42,15 +39,6 @@ export function CheckpointCheckinPage() {
 
   const done = visit.allTriggeredComplete || visit.hasNoApplicable;
   useCloseWhenDone(done);
-
-  if (!isLoaded) return null;
-
-  if (!isSignedIn) {
-    const returnTo = `${window.location.pathname}${window.location.search}`;
-    return <Navigate to={`/sign-in?returnTo=${encodeURIComponent(returnTo)}`} replace />;
-  }
-
-  if (!guidUrl) return null;
 
   if (cpLoading) {
     return (
