@@ -4,6 +4,7 @@ import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { rangesOverlap } from "../../lib/reservations";
 import { activityTx } from "../../lib/activityLog";
+import { LocationPicker } from "../shared/LocationPicker";
 
 export interface NewReservationState {
   targetKind?: "location" | "asset";
@@ -38,7 +39,11 @@ export function NewReservationPage() {
   const [saving, setSaving] = useState(false);
 
   const { data } = db.useQuery({
-    locations: { $: { where: { reservationEnabled: true } }, type: {} },
+    locations: {
+      $: { where: { reservationEnabled: true } },
+      type: {},
+      parent: {},
+    },
     assets: { $: { where: { reservationEnabled: true } } },
     contacts: {},
     marinaSettings: {},
@@ -186,28 +191,33 @@ export function NewReservationPage() {
       </div>
 
       <div className="field">
-        <span className="field-label">Target — reservable locations & assets only</span>
+        <span className="field-label">Location — reservable only</span>
+        {/* Path-aware search: "Slip 14" exists on every dock, so the
+            ancestor path is what disambiguates. */}
+        <LocationPicker
+          locations={locations}
+          value={targetKind === "location" ? (targetId ?? "") : ""}
+          onChange={(locationId) =>
+            setTargetKey(locationId ? `location:${locationId}` : "")
+          }
+          allowNone={false}
+          placeholder="Search reservable locations…"
+        />
+      </div>
+
+      <div className="field">
+        <span className="field-label">…or a reservable asset</span>
         <select
           className="select"
-          value={targetKey}
+          value={targetKind === "asset" ? targetKey : ""}
           onChange={(e) => setTargetKey(e.target.value)}
         >
-          <option value="">Select…</option>
-          <optgroup label="Locations">
-            {locations.map((l) => (
-              <option key={l.id} value={`location:${l.id}`}>
-                {l.name}
-                {l.type?.name ? ` (${l.type.name})` : ""}
-              </option>
-            ))}
-          </optgroup>
-          <optgroup label="Assets">
-            {assets.map((a) => (
-              <option key={a.id} value={`asset:${a.id}`}>
-                {a.name}
-              </option>
-            ))}
-          </optgroup>
+          <option value="">Select an asset…</option>
+          {assets.map((a) => (
+            <option key={a.id} value={`asset:${a.id}`}>
+              {a.name}
+            </option>
+          ))}
         </select>
       </div>
 

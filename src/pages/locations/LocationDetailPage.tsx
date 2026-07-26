@@ -177,16 +177,19 @@ export function LocationDetailPage() {
 
       <div className={isMobile ? undefined : "grid-2"}>
         <div>
+          {location.type?.tracksStatus && (
           <div className="field">
             <span className="field-label">Status</span>
             <div className="field-value row">
               {canManage ? (
                 <select
                   className="select select-inline"
-                  value={location.status}
+                  value={location.status ?? "vacant"}
                   onChange={(e) => setStatus(e.target.value)}
                 >
-                  {[...new Set([...STANDARD_STATUSES, location.status])].map((s) => (
+                  {[
+                    ...new Set([...STANDARD_STATUSES, location.status ?? "vacant"]),
+                  ].map((s) => (
                     <option key={s} value={s}>
                       {statusLabel(s)}
                     </option>
@@ -208,6 +211,7 @@ export function LocationDetailPage() {
               )}
             </div>
           </div>
+          )}
 
           {location.type?.allowsReservations && canManage && (
             <div className="field">
@@ -362,7 +366,11 @@ export function LocationDetailPage() {
               {children.map((c) => (
                 <Link key={c.id} to={`/locations/${c.id}`} className="card spread" style={{ textDecoration: "none", color: "inherit" }}>
                   <span className="card-title">{c.name}</span>
-                  <span className={statusBadgeClass(c.status)}>{statusLabel(c.status)}</span>
+                  {c.type?.tracksStatus && (
+                    <span className={statusBadgeClass(c.status)}>
+                      {statusLabel(c.status)}
+                    </span>
+                  )}
                 </Link>
               ))}
             </Section>

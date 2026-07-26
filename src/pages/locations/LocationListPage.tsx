@@ -25,11 +25,11 @@ type ViewMode = "list" | "pins" | "schematic";
 type LocationRow = {
   id: string;
   name: string;
-  status: string;
+  status?: string;
   reservationEnabled: boolean;
   gpsLat?: number;
   gpsLng?: number;
-  type?: { id: string; name: string } | null;
+  type?: { id: string; name: string; tracksStatus?: boolean } | null;
   parent?: { id: string } | null;
   currentBoat?: { id: string; name: string } | null;
   currentVehicle?: { id: string; description: string } | null;
@@ -58,7 +58,7 @@ export function LocationListPage() {
 
   const statuses = useMemo(() => {
     const set = new Set<string>(STANDARD_STATUSES);
-    for (const l of locations) set.add(l.status);
+    for (const l of locations) if (l.status) set.add(l.status);
     return [...set];
   }, [locations]);
 
@@ -262,14 +262,16 @@ function LocationCard({
         </div>
       </div>
       <div className="row">
-        {canManage ? (
+        {!location.type?.tracksStatus ? null : canManage ? (
           <select
             className="select select-inline"
-            value={location.status}
+            value={location.status ?? "vacant"}
             onClick={(e) => e.stopPropagation()}
             onChange={(e) => setStatus(e.target.value)}
           >
-            {[...new Set([...STANDARD_STATUSES, location.status])].map((s) => (
+            {[
+              ...new Set([...STANDARD_STATUSES, location.status ?? "vacant"]),
+            ].map((s) => (
               <option key={s} value={s}>
                 {statusLabel(s)}
               </option>

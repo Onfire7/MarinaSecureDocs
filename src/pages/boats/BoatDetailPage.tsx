@@ -5,6 +5,7 @@ import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { compareNames } from "../../lib/locations";
 import { OwnersSection } from "./OwnersSection";
 import { TargetActivity } from "../shared/TargetActivity";
+import { LocationPicker } from "../shared/LocationPicker";
 import { activityTx } from "../../lib/activityLog";
 
 // Boats & Vehicles — Boat Detail (see docs/pages/boat-detail.html).
@@ -30,7 +31,7 @@ export function BoatDetailPage() {
             incidents: {},
             tickets: {},
           },
-          locations: { $: { where: { "type.hasBoat": true } } },
+          locations: { $: { where: { "type.hasBoat": true } }, parent: {}, type: {} },
           marinaSettings: {},
         }
       : null,
@@ -160,20 +161,15 @@ export function BoatDetailPage() {
               )}
               {canEdit && (
                 <>
-                  <select
-                    className="select select-inline"
-                    value=""
-                    onChange={(e) => reassignSlip(e.target.value)}
-                  >
-                    <option value="">Reassign…</option>
-                    {slipOptions
-                      .filter((l) => l.id !== boat.currentSlip?.id)
-                      .map((l) => (
-                        <option key={l.id} value={l.id}>
-                          {l.name}
-                        </option>
-                      ))}
-                  </select>
+                  <div style={{ minWidth: 240 }}>
+                    <LocationPicker
+                      locations={slipOptions}
+                      value=""
+                      onChange={reassignSlip}
+                      allowNone={false}
+                      placeholder="Reassign to a slip…"
+                    />
+                  </div>
                   {boat.currentSlip && (
                     <button
                       type="button"

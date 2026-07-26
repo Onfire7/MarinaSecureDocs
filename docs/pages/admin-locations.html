@@ -48,6 +48,7 @@
       <tr><td>Name</td><td>LocationType.name</td><td>e.g. "Dock," "Slip," "Cabin," "Building," "RV Site" — not a fixed list.</td></tr>
       <tr><td>Valid parent types</td><td>LocationType.valid_parent_types</td><td>Which type(s) this type may nest under; a type may allow more than one.</td></tr>
       <tr><td>Allows reservations</td><td>LocationType.allows_reservations</td><td>The type-level capability flag — whether Locations of this type <em>can</em> be made reservation-enabled at all, per <a href="../data-model.html">Data Model</a>.</td></tr>
+      <tr><td>Tracks status</td><td>LocationType.tracks_status</td><td>Whether Locations of this type carry an occupancy status. Off for organizational containers (a root property, a dock that only groups slips) so they never display or offer a meaningless "Vacant."</td></tr>
     </table>
 
     <h2>Locations</h2>
@@ -73,7 +74,8 @@
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
       <tr><td>Create / edit a LocationType</td><td><code>manage_locations</code></td><td></td></tr>
-      <tr><td>Create / edit a Location</td><td><code>manage_locations</code></td><td>Including the reservation toggle and post-reservation status.</td></tr>
+      <tr><td>Create / edit a Location</td><td><code>manage_locations</code></td><td>Including status (only for types that track it), the reservation toggle, and post-reservation status. Selecting a location in the list opens its settings and its children together, rather than requiring a separate edit affordance.</td></tr>
+      <tr><td>Create many Locations at once</td><td><code>manage_locations</code></td><td>A newline-separated name list creates one Location per line under a shared type and parent. A name generator composes that list from prefix(es), a numeric or alphabetic counter, and suffix(es) — e.g. <code>BH-A-5L</code> through <code>BH-A-10R</code> — with a live preview; accepting it fills the name list, which stays freely editable so gaps in a series can be removed before creating.</td></tr>
       <tr><td>Add / edit a Checkpoint</td><td><code>manage_locations</code></td><td>GUID URL is generated automatically on creation, not user-entered; GPS radius override defaults to the marina-wide default from <a href="admin-marina-settings.html">Marina Settings</a>. This is also the only place the GUID URL can be copied/shared (e.g. to re-generate a lost NFC tag or QR sticker) — it isn't exposed on <a href="checkpoint-detail.html">Checkpoint detail</a>.</td></tr>
       <tr><td>Upload a map</td><td><code>manage_locations</code></td><td>Creates a <code>MarinaMap</code>; the upload form requires picking a Location to scope it to before the upload completes — there's no way to create an unscoped map. Any Location can be picked, but a root Location (no parent) is the natural choice for an overview map.</td></tr>
       <tr><td>Plot a Location on a map</td><td><code>manage_locations</code></td><td>Drag-and-place (or click-and-resize) a rectangle; creates/updates the corresponding <code>LocationMapPlacement</code>.</td></tr>

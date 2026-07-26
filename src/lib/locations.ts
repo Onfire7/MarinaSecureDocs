@@ -14,14 +14,16 @@ export const STANDARD_STATUSES = [
 // per-location override is set (see docs: data-model.html — Location).
 export const DEFAULT_POST_RESERVATION_STATUS = "needs_cleaning";
 
-export function statusLabel(status: string): string {
+// Status is absent entirely for types that don't track it (containers, roots).
+export function statusLabel(status: string | null | undefined): string {
+  if (!status) return "—";
   return status
     .split("_")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
 }
 
-export function statusBadgeClass(status: string): string {
+export function statusBadgeClass(status: string | null | undefined): string {
   switch (status) {
     case "occupied":
       return "badge badge-bad";
@@ -39,7 +41,7 @@ export function statusBadgeClass(status: string): string {
 
 // Rect/pin fill colors for the two map modes, keyed to the same semantics
 // as the status badges.
-export function statusMapColors(status: string): {
+export function statusMapColors(status: string | null | undefined): {
   background: string;
   border: string;
 } {

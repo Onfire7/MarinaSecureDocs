@@ -315,7 +315,7 @@ function CalendarView({ reservations }: { reservations: ReservationRow[] }) {
 type WeekLocation = {
   id: string;
   name: string;
-  status: string;
+  status?: string;
   postReservationStatus?: string | null;
 };
 

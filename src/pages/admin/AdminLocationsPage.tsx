@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { db, id } from "../../lib/db";
 import { compareNames, statusLabel, STANDARD_STATUSES, DEFAULT_POST_RESERVATION_STATUS } from "../../lib/locations";
 import { LocationPicker, type PickerLocation } from "../shared/LocationPicker";
+import { NameGeneratorDialog } from "./NameGeneratorDialog";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
 
@@ -93,6 +94,7 @@ function TypesTab() {
         allowsReservations: false,
         hasBoat: false,
         hasVehicle: false,
+        tracksStatus: false,
       }),
     );
     setName("");
@@ -155,6 +157,7 @@ function TypesTab() {
               <div className="row" style={{ flexWrap: "wrap", marginTop: 8 }}>
                 {(
                   [
+                    ["tracksStatus", "Tracks occupancy status"],
                     ["allowsReservations", "Can accept reservations"],
                     ["hasBoat", "Holds a boat"],
                     ["hasVehicle", "Holds a vehicle"],
@@ -334,10 +337,16 @@ function LocationsTab() {
           childCount={descendantCount.get(l.id) ?? 0}
           hasChildren={kids.length > 0}
           isOpen={isOpen}
-          onToggleOpen={() => toggleOpen(l.id)}
           highlighted={matchIds.has(l.id)}
           expanded={editing === l.id}
-          onToggle={() => setEditing(editing === l.id ? null : l.id)}
+          onSelect={() => {
+            // Selecting a location reveals both its settings and its
+            // children — no separate edit affordance to hunt for.
+            const nowEditing = editing === l.id ? null : l.id;
+            setEditing(nowEditing);
+            if (nowEditing && kids.length > 0 && !openIds.has(l.id)) toggleOpen(l.id);
+            if (!nowEditing && openIds.has(l.id)) toggleOpen(l.id);
+          }}
         />
         {isOpen && kids.map((k) => renderNode(k, depth + 1))}
       </div>
@@ -413,13 +422,18 @@ function LocationsTab() {
 type LocationRowType = {
   id: string;
   name: string;
-  status: string;
+  status?: string;
   reservationEnabled: boolean;
   reservationVisibility?: string | null;
   postReservationStatus?: string | null;
   gpsLat?: number;
   gpsLng?: number;
-  type?: { id: string; name: string; allowsReservations?: boolean } | null;
+  type?: {
+    id: string;
+    name: string;
+    allowsReservations?: boolean;
+    tracksStatus?: boolean;
+  } | null;
   parent?: { id: string; name: string } | null;
   checkpoints?: { id: string; name: string; guidUrl: string; gpsValidationRadius?: number }[];
 };
@@ -432,28 +446,32 @@ function LocationRow({
   childCount,
   hasChildren,
   isOpen,
-  onToggleOpen,
   highlighted,
   expanded,
-  onToggle,
+  onSelect,
 }: {
   location: LocationRowType;
-  types: { id: string; name: string; allowsReservations?: boolean }[];
+  types: {
+    id: string;
+    name: string;
+    allowsReservations?: boolean;
+    tracksStatus?: boolean;
+  }[];
   allLocations: PickerLocation[];
   depth: number;
   childCount: number;
   hasChildren: boolean;
   isOpen: boolean;
-  onToggleOpen: () => void;
   highlighted: boolean;
   expanded: boolean;
-  onToggle: () => void;
+  onSelect: () => void;
 }) {
   const update = (fields: Record<string, unknown>) =>
     void db.transact(db.tx.locations[location.id].update(fields));
 
-  const typeAllowsReservations = types.find((t) => t.id === location.type?.id)
-    ?.allowsReservations;
+  const locationType = types.find((t) => t.id === location.type?.id);
+  const typeAllowsReservations = locationType?.allowsReservations;
+  const tracksStatus = Boolean(locationType?.tracksStatus ?? location.type?.tracksStatus);
 
   const addCheckpoint = async () => {
     const name = window.prompt("Checkpoint name:");
@@ -479,36 +497,25 @@ function LocationRow({
       className={"card tree-row" + (highlighted ? " tree-match" : "")}
       style={{ marginLeft: depth * 22 }}
     >
-      <div className="spread" style={{ flexWrap: "wrap" }}>
-        <div className="row" style={{ minWidth: 0 }}>
-          {/* Only branches get a chevron; leaves keep the same indent. */}
-          {hasChildren ? (
-            <button
-              type="button"
-              className="tree-toggle"
-              onClick={onToggleOpen}
-              aria-label={isOpen ? "Collapse" : "Expand"}
-            >
-              {isOpen ? "▾" : "▸"}
-            </button>
-          ) : (
-            <span className="tree-toggle tree-leaf" />
-          )}
-          <div style={{ minWidth: 0 }}>
-            <div className="card-title">{location.name}</div>
-            <div className="card-meta">
-              {location.type?.name ?? "No type"} · {statusLabel(location.status)}
+      <button type="button" className="tree-head" onClick={onSelect}>
+        <span className="row" style={{ minWidth: 0 }}>
+          {/* Indicator, not a separate control — the whole row toggles. */}
+          <span className="tree-toggle" aria-hidden="true">
+            {hasChildren ? (expanded || isOpen ? "▾" : "▸") : ""}
+          </span>
+          <span style={{ minWidth: 0 }}>
+            <span className="card-title">{location.name}</span>
+            <span className="card-meta" style={{ display: "block" }}>
+              {location.type?.name ?? "No type"}
+              {tracksStatus && ` · ${statusLabel(location.status)}`}
               {/* Say what's inside before you open it. */}
               {hasChildren && ` · ${childCount} inside`}
               {(location.checkpoints ?? []).length > 0 &&
                 ` · ${(location.checkpoints ?? []).length} checkpoint(s)`}
-            </div>
-          </div>
-        </div>
-        <button type="button" className="btn btn-sm btn-quiet" onClick={onToggle}>
-          {expanded ? "Done" : "Edit"}
-        </button>
-      </div>
+            </span>
+          </span>
+        </span>
+      </button>
 
       {expanded && (
         <div style={{ marginTop: 12 }}>
@@ -522,6 +529,27 @@ function LocationRow({
                   onChange={(e) => update({ name: e.target.value })}
                 />
               </div>
+              {/* Containers and roots have no meaningful occupancy, so the
+                  control is absent rather than showing a misleading value. */}
+              {tracksStatus && (
+                <div className="field">
+                  <span className="field-label">Status</span>
+                  <select
+                    className="select select-inline"
+                    value={location.status ?? "vacant"}
+                    onChange={(e) => update({ status: e.target.value })}
+                  >
+                    {[
+                      ...new Set([...STANDARD_STATUSES, location.status ?? "vacant"]),
+                    ].map((s) => (
+                      <option key={s} value={s}>
+                        {statusLabel(s)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="field">
                 <span className="field-label">Parent</span>
                 <LocationPicker
@@ -722,7 +750,7 @@ function CreateLocationDialog({
   locations,
   onClose,
 }: {
-  types: { id: string; name: string }[];
+  types: { id: string; name: string; tracksStatus?: boolean }[];
   locations: PickerLocation[];
   onClose: () => void;
 }) {
@@ -737,6 +765,7 @@ function CreateLocationDialog({
     locations.some((l) => l.id === remembered.parentId) ? remembered.parentId : "",
   );
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   // One location per non-blank line, de-duplicated — so pasting a slip list
   // straight out of a spreadsheet works.
@@ -768,10 +797,17 @@ function CreateLocationDialog({
   const create = async () => {
     if (parsedNames.length === 0 || !typeId) return;
     setSaving(true);
+    // Only types that track status get one — a container with a "Vacant"
+    // label is exactly the confusion this avoids.
+    const tracksStatus = Boolean(types.find((t) => t.id === typeId)?.tracksStatus);
     await db.transact(
       parsedNames.map((name) =>
         db.tx.locations[id()]
-          .update({ name, status: "vacant", reservationEnabled: false })
+          .update({
+            name,
+            reservationEnabled: false,
+            ...(tracksStatus ? { status: "vacant" } : {}),
+          })
           .link({ type: typeId, ...(parentId ? { parent: parentId } : {}) }),
       ),
     );
@@ -817,8 +853,15 @@ function CreateLocationDialog({
         </div>
 
         <div className="field">
-          <span className="field-label">
-            Names — one per line, all sharing the type and parent above
+          <span className="field-label spread">
+            <span>Names — one per line, all sharing the type and parent above</span>
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setGenerating(true)}
+            >
+              Generate…
+            </button>
           </span>
           <textarea
             className="textarea"
@@ -842,6 +885,18 @@ function CreateLocationDialog({
             </div>
           )}
         </div>
+
+        {generating && (
+          <NameGeneratorDialog
+            onClose={() => setGenerating(false)}
+            onInsert={(generated) =>
+              // Appended, not replaced — several runs can build one list.
+              setNames((prev) =>
+                [...prev.split("\n").filter((l) => l.trim()), ...generated].join("\n"),
+              )
+            }
+          />
+        )}
 
         <div className="row">
           <button

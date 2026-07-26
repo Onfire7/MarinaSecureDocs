@@ -47,10 +47,16 @@ const _schema = i.schema({
       // stay valid; absent = false.
       hasBoat: i.boolean().optional(),
       hasVehicle: i.boolean().optional(),
+      // Whether Locations of this type carry an occupancy status at all —
+      // off for organizational containers (a root property, a dock that only
+      // groups slips), which would otherwise read a meaningless "Vacant".
+      tracksStatus: i.boolean().optional(),
     }),
     locations: i.entity({
       name: i.string(),
-      status: i.string(), // occupied / vacant / reserved / out_of_service / admin-defined
+      // occupied / vacant / reserved / out_of_service / needs_cleaning /
+      // admin-defined. Absent entirely when the type doesn't track status.
+      status: i.string().optional(),
       reservationEnabled: i.boolean(),
       reservationVisibility: i.string().optional(), // public / internal
       postReservationStatus: i.string().optional(),

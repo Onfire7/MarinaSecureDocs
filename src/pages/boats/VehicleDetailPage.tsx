@@ -5,6 +5,7 @@ import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { compareNames } from "../../lib/locations";
 import { OwnersSection } from "./OwnersSection";
 import { TargetActivity } from "../shared/TargetActivity";
+import { LocationPicker } from "../shared/LocationPicker";
 import { activityTx } from "../../lib/activityLog";
 
 // Boats & Vehicles — Vehicle Detail (see docs/pages/vehicle-detail.html).
@@ -28,7 +29,11 @@ export function VehicleDetailPage() {
             incidents: {},
             tickets: {},
           },
-          locations: { $: { where: { "type.hasVehicle": true } } },
+          locations: {
+            $: { where: { "type.hasVehicle": true } },
+            parent: {},
+            type: {},
+          },
         }
       : null,
   );
@@ -109,20 +114,15 @@ export function VehicleDetailPage() {
               )}
               {canEdit && (
                 <>
-                  <select
-                    className="select select-inline"
-                    value=""
-                    onChange={(e) => reassign(e.target.value)}
-                  >
-                    <option value="">Reassign…</option>
-                    {locationOptions
-                      .filter((l) => l.id !== vehicle.currentLocation?.id)
-                      .map((l) => (
-                        <option key={l.id} value={l.id}>
-                          {l.name}
-                        </option>
-                      ))}
-                  </select>
+                  <div style={{ minWidth: 240 }}>
+                    <LocationPicker
+                      locations={locationOptions}
+                      value=""
+                      onChange={reassign}
+                      allowNone={false}
+                      placeholder="Reassign to a location…"
+                    />
+                  </div>
                   {vehicle.currentLocation && (
                     <button
                       type="button"
