@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 
@@ -70,7 +71,7 @@ export function OwnersSection({
           <div key={o.id} className="card spread">
             <span>
               {ordered.length > 1 && <span className="muted small">{i + 1}. </span>}
-              {o.name ?? "Unnamed contact"}
+              <Link to={`/contacts/${o.id}`}>{o.name ?? "Unnamed contact"}</Link>
               {canContact && (
                 <span className="muted small">
                   {o.phone ? ` · ${o.phone}` : ""}

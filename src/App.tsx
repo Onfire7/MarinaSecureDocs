@@ -32,6 +32,9 @@ import { NewReservationPage } from "./pages/reservations/NewReservationPage";
 import { BoatListPage } from "./pages/boats/BoatListPage";
 import { BoatDetailPage } from "./pages/boats/BoatDetailPage";
 import { VehicleDetailPage } from "./pages/boats/VehicleDetailPage";
+import { ContactListPage } from "./pages/contacts/ContactListPage";
+import { ContactDetailPage } from "./pages/contacts/ContactDetailPage";
+import { LeaseDetailPage } from "./pages/contacts/LeaseDetailPage";
 
 export default function App() {
   const missing = missingConfig();
@@ -80,10 +83,13 @@ export default function App() {
             <Route path="/boats" element={<BoatListPage />} />
             <Route path="/boats/:id" element={<BoatDetailPage />} />
             <Route path="/vehicles/:id" element={<VehicleDetailPage />} />
+            <Route path="/contacts" element={<ContactListPage />} />
             <Route
-              path="/contacts/*"
-              element={<PlaceholderPage title="Owners & Contacts" spec="contact-list" />}
+              path="/contacts/leases/new"
+              element={<LeaseDetailPage mode="create" />}
             />
+            <Route path="/contacts/leases/:id" element={<LeaseDetailPage />} />
+            <Route path="/contacts/:id" element={<ContactDetailPage />} />
             <Route
               path="/assets/*"
               element={<PlaceholderPage title="Assets" spec="asset-list" />}

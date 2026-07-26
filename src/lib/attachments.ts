@@ -44,7 +44,7 @@ export function targetPath(target: AttachmentTarget): string {
     case "vehicle":
       return `/vehicles/${target.id}`;
     case "contact":
-      return "/contacts";
+      return `/contacts/${target.id}`;
     case "asset":
       return "/assets";
   }

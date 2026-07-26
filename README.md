@@ -51,6 +51,7 @@ src/
     reservations/        Reservation list/calendar/map, detail (+ check-in/out
                          dialog), New reservation form
     boats/               Boat & Vehicle lists/details, owners-succession editor
+    contacts/            Contact list/detail, nameless-contact merge, leases
     shared/              placeholders, More menu, config screen,
                          attachment-target picker, note dialog, schematic map,
                          target activity sections
@@ -82,9 +83,11 @@ src/
 - ✅ Boats & Vehicles group: tabbed lists with search, Boat detail
   (owners-in-succession editor, slip reassignment, lease), Vehicle detail
   (optional plate/owners, location reassignment)
+- ✅ Owners & Contacts group: contact list/detail with merge resolution,
+  nameless-contact name prompt & merge dialog, Lease detail (doubles as the
+  creation form, document upload, comment thread)
 - ⬜ Everything else renders a placeholder — see the docs' page-spec list for
-  the remaining groups (Comms, Owners & Contacts, Assets, Activity Log,
-  Reports, Admin), plus InstantDB permission rules, Netlify Functions
-  (shift report + scheduled jobs — including scheduled-trigger Checklist
-  generation and time-based maintenance rules), and Twilio Functions
-  (telephony bridge).
+  the remaining groups (Comms, Assets, Activity Log, Reports, Admin), plus
+  InstantDB permission rules, Netlify Functions (shift report + scheduled
+  jobs — including scheduled-trigger Checklist generation and time-based
+  maintenance rules), and Twilio Functions (telephony bridge).

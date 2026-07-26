@@ -277,7 +277,7 @@ export function LocationDetailPage() {
               <div className="field-value">
                 {owners.map((o) => (
                   <div key={o.id}>
-                    {o.name ?? "Unnamed contact"}
+                    <Link to={`/contacts/${o.id}`}>{o.name ?? "Unnamed contact"}</Link>
                     {current.can("view_contact") && (
                       <span className="muted small">
                         {o.phone ? ` · ${o.phone}` : ""}
@@ -290,18 +290,39 @@ export function LocationDetailPage() {
             </div>
           )}
 
-          {current.can("view_lease") && activeLease && (
+          {current.can("view_lease") && (
             <div className="field">
               <span className="field-label">Lease</span>
-              <div className="field-value">
-                {(activeLease.lessees ?? []).map((c) => c.name ?? "Unnamed").join(", ") ||
-                  "Lease on file"}
-                <span className="muted small">
-                  {activeLease.endDate
-                    ? ` · through ${new Date(activeLease.endDate).toLocaleDateString()}`
-                    : " · open-ended"}
-                </span>
-              </div>
+              {activeLease ? (
+                <div className="field-value">
+                  <Link to={`/contacts/leases/${activeLease.id}`}>
+                    {(activeLease.lessees ?? [])
+                      .map((c) => c.name ?? "Unnamed")
+                      .join(", ") || "Lease on file"}
+                  </Link>
+                  <span className="muted small">
+                    {activeLease.endDate
+                      ? ` · through ${new Date(activeLease.endDate).toLocaleDateString()}`
+                      : " · open-ended"}
+                  </span>
+                </div>
+              ) : current.can("manage_lease") ? (
+                <div className="field-value">
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() =>
+                      navigate("/contacts/leases/new", {
+                        state: { locationId: location.id },
+                      })
+                    }
+                  >
+                    + Add a lease
+                  </button>
+                </div>
+              ) : (
+                <div className="field-value muted">None</div>
+              )}
             </div>
           )}
         </div>
