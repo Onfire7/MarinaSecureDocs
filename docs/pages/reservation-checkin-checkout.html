@@ -59,8 +59,8 @@
 
     <h2>States &amp; edge cases</h2>
     <ul>
-      <li><strong>Check-in before expected date</strong> — allowed; for a Public reservation this is what <code>early_checkin</code> represents, recorded alongside rather than blocking the action.</li>
-      <li><strong>Check-out after expected date</strong> — same treatment via <code>late_checkout</code>, Public reservations only.</li>
+      <li><strong>Check-in before expected date</strong> — allowed; for a Billable reservation this is what <code>early_checkin</code> represents, recorded alongside rather than blocking the action.</li>
+      <li><strong>Check-out after expected date</strong> — same treatment via <code>late_checkout</code>, Billable reservations only.</li>
       <li><strong>Checking in an Asset target</strong> — identical flow; "the target's status" means <code>Asset.current_status</code> for an Asset, same mechanics as a Location's <code>status</code>.</li>
       <li><strong>Backfilling</strong> — an admin correcting history (e.g. logging a check-in that happened over the phone without the app open) sets an actual date/time in the past; the target-status side effect still applies at the moment of saving, not retroactively.</li>
     </ul>

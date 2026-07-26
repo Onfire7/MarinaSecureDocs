@@ -37,7 +37,7 @@
   <main class="content">
     <span class="eyebrow">Reservations · Page Specification</span>
     <h1>Reservation Detail</h1>
-    <p class="lede">Full record of one reservation — contact, target, dates, and (for Public reservations only) the billing fields.</p>
+    <p class="lede">Full record of one reservation — contact, target, dates, and (for Billable reservations only) the billing fields.</p>
 
     <h2>Purpose</h2>
     <p>Reached from <a href="reservation-list.html">Reservation calendar/list</a>, or from the target Location/Asset's own detail page (an upcoming reservation shown alongside current status, per <a href="../data-model.html">Data Model</a>).</p>
@@ -49,8 +49,9 @@
       <tr><td>Target</td><td>Reservation.target</td><td>Links to <a href="location-detail.html">Location detail</a> or <a href="asset-detail.html">Asset detail</a>, whichever applies.</td></tr>
       <tr><td>Status</td><td>Reservation.status</td><td>Requested / Confirmed / Checked In / Checked Out / Cancelled.</td></tr>
       <tr><td>Expected / actual dates</td><td>expected_checkin/checkout, actual_checkin/checkout</td><td>Actual dates are nullable until check-in/out happens, per <a href="reservation-checkin-checkout.html">Reservation Check-In / Check-Out Dialog</a>.</td></tr>
-      <tr><td>Early check-in / late check-out</td><td>Reservation.early_checkin / late_checkout</td><td>Shown only when the target's <code>reservation_visibility</code> is Public.</td></tr>
-      <tr><td>Rate / deposit / balance</td><td>Reservation.rate / deposit / balance</td><td>Same Public-only gating — entirely absent from the layout for an Internal reservation, not shown as zero/blank.</td></tr>
+      <tr><td>Reservation type</td><td>Reservation.billing_type</td><td>Billable / Non-Billable, chosen at booking; editable with <code>manage_reservations</code>.</td></tr>
+      <tr><td>Early check-in / late check-out</td><td>Reservation.early_checkin / late_checkout</td><td>Shown only when <code>billing_type</code> is Billable.</td></tr>
+      <tr><td>Rate / deposit / balance</td><td>Reservation.rate / deposit / balance</td><td>Same Billable-only gating — entirely absent from the layout for a Non-Billable reservation, not shown as zero/blank.</td></tr>
     </table>
 
     <h2>Actions</h2>
@@ -64,7 +65,7 @@
 
     <h2>States &amp; edge cases</h2>
     <ul>
-      <li><strong>Internal reservation</strong> — the whole billing section (early/late fields, rate/deposit/balance) is omitted from the layout, not shown empty, per <code>reservation_visibility</code>.</li>
+      <li><strong>Non-Billable reservation</strong> — the whole billing section (early/late fields, rate/deposit/balance) is omitted from the layout, not shown empty, per <code>billing_type</code>.</li>
       <li><strong>No <code>manage_reservations</code></strong> — the reservation is still fully viewable (subject to <code>view_contact</code> for contact detail); every edit/check-in-out action is hidden.</li>
       <li><strong>Cancelled reservation</strong> — remains visible in history; a target's status/upcoming-indicator no longer reflects it once cancelled.</li>
       <li><strong>Asset target</strong> — identical layout to a Location target, just linking to <a href="asset-detail.html">Asset detail</a> instead; the reservation model doesn't distinguish the two beyond the target reference itself.</li>

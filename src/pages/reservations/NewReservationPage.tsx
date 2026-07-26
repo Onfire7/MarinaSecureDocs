@@ -29,6 +29,10 @@ export function NewReservationPage() {
   const [rate, setRate] = useState("");
   const [deposit, setDeposit] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  // Null until the user picks explicitly; falls back to the target's default.
+  const [billingChoice, setBillingChoice] = useState<"billable" | "non_billable" | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -64,9 +68,13 @@ export function NewReservationPage() {
   ];
   const selectedLocation = targetKind === "location" ? locations.find((l) => l.id === targetId) : undefined;
   const selectedAsset = targetKind === "asset" ? assets.find((a) => a.id === targetId) : undefined;
-  const isPublic =
+  // The target's visibility only sets the default; the same pavilion gets
+  // booked both ways without reconfiguring it.
+  const defaultBillable =
     (selectedLocation?.reservationVisibility ?? selectedAsset?.reservationVisibility) ===
     "public";
+  const billingType = billingChoice ?? (defaultBillable ? "billable" : "non_billable");
+  const billable = billingType === "billable";
 
   const submit = async () => {
     if (!targetId || !checkin) return;
@@ -144,10 +152,11 @@ export function NewReservationPage() {
       db.tx.reservations[reservationId]
         .update({
           status: confirmed ? "confirmed" : "requested",
+          billingType,
           expectedCheckin: start,
           expectedCheckout: checkout ? end : null,
-          ...(isPublic && rate !== "" ? { rate: Number(rate) } : {}),
-          ...(isPublic && deposit !== "" ? { deposit: Number(deposit) } : {}),
+          ...(billable && rate !== "" ? { rate: Number(rate) } : {}),
+          ...(billable && deposit !== "" ? { deposit: Number(deposit) } : {}),
         })
         .link({
           [targetKind]: targetId,
@@ -188,6 +197,26 @@ export function NewReservationPage() {
             ))}
           </optgroup>
         </select>
+      </div>
+
+      <div className="field">
+        <span className="field-label">Reservation type</span>
+        <select
+          className="select select-inline"
+          value={billingType}
+          onChange={(e) =>
+            setBillingChoice(e.target.value as "billable" | "non_billable")
+          }
+        >
+          <option value="billable">Billable</option>
+          <option value="non_billable">Non-Billable</option>
+        </select>
+        {targetKey && billingChoice === null && (
+          <span className="muted small">
+            {" "}
+            default for this target
+          </span>
+        )}
       </div>
 
       <div className="field">
@@ -263,7 +292,7 @@ export function NewReservationPage() {
         </div>
       </div>
 
-      {isPublic && (
+      {billable && (
         <div className="field">
           <span className="field-label">Rate / deposit</span>
           <div className="row">

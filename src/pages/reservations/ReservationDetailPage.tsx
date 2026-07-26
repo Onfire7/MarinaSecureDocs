@@ -5,6 +5,7 @@ import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { DEFAULT_POST_RESERVATION_STATUS, statusLabel } from "../../lib/locations";
 import {
   RESERVATION_STATUSES,
+  isBillable,
   reservationStatusBadgeClass,
   reservationTargetOf,
   type ReservationTarget,
@@ -12,8 +13,8 @@ import {
 
 // Reservations — Reservation Detail (see docs/pages/reservation-detail.html).
 // Fully viewable by anyone; every mutating action is manage_reservations.
-// Billing fields exist only for Public-visibility targets — omitted from the
-// layout entirely for Internal ones.
+// Billing fields exist only for Billable reservations — omitted from the
+// layout entirely for Non-Billable ones, rather than shown blank.
 export function ReservationDetailPage() {
   const { id: reservationId } = useParams();
   const current = useCurrent();
@@ -43,7 +44,7 @@ export function ReservationDetailPage() {
   }
 
   const target = reservationTargetOf(reservation);
-  const isPublic = target?.isPublic ?? false;
+  const billable = isBillable(reservation, target);
 
   const update = (fields: Record<string, unknown>) => {
     void db.transact(db.tx.reservations[reservation.id].update(fields));
@@ -127,6 +128,24 @@ export function ReservationDetailPage() {
             </div>
           </div>
 
+          <div className="field">
+            <span className="field-label">Reservation type</span>
+            <div className="field-value row">
+              {canManage ? (
+                <select
+                  className="select select-inline"
+                  value={billable ? "billable" : "non_billable"}
+                  onChange={(e) => update({ billingType: e.target.value })}
+                >
+                  <option value="billable">Billable</option>
+                  <option value="non_billable">Non-Billable</option>
+                </select>
+              ) : (
+                <span className="badge">{billable ? "Billable" : "Non-Billable"}</span>
+              )}
+            </div>
+          </div>
+
           {target && (
             <div className="field">
               <span className="field-label">Target</span>
@@ -188,7 +207,7 @@ export function ReservationDetailPage() {
           </div>
         </div>
 
-        {isPublic && (
+        {billable && (
           <div>
             <div className="section-title">Billing</div>
             {(["rate", "deposit", "balance"] as const).map((f) => (
@@ -235,6 +254,7 @@ export function ReservationDetailPage() {
           mode={dialog}
           reservation={reservation}
           target={target}
+          billable={billable}
           onClose={() => setDialog(null)}
         />
       )}
@@ -250,6 +270,7 @@ function CheckInOutDialog({
   mode,
   reservation,
   target,
+  billable,
   onClose,
 }: {
   mode: "in" | "out";
@@ -260,6 +281,7 @@ function CheckInOutDialog({
     contact?: { name?: string | null } | null;
   };
   target: ReservationTarget;
+  billable: boolean;
   onClose: () => void;
 }) {
   const current = useCurrent();
@@ -275,7 +297,7 @@ function CheckInOutDialog({
 
     if (mode === "in") {
       const early =
-        target.isPublic &&
+        billable &&
         reservation.expectedCheckin &&
         ts < new Date(reservation.expectedCheckin).getTime();
       txns.push(
@@ -300,7 +322,7 @@ function CheckInOutDialog({
       }
     } else {
       const late =
-        target.isPublic &&
+        billable &&
         reservation.expectedCheckout &&
         ts > new Date(reservation.expectedCheckout).getTime();
       const postStatus =

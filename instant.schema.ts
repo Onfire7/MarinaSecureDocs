@@ -183,11 +183,15 @@ const _schema = i.schema({
     // ---- reservations ----
     reservations: i.entity({
       status: i.string().indexed(), // requested / confirmed / checked_in / checked_out / cancelled
+      // billable / non_billable — chosen per booking; defaults from the
+      // target's reservationVisibility. Absent (legacy rows) falls back to
+      // that target default too.
+      billingType: i.string().optional(),
       expectedCheckin: i.date().indexed().optional(),
       expectedCheckout: i.date().indexed().optional(),
       actualCheckin: i.date().optional(),
       actualCheckout: i.date().optional(),
-      // Hidden/ignored when the target's reservationVisibility is internal:
+      // Hidden/ignored when this reservation is non_billable:
       earlyCheckin: i.date().optional(),
       lateCheckout: i.date().optional(),
       rate: i.number().optional(),
@@ -294,6 +298,9 @@ const _schema = i.schema({
         .json<{ number: string; label: string; routing?: Record<string, unknown> }[]>()
         .optional(),
       allowOverlappingReservations: i.boolean(),
+      // ask / customer — whether hauling a boat out prompts for who did it.
+      // A marina haul-out raises a Ticket; a customer one doesn't.
+      haulOutMode: i.string().optional(),
     }),
   },
 

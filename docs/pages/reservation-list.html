@@ -49,7 +49,7 @@
       <tr><td>Contact</td><td>Reservation.contact</td><td>Name always shown; phone/email require <code>view_contact</code>.</td></tr>
       <tr><td>Status</td><td>Reservation.status</td><td>Requested / Confirmed / Checked In / Checked Out / Cancelled.</td></tr>
       <tr><td>Dates</td><td>expected/actual checkin/checkout</td><td>Calendar view groups by date range; list view sorts by <code>expected_checkin</code>.</td></tr>
-      <tr><td>Rate / deposit / balance</td><td>Reservation.rate / deposit / balance</td><td>Shown only when the target's <code>reservation_visibility</code> is Public; hidden entirely for Internal reservations.</td></tr>
+      <tr><td>Rate / deposit / balance</td><td>Reservation.rate / deposit / balance</td><td>Shown only when the reservation's own <code>billing_type</code> is Billable; hidden entirely for Non-Billable ones.</td></tr>
     </table>
 
     <h2>Week view</h2>

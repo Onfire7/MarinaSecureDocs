@@ -6,6 +6,7 @@ import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { DEFAULT_POST_RESERVATION_STATUS, statusLabel } from "../../lib/locations";
 import {
   RESERVATION_STATUSES,
+  isBillable,
   rangesOverlap,
   reservationStatusBadgeClass,
   reservationTargetOf,
@@ -193,8 +194,8 @@ function ListView({ reservations }: { reservations: ReservationRow[] }) {
                 {current.can("view_contact") && r.contact?.phone
                   ? ` · ${r.contact.phone}`
                   : ""}
-                {target?.isPublic && r.rate != null && ` · $${r.rate}`}
-                {target?.isPublic && r.balance != null && ` · balance $${r.balance}`}
+                {isBillable(r, target) && r.rate != null && ` · $${r.rate}`}
+                {isBillable(r, target) && r.balance != null && ` · balance $${r.balance}`}
               </div>
             </div>
             <div style={{ textAlign: "right" }}>

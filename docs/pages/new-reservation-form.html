@@ -48,7 +48,8 @@
       <tr><td>Target</td><td>Select — reservable Locations and Assets only</td><td>Pre-filled when opened from a specific Location/Asset's context.</td></tr>
       <tr><td>Contact</td><td>Search/select, or create new</td><td>Same contact picker used elsewhere (see <a href="contact-list.html">Owner/Contact list</a>).</td></tr>
       <tr><td>Expected check-in / check-out</td><td>Date</td><td></td></tr>
-      <tr><td>Rate / deposit</td><td>Currency</td><td>Shown only if the selected target's <code>reservation_visibility</code> is Public; the field group itself appears/disappears as the target selection changes.</td></tr>
+      <tr><td>Reservation type</td><td>Select — Billable / Non-Billable</td><td>Defaults from the selected target's <code>reservation_visibility</code> (Public → Billable, Internal → Non-Billable); freely changeable per booking, since the same target is often booked both ways.</td></tr>
+      <tr><td>Rate / deposit</td><td>Currency</td><td>Shown only while Reservation type is Billable; the field group appears/disappears as the type changes.</td></tr>
     </table>
 
     <h2>Actions</h2>
@@ -63,7 +64,7 @@
       <li><strong>Target not reservation-enabled</strong> — never appears in the picker; there's no way to attempt booking a non-reservable Location or Asset from here.</li>
       <li><strong>Overlapping dates on the same target</strong> — governed by <code>MarinaSettings.allow_overlapping_reservations</code> (off by default, see <a href="admin-marina-settings.html">Marina Settings</a>): with the default off, submitting is blocked outright with an error naming the conflicting reservation; a marina that wants a waitlist/overbooking model can turn the setting on, at which point overlapping dates are simply permitted with no confirmation friction.</li>
       <li><strong>No <code>manage_reservations</code></strong> — this form is unreachable; every entry point to it is gated the same way.</li>
-      <li><strong>Internal-only target</strong> — rate/deposit fields never appear, and the resulting reservation has no billing surface anywhere downstream.</li>
+      <li><strong>Non-Billable reservation</strong> — rate/deposit fields never appear, and the resulting reservation has no billing surface anywhere downstream, regardless of the target's default.</li>
     </ul>
 
     <h2>Mobile vs. desktop</h2>

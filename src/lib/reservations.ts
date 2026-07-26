@@ -30,9 +30,19 @@ export interface ReservationTarget {
   id: string;
   name: string;
   typeLabel: string;
-  /** Billing fields (rate/deposit/balance, early/late) show only when public. */
-  isPublic: boolean;
+  /** Target default for new bookings: public visibility defaults to Billable. */
+  defaultBillable: boolean;
   postStatus?: string | null;
+}
+
+// A reservation's own billingType governs its billing fields; rows created
+// before the field existed fall back to the target's default.
+export function isBillable(
+  r: { billingType?: string | null },
+  target: ReservationTarget | null,
+): boolean {
+  if (r.billingType) return r.billingType === "billable";
+  return target?.defaultBillable ?? false;
 }
 
 type ReservationWithTargets = {
@@ -61,7 +71,7 @@ export function reservationTargetOf(
       id: r.location.id,
       name: r.location.name,
       typeLabel: r.location.type?.name ?? "Location",
-      isPublic: r.location.reservationVisibility === "public",
+      defaultBillable: r.location.reservationVisibility === "public",
       postStatus: r.location.postReservationStatus,
     };
   }
@@ -71,7 +81,7 @@ export function reservationTargetOf(
       id: r.asset.id,
       name: r.asset.name,
       typeLabel: r.asset.category ?? "Asset",
-      isPublic: r.asset.reservationVisibility === "public",
+      defaultBillable: r.asset.reservationVisibility === "public",
       postStatus: r.asset.postReturnStatus,
     };
   }

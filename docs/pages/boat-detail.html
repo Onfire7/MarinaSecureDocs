@@ -59,6 +59,7 @@
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
       <tr><td>Edit boat details</td><td><code>edit_owner_contact</code></td><td>Same permission as boat creation on <a href="boat-list.html">Boat list</a>.</td></tr>
       <tr><td>Reassign current slip</td><td><code>edit_owner_contact</code></td><td>Updates <code>Boat.current_slip</code>; the move itself is preserved via the Activity Log rather than a slip-history table, per <a href="../data-model.html">Data Model</a>.</td></tr>
+      <tr><td>Haul out</td><td><code>edit_owner_contact</code></td><td>Clears <code>Boat.current_slip</code> entirely — the boat is out of the water (winter storage, bottom work, or departing) rather than moving between slips, and its slip frees up. When <code>MarinaSettings.haul_out_mode</code> is Ask (the default), first prompts whether this is a <strong>marina</strong> or <strong>customer</strong> haul-out; a marina haul-out also creates a Ticket for the work, attached to the boat. Set the mode to Customer to skip the prompt at marinas that never haul boats themselves — see <a href="admin-marina-settings.html">Marina Settings</a>.</td></tr>
       <tr><td>Add a note</td><td>Unrestricted</td><td>Opens <a href="new-note-dialog.html">New note dialog</a>, pre-attached to this Boat.</td></tr>
       <tr><td>Log an incident</td><td><code>create_incidents</code></td><td>Opens <a href="new-incident-form.html">New incident form</a>, pre-attached.</td></tr>
       <tr><td>Create a ticket</td><td>Unrestricted</td><td>Opens <a href="new-ticket-form.html">New ticket form</a>, pre-attached.</td></tr>
@@ -67,7 +68,8 @@
     <h2>States &amp; edge cases</h2>
     <ul>
       <li><strong>No <code>view_owner</code></strong> — owners and authorized users sections are both omitted entirely, matching the gating used on <a href="location-detail.html">Location detail</a>.</li>
-      <li><strong>No current slip</strong> — shown as an explicit "unassigned" state rather than an empty field, since a boat with no slip is a meaningfully different situation from one whose slip just isn't loaded yet.</li>
+      <li><strong>No current slip</strong> — shown as an explicit "unassigned" state rather than an empty field, since a boat with no slip is a meaningfully different situation from one whose slip just isn't loaded yet. Reached either by hauling the boat out or by adding it before any slip assignment; the two aren't distinguished on the record itself, only in the Activity Log.</li>
+      <li><strong>Marina haul-out ticket</strong> — created unassigned at Medium priority like any other ticket, so it lands in the normal <a href="ticket-queue.html">Ticket queue</a> workflow rather than a separate haul-out list.</li>
       <li><strong>No lease, or no <code>view_lease</code></strong> — the lease section is omitted either way; the UI doesn't distinguish "no lease exists" from "you can't see it."</li>
     </ul>
 
