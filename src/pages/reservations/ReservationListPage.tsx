@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import type { InstaQLEntity } from "@instantdb/react";
 import { db, type AppSchema } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { statusLabel } from "../../lib/locations";
+import { DEFAULT_POST_RESERVATION_STATUS, statusLabel } from "../../lib/locations";
 import {
   RESERVATION_STATUSES,
   rangesOverlap,
@@ -18,7 +18,7 @@ import {
 // Reservations — Calendar / List (see docs/pages/reservation-list.html).
 // One screen for every reservable target, Location or Asset alike. Browsing
 // is unrestricted; only creating/editing needs manage_reservations.
-type ViewMode = "list" | "calendar" | "map";
+type ViewMode = "list" | "calendar" | "week" | "map";
 
 const RESERVATION_QUERY = {
   reservations: {
@@ -83,14 +83,20 @@ export function ReservationListPage() {
       </div>
 
       <div className="chip-row">
-        {(["list", "calendar", "map"] as ViewMode[]).map((m) => (
+        {(["list", "calendar", "week", "map"] as ViewMode[]).map((m) => (
           <button
             key={m}
             type="button"
             className={"chip" + (view === m ? " active" : "")}
             onClick={() => setView(m)}
           >
-            {m === "list" ? "List" : m === "calendar" ? "Calendar" : "Map"}
+            {m === "list"
+              ? "List"
+              : m === "calendar"
+                ? "Calendar"
+                : m === "week"
+                  ? "Week"
+                  : "Map"}
           </button>
         ))}
         <select
@@ -132,6 +138,12 @@ export function ReservationListPage() {
 
       {view === "list" && <ListView reservations={filtered} />}
       {view === "calendar" && <CalendarView reservations={filtered} />}
+      {view === "week" && (
+        <WeekView
+          reservations={filtered}
+          locations={(data?.locations ?? []).filter((l) => l.reservationEnabled)}
+        />
+      )}
       {view === "map" && (
         <ReservationMap
           maps={maps}
@@ -293,6 +305,147 @@ function CalendarView({ reservations }: { reservations: ReservationRow[] }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Week
+
+type WeekLocation = {
+  id: string;
+  name: string;
+  status: string;
+  postReservationStatus?: string | null;
+};
+
+// One row per reservable Location, one column per day, stays spanning the
+// days they cover. Row tint: green when Available (Vacant) — deliberately
+// outranking orange, so a pavilion whose post-reservation status is Vacant
+// reads green — orange when sitting in its own post-reservation status
+// (e.g. Needs Cleaning), red for every other status.
+function rowTint(l: WeekLocation): string {
+  if (l.status === "vacant" || l.status === "available") return "var(--good-bg)";
+  const postStatus = l.postReservationStatus ?? DEFAULT_POST_RESERVATION_STATUS;
+  if (l.status === postStatus) return "var(--warn-bg)";
+  return "var(--bad-bg)";
+}
+
+function WeekView({
+  reservations,
+  locations,
+}: {
+  reservations: ReservationRow[];
+  locations: WeekLocation[];
+}) {
+  const navigate = useNavigate();
+  const [weekStart, setWeekStart] = useState(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - d.getDay());
+    return d;
+  });
+
+  const shiftWeek = (delta: number) => {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + delta * 7);
+    setWeekStart(d);
+  };
+
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+
+  const sorted = [...locations].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true }),
+  );
+
+  const staysFor = (locationId: string, dayTs: number) =>
+    reservations.filter((r) => {
+      if (r.location?.id !== locationId || r.status === "cancelled" || !r.expectedCheckin)
+        return false;
+      const start = new Date(r.expectedCheckin).getTime();
+      const end = r.expectedCheckout
+        ? new Date(r.expectedCheckout).getTime()
+        : start + 24 * 3600_000;
+      return rangesOverlap(dayTs, dayTs + 24 * 3600_000, start, end);
+    });
+
+  return (
+    <div>
+      <div className="row" style={{ marginBottom: 10 }}>
+        <button type="button" className="btn btn-sm" onClick={() => shiftWeek(-1)}>
+          ←
+        </button>
+        <span className="section-title" style={{ marginBottom: 0 }}>
+          Week of{" "}
+          {weekStart.toLocaleDateString(undefined, {
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          })}
+        </span>
+        <button type="button" className="btn btn-sm" onClick={() => shiftWeek(1)}>
+          →
+        </button>
+      </div>
+
+      {sorted.length === 0 ? (
+        <div className="placeholder">
+          <div className="big">No reservation-enabled locations</div>
+          Enable reservations per location from its detail page or Admin.
+        </div>
+      ) : (
+        <div className="week-scroll">
+          <table className="table week-table">
+            <thead>
+              <tr>
+                <th>Location</th>
+                {days.map((d) => (
+                  <th key={d.getTime()}>
+                    {d.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((l) => (
+                <tr key={l.id}>
+                  <td style={{ background: rowTint(l) }}>
+                    <Link to={`/locations/${l.id}`} style={{ fontWeight: 650 }}>
+                      {l.name}
+                    </Link>
+                    <div className="muted small">{statusLabel(l.status)}</div>
+                  </td>
+                  {days.map((d) => {
+                    const stays = staysFor(l.id, d.getTime());
+                    return (
+                      <td key={d.getTime()}>
+                        {stays.map((r) => (
+                          <button
+                            key={r.id}
+                            type="button"
+                            className={"cal-chip " + reservationStatusBadgeClass(r.status)}
+                            title={`${r.contact?.name ?? ""} — ${statusLabel(r.status)}`}
+                            onClick={() => navigate(`/reservations/${r.id}`)}
+                          >
+                            {r.contact?.name ?? statusLabel(r.status)}
+                          </button>
+                        ))}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="muted small" style={{ marginTop: 8 }}>
+        Row tint — green: available now; orange: awaiting turnaround (sitting in its
+        post-checkout status); red: any other status.
+      </p>
     </div>
   );
 }

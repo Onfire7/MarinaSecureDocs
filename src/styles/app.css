@@ -739,6 +739,21 @@ h3 {
   white-space: nowrap;
 }
 
+/* Weekly table */
+
+.week-scroll {
+  overflow-x: auto;
+}
+.week-table {
+  min-width: 760px;
+}
+.week-table td {
+  vertical-align: top;
+}
+.week-table td:not(:first-child) {
+  min-width: 84px;
+}
+
 /* ---------- Locations: maps ---------- */
 
 .map-canvas {

@@ -7,7 +7,12 @@ export const STANDARD_STATUSES = [
   "vacant",
   "reserved",
   "out_of_service",
+  "needs_cleaning",
 ] as const;
+
+// The status a reservation-enabled Location takes on check-out when no
+// per-location override is set (see docs: data-model.html — Location).
+export const DEFAULT_POST_RESERVATION_STATUS = "needs_cleaning";
 
 export function statusLabel(status: string): string {
   return status
@@ -25,6 +30,7 @@ export function statusBadgeClass(status: string): string {
     case "reserved":
       return "badge badge-accent";
     case "out_of_service":
+    case "needs_cleaning":
       return "badge badge-warn";
     default:
       return "badge";
@@ -45,6 +51,7 @@ export function statusMapColors(status: string): {
     case "reserved":
       return { background: "var(--accent-soft)", border: "var(--accent)" };
     case "out_of_service":
+    case "needs_cleaning":
       return { background: "var(--warn-bg)", border: "var(--warn)" };
     default:
       return { background: "var(--fill)", border: "var(--line)" };

@@ -7,6 +7,7 @@ import { useIsMobile } from "../../hooks/useIsMobile";
 import { NoteDialog } from "../shared/NoteDialog";
 import type { AttachmentTarget } from "../../lib/attachments";
 import {
+  DEFAULT_POST_RESERVATION_STATUS,
   STANDARD_STATUSES,
   breadcrumb,
   compareNames,
@@ -103,7 +104,19 @@ export function LocationDetailPage() {
       if (!ok) return;
     }
     void db.transact(
-      db.tx.locations[location.id].update({ reservationEnabled: enabling }),
+      db.tx.locations[location.id].update({
+        reservationEnabled: enabling,
+        // First enable establishes the post-checkout default.
+        ...(enabling && !location.postReservationStatus
+          ? { postReservationStatus: DEFAULT_POST_RESERVATION_STATUS }
+          : {}),
+      }),
+    );
+  };
+
+  const setPostReservationStatus = (status: string) => {
+    void db.transact(
+      db.tx.locations[location.id].update({ postReservationStatus: status }),
     );
   };
 
@@ -199,6 +212,29 @@ export function LocationDetailPage() {
                   {location.reservationEnabled ? "Enabled" : "Disabled"} for this location
                 </span>
               </label>
+              {location.reservationEnabled && (
+                <div className="row" style={{ marginTop: 6 }}>
+                  <span className="small muted">After check-out becomes</span>
+                  <select
+                    className="select select-inline"
+                    value={
+                      location.postReservationStatus ?? DEFAULT_POST_RESERVATION_STATUS
+                    }
+                    onChange={(e) => setPostReservationStatus(e.target.value)}
+                  >
+                    {[
+                      ...new Set([
+                        ...STANDARD_STATUSES,
+                        location.postReservationStatus ?? DEFAULT_POST_RESERVATION_STATUS,
+                      ]),
+                    ].map((s) => (
+                      <option key={s} value={s}>
+                        {statusLabel(s)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           )}
 

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { statusLabel } from "../../lib/locations";
+import { DEFAULT_POST_RESERVATION_STATUS, statusLabel } from "../../lib/locations";
 import {
   RESERVATION_STATUSES,
   reservationStatusBadgeClass,
@@ -303,7 +303,9 @@ function CheckInOutDialog({
         target.isPublic &&
         reservation.expectedCheckout &&
         ts > new Date(reservation.expectedCheckout).getTime();
-      const postStatus = target.postStatus ?? (target.kind === "location" ? "vacant" : "available");
+      const postStatus =
+        target.postStatus ??
+        (target.kind === "location" ? DEFAULT_POST_RESERVATION_STATUS : "available");
       txns.push(
         db.tx.reservations[reservation.id].update({
           actualCheckout: ts,
@@ -361,7 +363,10 @@ function CheckInOutDialog({
           {mode === "in"
             ? `${target.name} will be marked ${target.kind === "location" ? "Occupied" : "In Use"}.`
             : `${target.name} will move to ${statusLabel(
-                target.postStatus ?? (target.kind === "location" ? "vacant" : "available"),
+                target.postStatus ??
+                  (target.kind === "location"
+                    ? DEFAULT_POST_RESERVATION_STATUS
+                    : "available"),
               )}.`}
         </p>
         <div className="row">
