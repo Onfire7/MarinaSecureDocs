@@ -5,6 +5,7 @@ import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { NoteDialog } from "../shared/NoteDialog";
+import { ManualCheckinDialog } from "../checklists/ManualCheckinDialog";
 import { activityTx } from "../../lib/activityLog";
 import type { AttachmentTarget } from "../../lib/attachments";
 import {
@@ -27,6 +28,7 @@ export function LocationDetailPage() {
   const isMobile = useIsMobile();
   const canManage = current.can("manage_locations");
   const [showNoteDialog, setShowNoteDialog] = useState(false);
+  const [showCheckin, setShowCheckin] = useState(false);
 
   const { data } = db.useQuery(
     locationId
@@ -172,6 +174,15 @@ export function LocationDetailPage() {
           >
             + Ticket
           </button>
+          {(location.checkpoints ?? []).length > 0 && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setShowCheckin(true)}
+            >
+              Check in manually
+            </button>
+          )}
         </div>
       </div>
 
@@ -436,6 +447,13 @@ export function LocationDetailPage() {
 
       {showNoteDialog && (
         <NoteDialog target={selfTarget} onClose={() => setShowNoteDialog(false)} />
+      )}
+
+      {showCheckin && (
+        <ManualCheckinDialog
+          initialCheckpointId={(location.checkpoints ?? [])[0]?.id}
+          onClose={() => setShowCheckin(false)}
+        />
       )}
     </div>
   );

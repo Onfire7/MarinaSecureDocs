@@ -8,9 +8,17 @@ import { useCheckpointVisit } from "./useCheckpointVisit";
 // Fallback when a checkpoint's NFC tag/QR is unreadable. Reason is the one
 // hard validation rule; GPS is still captured in the background exactly as
 // on the scanned flow.
-export function ManualCheckinDialog({ onClose }: { onClose: () => void }) {
+export function ManualCheckinDialog({
+  initialCheckpointId,
+  onClose,
+}: {
+  /** Preselected when opened from somewhere that already knows the
+   *  checkpoint — a location's own detail page, say. Still changeable. */
+  initialCheckpointId?: string;
+  onClose: () => void;
+}) {
   const navigate = useNavigate();
-  const [checkpointId, setCheckpointId] = useState("");
+  const [checkpointId, setCheckpointId] = useState(initialCheckpointId ?? "");
   const [reason, setReason] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
