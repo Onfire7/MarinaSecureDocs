@@ -11,7 +11,6 @@ import { SignInPage } from "./pages/access/SignInPage";
 import { UserSwitchPage } from "./pages/access/UserSwitchPage";
 import { DashboardPage } from "./pages/home/DashboardPage";
 import { MorePage } from "./pages/shared/MorePage";
-import { PlaceholderPage } from "./pages/shared/PlaceholderPage";
 import { ConfigMissingPage } from "./pages/shared/ConfigMissingPage";
 import { ChecklistListPage } from "./pages/checklists/ChecklistListPage";
 import { ChecklistRoute } from "./pages/checklists/ChecklistRoute";
@@ -38,6 +37,11 @@ import { LeaseDetailPage } from "./pages/contacts/LeaseDetailPage";
 import { AssetListPage } from "./pages/assets/AssetListPage";
 import { AssetDetailPage } from "./pages/assets/AssetDetailPage";
 import { ActivityLogPage } from "./pages/activity/ActivityLogPage";
+import { CommsHomePage } from "./pages/comms/CommsHomePage";
+import { ChatRoomPage } from "./pages/comms/ChatRoomPage";
+import { NewChatRoomPage } from "./pages/comms/NewChatRoomPage";
+import { SmsThreadPage } from "./pages/comms/SmsThreadPage";
+import { MissedCommsPage } from "./pages/comms/MissedCommsPage";
 import { AdminHomePage } from "./pages/admin/AdminHomePage";
 import { AdminUsersPage } from "./pages/admin/AdminUsersPage";
 import { AdminRolesPage } from "./pages/admin/AdminRolesPage";
@@ -82,10 +86,11 @@ export default function App() {
               element={<CheckpointDetailPage />}
             />
             <Route path="/locations/:id" element={<LocationDetailPage />} />
-            <Route
-              path="/comms/*"
-              element={<PlaceholderPage title="Comms" spec="comms-home" />}
-            />
+            <Route path="/comms" element={<CommsHomePage />} />
+            <Route path="/comms/missed" element={<MissedCommsPage />} />
+            <Route path="/comms/chat/new" element={<NewChatRoomPage />} />
+            <Route path="/comms/chat/:id" element={<ChatRoomPage />} />
+            <Route path="/comms/sms/:id" element={<SmsThreadPage />} />
             <Route path="/tickets" element={<TicketQueuePage />} />
             <Route path="/tickets/new" element={<NewTicketPage />} />
             <Route path="/tickets/:id" element={<TicketDetailPage />} />

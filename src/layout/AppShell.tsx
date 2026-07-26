@@ -3,6 +3,8 @@ import { useClerk } from "@clerk/clerk-react";
 import { useCurrent } from "../lib/auth/CurrentUserContext";
 import { db } from "../lib/db";
 import { visibleSections, MOBILE_TAB_COUNT } from "../routes/nav";
+import { ActiveCallPanel } from "../pages/comms/ActiveCallPanel";
+import { MissedCommsBadge } from "../pages/comms/MissedCommsBadge";
 
 // Responsive shell: persistent left sidenav on desktop, app bar + bottom tab
 // bar on mobile (see wireframes — Dashboard frames for both breakpoints).
@@ -73,6 +75,11 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+
+      {/* App-wide: the call panel surfaces whenever a call is live, and the
+          missed-comms badge floats over everything. */}
+      <ActiveCallPanel />
+      <MissedCommsBadge />
 
       <nav className="tabbar">
         {tabs.map((s) => (

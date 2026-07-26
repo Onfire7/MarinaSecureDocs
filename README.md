@@ -56,9 +56,10 @@ src/
     activity/            permission-scoped Activity Log feed
     reports/             Reports home (aggregates), Shift report
     admin/               all 10 configuration screens, each independently gated
-    shared/              placeholders, More menu, config screen,
-                         attachment-target picker, note dialog, schematic map,
-                         target activity sections
+    comms/               Comms home, chat rooms, SMS threads, call dialogs,
+                         active-call panel, missed-comms badge
+    shared/              More menu, config screen, attachment-target picker,
+                         note dialog, schematic map, target activity sections
   styles/app.css         design tokens + component styles
 ```
 
@@ -104,9 +105,21 @@ src/
   Types & Locations (hierarchy, checkpoints, map upload and drag-plotting),
   Tours, Incident Types, Asset Categories & Maintenance Rules, SMS
   Templates, and Marina Settings — each independently permission-gated
-- ⬜ Remaining: the Comms group (calls/SMS depend on the Twilio bridge; chat
-  rooms are buildable now), InstantDB server-side permission rules, Netlify
-  Functions (shift report send + scheduled jobs — scheduled-trigger
-  Checklist generation, time-based maintenance rules, Activity Log
-  retention purge), and Twilio Functions (telephony bridge). Sending Clerk
-  invitation emails from Admin → Users also needs a server-side call.
+- ✅ Comms: chat rooms (fully working — ordinary InstantDB data, so offline
+  too) with participant computation and the join overlay; Comms home's three
+  independently gated sections; SMS threads with template picker; call/SMS
+  dialogs; active-call panel; floating missed-comms badge
+
+**Every screen in the page-spec list now exists.** What remains is the
+backend, without which some actions can't complete:
+
+- ⬜ **Twilio Functions** (telephony bridge) — calls and SMS *read* fine, but
+  nothing creates that data and sending/placing fails with an explicit
+  error until the bridge is deployed.
+- ⬜ **Netlify Functions** — shift-report send, plus the scheduled jobs:
+  checklist-trigger generation, time-based maintenance rules, and the
+  Activity Log retention purge.
+- ⬜ **InstantDB permission rules** — the app currently enforces permissions
+  client-side only. These matter before any production use.
+- ⬜ **Clerk invitation emails** from Admin → Users need a server-side call;
+  provisioning + email-matched first sign-in works today.

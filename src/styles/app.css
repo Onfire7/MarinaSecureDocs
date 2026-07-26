@@ -690,6 +690,122 @@ h3 {
   background: var(--good-bg);
 }
 
+/* ---------- Comms ---------- */
+
+.comms-columns {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (min-width: 900px) {
+  .comms-columns {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.chat-scroll {
+  max-height: 55vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line-lt);
+  border-radius: var(--radius);
+}
+.chat-msg {
+  max-width: 78%;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--fill);
+  align-self: flex-start;
+}
+.chat-mine {
+  align-self: flex-end;
+  background: var(--accent-soft);
+}
+.chat-meta {
+  font-size: 0.72rem;
+  color: var(--mute);
+  margin-bottom: 2px;
+}
+.chat-body {
+  white-space: pre-wrap;
+  font-size: 0.92rem;
+}
+.composer {
+  margin-top: 12px;
+}
+.composer-locked {
+  position: relative;
+}
+.composer-locked .btn {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: max-content;
+  height: max-content;
+}
+
+/* Live-call panel: a right-side panel on desktop, bottom sheet on mobile. */
+.call-panel {
+  position: fixed;
+  z-index: 60;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+  overflow-y: auto;
+}
+@media (min-width: 900px) {
+  .call-panel {
+    top: 0;
+    right: 0;
+    width: 340px;
+    height: 100vh;
+    border-radius: 0;
+  }
+}
+@media (max-width: 899px) {
+  .call-panel {
+    left: 0;
+    right: 0;
+    bottom: var(--tabbar-h);
+    max-height: 70vh;
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+}
+
+.missed-badge {
+  position: fixed;
+  z-index: 55;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--accent-ink);
+  background: var(--bad);
+  border: none;
+  border-radius: 999px;
+  padding: 9px 16px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+@media (max-width: 899px) {
+  .missed-badge {
+    bottom: calc(var(--tabbar-h) + 14px);
+  }
+}
+.missed-badge-count {
+  font-size: 0.95rem;
+}
+
 /* ---------- Admin: permission matrix ---------- */
 
 .matrix-scroll {
