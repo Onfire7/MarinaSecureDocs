@@ -1,8 +1,37 @@
 import { useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { db, id } from "../../lib/db";
 import { compareNames, statusLabel, STANDARD_STATUSES, DEFAULT_POST_RESERVATION_STATUS } from "../../lib/locations";
+import { LocationPicker, type PickerLocation } from "../shared/LocationPicker";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
+
+const EXPANDED_KEY = "marinasecure.admin.locations.expanded";
+const LAST_USED_KEY = "marinasecure.admin.locations.lastUsed";
+
+/**
+ * Setting up a marina means creating hundreds of near-identical locations,
+ * so the create dialog reopens with the type and parent last used *in this
+ * browser* — following your own session rather than a co-admin's last write,
+ * and working offline.
+ */
+function readLastUsed(): { typeId: string; parentId: string } {
+  try {
+    const raw = localStorage.getItem(LAST_USED_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return { typeId: parsed.typeId ?? "", parentId: parsed.parentId ?? "" };
+  } catch {
+    return { typeId: "", parentId: "" };
+  }
+}
+
+function writeLastUsed(value: { typeId: string; parentId: string }): void {
+  try {
+    localStorage.setItem(LAST_USED_KEY, JSON.stringify(value));
+  } catch {
+    // A full or disabled localStorage shouldn't block creating locations.
+  }
+}
 
 // Admin — Location Types & Locations Setup (see docs/pages/admin-locations.html).
 // Three nested concerns: the type system, the actual locations (and their
@@ -188,8 +217,19 @@ function TypesTab() {
 // ---------------------------------------------------------------- Locations
 
 function LocationsTab() {
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [filter, setFilter] = useState("");
+  // Expansion persists so drilling into a dock, editing, and coming back
+  // doesn't collapse everything again.
+  const [openIds, setOpenIds] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem(EXPANDED_KEY);
+      return new Set<string>(raw ? JSON.parse(raw) : []);
+    } catch {
+      return new Set<string>();
+    }
+  });
 
   const { data } = db.useQuery({
     locations: { type: {}, parent: {}, checkpoints: {} },
@@ -201,9 +241,112 @@ function LocationsTab() {
   );
   const types = data?.locationTypes ?? [];
 
+  const childrenOf = useMemo(() => {
+    const m = new Map<string | null, typeof locations>();
+    for (const l of locations) {
+      const key = l.parent?.id ?? null;
+      const list = m.get(key) ?? [];
+      list.push(l);
+      m.set(key, list);
+    }
+    return m;
+  }, [locations]);
+
+  // Total descendants, so a collapsed row can say what's inside it.
+  const descendantCount = useMemo(() => {
+    const counts = new Map<string, number>();
+    const count = (locationId: string): number => {
+      const cached = counts.get(locationId);
+      if (cached != null) return cached;
+      const kids = childrenOf.get(locationId) ?? [];
+      const total = kids.reduce((sum, k) => sum + 1 + count(k.id), 0);
+      counts.set(locationId, total);
+      return total;
+    };
+    for (const l of locations) count(l.id);
+    return counts;
+  }, [locations, childrenOf]);
+
+  // Filtering reveals matches in place: keep every match plus its ancestors,
+  // so a hit deep in the tree still shows where it lives.
+  const { visibleIds, matchIds } = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return { visibleIds: null as Set<string> | null, matchIds: new Set<string>() };
+    const byId = new Map(locations.map((l) => [l.id, l]));
+    const terms = q.split(/\s+/).filter(Boolean);
+    const matches = new Set(
+      locations
+        .filter((l) => {
+          // Same short-term rule as the picker: "c" shouldn't match "Dock".
+          const words: string[] = l.name.toLowerCase().split(/[\s/-]+/).filter(Boolean);
+          const hay = l.name.toLowerCase();
+          return terms.every((t) =>
+            t.length <= 2 ? words.some((w) => w.startsWith(t)) : hay.includes(t),
+          );
+        })
+        .map((l) => l.id),
+    );
+    const visible = new Set<string>(matches);
+    for (const mid of matches) {
+      let cursor = byId.get(mid)?.parent?.id;
+      let guard = 0;
+      while (cursor && guard++ < 30) {
+        visible.add(cursor);
+        cursor = byId.get(cursor)?.parent?.id;
+      }
+    }
+    return { visibleIds: visible, matchIds: matches };
+  }, [filter, locations]);
+
+  const persist = (next: Set<string>) => {
+    setOpenIds(next);
+    try {
+      localStorage.setItem(EXPANDED_KEY, JSON.stringify([...next]));
+    } catch {
+      // A full or disabled localStorage shouldn't break the tree.
+    }
+  };
+
+  const toggleOpen = (locationId: string) => {
+    const next = new Set(openIds);
+    if (next.has(locationId)) next.delete(locationId);
+    else next.add(locationId);
+    persist(next);
+  };
+
+  const expandAll = () => persist(new Set(locations.map((l) => l.id)));
+  const collapseAll = () => persist(new Set());
+
+  const roots = childrenOf.get(null) ?? [];
+
+  const renderNode = (l: (typeof locations)[number], depth: number): ReactNode => {
+    if (visibleIds && !visibleIds.has(l.id)) return null;
+    const kids = childrenOf.get(l.id) ?? [];
+    // While filtering, ancestors auto-expand so matches are actually reachable.
+    const isOpen = visibleIds ? true : openIds.has(l.id);
+    return (
+      <div key={l.id}>
+        <LocationRow
+          location={l}
+          types={types}
+          allLocations={locations}
+          depth={depth}
+          childCount={descendantCount.get(l.id) ?? 0}
+          hasChildren={kids.length > 0}
+          isOpen={isOpen}
+          onToggleOpen={() => toggleOpen(l.id)}
+          highlighted={matchIds.has(l.id)}
+          expanded={editing === l.id}
+          onToggle={() => setEditing(editing === l.id ? null : l.id)}
+        />
+        {isOpen && kids.map((k) => renderNode(k, depth + 1))}
+      </div>
+    );
+  };
+
   return (
     <div>
-      <div className="row" style={{ marginBottom: 16 }}>
+      <div className="row" style={{ marginBottom: 12, flexWrap: "wrap" }}>
         <button
           type="button"
           className="btn btn-sm btn-primary"
@@ -211,30 +354,47 @@ function LocationsTab() {
           title={types.length === 0 ? "Define a location type first" : undefined}
           onClick={() => setCreating(true)}
         >
-          + Add location
+          + Add locations
         </button>
-        {locations.filter((l) => !l.parent).length === 0 && (
-          <span className="badge badge-warn">
-            No root location yet — one is required before an overview map can
-            be uploaded.
-          </span>
-        )}
+        <input
+          className="input select-inline"
+          style={{ minWidth: 200 }}
+          placeholder="Filter by name…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+        <button type="button" className="btn btn-sm btn-quiet" onClick={expandAll}>
+          Expand all
+        </button>
+        <button type="button" className="btn btn-sm btn-quiet" onClick={collapseAll}>
+          Collapse all
+        </button>
+        <span className="muted small">{locations.length} total</span>
       </div>
 
-      <div className="stack" style={{ gap: 8 }}>
-        {locations.map((l) => (
-          <LocationRow
-            key={l.id}
-            location={l}
-            types={types}
-            allLocations={locations}
-            expanded={expanded === l.id}
-            onToggle={() => setExpanded(expanded === l.id ? null : l.id)}
-          />
-        ))}
+      {roots.length === 0 && locations.length > 0 && (
+        <span className="badge badge-warn">
+          Every location has a parent — no root exists, so an overview map
+          can't be scoped yet.
+        </span>
+      )}
+      {locations.filter((l) => !l.parent).length === 0 && locations.length === 0 && (
+        <span className="badge badge-warn">
+          No root location yet — one is required before an overview map can be
+          uploaded.
+        </span>
+      )}
+
+      <div className="stack" style={{ gap: 4 }}>
+        {roots.map((l) => renderNode(l, 0))}
         {locations.length === 0 && (
           <div className="placeholder">
             <div className="big">No locations yet</div>
+          </div>
+        )}
+        {locations.length > 0 && visibleIds && visibleIds.size === 0 && (
+          <div className="placeholder">
+            <div className="big">Nothing matches "{filter}"</div>
           </div>
         )}
       </div>
@@ -268,12 +428,24 @@ function LocationRow({
   location,
   types,
   allLocations,
+  depth,
+  childCount,
+  hasChildren,
+  isOpen,
+  onToggleOpen,
+  highlighted,
   expanded,
   onToggle,
 }: {
   location: LocationRowType;
   types: { id: string; name: string; allowsReservations?: boolean }[];
-  allLocations: { id: string; name: string }[];
+  allLocations: PickerLocation[];
+  depth: number;
+  childCount: number;
+  hasChildren: boolean;
+  isOpen: boolean;
+  onToggleOpen: () => void;
+  highlighted: boolean;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -303,16 +475,34 @@ function LocationRow({
   };
 
   return (
-    <div className="card">
+    <div
+      className={"card tree-row" + (highlighted ? " tree-match" : "")}
+      style={{ marginLeft: depth * 22 }}
+    >
       <div className="spread" style={{ flexWrap: "wrap" }}>
-        <div>
-          <div className="card-title">{location.name}</div>
-          <div className="card-meta">
-            {location.type?.name ?? "No type"}
-            {location.parent && ` · under ${location.parent.name}`} ·{" "}
-            {statusLabel(location.status)}
-            {(location.checkpoints ?? []).length > 0 &&
-              ` · ${(location.checkpoints ?? []).length} checkpoint(s)`}
+        <div className="row" style={{ minWidth: 0 }}>
+          {/* Only branches get a chevron; leaves keep the same indent. */}
+          {hasChildren ? (
+            <button
+              type="button"
+              className="tree-toggle"
+              onClick={onToggleOpen}
+              aria-label={isOpen ? "Collapse" : "Expand"}
+            >
+              {isOpen ? "▾" : "▸"}
+            </button>
+          ) : (
+            <span className="tree-toggle tree-leaf" />
+          )}
+          <div style={{ minWidth: 0 }}>
+            <div className="card-title">{location.name}</div>
+            <div className="card-meta">
+              {location.type?.name ?? "No type"} · {statusLabel(location.status)}
+              {/* Say what's inside before you open it. */}
+              {hasChildren && ` · ${childCount} inside`}
+              {(location.checkpoints ?? []).length > 0 &&
+                ` · ${(location.checkpoints ?? []).length} checkpoint(s)`}
+            </div>
           </div>
         </div>
         <button type="button" className="btn btn-sm btn-quiet" onClick={onToggle}>
@@ -334,13 +524,14 @@ function LocationRow({
               </div>
               <div className="field">
                 <span className="field-label">Parent</span>
-                <select
-                  className="select select-inline"
+                <LocationPicker
+                  locations={allLocations}
                   value={location.parent?.id ?? ""}
-                  onChange={(e) =>
+                  excludeId={location.id}
+                  onChange={(parentId) =>
                     void db.transact(
-                      e.target.value
-                        ? db.tx.locations[location.id].link({ parent: e.target.value })
+                      parentId
+                        ? db.tx.locations[location.id].link({ parent: parentId })
                         : location.parent
                           ? db.tx.locations[location.id].unlink({
                               parent: location.parent.id,
@@ -348,16 +539,7 @@ function LocationRow({
                           : db.tx.locations[location.id].update({}),
                     )
                   }
-                >
-                  <option value="">None — a root location</option>
-                  {allLocations
-                    .filter((o) => o.id !== location.id)
-                    .map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.name}
-                      </option>
-                    ))}
-                </select>
+                />
               </div>
               <div className="field">
                 <span className="field-label">GPS coordinates</span>
@@ -541,38 +723,73 @@ function CreateLocationDialog({
   onClose,
 }: {
   types: { id: string; name: string }[];
-  locations: { id: string; name: string }[];
+  locations: PickerLocation[];
   onClose: () => void;
 }) {
-  const [name, setName] = useState("");
-  const [typeId, setTypeId] = useState("");
-  const [parentId, setParentId] = useState("");
+  // Setting up a marina means creating the same shape over and over, so the
+  // dialog reopens with whatever you used last rather than blank.
+  const remembered = readLastUsed();
+  const [names, setNames] = useState("");
+  const [typeId, setTypeId] = useState(
+    types.some((t) => t.id === remembered.typeId) ? remembered.typeId : "",
+  );
+  const [parentId, setParentId] = useState(
+    locations.some((l) => l.id === remembered.parentId) ? remembered.parentId : "",
+  );
+  const [saving, setSaving] = useState(false);
+
+  // One location per non-blank line, de-duplicated — so pasting a slip list
+  // straight out of a spreadsheet works.
+  const parsedNames = useMemo(() => {
+    const seen = new Set<string>();
+    return names
+      .split("\n")
+      .map((n) => n.trim())
+      .filter((n) => n.length > 0)
+      .filter((n) => {
+        const key = n.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }, [names]);
+
+  const existingNames = useMemo(
+    () =>
+      new Set(
+        locations
+          .filter((l) => (l.parent?.id ?? "") === parentId)
+          .map((l) => l.name.toLowerCase()),
+      ),
+    [locations, parentId],
+  );
+  const duplicates = parsedNames.filter((n) => existingNames.has(n.toLowerCase()));
 
   const create = async () => {
-    if (!name.trim() || !typeId) return;
+    if (parsedNames.length === 0 || !typeId) return;
+    setSaving(true);
     await db.transact(
-      db.tx.locations[id()]
-        .update({ name: name.trim(), status: "vacant", reservationEnabled: false })
-        .link({ type: typeId, ...(parentId ? { parent: parentId } : {}) }),
+      parsedNames.map((name) =>
+        db.tx.locations[id()]
+          .update({ name, status: "vacant", reservationEnabled: false })
+          .link({ type: typeId, ...(parentId ? { parent: parentId } : {}) }),
+      ),
     );
+    writeLastUsed({ typeId, parentId });
     onClose();
   };
 
   return (
     <div className="dialog-backdrop" onClick={onClose}>
-      <div className="dialog-card" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="dialog-card"
+        style={{ maxWidth: 560 }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="card-title" style={{ marginBottom: 10 }}>
-          Add location
+          Add locations
         </div>
-        <div className="field">
-          <span className="field-label">Name — required</span>
-          <input
-            className="input"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus
-          />
-        </div>
+
         <div className="field">
           <span className="field-label">Type — required</span>
           <select
@@ -588,29 +805,54 @@ function CreateLocationDialog({
             ))}
           </select>
         </div>
+
         <div className="field">
           <span className="field-label">Parent</span>
-          <select
-            className="select"
+          <LocationPicker
+            locations={locations}
             value={parentId}
-            onChange={(e) => setParentId(e.target.value)}
-          >
-            <option value="">None — a root location</option>
-            {locations.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </select>
+            onChange={setParentId}
+            placeholder="Search by name or path, e.g. dock c"
+          />
         </div>
+
+        <div className="field">
+          <span className="field-label">
+            Names — one per line, all sharing the type and parent above
+          </span>
+          <textarea
+            className="textarea"
+            rows={8}
+            value={names}
+            onChange={(e) => setNames(e.target.value)}
+            placeholder={"Slip 1\nSlip 2\nSlip 3"}
+            autoFocus
+          />
+          <p className="muted small" style={{ marginTop: 4 }}>
+            {parsedNames.length === 0
+              ? "Blank lines and duplicates within the list are ignored."
+              : `${parsedNames.length} location${parsedNames.length === 1 ? "" : "s"} will be created.`}
+          </p>
+          {duplicates.length > 0 && (
+            <div className="badge badge-warn" style={{ display: "block", marginTop: 4 }}>
+              {duplicates.length} name{duplicates.length === 1 ? "" : "s"} already
+              exist under that parent ({duplicates.slice(0, 3).join(", ")}
+              {duplicates.length > 3 ? "…" : ""}) — creating them anyway is
+              allowed, names aren't identifiers.
+            </div>
+          )}
+        </div>
+
         <div className="row">
           <button
             type="button"
             className="btn btn-primary"
-            disabled={!name.trim() || !typeId}
+            disabled={parsedNames.length === 0 || !typeId || saving}
             onClick={() => void create()}
           >
-            Create
+            {saving
+              ? "Creating…"
+              : `Create ${parsedNames.length || ""} location${parsedNames.length === 1 ? "" : "s"}`}
           </button>
           <button type="button" className="btn btn-quiet" onClick={onClose}>
             Cancel
