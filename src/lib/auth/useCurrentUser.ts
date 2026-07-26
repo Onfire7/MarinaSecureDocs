@@ -46,6 +46,9 @@ export function useCurrentUser(): CurrentUser {
               },
             },
             roles: {},
+            // The User's own Contact record, where one is linked — used to
+            // default "checking out to" on asset checkout.
+            contact: {},
           },
         }
       : null,

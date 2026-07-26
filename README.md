@@ -52,6 +52,7 @@ src/
                          dialog), New reservation form
     boats/               Boat & Vehicle lists/details, owners-succession editor
     contacts/            Contact list/detail, nameless-contact merge, leases
+    assets/              Asset list/detail, checkout/return, meter update
     shared/              placeholders, More menu, config screen,
                          attachment-target picker, note dialog, schematic map,
                          target activity sections
@@ -86,8 +87,12 @@ src/
 - ✅ Owners & Contacts group: contact list/detail with merge resolution,
   nameless-contact name prompt & merge dialog, Lease detail (doubles as the
   creation form, document upload, comment thread)
+- ✅ Assets group: asset list/detail with status + meter history, checkout /
+  return dialog (post-return status applied on return), meter update dialog
+  (absolute reading or accrued hours, correction reason, inline
+  maintenance-rule tickets)
 - ⬜ Everything else renders a placeholder — see the docs' page-spec list for
-  the remaining groups (Comms, Assets, Activity Log, Reports, Admin), plus
-  InstantDB permission rules, Netlify Functions (shift report + scheduled
-  jobs — including scheduled-trigger Checklist generation and time-based
+  the remaining groups (Comms, Activity Log, Reports, Admin), plus InstantDB
+  permission rules, Netlify Functions (shift report + scheduled jobs —
+  including scheduled-trigger Checklist generation and time-based
   maintenance rules), and Twilio Functions (telephony bridge).
