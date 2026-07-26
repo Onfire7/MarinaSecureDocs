@@ -38,12 +38,18 @@ export function TourProgressPage() {
                 timestamp: { $gt: new Date(activeShift.startedAt) },
               },
             },
+            // Filtering on checkpoint.id does not load the link — without
+            // this the rows come back with no checkpoint and nothing ever
+            // reads as visited.
+            checkpoint: {},
           },
         }
       : null,
   );
   const visitedIds = new Set(
-    (checkInData?.checkIns ?? []).map((c) => (c as { checkpoint?: { id: string } }).checkpoint?.id),
+    (checkInData?.checkIns ?? [])
+      .map((c) => c.checkpoint?.id)
+      .filter((cid): cid is string => Boolean(cid)),
   );
 
   if (!tour) {
