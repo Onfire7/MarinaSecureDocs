@@ -4,6 +4,7 @@ import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { statusLabel } from "../../lib/locations";
 import { attachmentLink, type AttachmentTarget } from "../../lib/attachments";
+import { activityTx } from "../../lib/activityLog";
 import { AttachmentTargetPicker } from "../shared/AttachmentTargetPicker";
 import { PRIORITY_ORDER } from "../../lib/workItems";
 
@@ -35,7 +36,7 @@ export function NewTicketPage() {
     if (!title.trim() || !target) return;
     setSaving(true);
     const ticketId = id();
-    await db.transact(
+    await db.transact([
       db.tx.tickets[ticketId]
         .update({
           title: title.trim(),
@@ -50,7 +51,14 @@ export function NewTicketPage() {
           ...(current.user ? { createdBy: current.user.id } : {}),
           ...(state.sourceIncidentId ? { sourceIncident: state.sourceIncidentId } : {}),
         }),
-    );
+      activityTx({
+        eventType: "ticket.created",
+        summary: `Ticket "${title.trim()}" created on ${target.label}`,
+        subjectType: "tickets",
+        subjectId: ticketId,
+        actorId: current.user?.id,
+      }),
+    ]);
     navigate(`/tickets/${ticketId}`, { replace: true });
   };
 

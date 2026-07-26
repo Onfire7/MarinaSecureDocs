@@ -5,6 +5,7 @@ import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { ITEM_TYPE_LABEL, type ItemType } from "../../lib/checklists";
+import { activityTx } from "../../lib/activityLog";
 import {
   DoorCheckItem,
   LocationCheckItem,
@@ -109,10 +110,27 @@ export function ActiveChecklistPage() {
   const allDone = items.length > 0 && remaining === 0;
 
   const submit = async () => {
+    const templateName = checklist.template?.name ?? "Checklist";
     await db.transact([
       db.tx.checklists[checklist.id].update({ status: "complete", completedAt: Date.now() }),
+      activityTx({
+        eventType: "checklist.completed",
+        summary: `"${templateName}" completed`,
+        subjectType: "checklists",
+        subjectId: checklist.id,
+        actorId: current.user?.id,
+      }),
       ...(checklist.endedShift
-        ? [db.tx.shifts[checklist.endedShift.id].update({ endedAt: Date.now() })]
+        ? [
+            db.tx.shifts[checklist.endedShift.id].update({ endedAt: Date.now() }),
+            activityTx({
+              eventType: "shift.ended",
+              summary: `Shift ended by end-of-shift checklist "${templateName}"`,
+              subjectType: "shifts",
+              subjectId: checklist.endedShift.id,
+              actorId: current.user?.id,
+            }),
+          ]
         : []),
     ]);
     navigate(returnTo ?? "/checklists");

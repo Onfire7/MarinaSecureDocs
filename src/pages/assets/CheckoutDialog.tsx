@@ -4,6 +4,7 @@ import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { statusLabel } from "../../lib/locations";
 import { DEFAULT_POST_RETURN_STATUS } from "../../lib/assets";
 import { displayName } from "../../lib/contacts";
+import { activityTx } from "../../lib/activityLog";
 
 // Assets — Checkout / Return Dialog (see docs/pages/asset-checkout-dialog.html).
 // One dialog, two modes: an asset with an open checkout can only be returned,
@@ -31,7 +32,8 @@ export function CheckoutDialog({
   const submit = async () => {
     const ts = new Date(when).getTime();
     if (mode === "checkout") {
-      await db.transact(
+      const person = contacts.find((c) => c.id === personId);
+      await db.transact([
         db.tx.assetCheckouts[id()]
           .update({ timeOut: ts })
           .link({
@@ -39,7 +41,14 @@ export function CheckoutDialog({
             ...(current.user ? { checkedOutBy: current.user.id } : {}),
             ...(personId ? { person: personId } : {}),
           }),
-      );
+        activityTx({
+          eventType: "asset.checked_out",
+          summary: `${asset.name} checked out to ${person ? displayName(person) : "someone"}`,
+          subjectType: "assets",
+          subjectId: asset.id,
+          actorId: current.user?.id,
+        }),
+      ]);
     } else {
       const postStatus = asset.postReturnStatus ?? DEFAULT_POST_RETURN_STATUS;
       await db.transact([
@@ -51,6 +60,13 @@ export function CheckoutDialog({
             asset: asset.id,
             ...(current.user ? { loggedBy: current.user.id } : {}),
           }),
+        activityTx({
+          eventType: "asset.returned",
+          summary: `${asset.name} returned — set to ${statusLabel(postStatus)}`,
+          subjectType: "assets",
+          subjectId: asset.id,
+          actorId: current.user?.id,
+        }),
       ]);
     }
     onClose();

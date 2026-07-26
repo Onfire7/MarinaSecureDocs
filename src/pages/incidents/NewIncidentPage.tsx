@@ -4,6 +4,7 @@ import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { attachmentLink, type AttachmentTarget } from "../../lib/attachments";
 import { AttachmentTargetPicker } from "../shared/AttachmentTargetPicker";
+import { activityTx } from "../../lib/activityLog";
 import type { NewTicketState } from "../tickets/NewTicketPage";
 
 export interface NewIncidentState {
@@ -57,7 +58,7 @@ export function NewIncidentPage() {
     if (!title.trim() || !target) return;
     setSaving(true);
     const incidentId = id();
-    await db.transact(
+    await db.transact([
       db.tx.incidents[incidentId]
         .update({
           title: title.trim(),
@@ -71,7 +72,14 @@ export function NewIncidentPage() {
           ...(typeId ? { type: typeId } : {}),
           ...(assigneeId ? { assignedTo: assigneeId } : {}),
         }),
-    );
+      activityTx({
+        eventType: "incident.created",
+        summary: `Incident "${title.trim()}" logged on ${target.label}`,
+        subjectType: "incidents",
+        subjectId: incidentId,
+        actorId: current.user?.id,
+      }),
+    ]);
     if (raiseTicketAfter) {
       navigate("/tickets/new", {
         replace: true,

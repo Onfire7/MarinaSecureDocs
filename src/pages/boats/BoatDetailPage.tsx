@@ -5,6 +5,7 @@ import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { compareNames } from "../../lib/locations";
 import { OwnersSection } from "./OwnersSection";
 import { TargetActivity } from "../shared/TargetActivity";
+import { activityTx } from "../../lib/activityLog";
 
 // Boats & Vehicles — Boat Detail (see docs/pages/boat-detail.html).
 // Owner/authorized-user sections require view_owner (omitted entirely
@@ -57,7 +58,19 @@ export function BoatDetailPage() {
   const reassignSlip = (locationId: string) => {
     if (!locationId) return;
     // The move is preserved via the Activity Log rather than a history table.
-    void db.transact(db.tx.boats[boat.id].link({ currentSlip: locationId }));
+    const to = slipOptions.find((l) => l.id === locationId);
+    void db.transact([
+      db.tx.boats[boat.id].link({ currentSlip: locationId }),
+      activityTx({
+        eventType: "boat.slip_changed",
+        summary:
+          `${boat.name} moved${boat.currentSlip ? ` from ${boat.currentSlip.name}` : ""}` +
+          ` to ${to?.name ?? "another slip"}`,
+        subjectType: "boats",
+        subjectId: boat.id,
+        actorId: current.user?.id,
+      }),
+    ]);
   };
   // Hauling out clears the slip entirely (the boat is out of the water, not
   // moving between slips). A marina haul-out also raises a ticket for the
@@ -67,6 +80,15 @@ export function BoatDetailPage() {
     const slipName = boat.currentSlip.name;
     void db.transact([
       db.tx.boats[boat.id].unlink({ currentSlip: boat.currentSlip.id }),
+      activityTx({
+        eventType: "boat.hauled_out",
+        summary:
+          `${boat.name} hauled out of ${slipName} ` +
+          `(${byMarina ? "marina haul-out" : "customer haul-out"})`,
+        subjectType: "boats",
+        subjectId: boat.id,
+        actorId: current.user?.id,
+      }),
       ...(byMarina
         ? [
             db.tx.tickets[id()]

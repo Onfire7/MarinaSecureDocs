@@ -11,6 +11,7 @@ import {
 } from "../../lib/assets";
 import { displayName } from "../../lib/contacts";
 import { TargetActivity } from "../shared/TargetActivity";
+import { activityTx } from "../../lib/activityLog";
 import { CheckoutDialog } from "./CheckoutDialog";
 import { MeterUpdateDialog } from "./MeterUpdateDialog";
 
@@ -299,6 +300,13 @@ function StatusDialog({
         }),
       // currentStatus is the denormalized latest log value.
       db.tx.assets[asset.id].update({ currentStatus: status }),
+      activityTx({
+        eventType: "asset.status_changed",
+        summary: `${asset.name} set to ${statusLabel(status)}${note.trim() ? ` — ${note.trim()}` : ""}`,
+        subjectType: "assets",
+        subjectId: asset.id,
+        actorId: current.user?.id,
+      }),
     ]);
     onClose();
   };

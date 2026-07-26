@@ -4,6 +4,7 @@ import type { ComponentType } from "react";
 import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import type { CurrentUser } from "../../lib/auth/useCurrentUser";
+import { activityTx } from "../../lib/activityLog";
 
 // Dashboard cards (see pages/dashboard.html — Available cards).
 // A card's availability gate is exactly the permission that governs the data
@@ -164,6 +165,13 @@ function ShiftCard() {
       db.tx.shifts[shiftId]
         .update({ startedAt: Date.now() })
         .link({ guard: userId }),
+      activityTx({
+        eventType: "shift.started",
+        summary: `Shift started by ${current.user?.name ?? "a guard"}`,
+        subjectType: "shifts",
+        subjectId: shiftId,
+        actorId: userId,
+      }),
       ...(clockInTemplate
         ? [
             db.tx.checklists[id()]
@@ -180,9 +188,16 @@ function ShiftCard() {
 
   const endShiftManually = async () => {
     if (!activeShift) return;
-    await db.transact(
+    await db.transact([
       db.tx.shifts[activeShift.id].update({ endedAt: Date.now() }),
-    );
+      activityTx({
+        eventType: "shift.ended",
+        summary: `Shift ended manually by ${current.user?.name ?? "a guard"}`,
+        subjectType: "shifts",
+        subjectId: activeShift.id,
+        actorId: userId,
+      }),
+    ]);
     // TODO: call the shift-report Netlify Function on-demand once the
     // functions layer exists; the scheduled backstop sweep covers it meanwhile.
   };

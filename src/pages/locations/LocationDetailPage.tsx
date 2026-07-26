@@ -5,6 +5,7 @@ import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { NoteDialog } from "../shared/NoteDialog";
+import { activityTx } from "../../lib/activityLog";
 import type { AttachmentTarget } from "../../lib/attachments";
 import {
   DEFAULT_POST_RESERVATION_STATUS,
@@ -92,7 +93,16 @@ export function LocationDetailPage() {
     )[0];
 
   const setStatus = (status: string) => {
-    void db.transact(db.tx.locations[location.id].update({ status }));
+    void db.transact([
+      db.tx.locations[location.id].update({ status }),
+      activityTx({
+        eventType: "location.status_changed",
+        summary: `${location.name} set to ${statusLabel(status)}`,
+        subjectType: "locations",
+        subjectId: location.id,
+        actorId: current.user?.id,
+      }),
+    ]);
   };
 
   const toggleReservations = () => {

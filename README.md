@@ -53,6 +53,8 @@ src/
     boats/               Boat & Vehicle lists/details, owners-succession editor
     contacts/            Contact list/detail, nameless-contact merge, leases
     assets/              Asset list/detail, checkout/return, meter update
+    activity/            permission-scoped Activity Log feed
+    reports/             Reports home (aggregates), Shift report
     shared/              placeholders, More menu, config screen,
                          attachment-target picker, note dialog, schematic map,
                          target activity sections
@@ -91,8 +93,13 @@ src/
   return dialog (post-return status applied on return), meter update dialog
   (absolute reading or accrued hours, correction reason, inline
   maintenance-rule tickets)
+- ✅ Activity Log: entries generated at write time across every implemented
+  write path, feed scoped per entry by its subject's own permission,
+  Protected flag under `manage_marina_settings`
+- ✅ Reports: Reports home (aggregate-only sections + shift list, gated by
+  `view_reports`), Shift report compiled live by timestamp window
 - ⬜ Everything else renders a placeholder — see the docs' page-spec list for
-  the remaining groups (Comms, Activity Log, Reports, Admin), plus InstantDB
-  permission rules, Netlify Functions (shift report + scheduled jobs —
-  including scheduled-trigger Checklist generation and time-based
-  maintenance rules), and Twilio Functions (telephony bridge).
+  the remaining groups (Comms, Admin), plus InstantDB permission rules,
+  Netlify Functions (shift report send + scheduled jobs — including
+  scheduled-trigger Checklist generation, time-based maintenance rules, and
+  the Activity Log retention purge), and Twilio Functions (telephony bridge).

@@ -5,6 +5,7 @@ import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { compareNames } from "../../lib/locations";
 import { OwnersSection } from "./OwnersSection";
 import { TargetActivity } from "../shared/TargetActivity";
+import { activityTx } from "../../lib/activityLog";
 
 // Boats & Vehicles — Vehicle Detail (see docs/pages/vehicle-detail.html).
 // Mirrors Boat Detail: a partial record ("trailer, no plate, by the fuel
@@ -46,13 +47,31 @@ export function VehicleDetailPage() {
 
   const reassign = (locationId: string) => {
     if (!locationId) return;
-    void db.transact(db.tx.vehicles[vehicle.id].link({ currentLocation: locationId }));
+    const to = locationOptions.find((l) => l.id === locationId);
+    void db.transact([
+      db.tx.vehicles[vehicle.id].link({ currentLocation: locationId }),
+      activityTx({
+        eventType: "vehicle.location_changed",
+        summary: `${vehicle.description} moved to ${to?.name ?? "another location"}`,
+        subjectType: "vehicles",
+        subjectId: vehicle.id,
+        actorId: current.user?.id,
+      }),
+    ]);
   };
   const clearLocation = () => {
     if (!vehicle.currentLocation) return;
-    void db.transact(
+    const from = vehicle.currentLocation.name;
+    void db.transact([
       db.tx.vehicles[vehicle.id].unlink({ currentLocation: vehicle.currentLocation.id }),
-    );
+      activityTx({
+        eventType: "vehicle.departed",
+        summary: `${vehicle.description} departed ${from}`,
+        subjectType: "vehicles",
+        subjectId: vehicle.id,
+        actorId: current.user?.id,
+      }),
+    ]);
   };
 
   return (

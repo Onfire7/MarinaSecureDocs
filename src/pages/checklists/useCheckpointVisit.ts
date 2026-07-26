@@ -10,6 +10,7 @@ import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { deterministicId } from "../../lib/detId";
 import { distanceMeters } from "../../lib/geo";
 import { templateAppliesNow } from "../../lib/checklists";
+import { activityTx } from "../../lib/activityLog";
 
 const DEDUPE_WINDOW_MS = 5 * 60_000;
 const GPS_TIMEOUT_MS = 20_000;
@@ -108,6 +109,15 @@ export function useCheckpointVisit(
           })
           .link({ checkpoint: checkpointId!, user: userId }),
         ...checklistTxns,
+        activityTx({
+          eventType: method === "manual" ? "checkin.manual" : "checkin.scanned",
+          summary:
+            `${method === "manual" ? "Manual check-in" : "Checked in"} at ` +
+            `${checkpoint.name}${reason ? ` — ${reason}` : ""}`,
+          subjectType: "checkIns",
+          subjectId: checkInId,
+          actorId: userId,
+        }),
         ...(applicable.length > 0
           ? [
               db.tx.checkIns[checkInId].link({

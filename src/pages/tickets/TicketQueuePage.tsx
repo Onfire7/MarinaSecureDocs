@@ -10,6 +10,7 @@ import {
   targetPath,
 } from "../../lib/attachments";
 import { PRIORITY_ORDER, priorityBadgeClass } from "../../lib/workItems";
+import { activityTx } from "../../lib/activityLog";
 
 // Tickets — Ticket Queue (see pages/ticket-queue.html).
 // Deliberately no view permission: every role sees the queue and can create
@@ -61,13 +62,29 @@ export function TicketQueuePage() {
           : t.assignedTo?.id === assigneeFilter)),
   );
 
-  const take = (ticketId: string) => {
+  const logAssign = (ticketId: string, title: string, assigneeName: string) =>
+    activityTx({
+      eventType: "ticket.assigned",
+      summary: `"${title}" assigned to ${assigneeName}`,
+      subjectType: "tickets",
+      subjectId: ticketId,
+      actorId: current.user?.id,
+    });
+
+  const take = (ticketId: string, title: string) => {
     if (!current.user) return;
-    void db.transact(db.tx.tickets[ticketId].link({ assignedTo: current.user.id }));
+    void db.transact([
+      db.tx.tickets[ticketId].link({ assignedTo: current.user.id }),
+      logAssign(ticketId, title, current.user.name),
+    ]);
   };
-  const assign = (ticketId: string, userId: string) => {
+  const assign = (ticketId: string, title: string, userId: string) => {
     if (!userId) return;
-    void db.transact(db.tx.tickets[ticketId].link({ assignedTo: userId }));
+    const assignee = users.find((u) => u.id === userId);
+    void db.transact([
+      db.tx.tickets[ticketId].link({ assignedTo: userId }),
+      logAssign(ticketId, title, assignee?.name ?? "someone"),
+    ]);
   };
 
   return (
@@ -168,7 +185,7 @@ export function TicketQueuePage() {
                     <span className="muted small">{t.assignedTo.name}</span>
                   ) : (
                     canTake && (
-                      <button type="button" className="btn btn-sm" onClick={() => take(t.id)}>
+                      <button type="button" className="btn btn-sm" onClick={() => take(t.id, t.title)}>
                         Take
                       </button>
                     )
@@ -177,7 +194,7 @@ export function TicketQueuePage() {
                     <select
                       className="select select-inline"
                       value=""
-                      onChange={(e) => assign(t.id, e.target.value)}
+                      onChange={(e) => assign(t.id, t.title, e.target.value)}
                     >
                       <option value="">Assign…</option>
                       {users.map((u) => (

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { rangesOverlap } from "../../lib/reservations";
+import { activityTx } from "../../lib/activityLog";
 
 export interface NewReservationState {
   targetKind?: "location" | "asset";
@@ -162,6 +163,17 @@ export function NewReservationPage() {
           [targetKind]: targetId,
           ...(contact ? { contact } : {}),
         }),
+    );
+    const targetName =
+      selectedLocation?.name ?? selectedAsset?.name ?? "a reservable target";
+    txns.push(
+      activityTx({
+        eventType: "reservation.created",
+        summary: `Reservation created for ${targetName}`,
+        subjectType: "reservations",
+        subjectId: reservationId,
+        actorId: current.user?.id,
+      }),
     );
     await db.transact(txns);
     navigate(`/reservations/${reservationId}`, { replace: true });

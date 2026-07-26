@@ -145,7 +145,7 @@ export function CheckpointDetailPage() {
         <div>
           <div className="section-title spread">
             <span>Recent check-ins</span>
-            <Link to="/activity" className="small">
+            <Link to="/activity?subjectType=checkIns" className="small">
               Full history →
             </Link>
           </div>

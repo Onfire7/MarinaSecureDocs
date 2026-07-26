@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { displayName, findSimilarContacts, type ContactLike } from "../../lib/contacts";
+import { activityTx } from "../../lib/activityLog";
 
 // Owners & Contacts — Nameless-Contact Name Prompt & Merge Dialog (see
 // docs/pages/nameless-contact-merge.html). An unmatched inbound call/text
@@ -30,7 +31,16 @@ export function NamelessContactDialog({
   );
 
   const saveName = async () => {
-    await db.transact(db.tx.contacts[contact.id].update({ name: name.trim() }));
+    await db.transact([
+      db.tx.contacts[contact.id].update({ name: name.trim() }),
+      activityTx({
+        eventType: "contact.named",
+        summary: `Unnamed contact ${contact.phone ?? ""} named "${name.trim()}"`.trim(),
+        subjectType: "contacts",
+        subjectId: contact.id,
+        actorId: current.user?.id,
+      }),
+    ]);
     onResolved(contact.id);
   };
 
@@ -38,7 +48,19 @@ export function NamelessContactDialog({
   // match directly); display resolves through mergedInto to the canonical one.
   const confirmMerge = async () => {
     if (!selected) return;
-    await db.transact(db.tx.contacts[contact.id].link({ mergedInto: selected }));
+    const into = similar.find((c) => c.id === selected);
+    await db.transact([
+      db.tx.contacts[contact.id].link({ mergedInto: selected }),
+      activityTx({
+        eventType: "contact.merged",
+        summary:
+          `Contact ${contact.phone ?? "record"} merged into ` +
+          `${into ? displayName(into) : "another contact"}`,
+        subjectType: "contacts",
+        subjectId: selected,
+        actorId: current.user?.id,
+      }),
+    ]);
     onResolved(selected);
   };
 

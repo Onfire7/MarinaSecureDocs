@@ -7,6 +7,7 @@ import {
   dueMeterMaintenanceRules,
   maintenanceRuleTitle,
 } from "../../lib/maintenanceRules";
+import { activityTx } from "../../lib/activityLog";
 
 type Asset = InstaQLEntity<AppSchema, "assets">;
 
@@ -64,6 +65,15 @@ export function MeterUpdateDialog({
           ...(current.user ? { loggedBy: current.user.id } : {}),
         }),
       db.tx.assets[asset.id].update({ meterReading: newTotal }),
+      activityTx({
+        eventType: "asset.meter_updated",
+        summary:
+          `${asset.name} meter set to ${newTotal}` +
+          (isCorrection ? ` (correction: ${correctionReason.trim()})` : ""),
+        subjectType: "assets",
+        subjectId: asset.id,
+        actorId: current.user?.id,
+      }),
       // A due rule raises its ticket inline, not on a delayed sweep.
       ...dueRules.map((rule) =>
         db.tx.tickets[id()]

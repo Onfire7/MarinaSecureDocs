@@ -37,6 +37,9 @@ import { ContactDetailPage } from "./pages/contacts/ContactDetailPage";
 import { LeaseDetailPage } from "./pages/contacts/LeaseDetailPage";
 import { AssetListPage } from "./pages/assets/AssetListPage";
 import { AssetDetailPage } from "./pages/assets/AssetDetailPage";
+import { ActivityLogPage } from "./pages/activity/ActivityLogPage";
+import { ReportsHomePage } from "./pages/reports/ReportsHomePage";
+import { ShiftReportPage } from "./pages/reports/ShiftReportPage";
 
 export default function App() {
   const missing = missingConfig();
@@ -94,14 +97,9 @@ export default function App() {
             <Route path="/contacts/:id" element={<ContactDetailPage />} />
             <Route path="/assets" element={<AssetListPage />} />
             <Route path="/assets/:id" element={<AssetDetailPage />} />
-            <Route
-              path="/activity"
-              element={<PlaceholderPage title="Activity Log" spec="activity-log" />}
-            />
-            <Route
-              path="/reports/*"
-              element={<PlaceholderPage title="Reports" spec="reports-home" />}
-            />
+            <Route path="/activity" element={<ActivityLogPage />} />
+            <Route path="/reports" element={<ReportsHomePage />} />
+            <Route path="/reports/shifts/:id" element={<ShiftReportPage />} />
             <Route
               path="/admin/*"
               element={<PlaceholderPage title="Admin" spec="admin-home" />}

@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { DEFAULT_POST_RESERVATION_STATUS, statusLabel } from "../../lib/locations";
+import { activityTx } from "../../lib/activityLog";
 import {
   RESERVATION_STATUSES,
   isBillable,
@@ -349,6 +350,19 @@ function CheckInOutDialog({
         );
       }
     }
+
+    txns.push(
+      activityTx({
+        eventType: mode === "in" ? "reservation.checked_in" : "reservation.checked_out",
+        summary:
+          mode === "in"
+            ? `${reservation.contact?.name ?? "Guest"} checked in to ${target.name}`
+            : `${reservation.contact?.name ?? "Guest"} checked out of ${target.name}`,
+        subjectType: "reservations",
+        subjectId: reservation.id,
+        actorId: current.user?.id,
+      }),
+    );
 
     await db.transact(txns);
     onClose();
