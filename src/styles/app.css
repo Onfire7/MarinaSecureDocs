@@ -690,6 +690,47 @@ h3 {
   background: var(--good-bg);
 }
 
+/* ---------- Admin: permission matrix ---------- */
+
+.matrix-scroll {
+  overflow-x: auto;
+}
+.matrix-table th:first-child,
+.matrix-table td:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--panel);
+  z-index: 1;
+  min-width: 210px;
+}
+.matrix-table th:first-child {
+  background: var(--fill);
+}
+.perm-cell {
+  font: inherit;
+  font-weight: 700;
+  width: 34px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--mute);
+  cursor: pointer;
+}
+.perm-cell:hover {
+  border-color: var(--accent);
+}
+.perm-allow {
+  background: var(--good-bg);
+  border-color: var(--good);
+  color: var(--good);
+}
+.perm-deny {
+  background: var(--bad-bg);
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
 /* ---------- Reservations: calendar ---------- */
 
 .cal-grid {

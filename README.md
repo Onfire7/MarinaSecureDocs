@@ -55,6 +55,7 @@ src/
     assets/              Asset list/detail, checkout/return, meter update
     activity/            permission-scoped Activity Log feed
     reports/             Reports home (aggregates), Shift report
+    admin/               all 10 configuration screens, each independently gated
     shared/              placeholders, More menu, config screen,
                          attachment-target picker, note dialog, schematic map,
                          target activity sections
@@ -98,8 +99,14 @@ src/
   Protected flag under `manage_marina_settings`
 - ✅ Reports: Reports home (aggregate-only sections + shift list, gated by
   `view_reports`), Shift report compiled live by timestamp window
-- ⬜ Everything else renders a placeholder — see the docs' page-spec list for
-  the remaining groups (Comms, Admin), plus InstantDB permission rules,
-  Netlify Functions (shift report send + scheduled jobs — including
-  scheduled-trigger Checklist generation, time-based maintenance rules, and
-  the Activity Log retention purge), and Twilio Functions (telephony bridge).
+- ✅ Admin: home tile picker plus Users, Roles & Permissions (trinary
+  matrix), Checklist Templates (builder with per-item config), Location
+  Types & Locations (hierarchy, checkpoints, map upload and drag-plotting),
+  Tours, Incident Types, Asset Categories & Maintenance Rules, SMS
+  Templates, and Marina Settings — each independently permission-gated
+- ⬜ Remaining: the Comms group (calls/SMS depend on the Twilio bridge; chat
+  rooms are buildable now), InstantDB server-side permission rules, Netlify
+  Functions (shift report send + scheduled jobs — scheduled-trigger
+  Checklist generation, time-based maintenance rules, Activity Log
+  retention purge), and Twilio Functions (telephony bridge). Sending Clerk
+  invitation emails from Admin → Users also needs a server-side call.

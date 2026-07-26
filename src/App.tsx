@@ -38,6 +38,16 @@ import { LeaseDetailPage } from "./pages/contacts/LeaseDetailPage";
 import { AssetListPage } from "./pages/assets/AssetListPage";
 import { AssetDetailPage } from "./pages/assets/AssetDetailPage";
 import { ActivityLogPage } from "./pages/activity/ActivityLogPage";
+import { AdminHomePage } from "./pages/admin/AdminHomePage";
+import { AdminUsersPage } from "./pages/admin/AdminUsersPage";
+import { AdminRolesPage } from "./pages/admin/AdminRolesPage";
+import { AdminChecklistTemplatesPage } from "./pages/admin/AdminChecklistTemplatesPage";
+import { AdminLocationsPage } from "./pages/admin/AdminLocationsPage";
+import { AdminToursPage } from "./pages/admin/AdminToursPage";
+import { AdminIncidentTypesPage } from "./pages/admin/AdminIncidentTypesPage";
+import { AdminAssetsPage } from "./pages/admin/AdminAssetsPage";
+import { AdminSmsTemplatesPage } from "./pages/admin/AdminSmsTemplatesPage";
+import { AdminMarinaSettingsPage } from "./pages/admin/AdminMarinaSettingsPage";
 import { ReportsHomePage } from "./pages/reports/ReportsHomePage";
 import { ShiftReportPage } from "./pages/reports/ShiftReportPage";
 
@@ -100,10 +110,19 @@ export default function App() {
             <Route path="/activity" element={<ActivityLogPage />} />
             <Route path="/reports" element={<ReportsHomePage />} />
             <Route path="/reports/shifts/:id" element={<ShiftReportPage />} />
+            <Route path="/admin" element={<AdminHomePage />} />
+            <Route path="/admin/users" element={<AdminUsersPage />} />
+            <Route path="/admin/roles" element={<AdminRolesPage />} />
             <Route
-              path="/admin/*"
-              element={<PlaceholderPage title="Admin" spec="admin-home" />}
+              path="/admin/checklist-templates"
+              element={<AdminChecklistTemplatesPage />}
             />
+            <Route path="/admin/locations" element={<AdminLocationsPage />} />
+            <Route path="/admin/tours" element={<AdminToursPage />} />
+            <Route path="/admin/incident-types" element={<AdminIncidentTypesPage />} />
+            <Route path="/admin/assets" element={<AdminAssetsPage />} />
+            <Route path="/admin/sms-templates" element={<AdminSmsTemplatesPage />} />
+            <Route path="/admin/settings" element={<AdminMarinaSettingsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
