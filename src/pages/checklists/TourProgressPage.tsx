@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
+import { ManualCheckinDialog } from "./ManualCheckinDialog";
 
 // Checklists & Tours — Tour Progress View (see pages/tour-progress.html).
 // Security-only. Progress is derived from the current guard's own check-ins
@@ -10,6 +12,7 @@ export function TourProgressPage() {
   const { tourId } = useParams();
   const current = useCurrent();
   const userId = current.user?.id;
+  const [manualCheckin, setManualCheckin] = useState(false);
 
   const { data } = db.useQuery(
     tourId ? { tours: { $: { where: { id: tourId } }, checkpoints: { location: {} } } } : null,
@@ -80,10 +83,21 @@ export function TourProgressPage() {
         <h1 className="page-title">
           {tour.name} <span className="badge badge-accent">Security</span>
         </h1>
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={() => setManualCheckin(true)}
+        >
+          Check in manually
+        </button>
       </div>
       <div className="badge" style={{ marginBottom: 10 }}>
         {modeLabel(tour.mode)}
       </div>
+
+      {manualCheckin && (
+        <ManualCheckinDialog onClose={() => setManualCheckin(false)} />
+      )}
 
       {tour.mode === "linear" && (
         <LinearProgress

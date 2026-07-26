@@ -89,6 +89,13 @@ export function ChecklistListPage() {
     <div>
       <div className="page-head">
         <h1 className="page-title">Checklists</h1>
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={() => setShowManualCheckin(true)}
+        >
+          Check in manually
+        </button>
       </div>
 
       <div className="chip-row">
@@ -198,7 +205,7 @@ export function ChecklistListPage() {
 
         {showTours && (
           <div>
-            <ToursPanel onManualCheckin={() => setShowManualCheckin(true)} />
+            <ToursPanel />
           </div>
         )}
       </div>
@@ -210,18 +217,13 @@ export function ChecklistListPage() {
   );
 }
 
-function ToursPanel({ onManualCheckin }: { onManualCheckin: () => void }) {
+function ToursPanel() {
   const { data } = db.useQuery({ tours: { checkpoints: {} } });
   const tours = data?.tours ?? [];
   return (
     <div>
-      <div className="section-title spread">
-        <span>
-          Tours <span className="badge badge-accent">Security</span>
-        </span>
-        <button type="button" className="btn btn-sm" onClick={onManualCheckin}>
-          Log manual check-in
-        </button>
+      <div className="section-title">
+        Tours <span className="badge badge-accent">Security</span>
       </div>
       {tours.length === 0 && (
         <div className="placeholder">

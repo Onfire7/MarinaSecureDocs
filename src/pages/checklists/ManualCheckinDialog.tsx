@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { db } from "../../lib/db";
+import { distanceMeters } from "../../lib/geo";
 import { useCheckpointVisit } from "./useCheckpointVisit";
 
 // Checklists & Tours — Manual Check-In Dialog (see pages/manual-checkin-dialog.html).
@@ -14,7 +15,36 @@ export function ManualCheckinDialog({ onClose }: { onClose: () => void }) {
   const [submitted, setSubmitted] = useState(false);
 
   const { data } = db.useQuery({ checkpoints: { location: {} } });
-  const checkpoints = data?.checkpoints ?? [];
+
+  // Nearest first when the device will say where it is — this dialog gets
+  // used in the field, standing at the checkpoint whose tag won't scan.
+  const [here, setHere] = useState<{ lat: number; lng: number } | null>(null);
+  useEffect(() => {
+    if (!("geolocation" in navigator)) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setHere({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      // No location is fine — the full list is the documented fallback.
+      () => setHere(null),
+      { timeout: 10_000 },
+    );
+  }, []);
+
+  const checkpoints = useMemo(() => {
+    const all = [...(data?.checkpoints ?? [])];
+    if (!here) {
+      return all.sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { numeric: true }),
+      );
+    }
+    const distanceOf = (cp: (typeof all)[number]) =>
+      cp.gpsLat != null && cp.gpsLng != null
+        ? distanceMeters(here.lat, here.lng, cp.gpsLat, cp.gpsLng)
+        : Number.POSITIVE_INFINITY;
+    return all
+      .map((cp) => ({ cp, d: distanceOf(cp) }))
+      .sort((a, b) => a.d - b.d || a.cp.name.localeCompare(b.cp.name))
+      .map(({ cp, d }) => ({ ...cp, distance: d }));
+  }, [data, here]);
 
   const visit = useCheckpointVisit(
     submitted ? checkpointId : undefined,
@@ -44,13 +74,23 @@ export function ManualCheckinDialog({ onClose }: { onClose: () => void }) {
                 value={checkpointId}
                 onChange={(e) => setCheckpointId(e.target.value)}
               >
-                <option value="">Select…</option>
-                {checkpoints.map((cp) => (
-                  <option key={cp.id} value={cp.id}>
-                    {cp.name}
-                    {cp.location?.name ? ` — ${cp.location.name}` : ""}
-                  </option>
-                ))}
+                <option value="">
+                  {here ? "Select — nearest first…" : "Select…"}
+                </option>
+                {checkpoints.map((cp) => {
+                  const d = (cp as { distance?: number }).distance;
+                  const near =
+                    d != null && Number.isFinite(d)
+                      ? ` · ${d < 1000 ? `${Math.round(d)} m` : `${(d / 1000).toFixed(1)} km`} away`
+                      : "";
+                  return (
+                    <option key={cp.id} value={cp.id}>
+                      {cp.name}
+                      {cp.location?.name ? ` — ${cp.location.name}` : ""}
+                      {near}
+                    </option>
+                  );
+                })}
               </select>
             </div>
             <div className="field">

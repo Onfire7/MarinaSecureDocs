@@ -49,8 +49,13 @@ export function useCheckpointVisit(
   const { data: resumedData, isLoading: resumedLoading } = db.useQuery(
     resumeCheckInId ? { checkIns: { $: { where: { id: resumeCheckInId } } } } : null,
   );
+  // Dedupe exists because the scanned screen is reached by re-opening a URL
+  // (reload, resumed tab). The manual dialog is opened from inside a running
+  // session and closes on submit, so it needs no dedupe — and applying it
+  // would silently swallow a legitimate second manual check-in at the same
+  // checkpoint, per the Manual Check-In spec.
   const { data: recentData, isLoading: recentLoading } = db.useQuery(
-    !resumeCheckInId && checkpointId && userId
+    method === "scanned" && !resumeCheckInId && checkpointId && userId
       ? {
           checkIns: {
             $: {
@@ -68,7 +73,8 @@ export function useCheckpointVisit(
 
   const existingCheckIn =
     resumedData?.checkIns?.[0] ?? recentData?.checkIns?.[0] ?? null;
-  const dedupeSettled = resumeCheckInId ? !resumedLoading : !recentLoading;
+  const dedupeSettled =
+    method === "manual" ? true : resumeCheckInId ? !resumedLoading : !recentLoading;
 
   const [createdCheckInId, setCreatedCheckInId] = useState<string | null>(null);
   const creating = useRef(false);
