@@ -119,7 +119,11 @@ backend, without which some actions can't complete:
 - ⬜ **Netlify Functions** — shift-report send, plus the scheduled jobs:
   checklist-trigger generation, time-based maintenance rules, and the
   Activity Log retention purge.
-- ⬜ **InstantDB permission rules** — the app currently enforces permissions
-  client-side only. These matter before any production use.
+- 🟡 **InstantDB permission rules** — `instant.perms.ts` now blocks anonymous
+  access: every namespace requires a signed-in Clerk identity resolving to an
+  *active* marina User, runtime attribute creation is off, `$users` is
+  read-only, and Activity Log entries can't be deleted from the client.
+  Per-permission enforcement (`view_incidents`, `manage_locations`, …) is
+  **not** enforced server-side yet — see the gap notes in that file.
 - ⬜ **Clerk invitation emails** from Admin → Users need a server-side call;
   provisioning + email-matched first sign-in works today.
