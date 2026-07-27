@@ -32,11 +32,30 @@ const _schema = i.schema({
       active: i.boolean(),
       // Ordered [{ card, visible }] pairs; null = derive from current roles.
       dashboardLayout: i.json<{ card: string; visible: boolean }[]>().optional(),
+      // Denormalized copies of two effective permissions (allow minus deny
+      // across every currently-held role — see lib/permissions.ts),
+      // rewritten by Admin Roles/Users whenever a role's grants or this
+      // user's role links change. Plain booleans rather than a permission
+      // array: instant.perms.ts rules can only reach these via a single-hop
+      // auth.ref() to a scalar attribute (the same pattern already proven
+      // with `active`) — whether auth.ref() flattens a JSON array attribute
+      // or returns a list-of-lists is undocumented, so the rules never read
+      // one. Only these two are cached because they're the only permissions
+      // enforced server-side today; see instant.perms.ts.
+      canManageRoles: i.boolean().optional(),
+      canManageUsers: i.boolean().optional(),
     }),
     roles: i.entity({
       name: i.string(),
-      // Map of permission key → "allow" | "deny"; absent key = undefined (no opinion).
-      permissions: i.json<Record<string, "allow" | "deny">>(),
+      // Permission keys this role grants / explicitly denies. Was a single
+      // map<Permission, "allow"|"deny">; split into two plain string arrays
+      // because InstantDB's CEL permission rules can test list membership
+      // ("x" in data.ref(...)) but can't index into a JSON map — a rule
+      // needs "is this key present in this list", not "what's the value at
+      // this key". Absent from both = undefined (no opinion), matching the
+      // trinary model exactly.
+      allow: i.json<string[]>().optional(),
+      deny: i.json<string[]>().optional(),
     }),
 
     // ---- locations & checkpoints ----

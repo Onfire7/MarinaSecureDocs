@@ -30,25 +30,46 @@ export const PERMISSIONS = [
 
 export type Permission = (typeof PERMISSIONS)[number];
 
-export type RolePermissionMap = Partial<Record<Permission, "allow" | "deny">>;
-
 export interface RoleLike {
   name: string;
-  permissions?: Record<string, "allow" | "deny">;
+  // Permission keys this role grants / explicitly denies. Two plain arrays
+  // rather than one map<Permission, "allow"|"deny">, because InstantDB's
+  // CEL permission rules can test list membership but can't index into a
+  // JSON map — see instant.schema.ts (Role) and instant.perms.ts.
+  allow?: string[];
+  deny?: string[];
 }
 
 export function computeEffectivePermissions(roles: RoleLike[]): Set<Permission> {
   const granted = new Set<Permission>();
   const denied = new Set<Permission>();
   for (const role of roles) {
-    for (const [key, value] of Object.entries(role.permissions ?? {})) {
-      if (!(PERMISSIONS as readonly string[]).includes(key)) continue;
-      if (value === "allow") granted.add(key as Permission);
-      else if (value === "deny") denied.add(key as Permission);
+    for (const key of role.allow ?? []) {
+      if ((PERMISSIONS as readonly string[]).includes(key)) granted.add(key as Permission);
+    }
+    for (const key of role.deny ?? []) {
+      if ((PERMISSIONS as readonly string[]).includes(key)) denied.add(key as Permission);
     }
   }
   for (const p of denied) granted.delete(p);
   return granted;
+}
+
+/**
+ * The two booleans written to User.canManageRoles/canManageUsers — the
+ * denormalized cache instant.perms.ts rules read. Call this any time a
+ * role's grants or a user's role assignments change (Admin Roles / Admin
+ * Users), never from the affected user's own session — see instant.perms.ts
+ * for why the write itself is gated by manage_users/manage_roles.
+ */
+export function computeManagementFlags(
+  roles: RoleLike[],
+): { canManageRoles: boolean; canManageUsers: boolean } {
+  const perms = computeEffectivePermissions(roles);
+  return {
+    canManageRoles: perms.has("manage_roles"),
+    canManageUsers: perms.has("manage_users"),
+  };
 }
 
 // The Admin section is visible to anyone holding at least one manage_* permission.

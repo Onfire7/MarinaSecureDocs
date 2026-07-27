@@ -61,6 +61,7 @@
         <tr><td>active</td><td>boolean</td><td>Deactivated users are hidden from assignment pickers but preserved for historical records.</td></tr>
         <tr><td>contact</td><td>ref → Contact</td><td>Optional link so a User can also be reached as a Contact (e.g. for asset checkout).</td></tr>
         <tr><td>dashboard_layout</td><td>structured, nullable</td><td>Ordered list of <code>{card, visible}</code> pairs for the <a href="pages/dashboard.html">Dashboard</a>. Null means "use the default derived from this user's current roles" — only set once a user actually customizes their layout.</td></tr>
+        <tr><td>can_manage_roles / can_manage_users</td><td>boolean, nullable</td><td>Denormalized copies of this user's effective <code>manage_roles</code> / <code>manage_users</code> permissions (see <a href="permissions.html">Permissions</a>), rewritten by Admin → Roles/Users whenever a role's grants or this user's role links change. Exists only so the server-side permission rules can check them in a single hop; the app itself always computes permissions live from <code>roles</code>.</td></tr>
       </table>
     </div>
 
@@ -69,11 +70,11 @@
       <table>
         <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
         <tr><td>name</td><td>text</td><td>e.g. "Security," "Maintenance," "Office," "Marina Manager." Admin-editable; can be duplicated or removed.</td></tr>
-        <tr><td>permissions</td><td>map of Permission → trinary value</td><td>See <a href="permissions.html">Permissions</a> for the full list and computation logic.</td></tr>
+        <tr><td>allow / deny</td><td>list of Permission, nullable</td><td>The permission keys this role grants and explicitly denies. A key absent from both is Undefined. See <a href="permissions.html">Permissions</a> for the full list and effective-value computation.</td></tr>
       </table>
     </div>
 
-    <p>Permission values themselves aren't a separate top-level entity with rows per user — they're a fixed, admin-editable list (see <a href="permissions.html">Permissions</a>) applied as a map on each Role.</p>
+    <p>Permission values themselves aren't a separate top-level entity with rows per user — they're a fixed, admin-editable list (see <a href="permissions.html">Permissions</a>) applied as two lists on each Role.</p>
 
     <div class="fathom">locations &amp; checkpoints</div>
 

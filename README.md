@@ -123,7 +123,12 @@ backend, without which some actions can't complete:
   access: every namespace requires a signed-in Clerk identity resolving to an
   *active* marina User, runtime attribute creation is off, `$users` is
   read-only, and Activity Log entries can't be deleted from the client.
-  Per-permission enforcement (`view_incidents`, `manage_locations`, …) is
-  **not** enforced server-side yet — see the gap notes in that file.
+  `roles` and `users` writes are further gated server-side by a denormalized
+  `canManageRoles`/`canManageUsers` cache on each User (kept in sync by
+  Admin → Roles/Users), closing the privilege-escalation hole where any
+  signed-in user could otherwise grant themselves `manage_*` directly.
+  Per-permission enforcement for everything else (`view_incidents`,
+  `manage_locations`, …) is **not** enforced server-side yet — those stay
+  client-side checks only.
 - ⬜ **Clerk invitation emails** from Admin → Users need a server-side call;
   provisioning + email-matched first sign-in works today.

@@ -2,7 +2,11 @@ import { useMemo, useState } from "react";
 import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
-import { PERMISSIONS, type Permission } from "../../lib/permissions";
+import {
+  PERMISSIONS,
+  computeManagementFlags,
+  type Permission,
+} from "../../lib/permissions";
 import { activityTx } from "../../lib/activityLog";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
@@ -20,10 +24,14 @@ export function AdminRolesPage() {
   );
 }
 
-type RoleRow = {
-  id: string;
-  name: string;
-  permissions: Record<string, "allow" | "deny">;
+type RoleRef = { id: string; name: string; allow?: string[]; deny?: string[] };
+
+type RoleRow = RoleRef & {
+  // Every user currently holding this role, each with their *entire* set of
+  // roles (not just this one) — needed to recompute their cached
+  // canManageRoles/canManageUsers across all of a user's roles whenever
+  // this role's grants change.
+  users?: { id: string; roles?: RoleRef[] }[];
 };
 
 type CellValue = "allow" | "deny" | undefined;
@@ -53,24 +61,31 @@ function Roles() {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
 
-  const { data } = db.useQuery({ roles: { users: {} } });
+  const { data } = db.useQuery({ roles: { users: { roles: {} } } });
   const roles = useMemo(
     () => [...((data?.roles ?? []) as RoleRow[])].sort((a, b) => a.name.localeCompare(b.name)),
     [data],
   );
 
   const setCell = (role: RoleRow, permission: Permission, value: CellValue) => {
-    const next = { ...(role.permissions ?? {}) };
-    if (value === undefined) delete next[permission];
-    else next[permission] = value;
+    const allow = new Set(role.allow ?? []);
+    const deny = new Set(role.deny ?? []);
+    allow.delete(permission);
+    deny.delete(permission);
+    if (value === "allow") allow.add(permission);
+    else if (value === "deny") deny.add(permission);
+    const nextAllow = [...allow];
+    const nextDeny = [...deny];
 
     // Warn — but don't block — before manage_roles stops being granted
     // anywhere, which would lock everyone out of this screen. Mirrors the
     // effective-permission rule: any Allow grants, any Deny cancels it.
     if (permission === "manage_roles" && value !== "allow") {
-      const after = roles.map((r) => (r.id === role.id ? { ...r, permissions: next } : r));
-      const anyAllows = after.some((r) => r.permissions?.manage_roles === "allow");
-      const anyDenies = after.some((r) => r.permissions?.manage_roles === "deny");
+      const after = roles.map((r) =>
+        r.id === role.id ? { ...r, allow: nextAllow, deny: nextDeny } : r,
+      );
+      const anyAllows = after.some((r) => r.allow?.includes("manage_roles"));
+      const anyDenies = after.some((r) => r.deny?.includes("manage_roles"));
       const stillGranted = anyAllows && !anyDenies;
       if (!stillGranted) {
         const ok = window.confirm(
@@ -81,8 +96,15 @@ function Roles() {
     }
 
     setWarning(null);
-    void db.transact([
-      db.tx.roles[role.id].update({ permissions: next }),
+    const txns = [];
+    txns.push(db.tx.roles[role.id].update({ allow: nextAllow, deny: nextDeny }));
+    for (const u of role.users ?? []) {
+      const updatedRoles = (u.roles ?? []).map((r) =>
+        r.id === role.id ? { ...r, allow: nextAllow, deny: nextDeny } : r,
+      );
+      txns.push(db.tx.users[u.id].update(computeManagementFlags(updatedRoles)));
+    }
+    txns.push(
       activityTx({
         eventType: "role.permission_changed",
         summary: `${role.name}: ${permission} set to ${value ?? "undefined"}`,
@@ -90,7 +112,8 @@ function Roles() {
         subjectId: role.id,
         actorId: current.user?.id,
       }),
-    ]);
+    );
+    void db.transact(txns);
   };
 
   const addRole = async (from?: RoleRow) => {
@@ -104,7 +127,8 @@ function Roles() {
       db.tx.roles[roleId].update({
         name: name.trim(),
         // A fresh role starts with everything Undefined.
-        permissions: from ? { ...(from.permissions ?? {}) } : {},
+        allow: from?.allow ?? [],
+        deny: from?.deny ?? [],
       }),
       activityTx({
         eventType: "role.created",
@@ -133,7 +157,7 @@ function Roles() {
     ]);
   };
 
-  const deleteRole = async (role: RoleRow & { users?: { id: string }[] }) => {
+  const deleteRole = async (role: RoleRow) => {
     const holders = (role.users ?? []).length;
     const ok = window.confirm(
       holders > 0
@@ -141,8 +165,13 @@ function Roles() {
         : `Delete "${role.name}"?`,
     );
     if (!ok) return;
-    await db.transact([
-      db.tx.roles[role.id].delete(),
+    const txns = [];
+    txns.push(db.tx.roles[role.id].delete());
+    for (const u of role.users ?? []) {
+      const remainingRoles = (u.roles ?? []).filter((r) => r.id !== role.id);
+      txns.push(db.tx.users[u.id].update(computeManagementFlags(remainingRoles)));
+    }
+    txns.push(
       activityTx({
         eventType: "role.deleted",
         summary: `Role "${role.name}" deleted`,
@@ -150,7 +179,8 @@ function Roles() {
         subjectId: role.id,
         actorId: current.user?.id,
       }),
-    ]);
+    );
+    await db.transact(txns);
   };
 
   const active = roles.find((r) => r.id === selectedRole) ?? roles[0];
@@ -225,7 +255,11 @@ function Roles() {
                 </button>
               </div>
               {PERMISSIONS.map((p) => {
-                const v = active.permissions?.[p];
+                const v: CellValue = active.allow?.includes(p)
+                  ? "allow"
+                  : active.deny?.includes(p)
+                    ? "deny"
+                    : undefined;
                 return (
                   <div key={p} className="card spread">
                     <code className="small">{p}</code>
@@ -288,7 +322,11 @@ function Roles() {
                     <code className="small">{p}</code>
                   </td>
                   {roles.map((r) => {
-                    const v = r.permissions?.[p];
+                    const v: CellValue = r.allow?.includes(p)
+                      ? "allow"
+                      : r.deny?.includes(p)
+                        ? "deny"
+                        : undefined;
                     return (
                       <td key={r.id} style={{ textAlign: "center" }}>
                         <button

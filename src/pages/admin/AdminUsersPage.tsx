@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { computeEffectivePermissions } from "../../lib/permissions";
+import { computeEffectivePermissions, computeManagementFlags } from "../../lib/permissions";
 import { activityTx } from "../../lib/activityLog";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
@@ -23,8 +23,10 @@ type UserRow = {
   phone?: string;
   active: boolean;
   clerkUserId?: string;
-  roles?: { id: string; name: string; permissions: Record<string, "allow" | "deny"> }[];
+  roles?: RoleRef[];
 };
+
+type RoleRef = { id: string; name: string; allow?: string[]; deny?: string[] };
 
 function Users() {
   const current = useCurrent();
@@ -187,7 +189,7 @@ function EditUser({
   onDone,
 }: {
   user: UserRow;
-  allRoles: { id: string; name: string }[];
+  allRoles: RoleRef[];
   onDone: () => void;
 }) {
   const current = useCurrent();
@@ -202,11 +204,13 @@ function EditUser({
   const save = async () => {
     const added = roleIds.filter((r) => !original.includes(r));
     const removed = original.filter((r) => !roleIds.includes(r));
+    const newRoles = allRoles.filter((r) => roleIds.includes(r.id));
     await db.transact([
       db.tx.users[user.id].update({
         name: form.name.trim(),
         email: form.email.trim() || undefined,
         phone: form.phone.trim() || undefined,
+        ...computeManagementFlags(newRoles),
       }),
       ...(added.length > 0 ? [db.tx.users[user.id].link({ roles: added })] : []),
       ...(removed.length > 0 ? [db.tx.users[user.id].unlink({ roles: removed })] : []),
