@@ -6,7 +6,9 @@ import {
   CurrentUserProvider,
   useCurrent,
 } from "./lib/auth/CurrentUserContext";
+import { useInstantAuthError } from "./lib/auth/instantAuthStatus";
 import { AppShell } from "./layout/AppShell";
+import { ErrorBoundary } from "./layout/ErrorBoundary";
 import { SignInPage } from "./pages/access/SignInPage";
 import { UserSwitchPage } from "./pages/access/UserSwitchPage";
 import { DashboardPage } from "./pages/home/DashboardPage";
@@ -68,70 +70,72 @@ export default function App() {
     >
       <InstantAuthSync />
       <BrowserRouter>
-        <Routes>
-          <Route path="/sign-in" element={<SignInPage />} />
-          <Route path="/switch-user" element={<UserSwitchPage />} />
-          {/* Public deep link (NFC/QR): sits outside RequireAuth so an
-              unauthenticated scan still resolves, but supplies the
-              current-user context the check-in write needs. */}
-          <Route path="/checkin/:guidUrl" element={<CheckinRoute />} />
-          <Route element={<RequireAuth />}>
-            <Route path="/" element={<DashboardPage />} />
-            <Route path="/more" element={<MorePage />} />
-            <Route path="/checklists" element={<ChecklistListPage />} />
-            <Route path="/checklists/tours/:tourId" element={<TourProgressPage />} />
-            <Route path="/checklists/:id" element={<ChecklistRoute />} />
-            <Route path="/locations" element={<LocationListPage />} />
-            <Route
-              path="/locations/checkpoints/:id"
-              element={<CheckpointDetailPage />}
-            />
-            <Route path="/locations/:id" element={<LocationDetailPage />} />
-            <Route path="/comms" element={<CommsHomePage />} />
-            <Route path="/comms/missed" element={<MissedCommsPage />} />
-            <Route path="/comms/chat/new" element={<NewChatRoomPage />} />
-            <Route path="/comms/chat/:id" element={<ChatRoomPage />} />
-            <Route path="/comms/sms/:id" element={<SmsThreadPage />} />
-            <Route path="/tickets" element={<TicketQueuePage />} />
-            <Route path="/tickets/new" element={<NewTicketPage />} />
-            <Route path="/tickets/:id" element={<TicketDetailPage />} />
-            <Route path="/incidents" element={<IncidentListPage />} />
-            <Route path="/incidents/new" element={<NewIncidentPage />} />
-            <Route path="/incidents/:id" element={<IncidentDetailPage />} />
-            <Route path="/reservations" element={<ReservationListPage />} />
-            <Route path="/reservations/new" element={<NewReservationPage />} />
-            <Route path="/reservations/:id" element={<ReservationDetailPage />} />
-            <Route path="/boats" element={<BoatListPage />} />
-            <Route path="/boats/:id" element={<BoatDetailPage />} />
-            <Route path="/vehicles/:id" element={<VehicleDetailPage />} />
-            <Route path="/contacts" element={<ContactListPage />} />
-            <Route
-              path="/contacts/leases/new"
-              element={<LeaseDetailPage mode="create" />}
-            />
-            <Route path="/contacts/leases/:id" element={<LeaseDetailPage />} />
-            <Route path="/contacts/:id" element={<ContactDetailPage />} />
-            <Route path="/assets" element={<AssetListPage />} />
-            <Route path="/assets/:id" element={<AssetDetailPage />} />
-            <Route path="/activity" element={<ActivityLogPage />} />
-            <Route path="/reports" element={<ReportsHomePage />} />
-            <Route path="/reports/shifts/:id" element={<ShiftReportPage />} />
-            <Route path="/admin" element={<AdminHomePage />} />
-            <Route path="/admin/users" element={<AdminUsersPage />} />
-            <Route path="/admin/roles" element={<AdminRolesPage />} />
-            <Route
-              path="/admin/checklist-templates"
-              element={<AdminChecklistTemplatesPage />}
-            />
-            <Route path="/admin/locations" element={<AdminLocationsPage />} />
-            <Route path="/admin/tours" element={<AdminToursPage />} />
-            <Route path="/admin/incident-types" element={<AdminIncidentTypesPage />} />
-            <Route path="/admin/assets" element={<AdminAssetsPage />} />
-            <Route path="/admin/sms-templates" element={<AdminSmsTemplatesPage />} />
-            <Route path="/admin/settings" element={<AdminMarinaSettingsPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/sign-in" element={<SignInPage />} />
+            <Route path="/switch-user" element={<UserSwitchPage />} />
+            {/* Public deep link (NFC/QR): sits outside RequireAuth so an
+                unauthenticated scan still resolves, but supplies the
+                current-user context the check-in write needs. */}
+            <Route path="/checkin/:guidUrl" element={<CheckinRoute />} />
+            <Route element={<RequireAuth />}>
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/more" element={<MorePage />} />
+              <Route path="/checklists" element={<ChecklistListPage />} />
+              <Route path="/checklists/tours/:tourId" element={<TourProgressPage />} />
+              <Route path="/checklists/:id" element={<ChecklistRoute />} />
+              <Route path="/locations" element={<LocationListPage />} />
+              <Route
+                path="/locations/checkpoints/:id"
+                element={<CheckpointDetailPage />}
+              />
+              <Route path="/locations/:id" element={<LocationDetailPage />} />
+              <Route path="/comms" element={<CommsHomePage />} />
+              <Route path="/comms/missed" element={<MissedCommsPage />} />
+              <Route path="/comms/chat/new" element={<NewChatRoomPage />} />
+              <Route path="/comms/chat/:id" element={<ChatRoomPage />} />
+              <Route path="/comms/sms/:id" element={<SmsThreadPage />} />
+              <Route path="/tickets" element={<TicketQueuePage />} />
+              <Route path="/tickets/new" element={<NewTicketPage />} />
+              <Route path="/tickets/:id" element={<TicketDetailPage />} />
+              <Route path="/incidents" element={<IncidentListPage />} />
+              <Route path="/incidents/new" element={<NewIncidentPage />} />
+              <Route path="/incidents/:id" element={<IncidentDetailPage />} />
+              <Route path="/reservations" element={<ReservationListPage />} />
+              <Route path="/reservations/new" element={<NewReservationPage />} />
+              <Route path="/reservations/:id" element={<ReservationDetailPage />} />
+              <Route path="/boats" element={<BoatListPage />} />
+              <Route path="/boats/:id" element={<BoatDetailPage />} />
+              <Route path="/vehicles/:id" element={<VehicleDetailPage />} />
+              <Route path="/contacts" element={<ContactListPage />} />
+              <Route
+                path="/contacts/leases/new"
+                element={<LeaseDetailPage mode="create" />}
+              />
+              <Route path="/contacts/leases/:id" element={<LeaseDetailPage />} />
+              <Route path="/contacts/:id" element={<ContactDetailPage />} />
+              <Route path="/assets" element={<AssetListPage />} />
+              <Route path="/assets/:id" element={<AssetDetailPage />} />
+              <Route path="/activity" element={<ActivityLogPage />} />
+              <Route path="/reports" element={<ReportsHomePage />} />
+              <Route path="/reports/shifts/:id" element={<ShiftReportPage />} />
+              <Route path="/admin" element={<AdminHomePage />} />
+              <Route path="/admin/users" element={<AdminUsersPage />} />
+              <Route path="/admin/roles" element={<AdminRolesPage />} />
+              <Route
+                path="/admin/checklist-templates"
+                element={<AdminChecklistTemplatesPage />}
+              />
+              <Route path="/admin/locations" element={<AdminLocationsPage />} />
+              <Route path="/admin/tours" element={<AdminToursPage />} />
+              <Route path="/admin/incident-types" element={<AdminIncidentTypesPage />} />
+              <Route path="/admin/assets" element={<AdminAssetsPage />} />
+              <Route path="/admin/sms-templates" element={<AdminSmsTemplatesPage />} />
+              <Route path="/admin/settings" element={<AdminMarinaSettingsPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </ErrorBoundary>
       </BrowserRouter>
     </ClerkProvider>
   );
@@ -162,8 +166,12 @@ function CheckinRoute() {
 // check-in, so say so plainly instead of silently recording nothing.
 function CheckinGate() {
   const current = useCurrent();
+  const instantAuthError = useInstantAuthError();
   if (current.isLoading) return <Splash />;
   if (current.unprovisioned) {
+    if (instantAuthError) {
+      return <InstantAuthErrorScreen message={instantAuthError} />;
+    }
     return (
       <div className="auth-screen">
         <div className="auth-brand">
@@ -194,11 +202,19 @@ function RequireAuth() {
 
 function ProvisionGate() {
   const current = useCurrent();
+  const instantAuthError = useInstantAuthError();
   const { signOut } = useClerk();
 
   if (current.isLoading) return <Splash />;
 
   if (current.unprovisioned) {
+    // An empty user query means nothing when the Clerk → Instant token
+    // exchange itself was rejected — every query is running anonymously and
+    // the permission rules are (correctly) denying it. Showing the account
+    // message for that sent a whole debugging session down the wrong road.
+    if (instantAuthError) {
+      return <InstantAuthErrorScreen message={instantAuthError} />;
+    }
     // Same generic presentation whether the account was never provisioned or
     // was deactivated — the UI does not reveal which (see Sign In spec).
     return (
@@ -219,6 +235,42 @@ function ProvisionGate() {
   }
 
   return <AppShell />;
+}
+
+// The Clerk sign-in worked but Instant refused the token exchange — a
+// deployment/configuration problem (most commonly this origin missing from
+// the Instant app's allowed origins), not an account problem.
+function InstantAuthErrorScreen({ message }: { message: string }) {
+  return (
+    <div className="auth-screen">
+      <div className="auth-brand">
+        <div className="marina-name">Can’t reach the marina database</div>
+        <div className="product">MarinaSecure</div>
+      </div>
+      <p className="muted" style={{ maxWidth: 420, textAlign: "center" }}>
+        You signed in, but the connection to the marina’s database was
+        refused, so nothing can load. This is a setup problem with the app —
+        send this message to whoever maintains it:
+      </p>
+      <pre
+        className="small"
+        style={{
+          maxWidth: 420,
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+        }}
+      >
+        {message}
+      </pre>
+      <button
+        type="button"
+        className="btn"
+        onClick={() => window.location.reload()}
+      >
+        Retry
+      </button>
+    </div>
+  );
 }
 
 function Splash() {
