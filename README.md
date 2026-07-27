@@ -119,16 +119,30 @@ backend, without which some actions can't complete:
 - ⬜ **Netlify Functions** — shift-report send, plus the scheduled jobs:
   checklist-trigger generation, time-based maintenance rules, and the
   Activity Log retention purge.
-- 🟡 **InstantDB permission rules** — `instant.perms.ts` now blocks anonymous
-  access: every namespace requires a signed-in Clerk identity resolving to an
-  *active* marina User, runtime attribute creation is off, `$users` is
-  read-only, and Activity Log entries can't be deleted from the client.
-  `roles` and `users` writes are further gated server-side by a denormalized
-  `canManageRoles`/`canManageUsers` cache on each User (kept in sync by
-  Admin → Roles/Users), closing the privilege-escalation hole where any
-  signed-in user could otherwise grant themselves `manage_*` directly.
+- 🟡 **InstantDB permission rules** — `instant.perms.ts` blocks anonymous
+  access (every namespace requires a signed-in Clerk identity), runtime
+  attribute creation is off, `$users` is read-only, and Activity Log entries
+  can't be deleted from the client. Two stronger tiers are written in that
+  file but deliberately inactive, each with its blocker documented inline:
+  requiring an *active marina User* (blocked until the app actually creates
+  the `userAuth` link on sign-in), and gating `roles`/`users` writes on the
+  `canManageRoles`/`canManageUsers` cache (blocked until that cache is
+  backfilled — enforcing first deadlocks all admin access; it happened).
   Per-permission enforcement for everything else (`view_incidents`,
-  `manage_locations`, …) is **not** enforced server-side yet — those stay
-  client-side checks only.
+  `manage_locations`, …) is client-side only.
 - ⬜ **Clerk invitation emails** from Admin → Users need a server-side call;
   provisioning + email-matched first sign-in works today.
+
+## Deployment
+
+The app deploys to Netlify from this repo's root (`netlify.toml`); `docs/`
+stays on GitHub Pages. Branch deploys of `beta` are the working preview.
+Two per-environment settings live outside the repo:
+
+- **Netlify env vars**: `VITE_CLERK_PUBLISHABLE_KEY` and
+  `VITE_INSTANT_APP_ID` (both public-by-design; never `CLERK_SECRET_KEY`).
+- **Instant allowed origins**: every origin that serves the app (the
+  Netlify URL, `http://localhost:5173`, a LAN IP for phone testing) must be
+  added in the Instant dashboard → Auth, or the Clerk → Instant token
+  exchange fails with "Unauthorized origin" and the app shows "Can't reach
+  the marina database" after sign-in.
