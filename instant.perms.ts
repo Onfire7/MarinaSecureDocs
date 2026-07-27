@@ -82,12 +82,16 @@ const rules = {
     },
   },
 
-  // Auth-owned namespaces: readable so the app can resolve its own identity,
-  // never writable from the client.
+  // Auth-owned namespace. The signInWithIdToken exchange creates the $users
+  // row *through these rules* (server hint: input ["$users","create"]) — with
+  // create: "false" every first-ever sign-in fails with "not perms-pass?",
+  // which took the whole app down once origins were fixed. Own-row-only is
+  // the tightest satisfiable setting: an identity can create and see itself,
+  // and nothing else.
   $users: {
     allow: {
-      view: "auth.id != null",
-      create: "false",
+      view: "auth.id == data.id",
+      create: "auth.id == data.id",
       update: "false",
       delete: "false",
     },
