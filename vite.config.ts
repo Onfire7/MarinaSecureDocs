@@ -2,8 +2,35 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+/**
+ * Ship React's *development* build (and skip minification) so runtime errors
+ * arrive as full sentences with readable component stacks, instead of the
+ * "Minified React error #185; visit react.dev/errors/185" codes that a
+ * production bundle emits. React picks its build off `process.env.NODE_ENV`,
+ * which Vite otherwise hardcodes to "production" for any `vite build`.
+ *
+ * This is deliberately ON for the beta deployment, which is this project's
+ * debugging environment — the tradeoff is a noticeably larger, slower bundle,
+ * and every other library that branches on NODE_ENV (Clerk, InstantDB) takes
+ * its dev path too. Set REACT_DEV_BUILD=0 to build a real production bundle;
+ * flip DEBUG_BUILD's default to false once the check-in error is pinned down.
+ */
+const DEBUG_BUILD = process.env.REACT_DEV_BUILD !== '0'
+
+if (DEBUG_BUILD) {
+  console.warn(
+    '\n[vite] DEBUG BUILD: bundling React\'s development build, unminified.\n' +
+      '       Bigger and slower on purpose — see vite.config.ts.\n' +
+      '       Build with REACT_DEV_BUILD=0 for a production bundle.\n',
+  )
+}
+
 // https://vite.dev/config/
 export default defineConfig({
+  define: DEBUG_BUILD
+    ? { 'process.env.NODE_ENV': JSON.stringify('development') }
+    : {},
+  build: DEBUG_BUILD ? { minify: false } : {},
   plugins: [
     react(),
     VitePWA({
@@ -25,6 +52,10 @@ export default defineConfig({
       // loads, so it must fall back the same as any other route.
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        // The unminified debug bundle blows past Workbox's 2 MiB default,
+        // which would silently drop the app shell from the precache and
+        // quietly break offline support — the one thing the PWA is for.
+        ...(DEBUG_BUILD ? { maximumFileSizeToCacheInBytes: 8 * 1024 * 1024 } : {}),
       },
       manifest: {
         name: 'MarinaSecure',

@@ -59,112 +59,7 @@ starting; the **Environment & tooling** section changes how you work.
 
 Verify each on the deployment before moving on.
 
-### 1. Tapping a Location should open the details page if it has no children
-
-Currently tapping a Location drills into its child list. When a Location has
-no children, that drill-in is a dead end — it should open the Location's
-details page instead.
-
-### 2. Map management: replace and delete a map
-
-`src/pages/admin/AdminLocationsPage.tsx` can only *add* maps — `upload()`
-(~line 945) creates a new `marinaMaps` row each time, and there's no way to
-swap a map's image or remove a map that's wrong or obsolete.
-
-Add both affordances to the map admin UI:
-
-- **Replace**: `$files` perms are `update: "false"` (`instant.perms.ts:89`),
-  so replacing means upload the new file → relink `marinaMaps.image` → delete
-  the old `$files` row. Not an overwrite. Reuse `upload()`'s timeout race and
-  error handling rather than writing a second upload path.
-- **Delete**: removes the map, its `$files` image, and its `placements`
-  (query already loads `placements: { location: {} }` at line 932). Confirm
-  first and say how many placements will be lost — placements are the
-  location↔map pins and can't be recovered.
-
-Both are destructive, so gate on `manage_locations` (`src/lib/permissions.ts`)
-and update `docs/pages/admin-locations.html` to match.
-
-### 3. Map upload dialog: scope picker must be searchable, not a dropdown
-
-`AdminLocationsPage.tsx:1006` scopes a new map with a plain `<select>` over
-every location. That doesn't scale — marinas have thousands of locations —
-and each option renders bare `l.name`, so the "Slip 14" that exists on every
-dock is indistinguishable from the others.
-
-Swap it for `LocationPicker` (`src/pages/shared/LocationPicker.tsx`), the
-searchable combobox already used for this exact problem elsewhere, including
-twice in this same file (lines 555 and 847 — it's already imported). It shows
-each result's full ancestor path and matches against that path, so "dock c
-14" finds the right slip. Pass `allowNone={false}`, since scope is required
-before upload.
-
-Note the page query (line 932) loads `locations: { parent: {} }` without
-`type`, so picker results won't show type labels until `type: {}` is added.
-
-### 4. Desktop nav: Admin should expand to its sub-sections
-
-In the desktop sidenav (`src/layout/AppShell.tsx:32-48`, styles at
-`src/styles/app.css:276`), Admin is one flat `NavLink` like every other
-section, so reaching a sub-section always costs a stop at the Admin landing
-page.
-
-Clicking Admin should do **both**: navigate to `/admin` as it does today
-*and* expand an indented sub-list beneath it. Not a disclosure-only toggle —
-the destination behavior must not regress.
-
-The sub-list comes from `ADMIN_SECTIONS` (`src/pages/admin/adminSections.ts`),
-already used by `AdminHomePage`. Filter it the same way that page does — by
-`current.can(s.requires)`, *not* by `isAdmin`. The nav item's own gate is
-`isAdmin` (`src/routes/nav.ts:39`), which is broader: a user holding only
-`manage_users` passes it but should still see just the Users sub-item.
-
-Details worth settling: keep it expanded while on any `/admin/*` route;
-decide whether expansion persists after navigating away; the sub-list is 9
-items at full permissions, so check the sidenav still scrolls sanely. Desktop
-only — mobile reaches Admin through the "Other" tab (`MOBILE_TAB_COUNT`,
-`src/pages/shared/MorePage.tsx`) and is out of scope. Update
-`docs/pages/admin-home.html` if it documents the nav.
-
-### 5. Map plots: size from text, and pick label color for contrast
-
-Two problems with plotted location rectangles. They render in two places off
-the same `.map-rect` class (`src/styles/app.css:1071`):
-`src/pages/shared/SchematicMapView.tsx:115` (the viewer, colored by status)
-and `src/pages/admin/AdminLocationsPage.tsx:1175` (the editor).
-
-**a. Sizing.** `width`/`height` are percentages, but of *different axes* —
-width of the image's width, height of its height. So a label rotated 90°
-has its width and height effectively swapped relative to the background, and
-the two can't be reasoned about together. Percent is still right for
-**position** (`cx`/`cy`), which is genuinely relative to the image.
-
-Intended direction: size the rect from its **text** instead — add font size
-and label attributes to the placement, and let `width`/`height` become
-padding around the text rather than absolute extents. Rotation then just
-rotates an intrinsically-sized box, and sizing becomes precisely specifiable.
-
-`placement` is a single `i.json<>` attribute (`instant.schema.ts:92`), so
-adding fields is a TypeScript type change — **no attribute deletion risk**
-from a schema push. Existing rows lack the new fields, so read them with
-defaults. The editor's sliders (`AdminLocationsPage.tsx:1244`) and
-`updatePlacement` need to move to the new units together.
-
-**b. Label contrast.** `.map-rect` sets no `color`, so labels inherit the
-page text color while the background comes from status
-(`statusMapColors`, `src/lib/locations.ts:44` → `var(--bad-bg)`,
-`var(--good-bg)`, …). In dark mode those backgrounds are dark and the label
-stays black — the reported unreadability.
-
-Fix at the source: add a `text` field alongside `background`/`border` in
-`statusMapColors` and in `RectStyle` (`SchematicMapView.tsx:33`), pointing at
-a per-status foreground custom property defined for both themes. That keeps
-the light/dark decision in CSS next to the palette rather than doing runtime
-luminance math on a `var()` that JS can't read without `getComputedStyle`.
-The editor hardcodes `var(--accent-soft)` and needs the matching foreground
-too. Check every status in both themes, including the `default` branch.
-
-### 6. User actions: add "Install app" to the desktop sidenav
+### 1. User actions: add "Install app" to the desktop sidenav
 
 The sidenav footer (`src/layout/AppShell.tsx:74-96`) holds the user info,
 theme toggle, and sign-out/switch-user buttons. Add an "Install app" button
@@ -175,9 +70,9 @@ the prompt isn't available (non-PWA browsers, already installed, dismissed).
 Note: `beforeinstallprompt` fires at the top level but is typically checked
 from a button handler, so capture it in a context or state hook available to
 `AppShell`. Example pattern in `src/main.tsx` or as a custom hook if another
-component elsewhere (e.g., MorePage, task 9) also needs it.
+component elsewhere (e.g., MorePage) also needs it.
 
-### 7. React library: use development build instead of production
+### 2. React library: use development build instead of production
 
 Currently the build bundles the minified React production library. For
 debugging purposes, use the development build, which includes warnings about
@@ -195,14 +90,14 @@ Whichever approach: verify in `npm run build` that the dev build is bundled
 Verify with the test account at `/beta.marinasecure.com` that React DevTools
 and hook warnings appear (if applicable).
 
-### 8. React error #185 on check-in page
+### 3. React error #185 on check-in page
 
 Visiting any `/checkin/<guidUrl>` route throws React error #185 in
 production (minified). Error #185 is a Rules of Hooks violation — see
 https://react.dev/errors/185.
 
 Repro with a valid checkpoint guid from the DB, then navigate to the
-check-in URL and watch the console. The error appears minified; task 7
+check-in URL and watch the console. The error appears minified; task 2
 (React dev build) will show the full message and help pinpoint the hook call.
 
 Affected code: `src/pages/checklists/CheckpointCheckinPage.tsx` and its
