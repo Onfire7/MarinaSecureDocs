@@ -126,6 +126,44 @@ only — mobile reaches Admin through the "Other" tab (`MOBILE_TAB_COUNT`,
 `src/pages/shared/MorePage.tsx`) and is out of scope. Update
 `docs/pages/admin-home.html` if it documents the nav.
 
+### 5. Map plots: size from text, and pick label color for contrast
+
+Two problems with plotted location rectangles. They render in two places off
+the same `.map-rect` class (`src/styles/app.css:1071`):
+`src/pages/shared/SchematicMapView.tsx:115` (the viewer, colored by status)
+and `src/pages/admin/AdminLocationsPage.tsx:1175` (the editor).
+
+**a. Sizing.** `width`/`height` are percentages, but of *different axes* —
+width of the image's width, height of its height. So a label rotated 90°
+has its width and height effectively swapped relative to the background, and
+the two can't be reasoned about together. Percent is still right for
+**position** (`cx`/`cy`), which is genuinely relative to the image.
+
+Intended direction: size the rect from its **text** instead — add font size
+and label attributes to the placement, and let `width`/`height` become
+padding around the text rather than absolute extents. Rotation then just
+rotates an intrinsically-sized box, and sizing becomes precisely specifiable.
+
+`placement` is a single `i.json<>` attribute (`instant.schema.ts:92`), so
+adding fields is a TypeScript type change — **no attribute deletion risk**
+from a schema push. Existing rows lack the new fields, so read them with
+defaults. The editor's sliders (`AdminLocationsPage.tsx:1244`) and
+`updatePlacement` need to move to the new units together.
+
+**b. Label contrast.** `.map-rect` sets no `color`, so labels inherit the
+page text color while the background comes from status
+(`statusMapColors`, `src/lib/locations.ts:44` → `var(--bad-bg)`,
+`var(--good-bg)`, …). In dark mode those backgrounds are dark and the label
+stays black — the reported unreadability.
+
+Fix at the source: add a `text` field alongside `background`/`border` in
+`statusMapColors` and in `RectStyle` (`SchematicMapView.tsx:33`), pointing at
+a per-status foreground custom property defined for both themes. That keeps
+the light/dark decision in CSS next to the palette rather than doing runtime
+luminance math on a `var()` that JS can't read without `getComputedStyle`.
+The editor hardcodes `var(--accent-soft)` and needs the matching foreground
+too. Check every status in both themes, including the `default` branch.
+
 ---
 
 ## Learnings from this codebase (read before debugging anything)
