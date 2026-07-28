@@ -5,6 +5,8 @@ import {
   ITEM_TYPE_LABEL,
   STATE_CHECK_KINDS,
   isStateCheck,
+  itemTypeLabel,
+  normalizeItemType,
   type ItemType,
   type StateCheckType,
 } from "../../lib/checklists";
@@ -510,7 +512,7 @@ function ItemRow({
       <div className="spread">
         <span className="small">
           <span className="badge">
-            {ITEM_TYPE_LABEL[item.type as ItemType] ?? item.type}
+            {itemTypeLabel(item.type)}
           </span>{" "}
           {item.label}
         </span>
@@ -555,7 +557,11 @@ function ItemRow({
       {open && (
         <div style={{ marginTop: 8 }}>
           {isStateCheck(item.type) && (
-            <StateCheckConfigFields kind={item.type} cfg={cfg} setConfig={setConfig} />
+            <StateCheckConfigFields
+              kind={normalizeItemType(item.type) as StateCheckType}
+              cfg={cfg}
+              setConfig={setConfig}
+            />
           )}
           {item.type === "verify_task" && (
             <label className="row" style={{ cursor: "pointer" }}>

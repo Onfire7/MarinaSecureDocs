@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { db } from "../../lib/db";
 import { useIsMobile } from "../../hooks/useIsMobile";
-import { ITEM_TYPE_LABEL, doorCheckSummary, type ItemResult } from "../../lib/checklists";
+import { doorCheckSummary, itemTypeLabel, type ItemResult } from "../../lib/checklists";
 
 // Checklists & Tours — Checklist Detail (see pages/checklist-detail.html).
 // Read-only record of a completed instance — no edit actions anywhere.
@@ -82,7 +82,7 @@ export function ChecklistDetailPage() {
               return (
                 <tr key={item.id}>
                   <td>{item.label}</td>
-                  <td>{ITEM_TYPE_LABEL[item.type as keyof typeof ITEM_TYPE_LABEL] ?? item.type}</td>
+                  <td>{itemTypeLabel(item.type)}</td>
                   <td>
                     <ResultSummary type={item.type} result={r?.result as ItemResult | undefined} />
                   </td>
@@ -120,7 +120,7 @@ function ResultCard({
 }) {
   return (
     <div className="card">
-      <div className="badge">{ITEM_TYPE_LABEL[type as keyof typeof ITEM_TYPE_LABEL] ?? type}</div>
+      <div className="badge">{itemTypeLabel(type)}</div>
       <div className="card-title">{label}</div>
       <div className="card-meta">
         <ResultSummary type={type} result={result?.result as ItemResult | undefined} />

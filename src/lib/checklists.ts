@@ -278,6 +278,12 @@ export function doorCheckSummary(r: DoorCheckResult): {
   };
 }
 
+/** Display label for an item type, mapping legacy type strings first. */
+export function itemTypeLabel(type: string): string {
+  const t = normalizeItemType(type);
+  return ITEM_TYPE_LABEL[t as ItemType] ?? type;
+}
+
 export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   simple_check: "Simple Check",
   verify_task: "Verify Task",
