@@ -12,7 +12,9 @@ export type ItemType =
   | "location_check"
   | "meter_reading";
 
-export type DoorState = "open" | "closed" | "locked" | "unlocked";
+// "Closed" isn't its own state — a door that's locked or unlocked is
+// necessarily closed, so those two states already imply it.
+export type DoorState = "open" | "unlocked" | "locked";
 
 // ---- ChecklistTemplateItem.config, per type ----
 

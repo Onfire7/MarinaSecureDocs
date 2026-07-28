@@ -540,7 +540,7 @@ function ItemRow({
                 value={(cfg.expectedState as string) ?? "locked"}
                 onChange={(e) => setConfig({ expectedState: e.target.value })}
               >
-                {["open", "closed", "locked", "unlocked"].map((s) => (
+                {["open", "unlocked", "locked"].map((s) => (
                   <option key={s} value={s}>
                     {s.charAt(0).toUpperCase() + s.slice(1)}
                   </option>

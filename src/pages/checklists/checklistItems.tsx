@@ -28,7 +28,7 @@ export interface ItemProps {
   onSaved: (result: ItemResult, ticketId?: string) => void;
 }
 
-const DOOR_STATES: DoorState[] = ["open", "closed", "locked", "unlocked"];
+const DOOR_STATES: DoorState[] = ["open", "unlocked", "locked"];
 
 async function saveResult(
   checklistId: string,

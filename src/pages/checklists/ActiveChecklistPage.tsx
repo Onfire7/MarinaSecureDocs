@@ -159,26 +159,21 @@ export function ActiveChecklistPage() {
     }
   };
 
-  const visibleItems =
-    isMobile && !allDone
-      ? items.slice(0, items.findIndex((i) => !isDone(i.id, i.type)) + 1).slice(-1)
-      : items;
-
   return (
     <div>
       <div className="page-head">
         <div>
           <h1 className="page-title">{checklist.template?.name ?? "Checklist"}</h1>
-          {isMobile && items.length > 0 && (
+          {items.length > 0 && (
             <div className="page-sub">
-              Item {items.length - remaining + (allDone ? 0 : 1)} of {items.length}
+              {items.length - remaining} of {items.length} complete
             </div>
           )}
         </div>
       </div>
 
       <div className={isMobile ? "stack" : "grid-2"}>
-        {visibleItems.map((item) => {
+        {items.map((item) => {
           const Component = componentFor(item.type);
           return (
             <Component
