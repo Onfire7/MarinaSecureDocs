@@ -3,6 +3,10 @@ import { createRoot } from "react-dom/client";
 import "./styles/app.css";
 import App from "./App.tsx";
 import { applyTheme, getStoredTheme } from "./lib/theme.ts";
+// Imported for its module-load side effect: the beforeinstallprompt listener
+// has to be registered before the browser fires that event, which can happen
+// before React mounts.
+import "./lib/pwaInstall.ts";
 
 // Applied before the first render so a stored Dark/Light choice never
 // flashes the wrong palette on load.

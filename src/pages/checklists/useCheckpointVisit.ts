@@ -56,11 +56,9 @@ export function useCheckpointVisit(
   // pushes a fresh snapshot, and re-renders: an infinite loop that React
   // aborts with "Maximum update depth exceeded". A cutoff that drifts by
   // milliseconds bought nothing anyway against a 5-minute window.
-  const dedupeSince = useMemo(
-    () => new Date(Date.now() - DEDUPE_WINDOW_MS),
-    // Re-pinned only when the visit itself changes identity.
-    [checkpointId, userId, method, resumeCheckInId],
-  );
+  // Pinned once for the lifetime of this visit. Only the create-or-resume
+  // effect below reads it, and that runs once, so it never needs to drift.
+  const [dedupeSince] = useState(() => new Date(Date.now() - DEDUPE_WINDOW_MS));
 
   // Dedupe exists because the scanned screen is reached by re-opening a URL
   // (reload, resumed tab). The manual dialog is opened from inside a running

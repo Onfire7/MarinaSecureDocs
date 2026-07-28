@@ -7,6 +7,7 @@ import { ActiveCallPanel } from "../pages/comms/ActiveCallPanel";
 import { MissedCommsBadge } from "../pages/comms/MissedCommsBadge";
 import { ThemeToggle } from "./ThemeToggle";
 import { ADMIN_SECTIONS } from "../pages/admin/adminSections";
+import { InstallAppButton } from "./InstallAppButton";
 
 // Responsive shell: persistent left sidenav on desktop, app bar + bottom tab
 // bar on mobile (see wireframes — Dashboard frames for both breakpoints).
@@ -77,7 +78,7 @@ export function AppShell() {
           <div style={{ marginBottom: 10 }}>
             <ThemeToggle />
           </div>
-          <div className="row">
+          <div className="row" style={{ flexWrap: "wrap" }}>
             <button
               type="button"
               className="btn btn-sm"
@@ -85,6 +86,7 @@ export function AppShell() {
             >
               Switch user
             </button>
+            <InstallAppButton />
             <button
               type="button"
               className="btn btn-sm btn-quiet"

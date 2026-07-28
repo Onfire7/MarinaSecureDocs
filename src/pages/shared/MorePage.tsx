@@ -3,6 +3,7 @@ import { useClerk } from "@clerk/clerk-react";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { visibleSections, MOBILE_TAB_COUNT } from "../../routes/nav";
 import { ThemeToggle } from "../../layout/ThemeToggle";
+import { InstallAppButton } from "../../layout/InstallAppButton";
 
 // Mobile "Other" tab — the sections that don't fit in the bottom tab bar,
 // plus the account actions the desktop sidenav footer carries.
@@ -36,7 +37,7 @@ export function MorePage() {
       <div className="card">
         <div className="card-title">{current.user?.name}</div>
         <div className="card-meta">{current.roleNames.join(" · ")}</div>
-        <div className="row" style={{ marginTop: 10 }}>
+        <div className="row" style={{ marginTop: 10, flexWrap: "wrap" }}>
           <button
             type="button"
             className="btn btn-sm"
@@ -44,6 +45,10 @@ export function MorePage() {
           >
             Switch user
           </button>
+          {/* The sidenav copy of this is desktop-only, and a phone is where
+              installing actually matters — without this, mobile has no
+              install path at all. */}
+          <InstallAppButton />
           <button
             type="button"
             className="btn btn-sm btn-quiet"
