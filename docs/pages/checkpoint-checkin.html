@@ -90,7 +90,8 @@
 
     <h2>States &amp; edge cases</h2>
     <ul>
-      <li><strong>Not signed in</strong> — the URL still opens (it's a public deep link), but routes to <a href="sign-in.html">Sign In</a> or <a href="user-switch.html">User Switch</a> first, then resumes the check-in flow.</li>
+      <li><strong>Not signed in</strong> — the URL still opens (it's a public deep link), but routes to <a href="sign-in.html">Sign In</a> or <a href="user-switch.html">User Switch</a> first, then resumes the check-in flow. The intended URL is carried through sign-in as a <code>returnTo</code>, which is the general mechanism for every deep link, not a special case for this one.</li>
+      <li><strong>Signed in but with no marina User record</strong> — the screen says the check-in wasn't recorded, rather than the generic "can't sign in" copy: a guard who just tapped a tag needs to know the tap didn't take.</li>
       <li><strong>GPS outside the checkpoint's radius</strong> — once GPS resolves, the check-in record updates to <code>within_radius</code> = false; it isn't blocked (the check-in already exists and the guard may already be mid-checklist), but is flagged for later review, matching the data model's spoof-guard-not-spoof-block design.</li>
       <li><strong>GPS never resolves</strong> — after a reasonable timeout, the pending indicator settles to "unavailable" and the Check-In record simply keeps <code>gps_at_checkin</code>/<code>within_radius</code> null. The check-in itself is still valid; it's just unvalidated, same as a manual check-in with no GPS (see <a href="manual-checkin-dialog.html">Manual Check-In Dialog</a>).</li>
       <li><strong>User navigates into a checklist before GPS resolves</strong> — expected and unblocked by design; the pending indicator follows along (or the resulting flag appears) regardless of which sub-screen the guard has moved to, since it's tied to the Check-In record, not this particular screen.</li>
@@ -101,6 +102,8 @@
     </ul>
 
     <h2>Mobile vs. desktop</h2>
+    <p>This screen renders inside the standard app shell (sidenav on desktop, tab bar on mobile) like every other screen — a scan is an entry point into the app, not a detached kiosk view, and the guard needs the nav to get anywhere once the check-in is logged.</p>
+
     <p>Phone is the primary case — tapping an NFC tag or scanning a QR code in the field — but the screen is built responsively rather than mobile-only: NFC-capable tablets and hybrid laptops are a real, if less common, way this gets opened (a guard using a rugged tablet for rounds, or a hybrid laptop with NFC at a fixed post that still moves between checkpoints). It is not designed for a permanently-placed desktop workstation, since nothing about a fixed desktop ever taps an NFC tag or scans a QR code — that case is only reachable by pasting the URL directly (e.g. testing a checkpoint's link), and renders the same content without any field-specific chrome. Layout scales from a single-column phone view up through tablet/hybrid-laptop widths using the same breakpoint approach as the rest of the app (see <a href="../architecture.html">Architecture — Frontend</a>), rather than assuming one fixed viewport size.</p>
 
     <div class="page-foot">

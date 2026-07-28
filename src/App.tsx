@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ClerkProvider, useAuth, useClerk } from "@clerk/clerk-react";
 import { CLERK_PUBLISHABLE_KEY, missingConfig } from "./lib/config";
 import { InstantAuthSync } from "./lib/auth/InstantAuthSync";
@@ -74,13 +74,15 @@ export default function App() {
           <Routes>
             <Route path="/sign-in" element={<SignInPage />} />
             <Route path="/switch-user" element={<UserSwitchPage />} />
-            {/* Public deep link (NFC/QR): sits outside RequireAuth so an
-                unauthenticated scan still resolves, but supplies the
-                current-user context the check-in write needs. */}
-            <Route path="/checkin/:guidUrl" element={<CheckinRoute />} />
             <Route element={<RequireAuth />}>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/more" element={<MorePage />} />
+              {/* The NFC/QR deep link. It lives inside the shell like any
+                  other screen — a guard who scans a tag still needs the nav
+                  to get anywhere afterward. An unauthenticated scan still
+                  resolves: RequireAuth sends it through Sign In carrying a
+                  returnTo, and it resumes here. */}
+              <Route path="/checkin/:guidUrl" element={<CheckpointCheckinPage />} />
               <Route path="/checklists" element={<ChecklistListPage />} />
               <Route path="/checklists/tours/:tourId" element={<TourProgressPage />} />
               <Route path="/checklists/:id" element={<ChecklistRoute />} />
@@ -141,58 +143,27 @@ export default function App() {
   );
 }
 
-/**
- * Auth gate for the checkpoint deep link. Same Clerk requirement as the rest
- * of the app, but it redirects through Sign In carrying a returnTo so the
- * scan resumes afterward, rather than dumping the guard on the dashboard.
- */
-function CheckinRoute() {
-  const { isLoaded, isSignedIn } = useAuth();
-  if (!isLoaded) return <Splash />;
-  if (!isSignedIn) {
-    const returnTo = `${window.location.pathname}${window.location.search}`;
-    return (
-      <Navigate to={`/sign-in?returnTo=${encodeURIComponent(returnTo)}`} replace />
-    );
-  }
-  return (
-    <CurrentUserProvider>
-      <CheckinGate />
-    </CurrentUserProvider>
-  );
-}
-
-// A Clerk identity with no marina User record can't be the author of a
-// check-in, so say so plainly instead of silently recording nothing.
-function CheckinGate() {
-  const current = useCurrent();
-  const instantAuthError = useInstantAuthError();
-  if (current.isLoading) return <Splash />;
-  if (current.unprovisioned) {
-    if (instantAuthError) {
-      return <InstantAuthErrorScreen message={instantAuthError} />;
-    }
-    return (
-      <div className="auth-screen">
-        <div className="auth-brand">
-          <div className="marina-name">Unable to check in</div>
-          <div className="product">MarinaSecure</div>
-        </div>
-        <p className="muted" style={{ maxWidth: 380, textAlign: "center" }}>
-          This account can't access this marina, so the check-in wasn't
-          recorded. Check with a manager.
-        </p>
-      </div>
-    );
-  }
-  return <CheckpointCheckinPage />;
-}
-
 // Gate: Clerk session required, then the marina User record must resolve.
 function RequireAuth() {
   const { isLoaded, isSignedIn } = useAuth();
+  const location = useLocation();
   if (!isLoaded) return <Splash />;
-  if (!isSignedIn) return <Navigate to="/sign-in" replace />;
+  if (!isSignedIn) {
+    // Carry the intended destination through Sign In so the deep link
+    // resumes afterward instead of dumping the user on the Dashboard. The
+    // check-in scan depends on this, but every deep link benefits.
+    const returnTo = `${location.pathname}${location.search}`;
+    return (
+      <Navigate
+        to={
+          returnTo === "/"
+            ? "/sign-in"
+            : `/sign-in?returnTo=${encodeURIComponent(returnTo)}`
+        }
+        replace
+      />
+    );
+  }
   return (
     <CurrentUserProvider>
       <ProvisionGate />
@@ -204,6 +175,7 @@ function ProvisionGate() {
   const current = useCurrent();
   const instantAuthError = useInstantAuthError();
   const { signOut } = useClerk();
+  const location = useLocation();
 
   if (current.isLoading) return <Splash />;
 
@@ -215,17 +187,24 @@ function ProvisionGate() {
     if (instantAuthError) {
       return <InstantAuthErrorScreen message={instantAuthError} />;
     }
+    // A Clerk identity with no marina User can't author a check-in, and a
+    // guard who just scanned a tag needs to know the scan didn't record —
+    // not just that sign-in failed.
+    const fromScan = location.pathname.startsWith("/checkin/");
     // Same generic presentation whether the account was never provisioned or
     // was deactivated — the UI does not reveal which (see Sign In spec).
     return (
       <div className="auth-screen">
         <div className="auth-brand">
-          <div className="marina-name">Unable to sign in</div>
+          <div className="marina-name">
+            {fromScan ? "Unable to check in" : "Unable to sign in"}
+          </div>
           <div className="product">MarinaSecure</div>
         </div>
         <p className="muted" style={{ maxWidth: 380, textAlign: "center" }}>
-          This account can’t access this marina. Check with a manager if you
-          believe this is an error.
+          {fromScan
+            ? "This account can’t access this marina, so the check-in wasn’t recorded. Check with a manager."
+            : "This account can’t access this marina. Check with a manager if you believe this is an error."}
         </p>
         <button type="button" className="btn" onClick={() => void signOut()}>
           Back to sign in
