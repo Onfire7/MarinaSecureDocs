@@ -1,7 +1,13 @@
 import { useMemo, useState } from "react";
 import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { ITEM_TYPE_LABEL, type ItemType } from "../../lib/checklists";
+import {
+  ITEM_TYPE_LABEL,
+  STATE_CHECK_KINDS,
+  isStateCheck,
+  type ItemType,
+  type StateCheckType,
+} from "../../lib/checklists";
 import { LocationPicker } from "../shared/LocationPicker";
 import { AdminHeader } from "./AdminHomePage";
 
@@ -145,7 +151,7 @@ function TemplateCard({
 }: {
   template: TemplateRow;
   roles: { id: string; name: string }[];
-  allCheckpoints: { id: string; name: string; location?: { name: string } | null }[];
+  allCheckpoints: { id: string; name: string; location?: { id: string; name: string } | null }[];
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -175,13 +181,23 @@ function TemplateCard({
   const addItem = (type: ItemType) => {
     const label = window.prompt(`Label for the new ${ITEM_TYPE_LABEL[type]}:`);
     if (!label?.trim()) return;
+    // A door or pump needs a Location, and on a checkpoint-triggered template
+    // the checkpoint's own location is almost always the right one — so
+    // default it rather than making the admin set it item by item. Ambiguous
+    // when several checkpoints are attached, so only default from a single
+    // one and leave the rest to the picker.
+    const attached = template.checkpoints ?? [];
+    const soleLocationId =
+      isStateCheck(type) && attached.length === 1
+        ? (allCheckpoints.find((c) => c.id === attached[0].id)?.location?.id ?? undefined)
+        : undefined;
     void db.transact(
       db.tx.checklistTemplateItems[id()]
         .update({
           type,
           label: label.trim(),
           order: items.length,
-          config: {},
+          config: soleLocationId ? { locationId: soleLocationId } : {},
         })
         .link({ template: template.id }),
     );
@@ -533,8 +549,8 @@ function ItemRow({
 
       {open && (
         <div style={{ marginTop: 8 }}>
-          {item.type === "door_check" && (
-            <DoorCheckConfigFields cfg={cfg} setConfig={setConfig} />
+          {isStateCheck(item.type) && (
+            <StateCheckConfigFields kind={item.type} cfg={cfg} setConfig={setConfig} />
           )}
           {item.type === "verify_task" && (
             <label className="row" style={{ cursor: "pointer" }}>
@@ -560,21 +576,27 @@ function ItemRow({
   );
 }
 
-// A door isn't its own entity — it's a labelled item here — so binding it to
-// a Location is what gives a mismatch incident something to attach to, and
-// what lets reports group "doors found unlocked" by building.
-function DoorCheckConfigFields({
+// A door or pump isn't its own entity — it's a labelled item here — so
+// binding it to a Location is what gives a mismatch incident something to
+// attach to, and what lets reports group findings by building. Required, and
+// flagged below when missing, because without it the guard would otherwise
+// have been asked to pick one mid-round.
+function StateCheckConfigFields({
+  kind,
   cfg,
   setConfig,
 }: {
+  kind: StateCheckType;
   cfg: Record<string, unknown>;
   setConfig: (patch: Record<string, unknown>) => void;
 }) {
+  const spec = STATE_CHECK_KINDS[kind];
   const { data } = db.useQuery({ locations: { parent: {}, type: {} } });
   const locations = useMemo(
     () => [...(data?.locations ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
     [data],
   );
+  const locationId = (cfg.locationId as string) ?? "";
 
   return (
     <div>
@@ -582,28 +604,33 @@ function DoorCheckConfigFields({
         <span className="small muted">Expected state</span>
         <select
           className="select select-inline"
-          value={(cfg.expectedState as string) ?? "locked"}
+          value={(cfg.expectedState as string) ?? spec.defaultState}
           onChange={(e) => setConfig({ expectedState: e.target.value })}
         >
-          {["open", "unlocked", "locked"].map((s) => (
-            <option key={s} value={s}>
-              {s.charAt(0).toUpperCase() + s.slice(1)}
+          {spec.states.map((st) => (
+            <option key={st} value={st}>
+              {st.charAt(0).toUpperCase() + st.slice(1)}
             </option>
           ))}
         </select>
       </div>
       <div className="field" style={{ marginTop: 8, marginBottom: 0 }}>
         <span className="field-label">
-          Location this door belongs to — what a mismatch incident attaches to
+          Location this {spec.noun} belongs to — required
         </span>
         <LocationPicker
           locations={locations}
-          value={(cfg.locationId as string) ?? ""}
-          onChange={(locationId) => setConfig({ locationId: locationId || undefined })}
+          value={locationId}
+          onChange={(next) => setConfig({ locationId: next || undefined })}
           placeholder="Search locations…"
-          allowNone
-          noneLabel="Not set — the guard picks at check time"
+          allowNone={false}
         />
+        {!locationId && (
+          <div className="badge badge-warn" style={{ display: "block", marginTop: 6 }}>
+            Set a location — without one, an incident raised for this {spec.noun}{" "}
+            has nothing to attach to.
+          </div>
+        )}
       </div>
     </div>
   );

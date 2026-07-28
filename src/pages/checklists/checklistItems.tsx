@@ -5,17 +5,17 @@ import type { InstaQLEntity } from "@instantdb/react";
 import { db, id, type AppSchema } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { deterministicId } from "../../lib/detId";
-import { doorCheckSummary, doorStateLabel } from "../../lib/checklists";
+import { doorCheckSummary, doorStateLabel, STATE_CHECK_KINDS } from "../../lib/checklists";
 import type {
   DoorCheckConfig,
+  DoorCheckResult,
   DoorState,
+  StateCheckType,
   ItemResult,
   LocationCheckConfig,
   MeterReadingConfig,
   VerifyTaskConfig,
 } from "../../lib/checklists";
-import type { AttachmentTarget } from "../../lib/attachments";
-import { AttachmentTargetPicker } from "../shared/AttachmentTargetPicker";
 
 type TemplateItem = InstaQLEntity<AppSchema, "checklistTemplateItems">;
 type ItemResultEntity = InstaQLEntity<
@@ -32,8 +32,6 @@ export interface ItemProps {
   /** False once the checklist is submitted — finished items become read-only. */
   editable?: boolean;
 }
-
-const DOOR_STATES: DoorState[] = ["open", "unlocked", "locked"];
 
 async function saveResult(
   checklistId: string,
@@ -284,44 +282,45 @@ function verifyOutcomeLabel(r: Extract<ItemResult, { type: "verify_task" }>): st
   return "Rejected — ticket raised";
 }
 
-// ---------------------------------------------------------------- Door Check
+// ------------------------------------------------- Door / Gas Pump checks
 
 /**
- * A door check records two facts, not one: the state the door was *found*
- * in, and the state it was *left* in. Only the pair supports the questions
- * the reports need to answer — "was this door actually secure overnight?"
- * and, separately, "did the guard put it right?" — which a single observed
- * state silently conflated.
+ * Records a physical thing's state as *found* and as *left*, separately.
+ * Only the pair supports the questions the reports need — "was this actually
+ * secure overnight?" and, separately, "did the guard put it right?" — which a
+ * single observed state silently conflated.
+ *
+ * Doors and gas pumps are the same check with different vocabularies: a pump
+ * has no "open", only locked or unlocked. Rather than fork the flow, the
+ * allowed states come from STATE_CHECK_KINDS, so adding another such thing
+ * later is a table entry rather than another copy of this component.
  *
  * Found-as-expected is the overwhelmingly common case and stays one tap: the
  * final state is implied and the second row of buttons never appears. A
- * mismatch is the exceptional path, and it's the one worth slowing down —
- * it logs an incident (the door was wrong before anyone touched it, which is
- * true regardless of what happens next) and then asks what state the guard
- * managed to leave it in.
+ * mismatch is the exceptional path, and the one worth slowing down — it
+ * raises an incident (it was wrong before anyone touched it, which is true
+ * regardless of what happens next) and then asks what state it was left in.
  */
-export function DoorCheckItem({
+function StateCheckItem({
+  kind,
   item,
   existing,
   checklistId,
   onSaved,
   editable = true,
-}: ItemProps) {
+}: ItemProps & { kind: StateCheckType }) {
+  const spec = STATE_CHECK_KINDS[kind];
   const cfg = (item.config ?? {}) as unknown as DoorCheckConfig;
-  // An item whose config was never opened in the template builder persists
-  // as `{}` — the builder only shows "Locked" as the select's default, it
-  // never writes it. Default here too, matching that displayed default,
-  // rather than crashing stateLabel() on an undefined state.
-  const expectedState: DoorState = cfg.expectedState ?? "locked";
-  const existingResult = existing?.result as
-    | Extract<ItemResult, { type: "door_check" }>
-    | undefined;
+  // An item whose config was never opened in the template builder persists as
+  // `{}`; fall back to the same default the builder displays rather than
+  // crashing on an undefined state.
+  const expectedState: DoorState = cfg.expectedState ?? spec.defaultState;
+  const existingResult = existing?.result as DoorCheckResult | undefined;
 
   const [initialState, setInitialState] = useState<DoorState | null>(null);
   const [pendingFinal, setPendingFinal] = useState<DoorState | null>(null);
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
-  const [target, setTarget] = useState<AttachmentTarget | null>(null);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   // Preserved across an edit so re-answering doesn't restamp the finding to
@@ -329,16 +328,14 @@ export function DoorCheckItem({
   const openedAtRef = useRef<number | null>(null);
   const done = existingResult != null && !editing;
 
-  // The door's bound Location is the incident's attachment target. Items
-  // authored before that binding existed have none, so the guard picks one
-  // rather than the incident silently failing to save.
+  // The bound Location is the incident's attachment target. It's required by
+  // the template builder, so the guard is never asked to choose one — that
+  // question belongs to whoever authored the template, not to someone
+  // standing at a door at 2am.
   const { data: boundData } = db.useQuery(
     cfg.locationId ? { locations: { $: { where: { id: cfg.locationId } } } } : null,
   );
   const boundLocation = boundData?.locations?.[0];
-  const effectiveTarget: AttachmentTarget | null = boundLocation
-    ? { type: "location", id: boundLocation.id, label: boundLocation.name }
-    : target;
 
   const beginMismatch = (found: DoorState) => {
     setInitialState(found);
@@ -358,7 +355,7 @@ export function DoorCheckItem({
     // Found as expected: nothing to correct, so the final state is the same
     // state and the guard is never asked a second question.
     const result: ItemResult = {
-      type: "door_check",
+      type: kind,
       expected: expectedState,
       initialState: found,
       finalState: found,
@@ -377,8 +374,6 @@ export function DoorCheckItem({
     if (!initialState || saving) return;
     setSaving(true);
     try {
-      // Stamped now, not at submit: a door found open at 02:10 and submitted
-      // at 05:45 was open at 02:10.
       const openedAt = openedAtRef.current ?? Date.now();
       const incidentId = existingResult?.pendingIncident?.id ?? id();
       const ticketId = raiseTicket
@@ -389,7 +384,7 @@ export function DoorCheckItem({
         `left ${stateLabel(finalState).toLowerCase()} ` +
         `(expected ${stateLabel(expectedState).toLowerCase()})`;
       const result: ItemResult = {
-        type: "door_check",
+        type: kind,
         expected: expectedState,
         initialState,
         finalState,
@@ -399,12 +394,12 @@ export function DoorCheckItem({
           title: title.trim() || summary,
           details: details.trim() || undefined,
           openedAt,
-          ...(effectiveTarget
+          ...(boundLocation
             ? {
                 target: {
-                  type: effectiveTarget.type,
-                  id: effectiveTarget.id,
-                  label: effectiveTarget.label,
+                  type: "location",
+                  id: boundLocation.id,
+                  label: boundLocation.name,
                 },
               }
             : {}),
@@ -413,7 +408,7 @@ export function DoorCheckItem({
           ? {
               pendingTicket: {
                 id: ticketId,
-                title: `Door left ${stateLabel(finalState).toLowerCase()}: ${item.label}`,
+                title: `${capitalizeFirst(spec.noun)} left ${stateLabel(finalState).toLowerCase()}: ${item.label}`,
                 description: summary,
                 openedAt,
                 priority: "medium",
@@ -446,7 +441,7 @@ export function DoorCheckItem({
     const s = doorCheckSummary(existingResult);
     return (
       <DoneCard
-        badge="Door Check"
+        badge={spec.label}
         title={item.label}
         summary={doneSummaryText(s)}
         tone={s.leftAsExpected ? "done" : "plain"}
@@ -473,20 +468,17 @@ export function DoorCheckItem({
   if (initialState) {
     return (
       <div className="card">
-        <div className="badge">Door Check</div>
+        <div className="badge">{spec.label}</div>
         <div className="card-title">{item.label}</div>
         <div className="badge badge-bad" style={{ margin: "8px 0", display: "block" }}>
           Found {stateLabel(initialState).toLowerCase()} — expected{" "}
-          {stateLabel(expectedState).toLowerCase()}. This is logged as an incident.
+          {stateLabel(expectedState).toLowerCase()}. This is logged as an incident
+          {boundLocation ? ` on ${boundLocation.name}` : ""}.
         </div>
 
         <div className="field">
           <span className="field-label">Incident title</span>
-          <input
-            className="input"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
+          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} />
         </div>
         <div className="field">
           <span className="field-label">Details</span>
@@ -497,17 +489,10 @@ export function DoorCheckItem({
             onChange={(e) => setDetails(e.target.value)}
           />
         </div>
-        {boundLocation ? (
-          <div className="field">
-            <span className="field-label">Attached to</span>
-            <div className="field-value">{boundLocation.name}</div>
-          </div>
-        ) : (
-          <div className="field">
-            <span className="field-label">
-              Attach to — this door has no location set in its template
-            </span>
-            <AttachmentTargetPicker value={target} onChange={setTarget} />
+        {!boundLocation && (
+          <div className="badge badge-warn" style={{ display: "block", marginBottom: 10 }}>
+            This {spec.noun} has no location set in its template, so the incident
+            won't be attached to one. Ask an admin to set it.
           </div>
         )}
 
@@ -515,13 +500,11 @@ export function DoorCheckItem({
           What state did you leave it in?
         </div>
         <div className="row" style={{ flexWrap: "wrap" }}>
-          {DOOR_STATES.map((s) => (
+          {spec.states.map((s) => (
             <button
               key={s}
               type="button"
-              className={
-                "btn btn-sm" + (pendingFinal === s ? " btn-primary" : "")
-              }
+              className={"btn btn-sm" + (pendingFinal === s ? " btn-primary" : "")}
               disabled={saving}
               onClick={() => chooseFinal(s)}
             >
@@ -562,13 +545,13 @@ export function DoorCheckItem({
 
   return (
     <div className="card">
-      <div className="badge">Door Check</div>
+      <div className="badge">{spec.label}</div>
       <div className="card-title">{item.label}</div>
       <div className="field-label" style={{ marginTop: 10 }}>
         Expected: {stateLabel(expectedState)} · how did you find it?
       </div>
       <div className="row" style={{ flexWrap: "wrap", marginTop: 8 }}>
-        {DOOR_STATES.map((s) => (
+        {spec.states.map((s) => (
           <button key={s} type="button" className="btn btn-sm" onClick={() => void selectInitial(s)}>
             {stateLabel(s)}
           </button>
@@ -578,9 +561,21 @@ export function DoorCheckItem({
   );
 }
 
+export function DoorCheckItem(props: ItemProps) {
+  return <StateCheckItem kind="door_check" {...props} />;
+}
+
+export function GasPumpCheckItem(props: ItemProps) {
+  return <StateCheckItem kind="gas_pump_check" {...props} />;
+}
+
+function capitalizeFirst(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 function doneSummaryText(s: ReturnType<typeof doorCheckSummary>): string {
   // Historical rows never stored an "as found" state, so say what's actually
-  // known rather than implying the door was found correct.
+  // known rather than implying it was found correct.
   if (!s.foundKnown) {
     return s.final
       ? `${stateLabel(s.final)}${s.leftAsExpected ? " (matched)" : " — mismatch"}`

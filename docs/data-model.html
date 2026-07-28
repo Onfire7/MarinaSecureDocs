@@ -195,9 +195,9 @@
       <div class="head"><span>ChecklistTemplateItem</span><span class="tag">admin/user-defined</span></div>
       <table>
         <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
-        <tr><td>type</td><td>enum</td><td>Simple Check / Verify Task / Door Check / Location-Based Check / Meter Reading.</td></tr>
+        <tr><td>type</td><td>enum</td><td>Simple Check / Verify Task / Door Check / Gas Pump Check / Location-Based Check / Meter Reading.</td></tr>
         <tr><td>label</td><td>text</td><td></td></tr>
-        <tr><td>config</td><td>structured</td><td>Type-specific: e.g. Door Check's expected state and the Location its door belongs to (what a mismatch Incident attaches to, since a door is not an entity of its own); Verify Task's "prompt retry after rejection" flag; Location-Based Check's nested checklist reference; Meter Reading's asset selection (a fixed Asset, or user-selected at completion time — e.g. "select your patrol vehicle").</td></tr>
+        <tr><td>config</td><td>structured</td><td>Type-specific: e.g. a Door or Gas Pump Check's expected state and the required Location it belongs to (what a mismatch Incident attaches to, since neither is an entity of its own; defaulted from the checkpoint's Location on creation); Verify Task's "prompt retry after rejection" flag; Location-Based Check's nested checklist reference; Meter Reading's asset selection (a fixed Asset, or user-selected at completion time — e.g. "select your patrol vehicle").</td></tr>
         <tr><td>order</td><td>number</td><td></td></tr>
       </table>
     </div>

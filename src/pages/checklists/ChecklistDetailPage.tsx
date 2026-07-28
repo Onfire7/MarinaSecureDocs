@@ -150,7 +150,8 @@ function ResultSummary({ type, result }: { type: string; result: ItemResult | un
       if (r.outcome === "rejected_reason") return <span>Rejected — {r.reason ?? "reason given"}</span>;
       return <span>Rejected — ticket raised</span>;
     }
-    case "door_check": {
+    case "door_check":
+    case "gas_pump_check": {
       const s = doorCheckSummary(result as Extract<ItemResult, { type: "door_check" }>);
       // Found and left are reported as separate facts: a door corrected on
       // arrival still means it was insecure until the guard got there.

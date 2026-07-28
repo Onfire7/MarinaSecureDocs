@@ -9,8 +9,39 @@ export type ItemType =
   | "simple_check"
   | "verify_task"
   | "door_check"
+  | "gas_pump_check"
   | "location_check"
   | "meter_reading";
+
+/**
+ * Item types that record a physical thing's state as found and as left.
+ * A gas pump is the same check as a door with a shorter vocabulary — it has
+ * no "open" state, only locked or unlocked — so the two share one
+ * implementation parameterised by the states they allow.
+ */
+export type StateCheckType = "door_check" | "gas_pump_check";
+
+export const STATE_CHECK_KINDS: Record<
+  StateCheckType,
+  { label: string; noun: string; states: DoorState[]; defaultState: DoorState }
+> = {
+  door_check: {
+    label: "Door Check",
+    noun: "door",
+    states: ["open", "unlocked", "locked"],
+    defaultState: "locked",
+  },
+  gas_pump_check: {
+    label: "Gas Pump Check",
+    noun: "pump",
+    states: ["unlocked", "locked"],
+    defaultState: "locked",
+  },
+};
+
+export function isStateCheck(type: string): type is StateCheckType {
+  return type === "door_check" || type === "gas_pump_check";
+}
 
 // "Closed" isn't its own state — a door that's locked or unlocked is
 // necessarily closed, so those two states already imply it.
@@ -24,10 +55,12 @@ export interface VerifyTaskConfig {
 export interface DoorCheckConfig {
   expectedState: DoorState;
   /**
-   * The Location this door belongs to. A door isn't an entity of its own —
-   * it's a labelled item on a template — so this is what a mismatch incident
-   * attaches to. Optional because items authored before this existed have no
-   * binding; those fall back to asking the guard to pick a target.
+   * The Location this door or pump belongs to — required, and what a mismatch
+   * incident attaches to. A door isn't an entity of its own (it's a labelled
+   * item on a template), so without this there is nothing to attach to.
+   * Defaulted from the template's checkpoint when the item is created, and
+   * flagged in the template builder when missing. Still optional in the type
+   * because items authored before it existed have none.
    */
   locationId?: string;
 }
@@ -113,7 +146,7 @@ export interface DoorCheckAttempt {
  * doorCheckSummary() rather than branching on shape at each call site.
  */
 export interface DoorCheckResult {
-  type: "door_check";
+  type: StateCheckType;
   expected: DoorState;
   initialState?: DoorState;
   finalState?: DoorState;
@@ -233,6 +266,7 @@ export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   simple_check: "Simple Check",
   verify_task: "Verify Task",
   door_check: "Door Check",
+  gas_pump_check: "Gas Pump Check",
   location_check: "Location-Based Check",
   meter_reading: "Meter Reading",
 };

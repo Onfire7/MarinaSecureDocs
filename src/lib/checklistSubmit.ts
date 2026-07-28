@@ -41,7 +41,7 @@ export function collectPendingEffects(
   for (const row of rows) {
     const r = row.result as ItemResult | undefined;
     if (!r) continue;
-    if (r.type === "door_check") {
+    if (r.type === "door_check" || r.type === "gas_pump_check") {
       if (r.pendingIncident) out.incidents.push(r.pendingIncident);
       if (r.pendingTicket) {
         out.tickets.push(r.pendingTicket);

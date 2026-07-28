@@ -135,7 +135,7 @@ const _schema = i.schema({
       assignmentMode: i.string(), // triggering_user / role
     }),
     checklistTemplateItems: i.entity({
-      type: i.string(), // simple_check / verify_task / door_check / location_check / meter_reading
+      type: i.string(), // simple_check / verify_task / door_check / gas_pump_check / location_check / meter_reading
       label: i.string(),
       config: i.json<Record<string, unknown>>().optional(),
       order: i.number(),

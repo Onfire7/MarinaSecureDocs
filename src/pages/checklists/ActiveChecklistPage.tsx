@@ -12,6 +12,7 @@ import {
 } from "../../lib/checklistSubmit";
 import {
   DoorCheckItem,
+  GasPumpCheckItem,
   LocationCheckItem,
   MeterReadingItem,
   SimpleCheckItem,
@@ -183,6 +184,8 @@ export function ActiveChecklistPage() {
         return VerifyTaskItem;
       case "door_check":
         return DoorCheckItem;
+      case "gas_pump_check":
+        return GasPumpCheckItem;
       case "location_check":
         return LocationCheckItem;
       case "meter_reading":
