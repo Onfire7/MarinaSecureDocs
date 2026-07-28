@@ -164,6 +164,37 @@ luminance math on a `var()` that JS can't read without `getComputedStyle`.
 The editor hardcodes `var(--accent-soft)` and needs the matching foreground
 too. Check every status in both themes, including the `default` branch.
 
+### 6. User actions: add "Install app" to the desktop sidenav
+
+The sidenav footer (`src/layout/AppShell.tsx:74-96`) holds the user info,
+theme toggle, and sign-out/switch-user buttons. Add an "Install app" button
+that invokes the `beforeinstallprompt` event — this gives users a one-click
+path to install the PWA. Position it among the other buttons; hide it when
+the prompt isn't available (non-PWA browsers, already installed, dismissed).
+
+Note: `beforeinstallprompt` fires at the top level but is typically checked
+from a button handler, so capture it in a context or state hook available to
+`AppShell`. Example pattern in `src/main.tsx` or as a custom hook if another
+component elsewhere (e.g., MorePage, task 9) also needs it.
+
+### 7. React library: use development build instead of production
+
+Currently the build bundles the minified React production library. For
+debugging purposes, use the development build, which includes warnings about
+issues like Rules of Hooks violations (it catches them at runtime; the prod
+build skips the check). This won't ship — it's for dev only, so either:
+
+- Conditional in `vite.config.ts`: detect a dev-mode flag or environment and
+  rewrite the React import to the `.development.js` export in the package
+  (`node_modules/react/index.js` vs. `…/index.development.js`), or
+- `package.json` override: use `"react": "…#development"` in dependencies (if
+  the package supports it) or point at a separate alias.
+
+Whichever approach: verify in `npm run build` that the dev build is bundled
+(check the bundle size difference and search the output for development).
+Verify with the test account at `/beta.marinasecure.com` that React DevTools
+and hook warnings appear (if applicable).
+
 ---
 
 ## Learnings from this codebase (read before debugging anything)
