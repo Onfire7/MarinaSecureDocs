@@ -65,6 +65,26 @@ Currently tapping a Location drills into its child list. When a Location has
 no children, that drill-in is a dead end — it should open the Location's
 details page instead.
 
+### 2. Map management: replace and delete a map
+
+`src/pages/admin/AdminLocationsPage.tsx` can only *add* maps — `upload()`
+(~line 945) creates a new `marinaMaps` row each time, and there's no way to
+swap a map's image or remove a map that's wrong or obsolete.
+
+Add both affordances to the map admin UI:
+
+- **Replace**: `$files` perms are `update: "false"` (`instant.perms.ts:89`),
+  so replacing means upload the new file → relink `marinaMaps.image` → delete
+  the old `$files` row. Not an overwrite. Reuse `upload()`'s timeout race and
+  error handling rather than writing a second upload path.
+- **Delete**: removes the map, its `$files` image, and its `placements`
+  (query already loads `placements: { location: {} }` at line 932). Confirm
+  first and say how many placements will be lost — placements are the
+  location↔map pins and can't be recovered.
+
+Both are destructive, so gate on `manage_locations` (`src/lib/permissions.ts`)
+and update `docs/pages/admin-locations.html` to match.
+
 ---
 
 ## Learnings from this codebase (read before debugging anything)
