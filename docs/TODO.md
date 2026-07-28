@@ -38,13 +38,12 @@ starting; the **Environment & tooling** section changes how you work.
 - **Test account**: `gpp@onfire.us` — the owner's dev account, active, roles
   Security + Admin (manage_roles + manage_users). It is the only account that
   has ever completed a sign-in.
-- **Permission-classifier blocks** (auto mode): `instant-cli push
-  schema/perms`, `instant-admin.mjs transact` (admin writes), and non-GET
+- **Permission-classifier blocks** (auto mode): Non-GET
   Clerk API curls get denied. Do **not** work around them. Sanctioned paths:
   data writes → drive the deployed app UI via Playwright as the signed-in
   user; perms changes → edit `instant.perms.ts`, then give the user the
   compiled JSON to paste into the Instant dashboard; schema changes → edit
-  `instant.schema.ts`, then ask the user to run
+  `instant.schema.ts`, then run
   `npx instant-cli@latest push schema --yes`.
 - **Schema push deletes removed attrs immediately** (data loss — it happened
   with `roles.permissions`). Only additive changes without user sign-off.
