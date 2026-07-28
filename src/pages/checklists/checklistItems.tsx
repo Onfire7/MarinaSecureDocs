@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import type { InstaQLEntity } from "@instantdb/react";
 import { db, id, type AppSchema } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { deterministicId } from "../../lib/detId";
-import { dueMeterMaintenanceRules, maintenanceRuleTitle } from "../../lib/maintenanceRules";
 import { doorCheckSummary, doorStateLabel } from "../../lib/checklists";
 import type {
   DoorCheckConfig,
@@ -14,9 +14,8 @@ import type {
   MeterReadingConfig,
   VerifyTaskConfig,
 } from "../../lib/checklists";
-import { attachmentLink, type AttachmentTarget } from "../../lib/attachments";
+import type { AttachmentTarget } from "../../lib/attachments";
 import { AttachmentTargetPicker } from "../shared/AttachmentTargetPicker";
-import { activityTx } from "../../lib/activityLog";
 
 type TemplateItem = InstaQLEntity<AppSchema, "checklistTemplateItems">;
 type ItemResultEntity = InstaQLEntity<
@@ -30,6 +29,8 @@ export interface ItemProps {
   existing: ItemResultEntity | undefined;
   checklistId: string;
   onSaved: (result: ItemResult, ticketId?: string) => void;
+  /** False once the checklist is submitted — finished items become read-only. */
+  editable?: boolean;
 }
 
 const DOOR_STATES: DoorState[] = ["open", "unlocked", "locked"];
@@ -39,81 +40,144 @@ async function saveResult(
   itemId: string,
   existingId: string | undefined,
   result: ItemResult,
-  linkedTicketId?: string,
 ) {
   const resultId = existingId ?? id();
+  // Reusing the existing row id means re-answering an item overwrites its
+  // result rather than stacking a second one beside it.
   await db.transact(
     db.tx.checklistItemResults[resultId]
       .update({ result: result as unknown as Record<string, unknown>, completedAt: Date.now() })
-      .link({
-        checklist: checklistId,
-        templateItem: itemId,
-        ...(linkedTicketId ? { linkedTicket: linkedTicketId } : {}),
-      }),
+      .link({ checklist: checklistId, templateItem: itemId }),
+  );
+}
+
+async function clearResult(existingId: string | undefined) {
+  if (!existingId) return;
+  await db.transact(db.tx.checklistItemResults[existingId].delete());
+}
+
+/**
+ * A finished item, with the Edit affordance that reopens it. Editing is only
+ * offered before the checklist is submitted — afterwards the item is part of
+ * a completed record, and its incidents and tickets actually exist.
+ */
+function DoneCard({
+  badge,
+  title,
+  summary,
+  tone = "done",
+  onEdit,
+}: {
+  badge: string;
+  title: string;
+  summary: ReactNode;
+  tone?: "done" | "plain";
+  onEdit?: () => void;
+}) {
+  return (
+    <div className={"card" + (tone === "done" ? " card-done" : "")}>
+      <div className="spread" style={{ alignItems: "flex-start" }}>
+        <div>
+          <div className="badge">{badge}</div>
+          <div className="card-title">{title}</div>
+          <div className="card-meta">{summary}</div>
+        </div>
+        {onEdit && (
+          <button type="button" className="btn btn-sm btn-quiet" onClick={onEdit}>
+            Edit
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
 // ---------------------------------------------------------------- Simple Check
 
-export function SimpleCheckItem({ item, existing, checklistId, onSaved }: ItemProps) {
+export function SimpleCheckItem({
+  item,
+  existing,
+  checklistId,
+  onSaved,
+  editable = true,
+}: ItemProps) {
   const done = existing?.result != null;
   const complete = async () => {
     const result: ItemResult = { type: "simple_check", completedAt: Date.now() };
     await saveResult(checklistId, item.id, existing?.id, result);
     onSaved(result);
   };
+
+  if (done) {
+    return (
+      <DoneCard
+        badge="Simple Check"
+        title={item.label}
+        summary="✓ Complete"
+        // "Complete" is this item's only state, so editing it can only mean
+        // undoing it — there's no form to reopen.
+        onEdit={editable ? () => void clearResult(existing?.id) : undefined}
+      />
+    );
+  }
   return (
-    <div className={"card" + (done ? " card-done" : "")}>
+    <div className="card">
       <div className="badge">Simple Check</div>
       <div className="card-title">{item.label}</div>
-      {done ? (
-        <div className="card-meta">✓ Complete</div>
-      ) : (
-        <div className="row" style={{ marginTop: 10 }}>
-          <button type="button" className="btn btn-primary" onClick={() => void complete()}>
-            ✓ Mark complete
-          </button>
-        </div>
-      )}
+      <div className="row" style={{ marginTop: 10 }}>
+        <button type="button" className="btn btn-primary" onClick={() => void complete()}>
+          ✓ Mark complete
+        </button>
+      </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------- Verify Task
 
-export function VerifyTaskItem({ item, existing, checklistId, onSaved }: ItemProps) {
+export function VerifyTaskItem({
+  item,
+  existing,
+  checklistId,
+  onSaved,
+  editable = true,
+}: ItemProps) {
   const cfg = (item.config ?? {}) as unknown as VerifyTaskConfig;
   const existingResult = existing?.result as
     | Extract<ItemResult, { type: "verify_task" }>
     | undefined;
   const [stage, setStage] = useState<"initial" | "attempt" | "reason">("initial");
   const [reason, setReason] = useState("");
-  const done = existingResult != null;
+  const [editing, setEditing] = useState(false);
+  const done = existingResult != null && !editing;
 
   const finish = async (
     outcome: "confirmed" | "rejected_reason" | "rejected_ticket",
     attempted?: boolean,
   ) => {
+    // The ticket is described now and written at submit, so changing this
+    // answer beforehand doesn't leave a stray ticket behind.
+    const ticketId = outcome === "rejected_ticket" ? id() : undefined;
     const result: ItemResult = {
       type: "verify_task",
       outcome,
       attempted,
       ...(outcome === "rejected_reason" ? { reason } : {}),
+      ...(ticketId
+        ? {
+            pendingTicket: {
+              id: ticketId,
+              title: `Failed Verify Task: ${item.label}`,
+              openedAt: Date.now(),
+              priority: "medium",
+              autoGenerated: false,
+            },
+          }
+        : {}),
     };
-    let ticketId: string | undefined;
-    if (outcome === "rejected_ticket") {
-      ticketId = id();
-      await db.transact(
-        db.tx.tickets[ticketId].update({
-          title: `Failed Verify Task: ${item.label}`,
-          priority: "medium",
-          status: "open",
-          autoGenerated: false,
-          createdAt: Date.now(),
-        }),
-      );
-    }
-    await saveResult(checklistId, item.id, existing?.id, result, ticketId);
+    await saveResult(checklistId, item.id, existing?.id, result);
+    setEditing(false);
+    setStage("initial");
     onSaved(result, ticketId);
   };
 
@@ -124,11 +188,20 @@ export function VerifyTaskItem({ item, existing, checklistId, onSaved }: ItemPro
 
   if (done) {
     return (
-      <div className="card card-done">
-        <div className="badge">Verify Task</div>
-        <div className="card-title">{item.label}</div>
-        <div className="card-meta">{verifyOutcomeLabel(existingResult)}</div>
-      </div>
+      <DoneCard
+        badge="Verify Task"
+        title={item.label}
+        summary={verifyOutcomeLabel(existingResult)}
+        onEdit={
+          editable
+            ? () => {
+                setReason(existingResult.reason ?? "");
+                setStage("initial");
+                setEditing(true);
+              }
+            : undefined
+        }
+      />
     );
   }
 
@@ -227,14 +300,19 @@ function verifyOutcomeLabel(r: Extract<ItemResult, { type: "verify_task" }>): st
  * true regardless of what happens next) and then asks what state the guard
  * managed to leave it in.
  */
-export function DoorCheckItem({ item, existing, checklistId, onSaved }: ItemProps) {
+export function DoorCheckItem({
+  item,
+  existing,
+  checklistId,
+  onSaved,
+  editable = true,
+}: ItemProps) {
   const cfg = (item.config ?? {}) as unknown as DoorCheckConfig;
   // An item whose config was never opened in the template builder persists
   // as `{}` — the builder only shows "Locked" as the select's default, it
   // never writes it. Default here too, matching that displayed default,
   // rather than crashing stateLabel() on an undefined state.
   const expectedState: DoorState = cfg.expectedState ?? "locked";
-  const current = useCurrent();
   const existingResult = existing?.result as
     | Extract<ItemResult, { type: "door_check" }>
     | undefined;
@@ -245,7 +323,11 @@ export function DoorCheckItem({ item, existing, checklistId, onSaved }: ItemProp
   const [details, setDetails] = useState("");
   const [target, setTarget] = useState<AttachmentTarget | null>(null);
   const [saving, setSaving] = useState(false);
-  const done = existingResult != null;
+  const [editing, setEditing] = useState(false);
+  // Preserved across an edit so re-answering doesn't restamp the finding to
+  // the time it was corrected.
+  const openedAtRef = useRef<number | null>(null);
+  const done = existingResult != null && !editing;
 
   // The door's bound Location is the incident's attachment target. Items
   // authored before that binding existed have none, so the guard picks one
@@ -260,6 +342,7 @@ export function DoorCheckItem({ item, existing, checklistId, onSaved }: ItemProp
 
   const beginMismatch = (found: DoorState) => {
     setInitialState(found);
+    openedAtRef.current ??= Date.now();
     setTitle(`${item.label} found ${stateLabel(found).toLowerCase()}`);
     setDetails(
       `Expected ${stateLabel(expectedState).toLowerCase()}, ` +
@@ -281,18 +364,26 @@ export function DoorCheckItem({ item, existing, checklistId, onSaved }: ItemProp
       finalState: found,
     };
     await saveResult(checklistId, item.id, existing?.id, result);
+    setEditing(false);
+    setInitialState(null);
     onSaved(result);
   };
 
-  // Everything a mismatch produces — the incident, an optional ticket, and
-  // the result itself — is written in one transaction at the end, so
-  // abandoning the item mid-flow can't leave an orphaned incident behind.
+  // The incident and any ticket are only *described* here; they're written
+  // when the checklist is submitted (see lib/checklistSubmit.ts). That's what
+  // lets the guard reopen this item and change their answer without the app
+  // having to retract a real Incident.
   const commitMismatch = async (finalState: DoorState, raiseTicket: boolean) => {
     if (!initialState || saving) return;
     setSaving(true);
     try {
-      const incidentId = id();
-      const ticketId = raiseTicket ? id() : undefined;
+      // Stamped now, not at submit: a door found open at 02:10 and submitted
+      // at 05:45 was open at 02:10.
+      const openedAt = openedAtRef.current ?? Date.now();
+      const incidentId = existingResult?.pendingIncident?.id ?? id();
+      const ticketId = raiseTicket
+        ? (existingResult?.pendingTicket?.id ?? id())
+        : undefined;
       const summary =
         `${item.label}: found ${stateLabel(initialState).toLowerCase()}, ` +
         `left ${stateLabel(finalState).toLowerCase()} ` +
@@ -303,43 +394,39 @@ export function DoorCheckItem({ item, existing, checklistId, onSaved }: ItemProp
         initialState,
         finalState,
         ...(details.trim() ? { note: details.trim() } : {}),
-        incidentId,
-      };
-      await db.transact([
-        db.tx.incidents[incidentId]
-          .update({
-            title: title.trim() || summary,
-            status: "open",
-            details: details.trim() || undefined,
-            createdAt: Date.now(),
-          })
-          .link({
-            ...(effectiveTarget ? attachmentLink(effectiveTarget) : {}),
-            ...(current.user ? { author: current.user.id } : {}),
-          }),
-        activityTx({
-          eventType: "incident.created",
-          summary,
-          subjectType: "incidents",
-          subjectId: incidentId,
-          actorId: current.user?.id,
-        }),
+        pendingIncident: {
+          id: incidentId,
+          title: title.trim() || summary,
+          details: details.trim() || undefined,
+          openedAt,
+          ...(effectiveTarget
+            ? {
+                target: {
+                  type: effectiveTarget.type,
+                  id: effectiveTarget.id,
+                  label: effectiveTarget.label,
+                },
+              }
+            : {}),
+        },
         ...(ticketId
-          ? [
-              db.tx.tickets[ticketId]
-                .update({
-                  title: `Door left ${stateLabel(finalState).toLowerCase()}: ${item.label}`,
-                  description: summary,
-                  priority: "medium",
-                  status: "open",
-                  autoGenerated: false,
-                  createdAt: Date.now(),
-                })
-                .link({ sourceIncident: incidentId }),
-            ]
-          : []),
-      ]);
-      await saveResult(checklistId, item.id, existing?.id, result, ticketId);
+          ? {
+              pendingTicket: {
+                id: ticketId,
+                title: `Door left ${stateLabel(finalState).toLowerCase()}: ${item.label}`,
+                description: summary,
+                openedAt,
+                priority: "medium",
+                autoGenerated: false,
+                sourceIncidentId: incidentId,
+              },
+            }
+          : {}),
+      };
+      await saveResult(checklistId, item.id, existing?.id, result);
+      setEditing(false);
+      setInitialState(null);
+      setPendingFinal(null);
       onSaved(result, ticketId);
     } finally {
       setSaving(false);
@@ -358,11 +445,27 @@ export function DoorCheckItem({ item, existing, checklistId, onSaved }: ItemProp
   if (done) {
     const s = doorCheckSummary(existingResult);
     return (
-      <div className={"card" + (s.leftAsExpected ? " card-done" : "")}>
-        <div className="badge">Door Check</div>
-        <div className="card-title">{item.label}</div>
-        <div className="card-meta">{doneSummaryText(s)}</div>
-      </div>
+      <DoneCard
+        badge="Door Check"
+        title={item.label}
+        summary={doneSummaryText(s)}
+        tone={s.leftAsExpected ? "done" : "plain"}
+        onEdit={
+          editable
+            ? () => {
+                // Reopen prefilled from what was recorded, so a correction is
+                // an adjustment rather than starting over.
+                const prev = existingResult.pendingIncident;
+                openedAtRef.current = prev?.openedAt ?? null;
+                setInitialState(s.initial ?? null);
+                setTitle(prev?.title ?? "");
+                setDetails(prev?.details ?? existingResult.note ?? "");
+                setPendingFinal(null);
+                setEditing(true);
+              }
+            : undefined
+        }
+      />
     );
   }
 
@@ -559,7 +662,13 @@ export function LocationCheckItem({ item, existing, checklistId, onSaved }: Item
 
 // ---------------------------------------------------------------- Meter Reading
 
-export function MeterReadingItem({ item, existing, checklistId, onSaved }: ItemProps) {
+export function MeterReadingItem({
+  item,
+  existing,
+  checklistId,
+  onSaved,
+  editable = true,
+}: ItemProps) {
   const cfg = (item.config ?? {}) as unknown as MeterReadingConfig;
   const existingResult = existing?.result as
     | Extract<ItemResult, { type: "meter_reading" }>
@@ -567,6 +676,8 @@ export function MeterReadingItem({ item, existing, checklistId, onSaved }: ItemP
   const [assetId, setAssetId] = useState(cfg.assetId ?? "");
   const [value, setValue] = useState("");
   const [correctionReason, setCorrectionReason] = useState("");
+  const [editing, setEditing] = useState(false);
+  const openedAtRef = useRef<number | null>(null);
 
   const { data } = db.useQuery(
     cfg.assetId
@@ -576,64 +687,55 @@ export function MeterReadingItem({ item, existing, checklistId, onSaved }: ItemP
   const options = cfg.assetId ? [] : data?.assets ?? [];
   const asset = cfg.assetId ? data?.assets?.[0] : options.find((a) => a.id === assetId);
 
-  const done = existingResult != null;
+  const done = existingResult != null && !editing;
   const needsCorrection =
     asset?.meterReading != null && Number(value) < asset.meterReading && value !== "";
 
+  // The reading, the Asset's meter bump, and any maintenance tickets it
+  // triggers are all deferred to submit. Writing them here would bump the
+  // asset off a number the guard can still correct, and would evaluate
+  // maintenance rules against a value that isn't final yet.
   const record = async () => {
     if (!asset) return;
     const numeric = Number(value);
-    const readingId = id();
-    const { data: fresh } = await db.queryOnce({
-      assetMeterReadings: { $: { where: { "asset.id": asset.id } } },
-      tickets: { $: { where: { "asset.id": asset.id } } },
-    });
-    const dueRules = dueMeterMaintenanceRules(
-      asset,
-      numeric,
-      fresh?.assetMeterReadings ?? [],
-      fresh?.tickets ?? [],
-    );
-    const ticketTxns = dueRules.map((rule) =>
-      db.tx.tickets[id()]
-        .update({
-          title: maintenanceRuleTitle(asset, rule),
-          priority: "medium",
-          status: "open",
-          autoGenerated: true,
-          createdAt: Date.now(),
-        })
-        .link({ asset: asset.id }),
-    );
-    await db.transact([
-      db.tx.assetMeterReadings[readingId]
-        .update({
-          value: numeric,
-          source: "checklist_item",
-          timestamp: Date.now(),
-          ...(needsCorrection ? { correctionReason } : {}),
-        })
-        .link({ asset: asset.id }),
-      db.tx.assets[asset.id].update({ meterReading: numeric }),
-      ...ticketTxns,
-    ]);
+    const readingId = existingResult?.pendingReading?.id ?? id();
+    const openedAt = openedAtRef.current ?? Date.now();
     const result: ItemResult = {
       type: "meter_reading",
       assetId: asset.id,
       value: numeric,
       meterReadingId: readingId,
+      pendingReading: {
+        id: readingId,
+        assetId: asset.id,
+        value: numeric,
+        openedAt,
+        ...(needsCorrection && correctionReason ? { correctionReason } : {}),
+      },
     };
     await saveResult(checklistId, item.id, existing?.id, result);
+    setEditing(false);
     onSaved(result);
   };
 
   if (done) {
     return (
-      <div className="card card-done">
-        <div className="badge">Meter Reading</div>
-        <div className="card-title">{item.label}</div>
-        <div className="card-meta">Recorded {existingResult.value}</div>
-      </div>
+      <DoneCard
+        badge="Meter Reading"
+        title={item.label}
+        summary={`Recorded ${existingResult.value}`}
+        onEdit={
+          editable
+            ? () => {
+                openedAtRef.current = existingResult.pendingReading?.openedAt ?? null;
+                setAssetId(existingResult.assetId);
+                setValue(String(existingResult.value));
+                setCorrectionReason(existingResult.pendingReading?.correctionReason ?? "");
+                setEditing(true);
+              }
+            : undefined
+        }
+      />
     );
   }
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ComponentType } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { db } from "../../lib/db";
@@ -6,6 +6,10 @@ import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { ITEM_TYPE_LABEL, type ItemType } from "../../lib/checklists";
 import { activityTx } from "../../lib/activityLog";
+import {
+  buildPendingEffectTxns,
+  collectPendingEffects,
+} from "../../lib/checklistSubmit";
 import {
   DoorCheckItem,
   LocationCheckItem,
@@ -24,6 +28,8 @@ export function ActiveChecklistPage() {
   const location = useLocation();
   const current = useCurrent();
   const isMobile = useIsMobile();
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const returnTo = (location.state as { returnTo?: string } | null)?.returnTo;
 
   const { data } = db.useQuery(
@@ -116,8 +122,35 @@ export function ActiveChecklistPage() {
   const allDone = items.length > 0 && remaining === 0;
 
   const submit = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      await runSubmit();
+    } catch (err) {
+      // A failed submit now also means the incidents and tickets this
+      // checklist raised were never written — the guard has to know.
+      setSubmitError(
+        err instanceof Error ? err.message : "Couldn't submit the checklist.",
+      );
+      setSubmitting(false);
+    }
+  };
+
+  const runSubmit = async () => {
     const templateName = checklist.template?.name ?? "Checklist";
+    // Everything the items described while the guard worked — incidents,
+    // tickets, meter readings — is written here, in the same transaction
+    // that completes the checklist. Until this point an item could still be
+    // reopened and changed, which is only safe because none of it existed.
+    const collected = collectPendingEffects(checklist.itemResults ?? []);
+    const effectTxns = await buildPendingEffectTxns(collected, current.user?.id);
     await db.transact([
+      ...effectTxns,
+      // Link each raised ticket back to the item result that raised it.
+      ...[...collected.ticketByResultId].map(([resultId, ticketId]) =>
+        db.tx.checklistItemResults[resultId].link({ linkedTicket: ticketId }),
+      ),
       db.tx.checklists[checklist.id].update({ status: "complete", completedAt: Date.now() }),
       activityTx({
         eventType: "checklist.completed",
@@ -193,16 +226,24 @@ export function ActiveChecklistPage() {
         </div>
       )}
 
+      {submitError && (
+        <div className="badge badge-bad" style={{ display: "block", marginTop: 12 }}>
+          {submitError}
+        </div>
+      )}
+
       <div className="row" style={{ marginTop: 16 }}>
         <button
           type="button"
           className="btn btn-primary"
-          disabled={!allDone}
+          disabled={!allDone || submitting}
           onClick={() => void submit()}
         >
-          {allDone
-            ? "Submit Checklist"
-            : `Submit Checklist — ${remaining} item${remaining === 1 ? "" : "s"} remaining`}
+          {submitting
+            ? "Submitting…"
+            : allDone
+              ? "Submit Checklist"
+              : `Submit Checklist — ${remaining} item${remaining === 1 ? "" : "s"} remaining`}
         </button>
       </div>
 
