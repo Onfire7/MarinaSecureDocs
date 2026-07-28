@@ -59,8 +59,8 @@ starting; the **Environment & tooling** section changes how you work.
 ## Tasks
 
 Suggested order: 1–5 (small, independent) → 6–7 (one subsystem, do together)
-→ 8 (CSS) → 9–10 (global, largest). Verify each on the deployment before
-moving on.
+→ 8, 11 (isolated) → 9–10 (global, largest). Verify each on the deployment
+before moving on.
 
 ### 1. Check-in URL shows the dashboard instead of the checkpoint page
 
@@ -175,19 +175,63 @@ deploys are the team's only distribution channel). The NFC/QR deep link
 `/checkin/:guidUrl` must keep working from inside the installed app.
 Verify installability with a Lighthouse pass via Playwright/chromium.
 
+### 11. Admin Locations: map upload hangs on the loading spinner
+
+`src/pages/admin/AdminLocationsPage.tsx:942` — `upload()` awaits
+`db.storage.uploadFile(path, file)` inside `try/finally` with **no catch**:
+if the upload *rejects*, the spinner clears but the error vanishes as an
+unhandled rejection; if it *never settles* (which matches the "hangs"
+report), the spinner spins forever. Repro with a Playwright
+`setInputFiles()` against the deployment while capturing the storage POST's
+response body. Things to check: the `$files` permission rules in
+`instant.perms.ts` (create requires an active user — fine for the test
+account; update is `"false"`, though paths are `Date.now()`-unique so
+overwrite shouldn't occur) and whether `@instantdb/react`'s storage upload
+surfaces permission denials as rejections at all. Regardless of root cause:
+add a `catch` that shows the error in the UI — this codebase has been bitten
+repeatedly by swallowed failures (see Learnings).
+
 ---
 
-## Verifying like the last agent
+## Learnings from this codebase (read before debugging anything)
 
-The loop that caught every real bug this cycle:
+- **Silent failures are the house specialty.** Three separate multi-hour
+  debugging spirals came from errors being swallowed: a render throw
+  unmounting the whole tree (blank white page), `signInWithIdToken`
+  failures logged as `console.warn` and surfaced as a misleading
+  "account can't access this marina", and `.catch(console.error)` on
+  transacts. Countermeasures now exist — a top-level `ErrorBoundary`
+  (`src/layout/ErrorBoundary.tsx`) and the Instant auth-failure screen
+  (`src/lib/auth/instantAuthStatus.ts`) — but when a screen misbehaves,
+  your first stop is capturing `pageerror`, console errors, **and ≥400
+  response bodies** in a Playwright run, not reading code.
+- **A rule that denies everyone passes every anonymous-access test.**
+  Never call a permission change verified until a real signed-in session
+  has exercised it (`scripts/agent-login.mjs`). Anonymous probes only
+  prove denial, which is the easy half.
+- **Filtering on a link's id does not load the link.** An Instant query
+  like `where: { "checkpoint.id": {...} }` returns rows with
+  `checkpoint: undefined` unless the query also includes `checkpoint: {}`.
+  This silently broke tour progress once; a type cast had hidden it.
+- **Instant gotchas** (each cost real downtime): browser origins must be
+  allowlisted in the Instant dashboard or the token exchange fails; the
+  `$users` row is created *through* the permission rules on first sign-in
+  (`create: "false"` breaks all new sign-ins); schema pushes **delete**
+  removed attrs and their data immediately; `auth.ref()` should only read
+  scalar attributes (JSON-array flattening is undocumented);
+  `asUser({email})` impersonation only works for identities that have
+  actually signed in.
+- **Testing the site properly** (the loop that caught every real bug):
+  1. Trio: `npx tsc -b` · `npx oxlint` · `npm run build` && `rm -rf dist`.
+  2. Commit+push `beta`; poll https://beta.marinasecure.com until the
+     `index-*.js` hash changes (~45–60s).
+  3. `node scripts/agent-login.mjs` → read the printed screen text → open
+     the screenshot and **look at it**.
+  4. Drive the specific flow with an ad-hoc script reusing
+     `/tmp/pw-test/state.json`; assert on visible text, not just absence
+     of errors.
+  5. Data/rules questions: `scripts/instant-admin.mjs`, with `--as` /
+     `--guest` to test through the rule engine.
 
-1. Change code → trio (`tsc`/`oxlint`/build) → commit to `beta` → push.
-2. Poll the site until the bundle hash changes (~45–60s).
-3. `node scripts/agent-login.mjs` → screenshot → **look at it**.
-4. Drive the specific flow with an ad-hoc Playwright script reusing
-   `/tmp/pw-test/state.json`; capture `pageerror`/console + failing response
-   bodies (`page.on('response')` for `>=400`).
-5. For rule/data questions, `instant-admin.mjs` with `--as`/`--guest`.
-
-Hard-won rule: nothing is "verified" until a real signed-in session has
-exercised it against the deployment. Screenshots or it didn't happen.
+Nothing is "verified" until a real signed-in session has exercised it
+against the deployment. Screenshots or it didn't happen.
