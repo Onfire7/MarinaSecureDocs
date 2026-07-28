@@ -49,6 +49,19 @@ export function useCheckpointVisit(
   const { data: resumedData, isLoading: resumedLoading } = db.useQuery(
     resumeCheckInId ? { checkIns: { $: { where: { id: resumeCheckInId } } } } : null,
   );
+  // The dedupe cutoff is pinned to when this visit mounted rather than
+  // recomputed per render. db.useQuery subscribes through
+  // useSyncExternalStore, so a query object that differs every render — and
+  // `Date.now()` differs every millisecond — resubscribes every render,
+  // pushes a fresh snapshot, and re-renders: an infinite loop that React
+  // aborts with "Maximum update depth exceeded". A cutoff that drifts by
+  // milliseconds bought nothing anyway against a 5-minute window.
+  const dedupeSince = useMemo(
+    () => new Date(Date.now() - DEDUPE_WINDOW_MS),
+    // Re-pinned only when the visit itself changes identity.
+    [checkpointId, userId, method, resumeCheckInId],
+  );
+
   // Dedupe exists because the scanned screen is reached by re-opening a URL
   // (reload, resumed tab). The manual dialog is opened from inside a running
   // session and closes on submit, so it needs no dedupe — and applying it
@@ -62,7 +75,7 @@ export function useCheckpointVisit(
               where: {
                 "checkpoint.id": checkpointId,
                 "user.id": userId,
-                timestamp: { $gt: new Date(Date.now() - DEDUPE_WINDOW_MS) },
+                timestamp: { $gt: dedupeSince },
               },
               order: { timestamp: "desc" },
             },
