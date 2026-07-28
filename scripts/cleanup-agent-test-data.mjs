@@ -64,6 +64,30 @@ const PLAN = [
     ],
   },
   {
+    // Test scans, identified by the fake geolocation every verify script
+    // injected — (40, -74), which is nowhere near this marina's real
+    // coordinates (~33.85, -96.64). That signal matters: check-in 6ff2a793
+    // looked like an agent row by timestamp and even surfaced in a verify
+    // script's output, but carries real marina GPS — the dedupe window had
+    // resumed a check-in a real user had just made, rather than creating
+    // one. Deleting by timestamp would have taken it.
+    ns: "checkIns",
+    rows: [
+      ["ed515f2e-5632-45ad-a19c-5d903bfb3316", "agent verify scan 07-27 21:52 — Maintenance Shop Gate"],
+      ["5f2f1a7f-8e71-4c61-94e8-4098737e489a", "agent verify scan 07-27 23:38 — Maintenance Shop Gate"],
+      ["c441a64b-873d-4e27-b8e8-dfff8a292210", "agent verify scan 07-27 23:39 — Main Pavilion"],
+      ["c860ca88-f1aa-4fcd-a5fc-50ca47b52fde", "agent verify scan 07-27 23:39 — Water Storage #2 - Pavilion"],
+      ["fc7b0160-2355-4c9d-818a-5e44877d2e8b", "agent verify scan 07-27 23:39 — The Point - Back Door"],
+      ["f50022a5-5478-4da0-90f3-fcc20e339d15", "agent verify scan 07-27 23:39 — Burrage Condo"],
+      ["3c709f76-f8be-4415-8159-d190e29997ac", "agent verify scan 07-27 23:43 — Maintenance Shop Gate"],
+      ["70b5971a-ad3b-423b-8f16-e7fa5d13caba", "agent verify scan 07-27 23:47 — Main Pavilion"],
+      ["3ba1133c-ca38-4483-8006-9814b9d98112", "agent verify scan 07-27 23:47 — Water Storage #2 - Pavilion"],
+      ["5ad6e734-b927-4014-97bc-2c074e71848f", "agent verify scan 07-27 23:47 — The Point - Back Door"],
+      ["df408f1b-97a0-4c21-a6c1-40c9c7cda03b", "agent verify scan 07-27 23:47 — Burrage Condo"],
+      ["eecc3db6-fa1a-4a3d-99c2-7e46985ec353", "agent verify scan 07-28 01:48 — Walkway"],
+    ],
+  },
+  {
     ns: "checklists",
     rows: [
       ["3bd508bc-d37c-4c40-8000-000000000000", "in-progress Fuel Dock instance created by the lock-check verify scan"],
