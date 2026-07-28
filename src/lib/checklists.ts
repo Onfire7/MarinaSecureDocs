@@ -9,17 +9,32 @@ export type ItemType =
   | "simple_check"
   | "verify_task"
   | "door_check"
-  | "gas_pump_check"
+  | "lock_check"
   | "location_check"
   | "meter_reading";
 
 /**
  * Item types that record a physical thing's state as found and as left.
- * A gas pump is the same check as a door with a shorter vocabulary — it has
- * no "open" state, only locked or unlocked — so the two share one
- * implementation parameterised by the states they allow.
+ * A Lock Check is the same check as a door with a shorter vocabulary — a
+ * padlocked gate, a fuel pump, a shed hasp has no "open" state, only locked
+ * or unlocked — so the two share one implementation parameterised by the
+ * states they allow.
  */
-export type StateCheckType = "door_check" | "gas_pump_check";
+export type StateCheckType = "door_check" | "lock_check";
+
+/**
+ * Lock Check shipped briefly as "gas_pump_check" before it was generalised
+ * past fuel pumps. Rows written in that window keep the old string, so it's
+ * mapped rather than migrated — the type is opaque storage, and a rename
+ * shouldn't strand anyone's template.
+ */
+const LEGACY_ITEM_TYPES: Record<string, ItemType> = {
+  gas_pump_check: "lock_check",
+};
+
+export function normalizeItemType(type: string): string {
+  return LEGACY_ITEM_TYPES[type] ?? type;
+}
 
 export const STATE_CHECK_KINDS: Record<
   StateCheckType,
@@ -31,16 +46,17 @@ export const STATE_CHECK_KINDS: Record<
     states: ["open", "unlocked", "locked"],
     defaultState: "locked",
   },
-  gas_pump_check: {
-    label: "Gas Pump Check",
-    noun: "pump",
+  lock_check: {
+    label: "Lock Check",
+    noun: "lock",
     states: ["unlocked", "locked"],
     defaultState: "locked",
   },
 };
 
 export function isStateCheck(type: string): type is StateCheckType {
-  return type === "door_check" || type === "gas_pump_check";
+  const t = normalizeItemType(type);
+  return t === "door_check" || t === "lock_check";
 }
 
 // "Closed" isn't its own state — a door that's locked or unlocked is
@@ -266,7 +282,7 @@ export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   simple_check: "Simple Check",
   verify_task: "Verify Task",
   door_check: "Door Check",
-  gas_pump_check: "Gas Pump Check",
+  lock_check: "Lock Check",
   location_check: "Location-Based Check",
   meter_reading: "Meter Reading",
 };

@@ -282,7 +282,7 @@ function verifyOutcomeLabel(r: Extract<ItemResult, { type: "verify_task" }>): st
   return "Rejected — ticket raised";
 }
 
-// ------------------------------------------------- Door / Gas Pump checks
+// ---------------------------------------------------- Door / Lock checks
 
 /**
  * Records a physical thing's state as *found* and as *left*, separately.
@@ -290,8 +290,9 @@ function verifyOutcomeLabel(r: Extract<ItemResult, { type: "verify_task" }>): st
  * secure overnight?" and, separately, "did the guard put it right?" — which a
  * single observed state silently conflated.
  *
- * Doors and gas pumps are the same check with different vocabularies: a pump
- * has no "open", only locked or unlocked. Rather than fork the flow, the
+ * A door and a bare lock are the same check with different vocabularies: a
+ * padlocked gate, a fuel pump, a shed hasp has no "open" state, only locked
+ * or unlocked. Rather than fork the flow, the
  * allowed states come from STATE_CHECK_KINDS, so adding another such thing
  * later is a table entry rather than another copy of this component.
  *
@@ -565,8 +566,8 @@ export function DoorCheckItem(props: ItemProps) {
   return <StateCheckItem kind="door_check" {...props} />;
 }
 
-export function GasPumpCheckItem(props: ItemProps) {
-  return <StateCheckItem kind="gas_pump_check" {...props} />;
+export function LockCheckItem(props: ItemProps) {
+  return <StateCheckItem kind="lock_check" {...props} />;
 }
 
 function capitalizeFirst(s: string): string {

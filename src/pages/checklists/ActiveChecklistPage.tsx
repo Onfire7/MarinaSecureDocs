@@ -4,7 +4,7 @@ import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
-import { ITEM_TYPE_LABEL, type ItemType } from "../../lib/checklists";
+import { ITEM_TYPE_LABEL, normalizeItemType, type ItemType } from "../../lib/checklists";
 import { activityTx } from "../../lib/activityLog";
 import {
   buildPendingEffectTxns,
@@ -12,7 +12,7 @@ import {
 } from "../../lib/checklistSubmit";
 import {
   DoorCheckItem,
-  GasPumpCheckItem,
+  LockCheckItem,
   LocationCheckItem,
   MeterReadingItem,
   SimpleCheckItem,
@@ -177,15 +177,15 @@ export function ActiveChecklistPage() {
   };
 
   const componentFor = (type: string): ComponentType<ItemProps> => {
-    switch (type as ItemType) {
+    switch (normalizeItemType(type) as ItemType) {
       case "simple_check":
         return SimpleCheckItem;
       case "verify_task":
         return VerifyTaskItem;
       case "door_check":
         return DoorCheckItem;
-      case "gas_pump_check":
-        return GasPumpCheckItem;
+      case "lock_check":
+        return LockCheckItem;
       case "location_check":
         return LocationCheckItem;
       case "meter_reading":

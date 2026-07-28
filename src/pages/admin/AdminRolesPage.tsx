@@ -10,6 +10,7 @@ import {
 import { activityTx } from "../../lib/activityLog";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
+import { useTextPrompt } from "../shared/TextPromptDialog";
 
 // Admin — Roles & Permissions (see docs/pages/admin-roles-permissions.html).
 // The one screen that directly edits the trinary model: it doesn't compute
@@ -59,6 +60,7 @@ function Roles() {
   const current = useCurrent();
   const isMobile = useIsMobile();
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const [askText, promptNode] = useTextPrompt();
   const [warning, setWarning] = useState<string | null>(null);
 
   const { data } = db.useQuery({ roles: { users: { roles: {} } } });
@@ -117,7 +119,7 @@ function Roles() {
   };
 
   const addRole = async (from?: RoleRow) => {
-    const name = window.prompt(
+    const name = await askText(
       from ? `Name for the copy of ${from.name}:` : "New role name:",
       from ? `${from.name} copy` : "",
     );
@@ -143,7 +145,7 @@ function Roles() {
   };
 
   const renameRole = async (role: RoleRow) => {
-    const name = window.prompt("Rename role:", role.name);
+    const name = await askText("Rename role:", role.name);
     if (!name?.trim() || name.trim() === role.name) return;
     await db.transact([
       db.tx.roles[role.id].update({ name: name.trim() }),
@@ -187,6 +189,7 @@ function Roles() {
 
   return (
     <div>
+      {promptNode}
       <AdminHeader title="Roles & Permissions">
         <button
           type="button"

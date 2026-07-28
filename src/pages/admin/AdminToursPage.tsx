@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { db, id } from "../../lib/db";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
+import { useTextPrompt } from "../shared/TextPromptDialog";
 
 // Admin — Tours Setup (see docs/pages/admin-tours.html).
 // Gated by manage_locations rather than a dedicated permission, since a tour
@@ -19,6 +20,7 @@ const MODES = ["linear", "freeform", "randomized"] as const;
 
 function Tours() {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [askText, promptNode] = useTextPrompt();
 
   const { data } = db.useQuery({
     tours: { checkpoints: { location: {} } },
@@ -37,7 +39,7 @@ function Tours() {
   );
 
   const addTour = async () => {
-    const name = window.prompt("New tour name:");
+    const name = await askText("New tour name:");
     if (!name?.trim()) return;
     await db.transact(
       db.tx.tours[id()].update({ name: name.trim(), mode: "freeform" }),
@@ -46,6 +48,7 @@ function Tours() {
 
   return (
     <div>
+      {promptNode}
       <AdminHeader title="Tours">
         <button type="button" className="btn btn-sm btn-primary" onClick={() => void addTour()}>
           + Add tour
@@ -98,6 +101,7 @@ function TourCard({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const [askText, promptNode] = useTextPrompt();
   const members = useMemo(() => tour.checkpoints ?? [], [tour.checkpoints]);
   const memberIds = new Set(members.map((c) => c.id));
 
@@ -159,7 +163,7 @@ function TourCard({
   };
 
   const rename = async () => {
-    const name = window.prompt("Rename tour:", tour.name);
+    const name = await askText("Rename tour:", tour.name);
     if (!name?.trim()) return;
     await db.transact(db.tx.tours[tour.id].update({ name: name.trim() }));
   };
@@ -171,6 +175,7 @@ function TourCard({
 
   return (
     <div className="card">
+      {promptNode}
       <div className="spread" style={{ flexWrap: "wrap" }}>
         <div>
           <div className="card-title">{tour.name}</div>

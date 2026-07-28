@@ -2,7 +2,9 @@ import { db, id, type AppSchema } from "./db";
 import { activityTx } from "./activityLog";
 import { dueMeterMaintenanceRules, maintenanceRuleTitle } from "./maintenanceRules";
 import type { TransactionChunk } from "@instantdb/react";
+import { isStateCheck } from "./checklists";
 import type {
+  DoorCheckResult,
   ItemResult,
   PendingIncident,
   PendingMeterReading,
@@ -41,11 +43,14 @@ export function collectPendingEffects(
   for (const row of rows) {
     const r = row.result as ItemResult | undefined;
     if (!r) continue;
-    if (r.type === "door_check" || r.type === "gas_pump_check") {
-      if (r.pendingIncident) out.incidents.push(r.pendingIncident);
-      if (r.pendingTicket) {
-        out.tickets.push(r.pendingTicket);
-        out.ticketByResultId.set(row.id, r.pendingTicket.id);
+    if (isStateCheck(r.type)) {
+      // isStateCheck narrows the type string, not the result union, and
+      // legacy rows may still carry the pre-rename type.
+      const sc = r as DoorCheckResult;
+      if (sc.pendingIncident) out.incidents.push(sc.pendingIncident);
+      if (sc.pendingTicket) {
+        out.tickets.push(sc.pendingTicket);
+        out.ticketByResultId.set(row.id, sc.pendingTicket.id);
       }
     } else if (r.type === "verify_task") {
       if (r.pendingTicket) {

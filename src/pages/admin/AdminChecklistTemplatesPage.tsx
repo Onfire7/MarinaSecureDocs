@@ -9,6 +9,7 @@ import {
   type StateCheckType,
 } from "../../lib/checklists";
 import { LocationPicker } from "../shared/LocationPicker";
+import { useTextPrompt } from "../shared/TextPromptDialog";
 import { AdminHeader } from "./AdminHomePage";
 
 // Admin — Checklist Templates (see docs/pages/admin-checklist-templates.html).
@@ -20,6 +21,7 @@ export function AdminChecklistTemplatesPage() {
   const current = useCurrent();
   const canManage = current.can("manage_checklists");
   const [editing, setEditing] = useState<string | null>(null);
+  const [askText, promptNode] = useTextPrompt();
 
   const { data } = db.useQuery({
     checklistTemplates: { items: {}, role: {}, creator: {}, checkpoints: {} },
@@ -46,7 +48,7 @@ export function AdminChecklistTemplatesPage() {
   );
 
   const create = async (visibility: string) => {
-    const name = window.prompt("New template name:");
+    const name = await askText("New template name:");
     if (!name?.trim()) return;
     const templateId = id();
     await db.transact(
@@ -110,6 +112,7 @@ export function AdminChecklistTemplatesPage() {
           </div>
         )}
       </div>
+      {promptNode}
     </div>
   );
 }
@@ -155,6 +158,7 @@ function TemplateCard({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const [askText, promptNode] = useTextPrompt();
   const update = (fields: Record<string, unknown>) =>
     void db.transact(db.tx.checklistTemplates[template.id].update(fields));
 
@@ -178,8 +182,8 @@ function TemplateCard({
     schedule?: string;
   };
 
-  const addItem = (type: ItemType) => {
-    const label = window.prompt(`Label for the new ${ITEM_TYPE_LABEL[type]}:`);
+  const addItem = async (type: ItemType) => {
+    const label = await askText(`Label for the new ${ITEM_TYPE_LABEL[type]}:`);
     if (!label?.trim()) return;
     // A door or pump needs a Location, and on a checkpoint-triggered template
     // the checkpoint's own location is almost always the right one — so
@@ -231,6 +235,7 @@ function TemplateCard({
 
   return (
     <div className="card">
+      {promptNode}
       <div className="spread" style={{ flexWrap: "wrap" }}>
         <div>
           <div className="card-title">{template.name}</div>
@@ -462,7 +467,7 @@ function TemplateCard({
                 className="select select-inline"
                 style={{ marginTop: 8 }}
                 value=""
-                onChange={(e) => addItem(e.target.value as ItemType)}
+                onChange={(e) => void addItem(e.target.value as ItemType)}
               >
                 <option value="">Add an item…</option>
                 {(Object.keys(ITEM_TYPE_LABEL) as ItemType[]).map((t) => (

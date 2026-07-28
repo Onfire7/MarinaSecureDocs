@@ -14,6 +14,7 @@ import { LocationPicker, type PickerLocation } from "../shared/LocationPicker";
 import { NameGeneratorDialog } from "./NameGeneratorDialog";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
+import { useTextPrompt } from "../shared/TextPromptDialog";
 
 const EXPANDED_KEY = "marinasecure.admin.locations.expanded";
 const LAST_USED_KEY = "marinasecure.admin.locations.lastUsed";
@@ -474,6 +475,7 @@ function LocationRow({
   expanded: boolean;
   onSelect: () => void;
 }) {
+  const [askText, promptNode] = useTextPrompt();
   const update = (fields: Record<string, unknown>) =>
     void db.transact(db.tx.locations[location.id].update(fields));
 
@@ -482,7 +484,7 @@ function LocationRow({
   const tracksStatus = Boolean(locationType?.tracksStatus ?? location.type?.tracksStatus);
 
   const addCheckpoint = async () => {
-    const name = window.prompt("Checkpoint name:");
+    const name = await askText("Checkpoint name:");
     if (!name?.trim()) return;
     await db.transact(
       db.tx.checkpoints[id()]
@@ -505,6 +507,7 @@ function LocationRow({
       className={"card tree-row" + (highlighted ? " tree-match" : "")}
       style={{ marginLeft: depth * 22 }}
     >
+      {promptNode}
       <button type="button" className="tree-head" onClick={onSelect}>
         <span className="row" style={{ minWidth: 0 }}>
           {/* Indicator, not a separate control — the whole row toggles. */}

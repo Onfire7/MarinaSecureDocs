@@ -151,7 +151,8 @@ function ResultSummary({ type, result }: { type: string; result: ItemResult | un
       return <span>Rejected — ticket raised</span>;
     }
     case "door_check":
-    case "gas_pump_check": {
+    case "lock_check":
+    case "gas_pump_check": { // legacy type string, pre-rename
       const s = doorCheckSummary(result as Extract<ItemResult, { type: "door_check" }>);
       // Found and left are reported as separate facts: a door corrected on
       // arrival still means it was insecure until the guard got there.
