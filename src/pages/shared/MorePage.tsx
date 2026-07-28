@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useClerk } from "@clerk/clerk-react";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { visibleSections, MOBILE_TAB_COUNT } from "../../routes/nav";
+import { ThemeToggle } from "../../layout/ThemeToggle";
 
 // Mobile "Other" tab — the sections that don't fit in the bottom tab bar,
 // plus the account actions the desktop sidenav footer carries.
@@ -28,6 +29,10 @@ export function MorePage() {
         ))}
       </div>
       <hr className="divider" />
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div className="card-title" style={{ marginBottom: 8 }}>Appearance</div>
+        <ThemeToggle />
+      </div>
       <div className="card">
         <div className="card-title">{current.user?.name}</div>
         <div className="card-meta">{current.roleNames.join(" · ")}</div>

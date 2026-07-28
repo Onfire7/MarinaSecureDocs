@@ -5,6 +5,7 @@ import { db } from "../lib/db";
 import { visibleSections, MOBILE_TAB_COUNT } from "../routes/nav";
 import { ActiveCallPanel } from "../pages/comms/ActiveCallPanel";
 import { MissedCommsBadge } from "../pages/comms/MissedCommsBadge";
+import { ThemeToggle } from "./ThemeToggle";
 
 // Responsive shell: persistent left sidenav on desktop, app bar + bottom tab
 // bar on mobile (see wireframes — Dashboard frames for both breakpoints).
@@ -48,6 +49,9 @@ export function AppShell() {
         <div className="sidenav-footer">
           <div className="sidenav-user">{current.user?.name}</div>
           <div className="sidenav-roles">{current.roleNames.join(" · ")}</div>
+          <div style={{ marginBottom: 10 }}>
+            <ThemeToggle />
+          </div>
           <div className="row">
             <button
               type="button"

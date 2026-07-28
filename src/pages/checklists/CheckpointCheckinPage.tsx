@@ -1,6 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { db } from "../../lib/db";
+import { useCurrent } from "../../lib/auth/CurrentUserContext";
+import type { AttachmentTarget } from "../../lib/attachments";
+import { NoteDialog } from "../shared/NoteDialog";
 import { useCheckpointVisit } from "./useCheckpointVisit";
 
 const IDLE_TIMEOUT_MS = 10 * 60_000;
@@ -13,8 +16,10 @@ const IDLE_TIMEOUT_MS = 10 * 60_000;
 export function CheckpointCheckinPage() {
   const { guidUrl } = useParams();
   const navigate = useNavigate();
+  const current = useCurrent();
   const [searchParams] = useSearchParams();
   const resumeCheckInId = searchParams.get("checkin") ?? undefined;
+  const [showNoteDialog, setShowNoteDialog] = useState(false);
 
   const { data, isLoading: cpLoading } = db.useQuery(
     guidUrl ? { checkpoints: { $: { where: { guidUrl } }, location: {} } } : null,
@@ -62,6 +67,12 @@ export function CheckpointCheckinPage() {
     );
   }
 
+  const target: AttachmentTarget = {
+    type: "checkpoint",
+    id: checkpoint.id,
+    label: checkpoint.name,
+  };
+
   return (
     <div>
       <div className="page-head">
@@ -99,6 +110,25 @@ export function CheckpointCheckinPage() {
           ))}
         </div>
       )}
+
+      <div className="row" style={{ marginTop: 16 }}>
+        <button type="button" className="btn btn-sm" onClick={() => setShowNoteDialog(true)}>
+          + Note
+        </button>
+        {current.can("create_incidents") && (
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => navigate("/incidents/new", { state: { target } })}
+          >
+            + Incident
+          </button>
+        )}
+      </div>
+
+      {showNoteDialog && (
+        <NoteDialog target={target} onClose={() => setShowNoteDialog(false)} />
+      )}
     </div>
   );
 }
@@ -110,10 +140,15 @@ function GpsPill({ status }: { status: "pending" | "clear" | "outside_radius" | 
   return <span className="badge">Location unavailable</span>;
 }
 
-// Closes this tab once nothing is left unfinished — or, if the app isn't
-// installed and the browser refuses to close a tab it didn't itself open,
-// falls back to redirecting to the Dashboard and keeps retrying the close on
-// every subsequent focus (see spec: "Tab pileup").
+// Closes this tab once nothing is left unfinished. window.close() only
+// works on a tab the script itself opened, which a scan-launched tab
+// usually isn't — that failure is silent (no return value, no event), so
+// the immediate attempt below must NOT also redirect: the guard needs the
+// chance to actually see this screen (and use the note/incident actions on
+// it) before anything whisks them away. Redirecting to the Dashboard is
+// reserved for the "never revisited" fallback — the idle timeout — so a tab
+// left open in the background at least shows something current rather than
+// a dead checkpoint screen (see spec: "Tab pileup").
 function useCloseWhenDone(done: boolean) {
   const navigate = useNavigate();
   const doneRef = useRef(done);
@@ -124,8 +159,7 @@ function useCloseWhenDone(done: boolean) {
     if (!done || attempted.current) return;
     attempted.current = true;
     window.close();
-    navigate("/", { replace: true });
-  }, [done, navigate]);
+  }, [done]);
 
   useEffect(() => {
     const retry = () => {
@@ -134,12 +168,15 @@ function useCloseWhenDone(done: boolean) {
     document.addEventListener("visibilitychange", retry);
     window.addEventListener("focus", retry);
     const idle = setTimeout(() => {
-      if (doneRef.current) window.close();
+      if (doneRef.current) {
+        window.close();
+        navigate("/", { replace: true });
+      }
     }, IDLE_TIMEOUT_MS);
     return () => {
       document.removeEventListener("visibilitychange", retry);
       window.removeEventListener("focus", retry);
       clearTimeout(idle);
     };
-  }, []);
+  }, [navigate]);
 }

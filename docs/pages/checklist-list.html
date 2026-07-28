@@ -57,6 +57,7 @@
       <tr><td>Open a Not Started / In Progress checklist</td><td>Must be the <code>assigned_to</code> user, or hold the role it's assigned to</td><td>Opens <a href="active-checklist.html">Active checklist</a>.</td></tr>
       <tr><td>Open a Complete checklist</td><td>Same as above</td><td>Opens <a href="checklist-detail.html">Checklist detail</a> (read-only).</td></tr>
       <tr><td>Filter by status</td><td>None</td><td>Client-side filter over the subscribed query.</td></tr>
+      <tr><td>Start a checklist manually</td><td>A manual-trigger (<code>trigger_type</code> = Manual) template must be visible to the user — Global, Role-restricted to a role they hold, or Personal and created by them</td><td>Picker lists the eligible manual templates; choosing one and starting creates a new Checklist instance (<code>assigned_to</code> = self when the template's assignment mode is "triggering user," otherwise left for the role to claim) and opens it directly, per <a href="active-checklist.html">Active checklist</a>. Hidden entirely when no manual template is visible to the user.</td></tr>
       <tr><td>Tours tab</td><td>Security role</td><td>Switches to a checkpoint-set view backed by <a href="tour-progress.html">Tour progress</a>; not shown to users without the Security role.</td></tr>
     </table>
 

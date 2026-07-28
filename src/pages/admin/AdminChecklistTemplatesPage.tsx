@@ -17,6 +17,7 @@ export function AdminChecklistTemplatesPage() {
   const { data } = db.useQuery({
     checklistTemplates: { items: {}, role: {}, creator: {}, checkpoints: {} },
     roles: {},
+    checkpoints: { location: {} },
   });
 
   const templates = useMemo(() => {
@@ -31,6 +32,11 @@ export function AdminChecklistTemplatesPage() {
   }, [data, canManage, current.user]);
 
   const roles = data?.roles ?? [];
+  const allCheckpoints = useMemo(
+    () =>
+      [...(data?.checkpoints ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
+    [data],
+  );
 
   const create = async (visibility: string) => {
     const name = window.prompt("New template name:");
@@ -85,6 +91,7 @@ export function AdminChecklistTemplatesPage() {
             key={t.id}
             template={t}
             roles={roles}
+            allCheckpoints={allCheckpoints}
             expanded={editing === t.id}
             onToggle={() => setEditing(editing === t.id ? null : t.id)}
           />
@@ -109,6 +116,7 @@ type TemplateRow = {
   assignmentMode: string;
   role?: { id: string; name: string } | null;
   creator?: { id: string; name: string } | null;
+  checkpoints?: { id: string; name: string }[];
   items?: {
     id: string;
     type: string;
@@ -130,16 +138,31 @@ const TRIGGERS = [
 function TemplateCard({
   template,
   roles,
+  allCheckpoints,
   expanded,
   onToggle,
 }: {
   template: TemplateRow;
   roles: { id: string; name: string }[];
+  allCheckpoints: { id: string; name: string; location?: { name: string } | null }[];
   expanded: boolean;
   onToggle: () => void;
 }) {
   const update = (fields: Record<string, unknown>) =>
     void db.transact(db.tx.checklistTemplates[template.id].update(fields));
+
+  const checkpointMembers = template.checkpoints ?? [];
+  const checkpointMemberIds = new Set(checkpointMembers.map((c) => c.id));
+  const addCheckpoint = (checkpointId: string) => {
+    if (!checkpointId) return;
+    void db.transact(
+      db.tx.checklistTemplates[template.id].link({ checkpoints: checkpointId }),
+    );
+  };
+  const removeCheckpoint = (checkpointId: string) =>
+    void db.transact(
+      db.tx.checklistTemplates[template.id].unlink({ checkpoints: checkpointId }),
+    );
 
   const items = [...(template.items ?? [])].sort((a, b) => a.order - b.order);
   const cfg = (template.triggerConfig ?? {}) as {
@@ -276,25 +299,56 @@ function TemplateCard({
                 </select>
 
                 {template.triggerType === "checkpoint" && (
-                  <div className="row" style={{ marginTop: 6 }}>
-                    <span className="small muted">Applies between</span>
-                    <input
-                      type="time"
-                      className="input select-inline"
-                      value={cfg.timeStart ?? ""}
-                      onChange={(e) =>
-                        update({ triggerConfig: { ...cfg, timeStart: e.target.value } })
-                      }
-                    />
-                    <span className="small muted">and</span>
-                    <input
-                      type="time"
-                      className="input select-inline"
-                      value={cfg.timeEnd ?? ""}
-                      onChange={(e) =>
-                        update({ triggerConfig: { ...cfg, timeEnd: e.target.value } })
-                      }
-                    />
+                  <div style={{ marginTop: 6 }}>
+                    <div className="row">
+                      <span className="small muted">Applies between</span>
+                      <input
+                        type="time"
+                        className="input select-inline"
+                        value={cfg.timeStart ?? ""}
+                        onChange={(e) =>
+                          update({ triggerConfig: { ...cfg, timeStart: e.target.value } })
+                        }
+                      />
+                      {cfg.timeStart && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-quiet"
+                          onClick={() => {
+                            const { timeStart: _drop, ...rest } = cfg;
+                            update({ triggerConfig: rest });
+                          }}
+                        >
+                          Clear
+                        </button>
+                      )}
+                      <span className="small muted">and</span>
+                      <input
+                        type="time"
+                        className="input select-inline"
+                        value={cfg.timeEnd ?? ""}
+                        onChange={(e) =>
+                          update({ triggerConfig: { ...cfg, timeEnd: e.target.value } })
+                        }
+                      />
+                      {cfg.timeEnd && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-quiet"
+                          onClick={() => {
+                            const { timeEnd: _drop, ...rest } = cfg;
+                            update({ triggerConfig: rest });
+                          }}
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <p className="muted small" style={{ marginTop: 4 }}>
+                      Leave both empty to apply at any time. An end time
+                      earlier than the start wraps past midnight (e.g. 5:00
+                      PM–5:00 AM applies overnight).
+                    </p>
                   </div>
                 )}
                 {template.triggerType === "scheduled" && (
@@ -309,10 +363,45 @@ function TemplateCard({
                   />
                 )}
                 {template.triggerType === "checkpoint" && (
-                  <p className="muted small" style={{ marginTop: 4 }}>
-                    Attach this template to specific checkpoints from Location
-                    Types &amp; Locations.
-                  </p>
+                  <div style={{ marginTop: 6 }}>
+                    <span className="small muted">Checkpoints</span>
+                    <div className="stack" style={{ gap: 4, marginTop: 4 }}>
+                      {checkpointMembers.map((c) => (
+                        <div key={c.id} className="row spread">
+                          <span className="small">{c.name}</span>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-quiet"
+                            onClick={() => removeCheckpoint(c.id)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                      {checkpointMembers.length === 0 && (
+                        <span className="muted small">
+                          Not attached to any checkpoint yet — this template
+                          never triggers until it is.
+                        </span>
+                      )}
+                    </div>
+                    <select
+                      className="select select-inline"
+                      style={{ marginTop: 6 }}
+                      value=""
+                      onChange={(e) => addCheckpoint(e.target.value)}
+                    >
+                      <option value="">Add a checkpoint…</option>
+                      {allCheckpoints
+                        .filter((c) => !checkpointMemberIds.has(c.id))
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                            {c.location?.name ? ` — ${c.location.name}` : ""}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
                 )}
                 {template.triggerType === "scheduled" && (
                   <p className="muted small" style={{ marginTop: 4 }}>

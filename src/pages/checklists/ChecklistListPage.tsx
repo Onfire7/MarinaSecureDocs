@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { db } from "../../lib/db";
+import { Link, useNavigate } from "react-router-dom";
+import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import { activityTx } from "../../lib/activityLog";
 import { triggeredByLabel, type TriggeredBy } from "../../lib/checklists";
 import { ManualCheckinDialog } from "./ManualCheckinDialog";
 
@@ -14,16 +15,55 @@ type StatusFilter = "all" | "not_started" | "in_progress" | "complete";
 
 export function ChecklistListPage() {
   const current = useCurrent();
+  const navigate = useNavigate();
   const userId = current.user?.id;
   const isSecurity = current.roleNames.includes("Security");
   const isMobile = useIsMobile();
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [mobileTab, setMobileTab] = useState<"checklists" | "tours">("checklists");
   const [showManualCheckin, setShowManualCheckin] = useState(false);
+  const [starting, setStarting] = useState<string | null>(null);
+  const [manualTemplateId, setManualTemplateId] = useState("");
   const showChecklists = !isMobile || mobileTab === "checklists";
   const showTours = isSecurity && (!isMobile || mobileTab === "tours");
 
   const roleIds = (current.user?.roles ?? []).map((r) => r.id);
+
+  const { data: manualTemplateData } = db.useQuery({
+    checklistTemplates: {
+      $: { where: { triggerType: "manual" } },
+      role: {},
+      creator: {},
+    },
+  });
+  const manualTemplates = (manualTemplateData?.checklistTemplates ?? []).filter((t) => {
+    if (t.visibility === "personal") return t.creator?.id === userId;
+    if (t.visibility === "role_restricted") return t.role && roleIds.includes(t.role.id);
+    return true;
+  });
+
+  const startChecklist = async (template: (typeof manualTemplates)[number]) => {
+    if (!userId || starting) return;
+    setStarting(template.id);
+    const checklistId = id();
+    await db.transact([
+      db.tx.checklists[checklistId]
+        .update({ status: "not_started", triggeredBy: { type: "manual" } })
+        .link({
+          template: template.id,
+          ...(template.assignmentMode === "triggering_user" ? { assignedTo: userId } : {}),
+        }),
+      activityTx({
+        eventType: "checklist.started",
+        summary: `${template.name} started manually by ${current.user?.name ?? "a user"}`,
+        subjectType: "checklists",
+        subjectId: checklistId,
+        actorId: userId,
+      }),
+    ]);
+    setStarting(null);
+    navigate(`/checklists/${checklistId}`);
+  };
 
   const { data: mineData } = db.useQuery(
     userId
@@ -89,13 +129,42 @@ export function ChecklistListPage() {
     <div>
       <div className="page-head">
         <h1 className="page-title">Checklists</h1>
-        <button
-          type="button"
-          className="btn btn-sm"
-          onClick={() => setShowManualCheckin(true)}
-        >
-          Check in manually
-        </button>
+        <div className="row">
+          {manualTemplates.length > 0 && (
+            <>
+              <select
+                className="select"
+                value={manualTemplateId}
+                onChange={(e) => setManualTemplateId(e.target.value)}
+              >
+                <option value="">Start a checklist…</option>
+                {manualTemplates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={!manualTemplateId || starting !== null}
+                onClick={() => {
+                  const template = manualTemplates.find((t) => t.id === manualTemplateId);
+                  if (template) void startChecklist(template);
+                }}
+              >
+                Start checklist
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setShowManualCheckin(true)}
+          >
+            Check in manually
+          </button>
+        </div>
       </div>
 
       <div className="chip-row">
@@ -145,7 +214,7 @@ export function ChecklistListPage() {
             <table className="table table-mobile-cards">
               <thead>
                 <tr>
-                  <th>Template</th>
+                  <th>Checklist</th>
                   <th>Status</th>
                   <th>Trigger</th>
                   <th>Started</th>
@@ -154,7 +223,7 @@ export function ChecklistListPage() {
               <tbody>
                 {filtered.map((c) => (
                   <tr key={c.id}>
-                    <td data-label="Template">
+                    <td data-label="Checklist">
                       <Link to={`/checklists/${c.id}`}>
                         {c.template?.name ?? "Checklist"}
                       </Link>

@@ -16,6 +16,7 @@
   --accent: #2f5d7c;
   --accent-ink: #ffffff;
   --accent-soft: #e3ecf2;
+  --accent-hover: #274e69;
 
   --good: #4f7a49;
   --good-bg: #e5efe2;
@@ -32,6 +33,61 @@
 
   --sidenav-w: 216px;
   --tabbar-h: 58px;
+}
+
+/* Dark palette — applied automatically when the system is dark, unless the
+   user has explicitly picked Light via the toggle (data-theme="light" then
+   wins over the media query); applied unconditionally when the user has
+   explicitly picked Dark (data-theme="dark"), regardless of system
+   preference. See main.tsx for the pre-paint class/attribute application
+   that avoids a flash of the wrong theme, and MorePage for the toggle. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1a1d1f;
+    --panel: #232629;
+    --line: #3b4045;
+    --line-lt: #2d3134;
+    --ink: #e7e9ea;
+    --mute: #9aa1a5;
+    --fill: #2b2f33;
+
+    --accent: #6fa2c9;
+    --accent-ink: #10181e;
+    --accent-soft: #223540;
+    --accent-hover: #8bb8d8;
+
+    --good: #7ec178;
+    --good-bg: #223324;
+    --warn: #d3ab5c;
+    --warn-bg: #392f1c;
+    --bad: #e08b7a;
+    --bad-bg: #3a251f;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.28);
+  }
+}
+[data-theme="dark"] {
+  --bg: #1a1d1f;
+  --panel: #232629;
+  --line: #3b4045;
+  --line-lt: #2d3134;
+  --ink: #e7e9ea;
+  --mute: #9aa1a5;
+  --fill: #2b2f33;
+
+  --accent: #6fa2c9;
+  --accent-ink: #10181e;
+  --accent-soft: #223540;
+  --accent-hover: #8bb8d8;
+
+  --good: #7ec178;
+  --good-bg: #223324;
+  --warn: #d3ab5c;
+  --warn-bg: #392f1c;
+  --bad: #e08b7a;
+  --bad-bg: #3a251f;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.28);
 }
 
 * {
@@ -94,7 +150,7 @@ h3 {
   color: var(--accent-ink);
 }
 .btn-primary:hover {
-  background: #274e69;
+  background: var(--accent-hover);
 }
 .btn-danger {
   color: var(--bad);
@@ -795,10 +851,7 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px;
-  background: var(--panel);
-  border: 1px solid var(--line-lt);
-  border-radius: var(--radius);
+  padding: 12px 0;
 }
 .chat-msg {
   max-width: 78%;

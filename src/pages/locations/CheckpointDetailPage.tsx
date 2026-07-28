@@ -75,24 +75,26 @@ export function CheckpointDetailPage() {
 
       <div className="grid-2">
         <div>
-          <div className="field">
-            <span className="field-label">GPS validation radius</span>
-            <div className="field-value">
-              {radius != null ? `${radius} m` : "—"}{" "}
-              <span className={overridden ? "badge badge-accent" : "badge"}>
-                {overridden ? "Overrides marina default" : "Marina default"}
-              </span>
+          {current.can("manage_locations") && (
+            <div className="field">
+              <span className="field-label">GPS validation radius</span>
+              <div className="field-value">
+                {radius != null ? `${radius} m` : "—"}{" "}
+                <span className={overridden ? "badge badge-accent" : "badge"}>
+                  {overridden ? "Overrides marina default" : "Marina default"}
+                </span>
+              </div>
+              {checkpoint.gpsLat != null && checkpoint.gpsLng != null ? (
+                <p className="muted small" style={{ marginTop: 4 }}>
+                  Anchored at {checkpoint.gpsLat.toFixed(5)}, {checkpoint.gpsLng.toFixed(5)}
+                </p>
+              ) : (
+                <p className="muted small" style={{ marginTop: 4 }}>
+                  No coordinates set — check-ins here are never radius-flagged.
+                </p>
+              )}
             </div>
-            {checkpoint.gpsLat != null && checkpoint.gpsLng != null ? (
-              <p className="muted small" style={{ marginTop: 4 }}>
-                Anchored at {checkpoint.gpsLat.toFixed(5)}, {checkpoint.gpsLng.toFixed(5)}
-              </p>
-            ) : (
-              <p className="muted small" style={{ marginTop: 4 }}>
-                No coordinates set — check-ins here are never radius-flagged.
-              </p>
-            )}
-          </div>
+          )}
 
           <div className="section-title">Applicable checklist templates</div>
           <div className="stack" style={{ gap: 8, marginBottom: 16 }}>

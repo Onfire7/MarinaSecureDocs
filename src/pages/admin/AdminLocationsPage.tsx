@@ -923,6 +923,7 @@ function CreateLocationDialog({
 function MapsTab() {
   const [selectedMap, setSelectedMap] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [scopeId, setScopeId] = useState("");
   const [mapName, setMapName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -939,23 +940,41 @@ function MapsTab() {
   const roots = locations.filter((l) => !l.parent);
   const active = maps.find((m) => m.id === selectedMap) ?? maps[0];
 
+  const UPLOAD_TIMEOUT_MS = 45_000;
+
   const upload = async (file: File) => {
     // Scope is required before the upload completes — there's no way to
     // create an unscoped map.
     if (!scopeId) return;
     setUploading(true);
+    setUploadError(null);
     try {
       const path = `marina-maps/${Date.now()}-${file.name}`;
-      const { data: uploaded } = await db.storage.uploadFile(path, file);
+      // db.storage.uploadFile doesn't expose an AbortSignal, so the browser
+      // fetch() underneath it has no timeout of its own — a stalled
+      // connection (as opposed to a rejected response, which the SDK does
+      // surface) would otherwise hang here indefinitely. Racing it against
+      // a timeout guarantees the spinner always resolves to an error.
+      const uploadResult = await Promise.race([
+        db.storage.uploadFile(path, file),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Upload timed out after 45s — check your connection and try again.")),
+            UPLOAD_TIMEOUT_MS,
+          ),
+        ),
+      ]);
       const mapId = id();
       await db.transact(
         db.tx.marinaMaps[mapId]
           .update({ name: mapName.trim() || file.name })
-          .link({ scope: scopeId, image: uploaded.id }),
+          .link({ scope: scopeId, image: uploadResult.data.id }),
       );
       setSelectedMap(mapId);
       setMapName("");
       setScopeId("");
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed.");
     } finally {
       setUploading(false);
     }
@@ -970,6 +989,11 @@ function MapsTab() {
             No root location exists — create a top-level location (one with no
             parent) before uploading an overview map. Detail maps scoped to a
             child location are still fine.
+          </div>
+        )}
+        {uploadError && (
+          <div className="badge badge-bad" style={{ display: "block", marginBottom: 8 }}>
+            {uploadError}
           </div>
         )}
         <div className="row" style={{ flexWrap: "wrap" }}>

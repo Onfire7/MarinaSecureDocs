@@ -160,6 +160,7 @@ function ShiftCard() {
   const startShift = async () => {
     if (!userId) return;
     const shiftId = id();
+    const checklistId = clockInTemplate ? id() : null;
     // Clock In may itself be a checklist trigger — the checklist opens immediately.
     await db.transact([
       db.tx.shifts[shiftId]
@@ -172,9 +173,9 @@ function ShiftCard() {
         subjectId: shiftId,
         actorId: userId,
       }),
-      ...(clockInTemplate
+      ...(clockInTemplate && checklistId
         ? [
-            db.tx.checklists[id()]
+            db.tx.checklists[checklistId]
               .update({
                 status: "not_started",
                 triggeredBy: { type: "clock_in", shiftId },
@@ -183,7 +184,7 @@ function ShiftCard() {
           ]
         : []),
     ]);
-    if (clockInTemplate) navigate("/checklists");
+    if (checklistId) navigate(`/checklists/${checklistId}`);
   };
 
   const endShiftManually = async () => {
@@ -214,7 +215,7 @@ function ShiftCard() {
         .link({ template: clockOutTemplate.id, assignedTo: userId })
         .link({ endedShift: activeShift.id }),
     );
-    navigate("/checklists");
+    navigate(`/checklists/${checklistId}`);
   };
 
   if (!activeShift) {

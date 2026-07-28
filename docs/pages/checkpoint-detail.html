@@ -46,7 +46,7 @@
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Name &amp; location</td><td>Checkpoint.name, Checkpoint.location</td><td>Location links back to <a href="location-detail.html">Location detail</a>.</td></tr>
-      <tr><td>GPS validation radius</td><td>Checkpoint.gps_validation_radius, falling back to MarinaSettings.gps_validation_radius_default</td><td>Shown with an indicator of whether this checkpoint overrides the marina default or inherits it.</td></tr>
+      <tr><td>GPS validation radius</td><td>Checkpoint.gps_validation_radius, falling back to MarinaSettings.gps_validation_radius_default</td><td>Manager-only (<code>manage_locations</code>) — shown with an indicator of whether this checkpoint overrides the marina default or inherits it. Hidden for everyone else; the radius itself still validates check-ins regardless of who can see the number.</td></tr>
       <tr><td>Applicable checklist templates</td><td>Checkpoint.checklist_templates</td><td>Each links to <a href="admin-checklist-templates.html">Admin → Checklist Templates</a>; shown with its trigger condition (time of day, season, etc.) so it's clear which applies when.</td></tr>
       <tr><td>Tours</td><td>Checkpoint.tours</td><td>Which Tours include this checkpoint, and each one's mode (Linear / Freeform / Randomized).</td></tr>
       <tr><td>Recent check-ins</td><td>Check-In records for this checkpoint</td><td>Most recent first: guard, timestamp, method (Scanned/Manual), and GPS validation result — an audit trail for patrol compliance review.</td></tr>

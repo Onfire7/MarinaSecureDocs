@@ -46,7 +46,7 @@
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Name, visibility</td><td>ChecklistTemplate.name / visibility</td><td>Global / Role-restricted / Personal.</td></tr>
-      <tr><td>Trigger</td><td>ChecklistTemplate.trigger_type / trigger_config</td><td>Clock In/Out, Scheduled Time, Checkpoint Visit, Incident Type, or Manual — each with its own config shape (e.g. a schedule expression, or a checkpoint + time-of-day/season condition).</td></tr>
+      <tr><td>Trigger</td><td>ChecklistTemplate.trigger_type / trigger_config</td><td>Clock In/Out, Scheduled Time, Checkpoint Visit, Incident Type, or Manual — each with its own config shape (e.g. a schedule expression, or a checkpoint + time-of-day/season condition). For Checkpoint Visit, the time-of-day window is optional (a Clear action empties either bound) — leaving both empty means the template applies at any time — and an end time earlier than the start wraps past midnight (e.g. 5:00 PM–5:00 AM applies overnight).</td></tr>
       <tr><td>Assignment</td><td>ChecklistTemplate.assignment_mode</td><td>To the triggering user, or to a specified Role.</td></tr>
       <tr><td>Items</td><td>ChecklistTemplate.items → ChecklistTemplateItem, ordered</td><td>Each item's type (one of the 5), label, and type-specific config.</td></tr>
     </table>
@@ -58,6 +58,7 @@
       <tr><td>Create / edit one's own Personal template</td><td>Unrestricted for the creator, regardless of <code>manage_checklists</code></td><td>Not editable by anyone else, including <code>manage_checklists</code> holders.</td></tr>
       <tr><td>Add / reorder / remove an item</td><td>Same as editing the template</td><td>Item type is fixed once added within this builder session but can be deleted and re-added as a different type.</td></tr>
       <tr><td>Configure a Door Check's expected state, a Verify Task's retry-prompt flag, a Location-Based Check's nested checklist, or a Meter Reading's asset selection</td><td>Same as editing the template</td><td>Type-specific config, per <a href="../data-model.html">Data Model — ChecklistTemplateItem</a>.</td></tr>
+      <tr><td>Attach / detach checkpoints (Checkpoint Visit trigger only)</td><td>Same as editing the template</td><td>Multi-select against <code>Checkpoint.checklist_templates</code> — a picker adds one at a time from every checkpoint not already attached, with a Remove action per attached checkpoint. A template stays inert (never triggers) until at least one checkpoint is attached.</td></tr>
     </table>
 
     <h2>States &amp; edge cases</h2>
@@ -65,6 +66,7 @@
       <li><strong>Editing a Personal template as its non-creator</strong> — never offered, even to a <code>manage_checklists</code> holder; the permission's own description explicitly carves this out.</li>
       <li><strong>Deleting a template with in-progress Checklist instances</strong> — existing instances are unaffected (a <code>Checklist</code> references its originating template but doesn't require the template to still exist for the instance's own data to remain valid); only future triggers stop generating new instances.</li>
       <li><strong>Scheduled-time trigger with an unusual schedule</strong> — evaluated by the <code>checklist-triggers</code> Netlify Scheduled Function, per <a href="../api-structure.html">API Structure</a>; this screen just authors the <code>trigger_config</code>, it doesn't run it.</li>
+      <li><strong>Checkpoint Visit trigger with no checkpoints attached</strong> — shown plainly rather than hidden; the template simply never generates a Checklist until at least one is attached here.</li>
     </ul>
 
     <h2>Mobile vs. desktop</h2>
