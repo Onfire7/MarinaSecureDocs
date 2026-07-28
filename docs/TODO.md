@@ -85,6 +85,23 @@ Add both affordances to the map admin UI:
 Both are destructive, so gate on `manage_locations` (`src/lib/permissions.ts`)
 and update `docs/pages/admin-locations.html` to match.
 
+### 3. Map upload dialog: scope picker must be searchable, not a dropdown
+
+`AdminLocationsPage.tsx:1006` scopes a new map with a plain `<select>` over
+every location. That doesn't scale — marinas have thousands of locations —
+and each option renders bare `l.name`, so the "Slip 14" that exists on every
+dock is indistinguishable from the others.
+
+Swap it for `LocationPicker` (`src/pages/shared/LocationPicker.tsx`), the
+searchable combobox already used for this exact problem elsewhere, including
+twice in this same file (lines 555 and 847 — it's already imported). It shows
+each result's full ancestor path and matches against that path, so "dock c
+14" finds the right slip. Pass `allowNone={false}`, since scope is required
+before upload.
+
+Note the page query (line 932) loads `locations: { parent: {} }` without
+`type`, so picker results won't show type labels until `type: {}` is added.
+
 ---
 
 ## Learnings from this codebase (read before debugging anything)
