@@ -102,6 +102,30 @@ before upload.
 Note the page query (line 932) loads `locations: { parent: {} }` without
 `type`, so picker results won't show type labels until `type: {}` is added.
 
+### 4. Desktop nav: Admin should expand to its sub-sections
+
+In the desktop sidenav (`src/layout/AppShell.tsx:32-48`, styles at
+`src/styles/app.css:276`), Admin is one flat `NavLink` like every other
+section, so reaching a sub-section always costs a stop at the Admin landing
+page.
+
+Clicking Admin should do **both**: navigate to `/admin` as it does today
+*and* expand an indented sub-list beneath it. Not a disclosure-only toggle —
+the destination behavior must not regress.
+
+The sub-list comes from `ADMIN_SECTIONS` (`src/pages/admin/adminSections.ts`),
+already used by `AdminHomePage`. Filter it the same way that page does — by
+`current.can(s.requires)`, *not* by `isAdmin`. The nav item's own gate is
+`isAdmin` (`src/routes/nav.ts:39`), which is broader: a user holding only
+`manage_users` passes it but should still see just the Users sub-item.
+
+Details worth settling: keep it expanded while on any `/admin/*` route;
+decide whether expansion persists after navigating away; the sub-list is 9
+items at full permissions, so check the sidenav still scrolls sanely. Desktop
+only — mobile reaches Admin through the "Other" tab (`MOBILE_TAB_COUNT`,
+`src/pages/shared/MorePage.tsx`) and is out of scope. Update
+`docs/pages/admin-home.html` if it documents the nav.
+
 ---
 
 ## Learnings from this codebase (read before debugging anything)
