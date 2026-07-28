@@ -197,7 +197,7 @@
         <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
         <tr><td>type</td><td>enum</td><td>Simple Check / Verify Task / Door Check / Location-Based Check / Meter Reading.</td></tr>
         <tr><td>label</td><td>text</td><td></td></tr>
-        <tr><td>config</td><td>structured</td><td>Type-specific: e.g. Door Check's expected state; Verify Task's "prompt retry after rejection" flag; Location-Based Check's nested checklist reference; Meter Reading's asset selection (a fixed Asset, or user-selected at completion time — e.g. "select your patrol vehicle").</td></tr>
+        <tr><td>config</td><td>structured</td><td>Type-specific: e.g. Door Check's expected state and the Location its door belongs to (what a mismatch Incident attaches to, since a door is not an entity of its own); Verify Task's "prompt retry after rejection" flag; Location-Based Check's nested checklist reference; Meter Reading's asset selection (a fixed Asset, or user-selected at completion time — e.g. "select your patrol vehicle").</td></tr>
         <tr><td>order</td><td>number</td><td></td></tr>
       </table>
     </div>
@@ -220,9 +220,9 @@
       <table>
         <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
         <tr><td>template_item</td><td>ref → ChecklistTemplateItem</td><td></td></tr>
-        <tr><td>result</td><td>structured</td><td>Type-specific: boolean for Simple Check; Confirmed/Rejected-Reason/Rejected-Ticket for Verify Task; observed state (+ retry history) for Door Check.</td></tr>
+        <tr><td>result</td><td>structured</td><td>Type-specific: boolean for Simple Check; Confirmed/Rejected-Reason/Rejected-Ticket for Verify Task; for Door Check, the state <em>as found</em> and <em>as left</em> recorded separately (plus the Incident logged when the two differ from expected) — a door corrected on arrival must still report as having been insecure, which a single observed state cannot express. Rows written before this carry an older observed-state-plus-retry-history shape and are read through the same helper.</td></tr>
         <tr><td>note</td><td>text</td><td>Optional freeform addition.</td></tr>
-        <tr><td>linked_ticket</td><td>ref → Ticket</td><td>Set when a Verify Task or Door Check failure raises a ticket.</td></tr>
+        <tr><td>linked_ticket</td><td>ref → Ticket</td><td>Set when a Verify Task fails, or a Door Check is left in a state that still isn't the expected one.</td></tr>
         <tr><td>completed_at</td><td>datetime</td><td></td></tr>
       </table>
     </div>

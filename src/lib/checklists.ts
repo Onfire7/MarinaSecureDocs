@@ -23,6 +23,13 @@ export interface VerifyTaskConfig {
 }
 export interface DoorCheckConfig {
   expectedState: DoorState;
+  /**
+   * The Location this door belongs to. A door isn't an entity of its own —
+   * it's a labelled item on a template — so this is what a mismatch incident
+   * attaches to. Optional because items authored before this existed have no
+   * binding; those fall back to asking the guard to pick a target.
+   */
+  locationId?: string;
 }
 export interface LocationCheckConfig {
   locationId: string;
@@ -49,12 +56,29 @@ export interface DoorCheckAttempt {
   observed: DoorState;
   matched: boolean;
 }
+/**
+ * Records the door's state *as found* and *as left*, separately — the whole
+ * point of a door check for reporting. "Locked when I left" says nothing
+ * about whether it was standing open when the guard walked up, and only the
+ * pair together answers both "was this door secure overnight?" and "did the
+ * guard fix it?".
+ *
+ * initialState/finalState are optional only because rows written before this
+ * change carry the older attempts/resolution shape instead. Read either via
+ * doorCheckSummary() rather than branching on shape at each call site.
+ */
 export interface DoorCheckResult {
   type: "door_check";
   expected: DoorState;
-  attempts: DoorCheckAttempt[];
-  resolution: "matched" | "note" | "ticket";
+  initialState?: DoorState;
+  finalState?: DoorState;
   note?: string;
+  /** Incident logged because the door was found in the wrong state. */
+  incidentId?: string;
+  /** @deprecated pre-initial/final shape; still present on historical rows. */
+  attempts?: DoorCheckAttempt[];
+  /** @deprecated pre-initial/final shape; still present on historical rows. */
+  resolution?: "matched" | "note" | "ticket";
 }
 export interface LocationCheckResult {
   type: "location_check";
@@ -107,6 +131,46 @@ export function triggeredByLabel(
     default:
       return "—";
   }
+}
+
+export function doorStateLabel(s: DoorState): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
+ * One reading of a door check across both stored shapes. Historical rows
+ * only ever recorded the *last* observed state, so their "as found" value is
+ * unknowable — foundKnown says so explicitly rather than quietly implying
+ * the door was found correct.
+ */
+export function doorCheckSummary(r: DoorCheckResult): {
+  expected: DoorState;
+  initial: DoorState | null;
+  final: DoorState | null;
+  foundKnown: boolean;
+  foundAsExpected: boolean;
+  leftAsExpected: boolean;
+  corrected: boolean;
+  note?: string;
+  incidentId?: string;
+} {
+  const legacyLast = r.attempts?.at(-1)?.observed ?? null;
+  const initial = r.initialState ?? null;
+  const final = r.finalState ?? legacyLast;
+  const foundKnown = r.initialState != null;
+  const foundAsExpected = foundKnown && initial === r.expected;
+  const leftAsExpected = final != null && final === r.expected;
+  return {
+    expected: r.expected,
+    initial,
+    final,
+    foundKnown,
+    foundAsExpected,
+    leftAsExpected,
+    corrected: foundKnown && !foundAsExpected && leftAsExpected,
+    note: r.note,
+    incidentId: r.incidentId,
+  };
 }
 
 export const ITEM_TYPE_LABEL: Record<ItemType, string> = {

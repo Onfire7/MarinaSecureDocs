@@ -5,6 +5,7 @@ import { db, id, type AppSchema } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { deterministicId } from "../../lib/detId";
 import { dueMeterMaintenanceRules, maintenanceRuleTitle } from "../../lib/maintenanceRules";
+import { doorCheckSummary, doorStateLabel } from "../../lib/checklists";
 import type {
   DoorCheckConfig,
   DoorState,
@@ -13,6 +14,9 @@ import type {
   MeterReadingConfig,
   VerifyTaskConfig,
 } from "../../lib/checklists";
+import { attachmentLink, type AttachmentTarget } from "../../lib/attachments";
+import { AttachmentTargetPicker } from "../shared/AttachmentTargetPicker";
+import { activityTx } from "../../lib/activityLog";
 
 type TemplateItem = InstaQLEntity<AppSchema, "checklistTemplateItems">;
 type ItemResultEntity = InstaQLEntity<
@@ -209,6 +213,20 @@ function verifyOutcomeLabel(r: Extract<ItemResult, { type: "verify_task" }>): st
 
 // ---------------------------------------------------------------- Door Check
 
+/**
+ * A door check records two facts, not one: the state the door was *found*
+ * in, and the state it was *left* in. Only the pair supports the questions
+ * the reports need to answer — "was this door actually secure overnight?"
+ * and, separately, "did the guard put it right?" — which a single observed
+ * state silently conflated.
+ *
+ * Found-as-expected is the overwhelmingly common case and stays one tap: the
+ * final state is implied and the second row of buttons never appears. A
+ * mismatch is the exceptional path, and it's the one worth slowing down —
+ * it logs an incident (the door was wrong before anyone touched it, which is
+ * true regardless of what happens next) and then asks what state the guard
+ * managed to leave it in.
+ */
 export function DoorCheckItem({ item, existing, checklistId, onSaved }: ItemProps) {
   const cfg = (item.config ?? {}) as unknown as DoorCheckConfig;
   // An item whose config was never opened in the template builder persists
@@ -216,141 +234,265 @@ export function DoorCheckItem({ item, existing, checklistId, onSaved }: ItemProp
   // never writes it. Default here too, matching that displayed default,
   // rather than crashing stateLabel() on an undefined state.
   const expectedState: DoorState = cfg.expectedState ?? "locked";
+  const current = useCurrent();
   const existingResult = existing?.result as
     | Extract<ItemResult, { type: "door_check" }>
     | undefined;
-  const [attempts, setAttempts] = useState<{ observed: DoorState; matched: boolean }[]>([]);
-  const [note, setNote] = useState("");
+
+  const [initialState, setInitialState] = useState<DoorState | null>(null);
+  const [pendingFinal, setPendingFinal] = useState<DoorState | null>(null);
+  const [title, setTitle] = useState("");
+  const [details, setDetails] = useState("");
+  const [target, setTarget] = useState<AttachmentTarget | null>(null);
+  const [saving, setSaving] = useState(false);
   const done = existingResult != null;
 
-  const select = async (observed: DoorState) => {
-    const matched = observed === expectedState;
-    const nextAttempts = [...attempts, { observed, matched }];
-    if (matched) {
-      const result: ItemResult = {
-        type: "door_check",
-        expected: expectedState,
-        attempts: nextAttempts,
-        resolution: "matched",
-      };
-      await saveResult(checklistId, item.id, existing?.id, result);
-      onSaved(result);
-      return;
-    }
-    setAttempts(nextAttempts);
+  // The door's bound Location is the incident's attachment target. Items
+  // authored before that binding existed have none, so the guard picks one
+  // rather than the incident silently failing to save.
+  const { data: boundData } = db.useQuery(
+    cfg.locationId ? { locations: { $: { where: { id: cfg.locationId } } } } : null,
+  );
+  const boundLocation = boundData?.locations?.[0];
+  const effectiveTarget: AttachmentTarget | null = boundLocation
+    ? { type: "location", id: boundLocation.id, label: boundLocation.name }
+    : target;
+
+  const beginMismatch = (found: DoorState) => {
+    setInitialState(found);
+    setTitle(`${item.label} found ${stateLabel(found).toLowerCase()}`);
+    setDetails(
+      `Expected ${stateLabel(expectedState).toLowerCase()}, ` +
+        `found ${stateLabel(found).toLowerCase()}.`,
+    );
   };
 
-  const resolveWithNote = async () => {
+  const selectInitial = async (found: DoorState) => {
+    if (found !== expectedState) {
+      beginMismatch(found);
+      return;
+    }
+    // Found as expected: nothing to correct, so the final state is the same
+    // state and the guard is never asked a second question.
     const result: ItemResult = {
       type: "door_check",
       expected: expectedState,
-      attempts,
-      resolution: "note",
-      note,
+      initialState: found,
+      finalState: found,
     };
     await saveResult(checklistId, item.id, existing?.id, result);
     onSaved(result);
   };
 
-  const resolveWithTicket = async () => {
-    const ticketId = id();
-    await db.transact(
-      db.tx.tickets[ticketId].update({
-        title: `Door Check mismatch: ${item.label}`,
-        description: `Expected ${expectedState}, observed ${attempts.at(-1)?.observed}.`,
-        priority: "medium",
-        status: "open",
-        autoGenerated: false,
-        createdAt: Date.now(),
-      }),
-    );
-    const result: ItemResult = {
-      type: "door_check",
-      expected: expectedState,
-      attempts,
-      resolution: "ticket",
-    };
-    await saveResult(checklistId, item.id, existing?.id, result, ticketId);
-    onSaved(result, ticketId);
+  // Everything a mismatch produces — the incident, an optional ticket, and
+  // the result itself — is written in one transaction at the end, so
+  // abandoning the item mid-flow can't leave an orphaned incident behind.
+  const commitMismatch = async (finalState: DoorState, raiseTicket: boolean) => {
+    if (!initialState || saving) return;
+    setSaving(true);
+    try {
+      const incidentId = id();
+      const ticketId = raiseTicket ? id() : undefined;
+      const summary =
+        `${item.label}: found ${stateLabel(initialState).toLowerCase()}, ` +
+        `left ${stateLabel(finalState).toLowerCase()} ` +
+        `(expected ${stateLabel(expectedState).toLowerCase()})`;
+      const result: ItemResult = {
+        type: "door_check",
+        expected: expectedState,
+        initialState,
+        finalState,
+        ...(details.trim() ? { note: details.trim() } : {}),
+        incidentId,
+      };
+      await db.transact([
+        db.tx.incidents[incidentId]
+          .update({
+            title: title.trim() || summary,
+            status: "open",
+            details: details.trim() || undefined,
+            createdAt: Date.now(),
+          })
+          .link({
+            ...(effectiveTarget ? attachmentLink(effectiveTarget) : {}),
+            ...(current.user ? { author: current.user.id } : {}),
+          }),
+        activityTx({
+          eventType: "incident.created",
+          summary,
+          subjectType: "incidents",
+          subjectId: incidentId,
+          actorId: current.user?.id,
+        }),
+        ...(ticketId
+          ? [
+              db.tx.tickets[ticketId]
+                .update({
+                  title: `Door left ${stateLabel(finalState).toLowerCase()}: ${item.label}`,
+                  description: summary,
+                  priority: "medium",
+                  status: "open",
+                  autoGenerated: false,
+                  createdAt: Date.now(),
+                })
+                .link({ sourceIncident: incidentId }),
+            ]
+          : []),
+      ]);
+      await saveResult(checklistId, item.id, existing?.id, result, ticketId);
+      onSaved(result, ticketId);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const chooseFinal = (finalState: DoorState) => {
+    if (finalState === expectedState) {
+      // Put right — no ticket to offer, so don't ask.
+      void commitMismatch(finalState, false);
+      return;
+    }
+    setPendingFinal(finalState);
   };
 
   if (done) {
+    const s = doorCheckSummary(existingResult);
     return (
-      <div className="card card-done">
+      <div className={"card" + (s.leftAsExpected ? " card-done" : "")}>
         <div className="badge">Door Check</div>
         <div className="card-title">{item.label}</div>
-        <div className="card-meta">
-          {existingResult.resolution === "matched"
-            ? `Observed ${existingResult.attempts.at(-1)?.observed} (matched)`
-            : `Mismatch — resolved via ${existingResult.resolution}`}
-        </div>
+        <div className="card-meta">{doneSummaryText(s)}</div>
       </div>
     );
   }
 
-  const secondMismatch = attempts.length >= 2 && !attempts.at(-1)?.matched;
+  // Mismatch flow: incident details, then the second row of buttons.
+  if (initialState) {
+    return (
+      <div className="card">
+        <div className="badge">Door Check</div>
+        <div className="card-title">{item.label}</div>
+        <div className="badge badge-bad" style={{ margin: "8px 0", display: "block" }}>
+          Found {stateLabel(initialState).toLowerCase()} — expected{" "}
+          {stateLabel(expectedState).toLowerCase()}. This is logged as an incident.
+        </div>
+
+        <div className="field">
+          <span className="field-label">Incident title</span>
+          <input
+            className="input"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <span className="field-label">Details</span>
+          <textarea
+            className="textarea"
+            rows={2}
+            value={details}
+            onChange={(e) => setDetails(e.target.value)}
+          />
+        </div>
+        {boundLocation ? (
+          <div className="field">
+            <span className="field-label">Attached to</span>
+            <div className="field-value">{boundLocation.name}</div>
+          </div>
+        ) : (
+          <div className="field">
+            <span className="field-label">
+              Attach to — this door has no location set in its template
+            </span>
+            <AttachmentTargetPicker value={target} onChange={setTarget} />
+          </div>
+        )}
+
+        <div className="field-label" style={{ marginTop: 4 }}>
+          What state did you leave it in?
+        </div>
+        <div className="row" style={{ flexWrap: "wrap" }}>
+          {DOOR_STATES.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={
+                "btn btn-sm" + (pendingFinal === s ? " btn-primary" : "")
+              }
+              disabled={saving}
+              onClick={() => chooseFinal(s)}
+            >
+              {stateLabel(s)}
+            </button>
+          ))}
+        </div>
+
+        {pendingFinal && pendingFinal !== expectedState && (
+          <div style={{ marginTop: 10 }}>
+            <div className="badge badge-warn" style={{ marginBottom: 8, display: "block" }}>
+              Leaving it {stateLabel(pendingFinal).toLowerCase()} — still not the
+              expected state. Raise a ticket so it gets followed up?
+            </div>
+            <div className="row" style={{ flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="btn btn-sm btn-danger"
+                disabled={saving}
+                onClick={() => void commitMismatch(pendingFinal, true)}
+              >
+                Save &amp; raise a ticket
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={saving}
+                onClick={() => void commitMismatch(pendingFinal, false)}
+              >
+                Save without a ticket
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="card">
       <div className="badge">Door Check</div>
       <div className="card-title">{item.label}</div>
       <div className="field-label" style={{ marginTop: 10 }}>
-        Expected: {stateLabel(expectedState)}
+        Expected: {stateLabel(expectedState)} · how did you find it?
       </div>
-
-      {attempts.length > 0 && !secondMismatch && (
-        <div className="badge badge-bad" style={{ margin: "6px 0" }}>
-          Observed: {stateLabel(attempts.at(-1)!.observed)} — mismatch. Correct it, then select
-          again.
-        </div>
-      )}
-
-      {!secondMismatch && (
-        <div className="row" style={{ flexWrap: "wrap", marginTop: 8 }}>
-          {DOOR_STATES.map((s) => (
-            <button key={s} type="button" className="btn btn-sm" onClick={() => void select(s)}>
-              {stateLabel(s)}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {secondMismatch && (
-        <div style={{ marginTop: 10 }}>
-          <div className="badge badge-bad" style={{ marginBottom: 8 }}>
-            Still mismatched — a note or ticket is required.
-          </div>
-          <div className="field">
-            <span className="field-label">Note (optional if raising a ticket)</span>
-            <textarea
-              className="textarea"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={2}
-            />
-          </div>
-          <div className="row">
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!note.trim()}
-              onClick={() => void resolveWithNote()}
-            >
-              Save note
-            </button>
-            <button type="button" className="btn btn-danger" onClick={() => void resolveWithTicket()}>
-              Raise a ticket
-            </button>
-          </div>
-        </div>
-      )}
+      <div className="row" style={{ flexWrap: "wrap", marginTop: 8 }}>
+        {DOOR_STATES.map((s) => (
+          <button key={s} type="button" className="btn btn-sm" onClick={() => void selectInitial(s)}>
+            {stateLabel(s)}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
 
-function stateLabel(s: DoorState): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
+function doneSummaryText(s: ReturnType<typeof doorCheckSummary>): string {
+  // Historical rows never stored an "as found" state, so say what's actually
+  // known rather than implying the door was found correct.
+  if (!s.foundKnown) {
+    return s.final
+      ? `${stateLabel(s.final)}${s.leftAsExpected ? " (matched)" : " — mismatch"}`
+      : "Recorded";
+  }
+  if (s.foundAsExpected) return `Found ${stateLabel(s.initial!).toLowerCase()} — as expected`;
+  if (s.corrected)
+    return `Found ${stateLabel(s.initial!).toLowerCase()} — corrected to ${stateLabel(s.final!).toLowerCase()}`;
+  return `Found ${stateLabel(s.initial!).toLowerCase()} — left ${stateLabel(s.final!).toLowerCase()}, still not as expected`;
 }
+
+function stateLabel(s: DoorState): string {
+  return doorStateLabel(s);
+}
+
 
 // ---------------------------------------------------------------- Location-Based Check
 

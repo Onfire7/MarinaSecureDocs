@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { db } from "../../lib/db";
 import { useIsMobile } from "../../hooks/useIsMobile";
-import { ITEM_TYPE_LABEL, type ItemResult } from "../../lib/checklists";
+import { ITEM_TYPE_LABEL, doorCheckSummary, type ItemResult } from "../../lib/checklists";
 
 // Checklists & Tours — Checklist Detail (see pages/checklist-detail.html).
 // Read-only record of a completed instance — no edit actions anywhere.
@@ -151,15 +151,27 @@ function ResultSummary({ type, result }: { type: string; result: ItemResult | un
       return <span>Rejected — ticket raised</span>;
     }
     case "door_check": {
-      const r = result as Extract<ItemResult, { type: "door_check" }>;
-      const last = r.attempts.at(-1);
-      return r.resolution === "matched" ? (
+      const s = doorCheckSummary(result as Extract<ItemResult, { type: "door_check" }>);
+      // Found and left are reported as separate facts: a door corrected on
+      // arrival still means it was insecure until the guard got there.
+      if (!s.foundKnown) {
+        return (
+          <span>
+            {s.final ? capitalize(s.final) : "—"}
+            {s.final ? (s.leftAsExpected ? " (matched)" : " — mismatch") : ""}
+          </span>
+        );
+      }
+      return (
         <span>
-          {last ? capitalize(last.observed) : "—"} (matched
-          {r.attempts.length > 1 ? " on retry" : ""})
+          Found {s.initial} → left {s.final}
+          {s.foundAsExpected
+            ? " (as expected)"
+            : s.corrected
+              ? " (corrected)"
+              : " — still not as expected"}
+          {s.note ? `: "${s.note}"` : ""}
         </span>
-      ) : (
-        <span>Mismatch — resolved via {r.resolution}{r.note ? `: "${r.note}"` : ""}</span>
       );
     }
     case "location_check":

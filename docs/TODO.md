@@ -59,7 +59,17 @@ starting; the **Environment & tooling** section changes how you work.
 
 Verify each on the deployment before moving on.
 
-### 1. Turn the React development build back off
+_Nothing open right now._
+
+---
+
+## Before shipping to production
+
+Not bugs and not blocking day-to-day work — deliberate development-time
+settings that have to be undone before real users see the app. Check this
+list at the end of development, not during it.
+
+### Turn the React development build back off
 
 **Beta is currently serving React's development build, unminified** — 2.1 MB
 instead of 820 kB (418 kB gzipped). That was deliberate: it's what turned

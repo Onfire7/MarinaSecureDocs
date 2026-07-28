@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { ITEM_TYPE_LABEL, type ItemType } from "../../lib/checklists";
+import { LocationPicker } from "../shared/LocationPicker";
 import { AdminHeader } from "./AdminHomePage";
 
 // Admin — Checklist Templates (see docs/pages/admin-checklist-templates.html).
@@ -533,20 +534,7 @@ function ItemRow({
       {open && (
         <div style={{ marginTop: 8 }}>
           {item.type === "door_check" && (
-            <div className="row">
-              <span className="small muted">Expected state</span>
-              <select
-                className="select select-inline"
-                value={(cfg.expectedState as string) ?? "locked"}
-                onChange={(e) => setConfig({ expectedState: e.target.value })}
-              >
-                {["open", "unlocked", "locked"].map((s) => (
-                  <option key={s} value={s}>
-                    {s.charAt(0).toUpperCase() + s.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <DoorCheckConfigFields cfg={cfg} setConfig={setConfig} />
           )}
           {item.type === "verify_task" && (
             <label className="row" style={{ cursor: "pointer" }}>
@@ -568,6 +556,55 @@ function ItemRow({
           {item.type === "meter_reading" && <MeterConfig cfg={cfg} setConfig={setConfig} />}
         </div>
       )}
+    </div>
+  );
+}
+
+// A door isn't its own entity — it's a labelled item here — so binding it to
+// a Location is what gives a mismatch incident something to attach to, and
+// what lets reports group "doors found unlocked" by building.
+function DoorCheckConfigFields({
+  cfg,
+  setConfig,
+}: {
+  cfg: Record<string, unknown>;
+  setConfig: (patch: Record<string, unknown>) => void;
+}) {
+  const { data } = db.useQuery({ locations: { parent: {}, type: {} } });
+  const locations = useMemo(
+    () => [...(data?.locations ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
+    [data],
+  );
+
+  return (
+    <div>
+      <div className="row">
+        <span className="small muted">Expected state</span>
+        <select
+          className="select select-inline"
+          value={(cfg.expectedState as string) ?? "locked"}
+          onChange={(e) => setConfig({ expectedState: e.target.value })}
+        >
+          {["open", "unlocked", "locked"].map((s) => (
+            <option key={s} value={s}>
+              {s.charAt(0).toUpperCase() + s.slice(1)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="field" style={{ marginTop: 8, marginBottom: 0 }}>
+        <span className="field-label">
+          Location this door belongs to — what a mismatch incident attaches to
+        </span>
+        <LocationPicker
+          locations={locations}
+          value={(cfg.locationId as string) ?? ""}
+          onChange={(locationId) => setConfig({ locationId: locationId || undefined })}
+          placeholder="Search locations…"
+          allowNone
+          noneLabel="Not set — the guard picks at check time"
+        />
+      </div>
     </div>
   );
 }
