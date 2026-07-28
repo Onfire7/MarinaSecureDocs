@@ -60,24 +60,17 @@ export function ActiveChecklistPage() {
     void db.transact(update);
   }, [checklist, current.user]);
 
-  if (!checklist) {
-    return (
-      <div className="placeholder">
-        <div className="big">Loading…</div>
-      </div>
-    );
-  }
-
-  if (checklist.status === "complete") {
-    navigate(`/checklists/${checklist.id}`, { replace: true });
-    return null;
-  }
-
-  const items = (checklist.template?.items ?? [])
+  // Every hook below must run on every render regardless of whether the
+  // checklist has loaded yet — a hook after the "not loaded" early return
+  // used to only run once data arrived, changing the hook count between
+  // renders (React error #310). Computed off optional chaining instead so
+  // the shape is stable: empty items/no nested query while loading, real
+  // values once `checklist` resolves.
+  const items = (checklist?.template?.items ?? [])
     .slice()
     .sort((a, b) => a.order - b.order);
   const resultByItemId = new Map(
-    (checklist.itemResults ?? []).map((r) => [r.templateItem?.id, r]),
+    (checklist?.itemResults ?? []).map((r) => [r.templateItem?.id, r]),
   );
 
   const locationCheckNestedIds = items
@@ -95,6 +88,19 @@ export function ActiveChecklistPage() {
   const nestedStatusById = new Map(
     (nestedData?.checklists ?? []).map((c) => [c.id, c.status]),
   );
+
+  if (!checklist) {
+    return (
+      <div className="placeholder">
+        <div className="big">Loading…</div>
+      </div>
+    );
+  }
+
+  if (checklist.status === "complete") {
+    navigate(`/checklists/${checklist.id}`, { replace: true });
+    return null;
+  }
 
   const isDone = (itemId: string, type: string) => {
     const r = resultByItemId.get(itemId);
