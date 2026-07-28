@@ -195,6 +195,21 @@ Whichever approach: verify in `npm run build` that the dev build is bundled
 Verify with the test account at `/beta.marinasecure.com` that React DevTools
 and hook warnings appear (if applicable).
 
+### 8. React error #185 on check-in page
+
+Visiting any `/checkin/<guidUrl>` route throws React error #185 in
+production (minified). Error #185 is a Rules of Hooks violation — see
+https://react.dev/errors/185.
+
+Repro with a valid checkpoint guid from the DB, then navigate to the
+check-in URL and watch the console. The error appears minified; task 7
+(React dev build) will show the full message and help pinpoint the hook call.
+
+Affected code: `src/pages/checklists/CheckpointCheckinPage.tsx` and its
+dependencies (`useCheckpointVisit.ts`, etc.). The violation is likely
+conditional hook usage or a hook inside a callback — common patterns that
+look right but violate the Rules. Trace the error stack to find the offender.
+
 ---
 
 ## Learnings from this codebase (read before debugging anything)
