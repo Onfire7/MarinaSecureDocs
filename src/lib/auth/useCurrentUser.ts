@@ -30,6 +30,9 @@ export interface CurrentUser {
 // sign-in (matched by email), per the Data Model.
 export function useCurrentUser(): CurrentUser {
   const { isLoaded, user: clerkUser } = useUser();
+  // Instant's own auth identity (the $users row created by the Clerk token
+  // exchange) — needed to lazily create the userAuth link below.
+  const { user: instantAuthUser } = db.useAuth();
   const clerkUserId = clerkUser?.id;
   const email = clerkUser?.primaryEmailAddress?.emailAddress;
 
@@ -49,6 +52,9 @@ export function useCurrentUser(): CurrentUser {
             // The User's own Contact record, where one is linked — used to
             // default "checking out to" on asset checkout.
             contact: {},
+            // The linked $users identity (own row only, per $users view
+            // rules) — read to decide whether the link still needs creating.
+            authUser: {},
           },
         }
       : null,
@@ -68,6 +74,20 @@ export function useCurrentUser(): CurrentUser {
       );
     }
   }, [byEmail, byClerkId, clerkUserId]);
+
+  // Same lazy-claim pattern for the userAuth link ($users.profile ↔
+  // users.authUser). signInWithIdToken creates the $users row and nothing
+  // else — without this link, auth.ref('$user.profile.…') in
+  // instant.perms.ts resolves to [] and the stricter rule tiers can never
+  // be enabled. Created here rather than at provisioning time because the
+  // $users row doesn't exist until the person's first actual sign-in.
+  useEffect(() => {
+    if (!user || !instantAuthUser) return;
+    if (user.authUser?.id === instantAuthUser.id) return;
+    db.transact(
+      db.tx.users[user.id].link({ authUser: instantAuthUser.id }),
+    ).catch(console.error);
+  }, [user, instantAuthUser]);
 
   const permissions = useMemo(
     () => computeEffectivePermissions(user?.roles ?? []),

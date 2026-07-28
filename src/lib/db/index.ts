@@ -24,7 +24,7 @@ export type Role = InstaQLEntity<AppSchema, "roles">;
 export type UserWithRoles = InstaQLEntity<
   AppSchema,
   "users",
-  { roles: object; contact: object }
+  { roles: object; contact: object; authUser: object }
 >;
 export type Shift = InstaQLEntity<AppSchema, "shifts">;
 export type Ticket = InstaQLEntity<AppSchema, "tickets">;
