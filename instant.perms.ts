@@ -4,64 +4,48 @@
 // their own: the app id ships in the browser bundle, so anyone holding it
 // could otherwise read and write this marina's data directly.
 //
-// CURRENT STATE: every namespace requires a signed-in Clerk identity, and
-// nothing more. That closes the anonymous-access hole above, which was the
-// reason this file exists, but it does NOT yet distinguish an active marina
-// User from any account that can obtain a Clerk session.
+// CURRENT TIER: every namespace requires a signed-in Clerk identity that
+// resolves — through the userAuth link created on sign-in (useCurrentUser)
+// — to an *active* marina User. Role grants can only be written by
+// manage_roles holders, checked against the canManageRoles/canManageUsers
+// booleans denormalized onto users (kept current by the Admin Roles/Users
+// cache cascade). Per-permission enforcement for everything else
+// (view_incidents, manage_locations, …) remains client-side only.
 //
-// Two stronger tiers are written below but deliberately inactive, each with
-// the reason inline: requiring an *active* marina User (blocked on the
-// missing userAuth link), and gating roles/users writes on manage_roles /
-// manage_users (blocked on backfilling the canManageRoles/canManageUsers
-// cache). Per-permission enforcement for everything else (view_incidents,
-// manage_locations, …) is only checked client-side.
-//
-// Hard-won rule for changing anything in this file: a rule that denies
-// everyone passes every anonymous-access test. Nothing here is verified
-// until a real signed-in session has been exercised against it.
+// Hard-won rules for changing anything in this file:
+// - A rule that denies everyone passes every anonymous-access test. Nothing
+//   here is verified until a real signed-in session has been exercised
+//   against it (scripts/agent-login.mjs) — and enforcement must never land
+//   before the data it reads has been backfilled, or the marina deadlocks.
+// - Break-glass: `instant-cli push perms` (or the dashboard Permissions
+//   editor) works regardless of these rules; relaxing them is always the
+//   recovery path.
 
 import type { InstantRules } from "@instantdb/react";
 
-// A signed-in Clerk identity, bridged to Instant by signInWithIdToken.
-// This is the only check that is satisfiable today — see the note below.
-const SIGNED_IN = "auth.id != null";
-
-// WHAT THIS *SHOULD* BE, and why it isn't yet:
-//
-//   auth.id != null && true in auth.ref('$user.profile.active')
-//
-// That walks $users -> profile (the marina User linked by the `userAuth`
-// link) and requires the identity to resolve to an *active* User. It is the
-// rule this app wants. It is also currently unsatisfiable, because nothing
-// ever creates the userAuth link: signInWithIdToken makes the $users row,
-// but no code links it to the marina `users` record. With the link absent
-// the ref returns an empty list, `true in []` is false, and the rule denies
-// every request from every user — which is exactly what happened when it
-// was deployed (the whole app locked out with "Unable to sign in").
-//
-// Restoring it is a three-step migration, not a one-line edit:
-//   1. ship code that creates the userAuth link on sign-in,
-//   2. confirm existing users have been backfilled with that link,
-//   3. only then swap SIGNED_IN back to the active-user check here.
-// Step 3 must be verified with a real signed-in session before it lands;
-// verifying that anonymous access is denied proves nothing about whether
-// legitimate access still works.
-const SIGNED_IN_ACTIVE_USER = SIGNED_IN;
-
-// Same one-hop auth.ref pattern, reading the denormalized canManageRoles /
-// canManageUsers booleans (see instant.schema.ts, User) instead of a
-// permission-array attribute — whether auth.ref() flattens a JSON array
-// value or returns a list-of-lists is undocumented, so these rules only
-// ever read plain scalar attributes off the single linked profile.
-const CAN_MANAGE_ROLES = "auth.id != null && true in auth.ref('$user.profile.canManageRoles')";
-const CAN_MANAGE_USERS = "auth.id != null && true in auth.ref('$user.profile.canManageUsers')";
+// auth.ref walks $users → profile (the marina User linked by userAuth, which
+// useCurrentUser creates lazily on first sign-in) and returns a list of that
+// field's values, so `true in …` means "this identity resolves to a User
+// record where the flag is true". Only plain scalar attributes are ever read
+// this way — whether auth.ref() flattens a JSON-array attribute is
+// undocumented, which is why the permission cache is two booleans and not an
+// array of permission keys.
+const SIGNED_IN_ACTIVE_USER =
+  "auth.id != null && true in auth.ref('$user.profile.active')";
+const CAN_MANAGE_ROLES =
+  "auth.id != null && true in auth.ref('$user.profile.canManageRoles')";
+const CAN_MANAGE_USERS =
+  "auth.id != null && true in auth.ref('$user.profile.canManageUsers')";
 // manage_roles can already edit any role's grants — including ones it
-// currently holds — which reaches everything manage_users can, without ever
-// writing to `users`. Since Instant's update rule is per-entity (not
-// per-field), gating `users` writes any tighter would still leave that path
-// open while breaking the Admin Roles cache-cascade for a manage_roles-only
-// admin, so both permissions are treated as equally trusted here.
+// currently holds — which reaches everything manage_users can. They're
+// treated as equally trusted where users-namespace writes are gated.
 const CAN_MANAGE_ROLES_OR_USERS = `(${CAN_MANAGE_ROLES}) || (${CAN_MANAGE_USERS})`;
+
+// Bootstrap clause for first sign-ins: before the userAuth link exists, the
+// active-user check above is unsatisfiable for that identity, yet the claim
+// flow must find the email-matched User row, write clerkUserId, and create
+// the link. Own-email scoping keeps this from exposing anyone else's row.
+const OWN_ROW_BY_EMAIL = "auth.email == data.email";
 
 const rules = {
   // Baseline for every namespace. Deny-by-default was tempting, but it would
@@ -87,7 +71,8 @@ const rules = {
   // create: "false" every first-ever sign-in fails with "not perms-pass?",
   // which took the whole app down once origins were fixed. Own-row-only is
   // the tightest satisfiable setting: an identity can create and see itself,
-  // and nothing else.
+  // and nothing else. (Linking users.authUser → $users does not require
+  // $users update — verified empirically with update: "false" in place.)
   $users: {
     allow: {
       view: "auth.id == data.id",
@@ -120,56 +105,39 @@ const rules = {
     },
   },
 
-  // Writes here are still open to any signed-in identity. The strict rules
-  // (commented out below) gate them on the canManageRoles/canManageUsers
-  // booleans, but those are null on every existing User until Admin ->
-  // Roles/Users rewrites them. Enforcing before that backfill deadlocks the
-  // marina: nobody holds manage_roles, so nobody can grant it, so the flags
-  // can never become true — and the client-side AdminGate blocks the very
-  // screen that would fix it.
-  //
-  // To close this: populate the cache first (open Admin -> Roles and set the
-  // grants, which writes the flags for every role holder), confirm a real
-  // session can still write, then swap in the strict blocks and re-push.
-  //
-  // Break-glass if this ever deadlocks again: `instant-cli push perms`
-  // always works regardless of these rules, so relaxing them is the
-  // recovery path.
+  // Role grants are the root of every other permission, so writing them is
+  // reserved for manage_roles holders.
   roles: {
     allow: {
       view: SIGNED_IN_ACTIVE_USER,
-      create: SIGNED_IN_ACTIVE_USER,
-      update: SIGNED_IN_ACTIVE_USER,
-      delete: SIGNED_IN_ACTIVE_USER,
-    },
-  },
-  users: {
-    allow: {
-      view: SIGNED_IN_ACTIVE_USER,
-      create: SIGNED_IN_ACTIVE_USER,
-      update: SIGNED_IN_ACTIVE_USER,
-      delete: "false",
+      create: CAN_MANAGE_ROLES,
+      update: CAN_MANAGE_ROLES,
+      delete: CAN_MANAGE_ROLES,
     },
   },
 
-  // ---- PHASE 2 rules, to swap in once the backfill above has run ----
+  // users carries role links, the permission cache, and self-serve fields
+  // (dashboardLayout, clerkUserId claim, authUser link), which pulls its
+  // rules in opposite directions:
   //
-  // roles: {
-  //   allow: {
-  //     view: SIGNED_IN_ACTIVE_USER,
-  //     create: CAN_MANAGE_ROLES,
-  //     update: CAN_MANAGE_ROLES,
-  //     delete: CAN_MANAGE_ROLES,
-  //   },
-  // },
-  // users: {
-  //   allow: {
-  //     view: SIGNED_IN_ACTIVE_USER,
-  //     create: CAN_MANAGE_ROLES_OR_USERS,
-  //     update: CAN_MANAGE_ROLES_OR_USERS,
-  //     delete: "false",
-  //   },
-  // },
+  // - view/update carry the OWN_ROW_BY_EMAIL bootstrap so a first sign-in
+  //   can claim its row before the userAuth link exists.
+  // - create is manage-only: provisioning happens in Admin → Users.
+  // - KNOWN RESIDUAL GAP: update is per-entity, not per-field, so any
+  //   *active* user can still update users rows — including linking roles or
+  //   setting the canManage flags on their own row. Closing that needs
+  //   either per-field/link rules from Instant or moving these writes to a
+  //   trusted server endpoint. What this tier does close: outsider Clerk
+  //   accounts (no active marina User) now have no access at all, and role
+  //   *grants* can't be edited without manage_roles.
+  users: {
+    allow: {
+      view: `(${SIGNED_IN_ACTIVE_USER}) || (${OWN_ROW_BY_EMAIL})`,
+      create: CAN_MANAGE_ROLES_OR_USERS,
+      update: `(${SIGNED_IN_ACTIVE_USER}) || (${OWN_ROW_BY_EMAIL})`,
+      delete: "false",
+    },
+  },
 } satisfies InstantRules;
 
 export default rules;
