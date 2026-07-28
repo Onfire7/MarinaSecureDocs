@@ -473,7 +473,7 @@ function ReservationMap({
       (r) => r.location?.id === locationId && r.status !== "cancelled",
     );
     if (forLocation.some((r) => r.status === "checked_in")) {
-      return { background: "var(--bad-bg)", border: "var(--bad)" };
+      return { background: "var(--bad-bg)", border: "var(--bad)", text: "var(--bad)" };
     }
     const upcoming = forLocation.some(
       (r) =>
@@ -481,8 +481,9 @@ function ReservationMap({
         r.expectedCheckin &&
         new Date(r.expectedCheckin).getTime() > now - 24 * 3600_000,
     );
-    if (upcoming) return { background: "var(--warn-bg)", border: "var(--warn)" };
-    return { background: "var(--good-bg)", border: "var(--good)" };
+    if (upcoming)
+      return { background: "var(--warn-bg)", border: "var(--warn)", text: "var(--warn)" };
+    return { background: "var(--good-bg)", border: "var(--good)", text: "var(--good)" };
   };
 
   const openLocation = (locationId: string) => {

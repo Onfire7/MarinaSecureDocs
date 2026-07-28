@@ -152,6 +152,7 @@ function ListView({
   canManage: boolean;
 }) {
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   // Mobile drills level by level; desktop shows the whole indented tree.
   const [drillStack, setDrillStack] = useState<LocationRow[]>([]);
 
@@ -209,8 +210,12 @@ function ListView({
                 location={l}
                 canManage={canManage}
                 childCount={kids.length}
+                // A location with no children is a drill-in dead end — tapping
+                // it opens its details instead, rather than doing nothing.
                 onDrill={
-                  kids.length > 0 ? () => setDrillStack([...drillStack, l]) : undefined
+                  kids.length > 0
+                    ? () => setDrillStack([...drillStack, l])
+                    : () => navigate(`/locations/${l.id}`)
                 }
               />
             );

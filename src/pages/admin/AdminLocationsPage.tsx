@@ -1,7 +1,15 @@
 import { useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { db, id } from "../../lib/db";
-import { compareNames, statusLabel, STANDARD_STATUSES, DEFAULT_POST_RESERVATION_STATUS } from "../../lib/locations";
+import {
+  compareNames,
+  statusLabel,
+  STANDARD_STATUSES,
+  DEFAULT_POST_RESERVATION_STATUS,
+  DEFAULT_PLACEMENT_STYLE,
+  placementStyle,
+  type PlacementShape,
+} from "../../lib/locations";
 import { LocationPicker, type PickerLocation } from "../shared/LocationPicker";
 import { NameGeneratorDialog } from "./NameGeneratorDialog";
 import { AdminGate } from "./AdminGate";
@@ -920,6 +928,27 @@ function CreateLocationDialog({
 
 // ---------------------------------------------------------------- Maps
 
+const UPLOAD_TIMEOUT_MS = 45_000;
+
+// db.storage.uploadFile doesn't expose an AbortSignal, so the browser
+// fetch() underneath it has no timeout of its own — a stalled connection
+// (as opposed to a rejected response, which the SDK does surface) would
+// otherwise hang indefinitely. Racing it against a timeout guarantees the
+// caller's spinner always resolves to an error. Shared by both new-map
+// upload and replace-image so there's one upload path, not two.
+async function uploadFileWithTimeout(path: string, file: File): Promise<string> {
+  const result = await Promise.race([
+    db.storage.uploadFile(path, file),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error("Upload timed out after 45s — check your connection and try again.")),
+        UPLOAD_TIMEOUT_MS,
+      ),
+    ),
+  ]);
+  return result.data.id;
+}
+
 function MapsTab() {
   const [selectedMap, setSelectedMap] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -927,10 +956,13 @@ function MapsTab() {
   const [scopeId, setScopeId] = useState("");
   const [mapName, setMapName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const [replacing, setReplacing] = useState(false);
+  const [replaceError, setReplaceError] = useState<string | null>(null);
+  const replaceFileRef = useRef<HTMLInputElement>(null);
 
   const { data } = db.useQuery({
     marinaMaps: { scope: {}, image: {}, placements: { location: {} } },
-    locations: { parent: {} },
+    locations: { parent: {}, type: {} },
   });
   const maps = data?.marinaMaps ?? [];
   const locations = useMemo(
@@ -940,8 +972,6 @@ function MapsTab() {
   const roots = locations.filter((l) => !l.parent);
   const active = maps.find((m) => m.id === selectedMap) ?? maps[0];
 
-  const UPLOAD_TIMEOUT_MS = 45_000;
-
   const upload = async (file: File) => {
     // Scope is required before the upload completes — there's no way to
     // create an unscoped map.
@@ -950,25 +980,12 @@ function MapsTab() {
     setUploadError(null);
     try {
       const path = `marina-maps/${Date.now()}-${file.name}`;
-      // db.storage.uploadFile doesn't expose an AbortSignal, so the browser
-      // fetch() underneath it has no timeout of its own — a stalled
-      // connection (as opposed to a rejected response, which the SDK does
-      // surface) would otherwise hang here indefinitely. Racing it against
-      // a timeout guarantees the spinner always resolves to an error.
-      const uploadResult = await Promise.race([
-        db.storage.uploadFile(path, file),
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error("Upload timed out after 45s — check your connection and try again.")),
-            UPLOAD_TIMEOUT_MS,
-          ),
-        ),
-      ]);
+      const fileId = await uploadFileWithTimeout(path, file);
       const mapId = id();
       await db.transact(
         db.tx.marinaMaps[mapId]
           .update({ name: mapName.trim() || file.name })
-          .link({ scope: scopeId, image: uploadResult.data.id }),
+          .link({ scope: scopeId, image: fileId }),
       );
       setSelectedMap(mapId);
       setMapName("");
@@ -978,6 +995,45 @@ function MapsTab() {
     } finally {
       setUploading(false);
     }
+  };
+
+  // $files has no update perm (instant.perms.ts:89), so "replacing" an
+  // image is upload-new → relink → delete-old, not an overwrite.
+  const replaceImage = async (map: NonNullable<typeof active>, file: File) => {
+    setReplacing(true);
+    setReplaceError(null);
+    try {
+      const path = `marina-maps/${Date.now()}-${file.name}`;
+      const newFileId = await uploadFileWithTimeout(path, file);
+      const oldImageId = map.image?.id;
+      await db.transact([
+        db.tx.marinaMaps[map.id].link({ image: newFileId }),
+        ...(oldImageId ? [db.tx.$files[oldImageId].delete()] : []),
+      ]);
+    } catch (err) {
+      setReplaceError(err instanceof Error ? err.message : "Replace failed.");
+    } finally {
+      setReplacing(false);
+    }
+  };
+
+  const deleteMap = async (map: NonNullable<typeof active>) => {
+    const placementCount = map.placements?.length ?? 0;
+    const confirmed = window.confirm(
+      `Delete "${map.scope?.name ?? map.name}"? This removes the map image` +
+        (placementCount > 0
+          ? ` and unplots ${placementCount} location${placementCount === 1 ? "" : "s"} from it — those placements can't be recovered`
+          : "") +
+        `.`,
+    );
+    if (!confirmed) return;
+    const imageId = map.image?.id;
+    await db.transact([
+      db.tx.marinaMaps[map.id].delete(),
+      ...(imageId ? [db.tx.$files[imageId].delete()] : []),
+      ...(map.placements ?? []).map((p) => db.tx.locationMapPlacements[p.id].delete()),
+    ]);
+    setSelectedMap(null);
   };
 
   return (
@@ -1003,19 +1059,15 @@ function MapsTab() {
             value={mapName}
             onChange={(e) => setMapName(e.target.value)}
           />
-          <select
-            className="select select-inline"
-            value={scopeId}
-            onChange={(e) => setScopeId(e.target.value)}
-          >
-            <option value="">Scope to a location — required…</option>
-            {locations.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-                {!l.parent ? " (root — overview map)" : ""}
-              </option>
-            ))}
-          </select>
+          <div style={{ flex: "1 1 240px", minWidth: 220 }}>
+            <LocationPicker
+              locations={locations}
+              value={scopeId}
+              onChange={setScopeId}
+              placeholder="Scope to a location — required…"
+              allowNone={false}
+            />
+          </div>
           <input
             ref={fileRef}
             type="file"
@@ -1056,20 +1108,49 @@ function MapsTab() {
               </button>
             ))}
           </div>
+
+          {active && (
+            <div className="row" style={{ marginBottom: 12 }}>
+              <input
+                ref={replaceFileRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void replaceImage(active, file);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={replacing}
+                onClick={() => replaceFileRef.current?.click()}
+              >
+                {replacing ? "Replacing…" : "Replace image"}
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-danger"
+                onClick={() => void deleteMap(active)}
+              >
+                Delete map
+              </button>
+            </div>
+          )}
+          {replaceError && (
+            <div className="badge badge-bad" style={{ display: "block", marginBottom: 8 }}>
+              {replaceError}
+            </div>
+          )}
+
           {active && <MapPlotter map={active} locations={locations} />}
         </>
       )}
     </div>
   );
 }
-
-type PlacementShape = {
-  cx: number;
-  cy: number;
-  width: number;
-  height: number;
-  rotation: number;
-};
 
 function MapPlotter({
   map,
@@ -1101,8 +1182,8 @@ function MapPlotter({
     if (!addLocationId) return;
     void db.transact(
       db.tx.locationMapPlacements[id()]
-        // Dropped mid-canvas at a sane default size; drag to position.
-        .update({ placement: { cx: 50, cy: 50, width: 12, height: 6, rotation: 0 } })
+        // Dropped mid-canvas at the default text size; drag to position.
+        .update({ placement: { cx: 50, cy: 50, rotation: 0 } })
         .link({ map: map.id, location: addLocationId }),
     );
     setAddLocationId("");
@@ -1177,12 +1258,9 @@ function MapPlotter({
               type="button"
               className="map-rect"
               style={{
-                left: `${p.placement.cx}%`,
-                top: `${p.placement.cy}%`,
-                width: `${p.placement.width}%`,
-                height: `${p.placement.height}%`,
-                transform: `translate(-50%, -50%) rotate(${p.placement.rotation ?? 0}deg)`,
+                ...placementStyle(p.placement),
                 background: "var(--accent-soft)",
+                color: "var(--accent)",
                 borderColor: selected === p.id ? "var(--accent)" : "var(--line)",
                 borderWidth: selected === p.id ? 2.5 : 1.5,
                 cursor: "grab",
@@ -1230,18 +1308,19 @@ function MapPlotter({
             <div className="card-title">{activePlacement.location?.name}</div>
             {(
               [
-                ["width", "Width %"],
-                ["height", "Height %"],
-                ["rotation", "Rotation °"],
+                ["fontSize", "Font size (px)", 8, 32, DEFAULT_PLACEMENT_STYLE.fontSize],
+                ["paddingX", "Padding, left/right (px)", 0, 24, DEFAULT_PLACEMENT_STYLE.paddingX],
+                ["paddingY", "Padding, top/bottom (px)", 0, 24, DEFAULT_PLACEMENT_STYLE.paddingY],
+                ["rotation", "Rotation °", -180, 180, 0],
               ] as const
-            ).map(([key, label]) => (
+            ).map(([key, label, min, max, fallback]) => (
               <div className="field" key={key}>
                 <span className="field-label">{label}</span>
                 <input
                   type="range"
-                  min={key === "rotation" ? -180 : 1}
-                  max={key === "rotation" ? 180 : 60}
-                  value={activePlacement.placement[key] ?? 0}
+                  min={min}
+                  max={max}
+                  value={activePlacement.placement[key] ?? fallback}
                   onChange={(e) =>
                     updatePlacement(activePlacement.id, {
                       [key]: Number(e.target.value),
@@ -1250,7 +1329,7 @@ function MapPlotter({
                   style={{ width: "100%" }}
                 />
                 <span className="muted small">
-                  {activePlacement.placement[key] ?? 0}
+                  {activePlacement.placement[key] ?? fallback}
                 </span>
               </div>
             ))}

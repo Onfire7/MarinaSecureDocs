@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { placementStyle, type PlacementShape } from "../../lib/locations";
 
 // Shared schematic-map renderer: MarinaMap image + LocationMapPlacement
 // rectangles, with root-map chooser and drill-down into scoped detail maps.
@@ -9,15 +10,7 @@ import { useState } from "react";
 
 export interface MapPlacementRecord {
   id: string;
-  // Center + dimensions as percentages (0–100) of the map image,
-  // rotation in degrees clockwise.
-  placement: {
-    cx: number;
-    cy: number;
-    width: number;
-    height: number;
-    rotation: number;
-  };
+  placement: PlacementShape;
   location?: { id: string; name: string } | null;
 }
 
@@ -32,6 +25,7 @@ export interface MarinaMapRecord {
 export interface RectStyle {
   background: string;
   border: string;
+  text: string;
 }
 
 export function SchematicMapView({
@@ -117,13 +111,10 @@ export function SchematicMapView({
               type="button"
               className="map-rect"
               style={{
-                left: `${p.placement.cx}%`,
-                top: `${p.placement.cy}%`,
-                width: `${p.placement.width}%`,
-                height: `${p.placement.height}%`,
-                transform: `translate(-50%, -50%) rotate(${p.placement.rotation ?? 0}deg)`,
+                ...placementStyle(p.placement),
                 background: colors.background,
                 borderColor: colors.border,
+                color: colors.text,
               }}
               title={p.location.name}
               onClick={() =>

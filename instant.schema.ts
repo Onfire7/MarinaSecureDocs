@@ -86,15 +86,23 @@ const _schema = i.schema({
       name: i.string(),
     }),
     locationMapPlacements: i.entity({
-      // Center point + dimensions as percentages (0–100) of the map image,
-      // rotation in degrees clockwise — a plotted slip can sit at whatever
-      // angle the dock actually runs.
+      // Center point as percentages (0–100) of the map image — genuinely
+      // relative, so this is the one part of the shape percent still suits.
+      // Everything else about the rectangle's size is intrinsic to its
+      // label text (font size + padding around it) rather than an absolute
+      // percent extent, so rotation just rotates a normally-sized box
+      // instead of stretching two independent axes. Old rows may still
+      // carry the retired width/height percent fields; they're ignored,
+      // not migrated (harmless leftover keys in an opaque JSON blob).
+      // fontSize/paddingX/paddingY are optional so old rows fall back to
+      // sane defaults (see lib/locations.ts — DEFAULT_PLACEMENT_STYLE).
       placement: i.json<{
         cx: number;
         cy: number;
-        width: number;
-        height: number;
         rotation: number;
+        fontSize?: number;
+        paddingX?: number;
+        paddingY?: number;
       }>(),
     }),
     checkpoints: i.entity({

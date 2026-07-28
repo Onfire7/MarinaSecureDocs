@@ -291,6 +291,29 @@ h3 {
   color: var(--accent);
   font-weight: 650;
 }
+.sidenav-subnav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 0 4px;
+}
+.sidenav-subitem {
+  display: block;
+  padding: 6px 10px 6px 26px;
+  border-radius: 6px;
+  color: var(--mute);
+  text-decoration: none;
+  font-size: 0.86rem;
+}
+.sidenav-subitem:hover {
+  background: var(--fill);
+  color: var(--ink);
+}
+.sidenav-subitem.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 650;
+}
 .sidenav-footer {
   border-top: 1px solid var(--line-lt);
   padding: 12px 14px;
@@ -1074,14 +1097,15 @@ h3 {
   align-items: center;
   justify-content: center;
   font: inherit;
-  font-size: 0.72rem;
   font-weight: 650;
   text-align: center;
+  white-space: nowrap;
   border: 1.5px solid var(--line);
   border-radius: 4px;
   cursor: pointer;
-  padding: 2px;
+  max-width: 220px;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 .map-rect:hover {
   outline: 2px solid var(--accent);
