@@ -59,51 +59,18 @@ starting; the **Environment & tooling** section changes how you work.
 
 Verify each on the deployment before moving on.
 
-### 1. User actions: add "Install app" to the desktop sidenav
+### 1. Turn the React development build back off
 
-The sidenav footer (`src/layout/AppShell.tsx:74-96`) holds the user info,
-theme toggle, and sign-out/switch-user buttons. Add an "Install app" button
-that invokes the `beforeinstallprompt` event — this gives users a one-click
-path to install the PWA. Position it among the other buttons; hide it when
-the prompt isn't available (non-PWA browsers, already installed, dismissed).
+**Beta is currently serving React's development build, unminified** — 2.1 MB
+instead of 820 kB (418 kB gzipped). That was deliberate: it's what turned
+"Minified React error #185" into a real message and stack, which is how the
+check-in render loop got found. It should not stay on indefinitely, and must
+be off before any production deploy.
 
-Note: `beforeinstallprompt` fires at the top level but is typically checked
-from a button handler, so capture it in a context or state hook available to
-`AppShell`. Example pattern in `src/main.tsx` or as a custom hook if another
-component elsewhere (e.g., MorePage) also needs it.
-
-### 2. React library: use development build instead of production
-
-Currently the build bundles the minified React production library. For
-debugging purposes, use the development build, which includes warnings about
-issues like Rules of Hooks violations (it catches them at runtime; the prod
-build skips the check). This won't ship — it's for dev only, so either:
-
-- Conditional in `vite.config.ts`: detect a dev-mode flag or environment and
-  rewrite the React import to the `.development.js` export in the package
-  (`node_modules/react/index.js` vs. `…/index.development.js`), or
-- `package.json` override: use `"react": "…#development"` in dependencies (if
-  the package supports it) or point at a separate alias.
-
-Whichever approach: verify in `npm run build` that the dev build is bundled
-(check the bundle size difference and search the output for development).
-Verify with the test account at `/beta.marinasecure.com` that React DevTools
-and hook warnings appear (if applicable).
-
-### 3. React error #185 on check-in page
-
-Visiting any `/checkin/<guidUrl>` route throws React error #185 in
-production (minified). Error #185 is a Rules of Hooks violation — see
-https://react.dev/errors/185.
-
-Repro with a valid checkpoint guid from the DB, then navigate to the
-check-in URL and watch the console. The error appears minified; task 2
-(React dev build) will show the full message and help pinpoint the hook call.
-
-Affected code: `src/pages/checklists/CheckpointCheckinPage.tsx` and its
-dependencies (`useCheckpointVisit.ts`, etc.). The violation is likely
-conditional hook usage or a hook inside a callback — common patterns that
-look right but violate the Rules. Trace the error stack to find the offender.
+Flip `DEBUG_BUILD`'s default to `false` in `vite.config.ts` (or build with
+`REACT_DEV_BUILD=0`). The Workbox `maximumFileSizeToCacheInBytes` bump is
+tied to the same flag and reverts with it. Keep the flag itself around —
+it's cheap, and the next minified error will want it.
 
 ---
 
@@ -127,6 +94,21 @@ look right but violate the Rules. Trace the error stack to find the offender.
   like `where: { "checkpoint.id": {...} }` returns rows with
   `checkpoint: undefined` unless the query also includes `checkpoint: {}`.
   This silently broke tour progress once; a type cast had hidden it.
+- **Never build a `db.useQuery` argument from a moving value.** A query
+  whose *value* differs every render — `Date.now()`, `Math.random()`, a
+  freshly-derived array — resubscribes every render through
+  `useSyncExternalStore`, pushes a new snapshot, and re-renders: an
+  infinite loop React kills with "Maximum update depth exceeded". This was
+  the check-in page's `new Date(Date.now() - DEDUPE_WINDOW_MS)`. Pin such
+  values with `useState(() => …)` or `useMemo`. Instant compares queries by
+  *value*, not identity, so a stable-valued `new Date(shift.startedAt)` is
+  fine — it's drift that kills, not allocation.
+- **Don't trust a React error number's description second-hand.** #185 is
+  "Maximum update depth exceeded" (an infinite update loop); #310 is the
+  Rules-of-Hooks one. A punch-list entry asserting #185 was a hooks
+  violation sent the first pass looking in the wrong place entirely. Get
+  the real message — that's what the `DEBUG_BUILD` flag in `vite.config.ts`
+  is for — before theorizing about the cause.
 - **Instant gotchas** (each cost real downtime): browser origins must be
   allowlisted in the Instant dashboard or the token exchange fails; the
   `$users` row is created *through* the permission rules on first sign-in
