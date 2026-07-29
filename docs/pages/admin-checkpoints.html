@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Checkpoints — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Admin · Page Specification</span>
+    <h1>Checkpoints</h1>
+    <p class="lede">Every checkpoint in the marina on one screen — for the jobs that are about checkpoints rather than about any one location.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="admin-home.html">Admin Home</a>, gated by <code>manage_locations</code> — the same permission as <a href="admin-locations.html">Locations</a> and <a href="admin-tours.html">Tours</a>, since a checkpoint is a fixture of a location and a member of tours.</p>
+    <p>This screen deliberately overlaps with <a href="admin-locations.html">Location Types &amp; Locations setup</a>, which can still create and edit a checkpoint inline while you're standing on its location. That remains the right affordance while building out the hierarchy. This page is the other half of the same data: creating checkpoints <em>across</em> many locations in one pass, auditing which ones nothing references, correcting GPS radii in bulk, and handing a batch to a tour — none of which are reachable from a tree that shows one location's checkpoints at a time.</p>
+
+    <h2>Data shown</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td>Name</td><td>Checkpoint.name</td><td>Edited inline on the row.</td></tr>
+      <tr><td>Location</td><td>Checkpoint.location</td><td>Shown as the full ancestor path — "Slip 14" is ambiguous when every dock has one. A checkpoint with no location is flagged.</td></tr>
+      <tr><td>Usage</td><td>Checkpoint.tours + Checkpoint.checklist_templates</td><td>How many tours include it and how many templates it triggers. Both empty earns an <strong>Unused</strong> badge — a checkpoint nothing references is almost always an oversight, and is otherwise invisible.</td></tr>
+      <tr><td>GPS &amp; radius</td><td>Checkpoint.gps_coordinates / gps_validation_radius</td><td>Under Details. Radius falls back to the marina-wide default from <a href="admin-marina-settings.html">Marina Settings</a> when empty.</td></tr>
+      <tr><td>Scan URL</td><td>Checkpoint.guid_url</td><td>Copyable, as on <a href="admin-locations.html">Location setup</a> — the two places the GUID URL is exposed. Still not shown on <a href="checkpoint-detail.html">Checkpoint detail</a>.</td></tr>
+    </table>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Create checkpoints in bulk</td><td><code>manage_locations</code></td><td>Pick any number of Locations from a searchable, parent-grouped multi-select; one checkpoint is created at each, named after its location. Locations that already have checkpoints are still offered, annotated with how many — a second checkpoint at one location is legitimate, and a repeat name gets a numeric suffix. One transaction regardless of count.</td></tr>
+      <tr><td>Rename a checkpoint</td><td><code>manage_locations</code></td><td>Inline on the row; no dialog.</td></tr>
+      <tr><td>Edit GPS / radius</td><td><code>manage_locations</code></td><td>Under Details. Clearing the radius restores the marina default rather than storing zero.</td></tr>
+      <tr><td>Add selected to a tour</td><td><code>manage_locations</code></td><td>Select rows, pick a tour. Checkpoints already on that tour are skipped rather than duplicated. On a Linear tour they append to <code>checkpoint_order</code>, ready to be dragged into place on <a href="admin-tours.html">Tours setup</a>.</td></tr>
+      <tr><td>Delete (single or selected)</td><td><code>manage_locations</code></td><td>Confirmation states the real consequence: the scan URL stops working and any physical NFC tag or QR sticker encoding it becomes dead. Past <code>CheckIn</code> records are kept.</td></tr>
+      <tr><td>Filter</td><td>—</td><td>By name or location path, using the same short-term matching rule as the location picker ("c" matches the start of a word, so "dock c 14" doesn't match Dock A's Slip 14). A separate toggle narrows to checkpoints on no tour and no template.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Checkpoint with no location</strong> — possible if its location was deleted; flagged with a badge rather than hidden, since it can never be reached by a location-scoped tour and needs either relinking or deleting.</li>
+      <li><strong>Unused checkpoint</strong> — surfaced, not blocked. A checkpoint created ahead of the tour that will use it is a normal mid-setup state; the badge exists so it doesn't stay that way silently.</li>
+      <li><strong>Bulk-creating at a location that already has one</strong> — allowed. The new checkpoint's name gets a numeric suffix so the two are distinguishable without a rename.</li>
+      <li><strong>Adding to a tour that already contains some of the selection</strong> — the overlap is skipped, so the action is safely repeatable and never produces duplicate membership.</li>
+      <li><strong>Deleting a checkpoint that a template triggers on</strong> — the template survives with one fewer attached checkpoint. If it was the only one, the template stops triggering, which <a href="admin-checklist-templates.html">Checklist Templates</a> already warns about on its own screen.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Desktop is the primary surface — bulk selection and multi-column rows want the width. Mobile supports filtering, renaming, copying a scan URL, and editing one checkpoint's GPS, which covers the realistic on-site case of standing at a checkpoint and correcting it.</p>
+
+    <div class="page-foot">
+      <a href="admin-setup-wizard.html">← Marina Setup Wizard</a>
+      <a href="admin-tours.html">Tours Setup →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

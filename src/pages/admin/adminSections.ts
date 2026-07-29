@@ -39,6 +39,18 @@ export const ADMIN_SECTIONS: AdminSection[] = [
     requires: "manage_locations",
   },
   {
+    path: "/admin/setup",
+    label: "Marina Setup Wizard",
+    description: "Build out docks and their slips, checkpoints, and a tour in one pass",
+    requires: "manage_locations",
+  },
+  {
+    path: "/admin/checkpoints",
+    label: "Checkpoints",
+    description: "Every checkpoint at once — bulk create, GPS, usage",
+    requires: "manage_locations",
+  },
+  {
     path: "/admin/tours",
     label: "Tours",
     description: "Checkpoint sets and sequencing mode",

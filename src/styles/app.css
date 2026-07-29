@@ -854,6 +854,70 @@ h3 {
   font-weight: 650;
 }
 
+/* ---------- Multi-select dialog ---------- */
+
+.multiselect-scroll {
+  max-height: 46vh;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--line-lt);
+  border-radius: var(--radius);
+}
+.multiselect-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  position: sticky;
+  top: 0;
+  background: var(--fill);
+  border-bottom: 1px solid var(--line-lt);
+}
+.multiselect-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.multiselect-option:hover {
+  background: var(--fill);
+}
+
+/* ---------- Drag-to-reorder ---------- */
+
+.reorder-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.reorder-dragging {
+  opacity: 0.6;
+}
+.reorder-handle {
+  flex: none;
+  padding: 4px 6px;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--mute);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: grab;
+  touch-action: none;
+}
+.reorder-handle:hover {
+  background: var(--fill);
+}
+.reorder-handle:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+.reorder-dragging .reorder-handle {
+  cursor: grabbing;
+}
+
 /* ---------- Comms ---------- */
 
 .comms-columns {

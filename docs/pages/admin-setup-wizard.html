@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Marina Setup Wizard — MarinaSecure Docs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidenav">
+    <a href="../index.html" class="brand">MarinaSecure</a>
+    <span class="brand-sub">Implementation Docs</span>
+    <nav>
+      <h3>Overview</h3>
+      <a href="../index.html">Introduction</a>
+      <a href="../terminology.html">Terminology</a>
+
+      <h3>Architecture</h3>
+      <a href="../architecture.html">Stack &amp; Architecture</a>
+      <a href="../api-structure.html">API Structure</a>
+
+      <h3>Data &amp; Access</h3>
+      <a href="../data-model.html">Data Model</a>
+      <a href="../permissions.html">Permissions</a>
+
+      <h3>Behavior</h3>
+      <a href="../workflows.html">Role Workflows</a>
+
+      <h3>Specifications</h3>
+      <a href="index.html" class="current">Page Specifications</a>
+      <a href="../wireframes/index.html">Wireframes</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Admin · Page Specification</span>
+    <h1>Marina Setup Wizard</h1>
+    <p class="lede">Builds two levels of the hierarchy, their checkpoints, a tour, and a template attachment in one pass — the job that otherwise spans four screens.</p>
+
+    <h2>Purpose</h2>
+    <p>Reached from <a href="admin-home.html">Admin Home</a>, gated by <code>manage_locations</code>. Standing up an area means creating containers (docks, boathouse rows, campground loops), their children (slips, sites), a checkpoint per container, a tour over those checkpoints, and a template attached to them. Done through the individual screens that is four contexts and hundreds of interactions; this collapses it into one form and one commit.</p>
+
+    <h3>The problem it actually solves</h3>
+    <p>Bulk creation elsewhere is deliberately scoped to a <em>single</em> shared parent, because containers are not uniform: neighbouring boathouse rows in a real marina hold different numbers of units and name them differently — <code>BH30-01L</code> zero-padded with left/right suffixes, <code>BH32-1L</code> unpadded, <code>BH35-01</code> with no suffix at all. A dialog that applies one name list to many parents cannot express that, which is why one doesn't exist.</p>
+    <p>The wizard's answer is that the shared pattern is a <strong>template that references its container</strong>. <code>{parent.last}</code> resolves to "A" for Dock A and "B" for Dock B, so a single pattern already covers rows whose prefixes differ. What remains different is the <em>count</em>, which is one number per row and sits directly on the row. Anything else — padding, suffixes, counter mode, even a wholly unrelated scheme — is overridable per row behind that row's Pattern expander.</p>
+
+    <h2>Steps</h2>
+    <table>
+      <tr><th>Step</th><th>Fields</th><th>Notes</th></tr>
+      <tr><td>1 · Scope</td><td>Anchor, container type, child type</td><td>The anchor is picked with the searchable ancestor-path combobox and is <strong>not</strong> assumed to be a root — a marina adds a boathouse row under an existing area far more often than it adds a whole property. The step reports how many matching containers already sit under the anchor.</td></tr>
+      <tr><td>2 · Containers &amp; children</td><td>New container names, shared pattern, per-row table</td><td>Containers already under the anchor are listed alongside newly typed ones. The shared pattern has an <em>Apply to all included rows</em> action; each row then owns its copy. Every row shows a live count of genuinely-new names, a sample, and how many the pattern generated that already exist.</td></tr>
+      <tr><td>3 · Finish</td><td>Optional tour, optional template, review</td><td>A tour can be built from every checkpoint this run creates, in any mode. A checkpoint-triggered template can be attached to the same set. The review states exactly what will be created, including how many generated names will be skipped.</td></tr>
+    </table>
+
+    <h2>Pattern tokens</h2>
+    <table>
+      <tr><th>Token</th><th>Resolves to</th><th>Example</th></tr>
+      <tr><td><code>{parent}</code></td><td>The container's full name</td><td>Dock A → <code>Dock A</code></td></tr>
+      <tr><td><code>{parent.last}</code></td><td>Its last word — usually the disambiguating part</td><td>Dock A → <code>A</code></td></tr>
+      <tr><td><code>{parent.initials}</code></td><td>First letter of each word</td><td>Dock A → <code>DA</code></td></tr>
+    </table>
+    <p>Tokens are valid in the prefix and suffix. The counter (numeric or alphabetic, with range, step, and zero-padding) fills the middle, and comma-separated prefixes or suffixes produce every combination — identical semantics to the name generator on <a href="admin-locations.html">Location setup</a>, which shares the same implementation.</p>
+
+    <h2>Re-runnability</h2>
+    <p>The wizard only ever creates; it never edits or deletes. Every generated name is checked against the names already present under its container and skipped if taken, so running it twice is safe and running it against a partially-built marina fills only the gaps. Adding next season's dock, or extending an existing row from 17 units to 18, is the same flow as the initial build-out — raise the count and the review reports exactly the two new names.</p>
+    <p>Existing containers are listed <strong>unchecked</strong>, so a re-run never silently reprocesses last season's work; including one is a deliberate act.</p>
+
+    <h2>Actions</h2>
+    <table>
+      <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
+      <tr><td>Create everything</td><td><code>manage_locations</code></td><td>Written in ordered chunks — containers, then children, then checkpoints, then the tour and template links — so anything linked to already exists when the link is written, and a 900-slip marina doesn't go out as one enormous transaction.</td></tr>
+      <tr><td>Override a row's pattern</td><td>—</td><td>Local to the wizard until committed. The count sits on the row; everything else is behind the row's Pattern expander, with a live preview of the names it will create.</td></tr>
+      <tr><td>Add a checkpoint per container</td><td><code>manage_locations</code></td><td>On by default for newly added containers, off for existing ones. A per-child checkpoint toggle also exists but defaults off — a checkpoint per slip is rarely wanted, and the label states how many it would be.</td></tr>
+    </table>
+
+    <h2>States &amp; edge cases</h2>
+    <ul>
+      <li><strong>Every generated name already exists</strong> — the row reports "nothing new" and contributes nothing to the commit. Not an error; it's the expected result of re-running against a finished area.</li>
+      <li><strong>A partial failure mid-commit</strong> — because the write is chunked, an error can leave earlier chunks committed. The error message says so, and the remedy is simply to re-run: everything already written is skipped.</li>
+      <li><strong>Container type and child type set to the same type</strong> — allowed. Nested same-type locations are legitimate (a boathouse row of boathouses), and the type system's own <code>valid_parent_types</code> governs whether it makes sense.</li>
+      <li><strong>Anchor with no existing containers</strong> — normal for a first run; the table starts empty and is filled from the name box.</li>
+      <li><strong>No checkpoint-triggered templates exist</strong> — the attach control says so rather than offering an empty dropdown.</li>
+      <li><strong>Undoing an over-generous count</strong> — <a href="admin-locations.html">Location setup</a> deletes a Location once nothing depends on it, so freshly-created children can be removed from the leaves up. That is deliberately not a bulk operation, which is why the review step states counts explicitly and each row previews the actual names before commit.</li>
+    </ul>
+
+    <h2>Mobile vs. desktop</h2>
+    <p>Desktop only in practice — the per-row table wants width, and marina build-out is a desk activity. The screen renders on mobile but is not designed for it.</p>
+
+    <div class="page-foot">
+      <a href="admin-locations.html">← Location Types &amp; Locations Setup</a>
+      <a href="admin-checkpoints.html">Checkpoints →</a>
+    </div>
+  </main>
+</div>
+</body>
+</html>

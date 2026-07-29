@@ -14,7 +14,6 @@ import { LocationPicker, type PickerLocation } from "../shared/LocationPicker";
 import { NameGeneratorDialog } from "./NameGeneratorDialog";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
-import { useTextPrompt } from "../shared/TextPromptDialog";
 
 const EXPANDED_KEY = "marinasecure.admin.locations.expanded";
 const LAST_USED_KEY = "marinasecure.admin.locations.lastUsed";
@@ -475,7 +474,6 @@ function LocationRow({
   expanded: boolean;
   onSelect: () => void;
 }) {
-  const [askText, promptNode] = useTextPrompt();
   const update = (fields: Record<string, unknown>) =>
     void db.transact(db.tx.locations[location.id].update(fields));
 
@@ -483,13 +481,16 @@ function LocationRow({
   const typeAllowsReservations = locationType?.allowsReservations;
   const tracksStatus = Boolean(locationType?.tracksStatus ?? location.type?.tracksStatus);
 
+  // Named after its location and renamed inline on the row below if that's
+  // wrong — which it rarely is, since a checkpoint is nearly always "the
+  // checkpoint at <this location>". Prompting first made every one of them a
+  // modal round-trip for a name the admin had just typed.
   const addCheckpoint = async () => {
-    const name = await askText("Checkpoint name:");
-    if (!name?.trim()) return;
+    const existing = (location.checkpoints ?? []).length;
     await db.transact(
       db.tx.checkpoints[id()]
         .update({
-          name: name.trim(),
+          name: existing === 0 ? location.name : `${location.name} ${existing + 1}`,
           // Auto-generated, never user-entered — this is the value the
           // physical NFC tag / QR code encodes.
           guidUrl: crypto.randomUUID(),
@@ -507,7 +508,6 @@ function LocationRow({
       className={"card tree-row" + (highlighted ? " tree-match" : "")}
       style={{ marginLeft: depth * 22 }}
     >
-      {promptNode}
       <button type="button" className="tree-head" onClick={onSelect}>
         <span className="row" style={{ minWidth: 0 }}>
           {/* Indicator, not a separate control — the whole row toggles. */}
@@ -668,6 +668,10 @@ function LocationRow({
             </div>
 
             <div>
+              <DeleteLocationControl
+                locationId={location.id}
+                name={location.name}
+              />
               <div className="section-title spread">
                 <span>Checkpoints</span>
                 <button type="button" className="btn btn-sm" onClick={() => void addCheckpoint()}>
@@ -685,6 +689,104 @@ function LocationRow({
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Deleting a Location is blocked whenever anything real depends on it, and
+ * says which thing — an enabled-but-destructive button here would take a
+ * whole dock's subtree, or a slip's lease history, with one click.
+ *
+ * Only `locationMapPlacements` cascade: they're join records that carry no
+ * information of their own once the location is gone, the same reasoning
+ * (and the same treatment) map deletion already applies to them.
+ *
+ * Scoped to a single location and mounted only while its row is expanded,
+ * so the dependency check costs one narrow query rather than pulling every
+ * ticket and reservation in the marina into the tree view.
+ */
+function DeleteLocationControl({
+  locationId,
+  name,
+}: {
+  locationId: string;
+  name: string;
+}) {
+  const { data, isLoading } = db.useQuery({
+    locations: {
+      $: { where: { id: locationId } },
+      children: {},
+      checkpoints: {},
+      currentBoat: {},
+      currentVehicle: {},
+      maps: {},
+      mapPlacements: {},
+      notes: {},
+      incidents: {},
+      tickets: {},
+      reservations: {},
+      leases: {},
+    },
+  });
+
+  const l = data?.locations?.[0];
+
+  const blockers: string[] = [];
+  if (l) {
+    const count = (rows?: unknown[]) => rows?.length ?? 0;
+    const add = (n: number, singular: string, plural = `${singular}s`) => {
+      if (n > 0) blockers.push(`${n} ${n === 1 ? singular : plural}`);
+    };
+    add(count(l.children), "child location", "child locations");
+    add(count(l.checkpoints), "checkpoint");
+    add(count(l.maps), "map scoped to it", "maps scoped to it");
+    add(count(l.leases), "lease");
+    add(count(l.reservations), "reservation");
+    add(count(l.incidents), "incident");
+    add(count(l.tickets), "ticket");
+    add(count(l.notes), "note");
+    if (l.currentBoat) blockers.push("a boat berthed here");
+    if (l.currentVehicle) blockers.push("a vehicle parked here");
+  }
+
+  const placements = l?.mapPlacements ?? [];
+
+  const remove = async () => {
+    const extra =
+      placements.length > 0
+        ? ` It's plotted on ${placements.length} map${placements.length === 1 ? "" : "s"}; those placements go too.`
+        : "";
+    if (!window.confirm(`Delete "${name}"?${extra} This can't be undone.`)) return;
+    await db.transact([
+      db.tx.locations[locationId].delete(),
+      ...placements.map((p) => db.tx.locationMapPlacements[p.id].delete()),
+    ]);
+  };
+
+  if (isLoading) return null;
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <button
+        type="button"
+        className="btn btn-sm btn-danger"
+        disabled={blockers.length > 0}
+        title={
+          blockers.length > 0
+            ? `Blocked by ${blockers.join(", ")}`
+            : "Permanently delete this location"
+        }
+        onClick={() => void remove()}
+      >
+        Delete location
+      </button>
+      {blockers.length > 0 && (
+        <p className="muted small" style={{ marginTop: 4 }}>
+          Can't delete — blocked by {blockers.join(", ")}. Reassign or remove
+          first.
+        </p>
       )}
     </div>
   );
@@ -777,6 +879,10 @@ function CreateLocationDialog({
   );
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  // Most locations that get a checkpoint get exactly one, named after
+  // themselves. Doing it here folds what used to be a per-location trip
+  // through the tree — expand, click, name, submit — into one checkbox.
+  const [withCheckpoints, setWithCheckpoints] = useState(false);
 
   // One location per non-blank line, de-duplicated — so pasting a slip list
   // straight out of a spreadsheet works.
@@ -812,15 +918,27 @@ function CreateLocationDialog({
     // label is exactly the confusion this avoids.
     const tracksStatus = Boolean(types.find((t) => t.id === typeId)?.tracksStatus);
     await db.transact(
-      parsedNames.map((name) =>
-        db.tx.locations[id()]
-          .update({
-            name,
-            reservationEnabled: false,
-            ...(tracksStatus ? { status: "vacant" } : {}),
-          })
-          .link({ type: typeId, ...(parentId ? { parent: parentId } : {}) }),
-      ),
+      parsedNames.flatMap((name) => {
+        const locationId = id();
+        return [
+          db.tx.locations[locationId]
+            .update({
+              name,
+              reservationEnabled: false,
+              ...(tracksStatus ? { status: "vacant" } : {}),
+            })
+            .link({ type: typeId, ...(parentId ? { parent: parentId } : {}) }),
+          // guidUrl is auto-generated, never user-entered — it's the value
+          // the physical NFC tag / QR code encodes.
+          ...(withCheckpoints
+            ? [
+                db.tx.checkpoints[id()]
+                  .update({ name, guidUrl: crypto.randomUUID() })
+                  .link({ location: locationId }),
+              ]
+            : []),
+        ];
+      }),
     );
     writeLastUsed({ typeId, parentId });
     onClose();
@@ -894,6 +1012,26 @@ function CreateLocationDialog({
               {duplicates.length > 3 ? "…" : ""}) — creating them anyway is
               allowed, names aren't identifiers.
             </div>
+          )}
+        </div>
+
+        <div className="field">
+          <label className="row" style={{ cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={withCheckpoints}
+              onChange={(e) => setWithCheckpoints(e.target.checked)}
+            />
+            <span className="small">
+              Also create a checkpoint at each, named to match
+            </span>
+          </label>
+          {withCheckpoints && parsedNames.length > 0 && (
+            <p className="muted small" style={{ marginTop: 4 }}>
+              {parsedNames.length} checkpoint
+              {parsedNames.length === 1 ? "" : "s"} too — each gets its own
+              scan URL, and any of them can be renamed afterwards.
+            </p>
           )}
         </div>
 
@@ -1169,7 +1307,7 @@ function MapPlotter({
       location?: { id: string; name: string } | null;
     }[];
   };
-  locations: { id: string; name: string }[];
+  locations: PickerLocation[];
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [addLocationId, setAddLocationId] = useState("");
@@ -1281,21 +1419,19 @@ function MapPlotter({
 
       <div>
         <div className="section-title">Plot a location</div>
-        <div className="row" style={{ marginBottom: 12 }}>
-          <select
-            className="select select-inline"
-            value={addLocationId}
-            onChange={(e) => setAddLocationId(e.target.value)}
-          >
-            <option value="">Choose a location…</option>
-            {locations
-              .filter((l) => !plottedIds.has(l.id))
-              .map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-          </select>
+        <div className="row" style={{ marginBottom: 12, alignItems: "flex-start" }}>
+          {/* Searchable rather than a flat option list: a marina's locations
+              run to the hundreds, and "Slip 14" exists on every dock — the
+              ancestor path is the only thing that tells them apart. */}
+          <div style={{ flex: "1 1 220px", minWidth: 180 }}>
+            <LocationPicker
+              locations={locations.filter((l) => !plottedIds.has(l.id))}
+              value={addLocationId}
+              onChange={setAddLocationId}
+              placeholder="Search locations to plot…"
+              allowNone={false}
+            />
+          </div>
           <button
             type="button"
             className="btn btn-sm"

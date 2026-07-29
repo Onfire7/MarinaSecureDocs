@@ -49,6 +49,8 @@ import { AdminUsersPage } from "./pages/admin/AdminUsersPage";
 import { AdminRolesPage } from "./pages/admin/AdminRolesPage";
 import { AdminChecklistTemplatesPage } from "./pages/admin/AdminChecklistTemplatesPage";
 import { AdminLocationsPage } from "./pages/admin/AdminLocationsPage";
+import { AdminSetupWizardPage } from "./pages/admin/AdminSetupWizardPage";
+import { AdminCheckpointsPage } from "./pages/admin/AdminCheckpointsPage";
 import { AdminToursPage } from "./pages/admin/AdminToursPage";
 import { AdminIncidentTypesPage } from "./pages/admin/AdminIncidentTypesPage";
 import { AdminAssetsPage } from "./pages/admin/AdminAssetsPage";
@@ -129,6 +131,8 @@ export default function App() {
                 element={<AdminChecklistTemplatesPage />}
               />
               <Route path="/admin/locations" element={<AdminLocationsPage />} />
+              <Route path="/admin/setup" element={<AdminSetupWizardPage />} />
+              <Route path="/admin/checkpoints" element={<AdminCheckpointsPage />} />
               <Route path="/admin/tours" element={<AdminToursPage />} />
               <Route path="/admin/incident-types" element={<AdminIncidentTypesPage />} />
               <Route path="/admin/assets" element={<AdminAssetsPage />} />

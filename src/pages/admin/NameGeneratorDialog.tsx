@@ -1,72 +1,18 @@
 import { useMemo, useState } from "react";
+import {
+  DEFAULT_GENERATOR,
+  generateNames,
+  type CounterMode,
+  type GeneratorOptions,
+} from "../../lib/nameGenerator";
 
 // Composes a name list from prefix(es) + a counter + suffix(es) — e.g.
 // "BH-A-" × 5…10 × "L,R" gives BH-A-5L … BH-A-10R. Accepting it fills the
 // create dialog's name list rather than creating anything directly, so gaps
 // in a series (a slip that doesn't exist) can be deleted before committing.
-
-type CounterMode = "number" | "letter" | "none";
-
-interface GeneratorOptions {
-  prefixes: string;
-  suffixes: string;
-  mode: CounterMode;
-  start: string;
-  end: string;
-  step: number;
-  pad: number;
-}
-
-/** Comma-separated variants; an empty field contributes one empty variant. */
-function splitList(raw: string): string[] {
-  const parts = raw
-    .split(",")
-    .map((p) => p.trim())
-    .filter((p) => p.length > 0);
-  return parts.length > 0 ? parts : [""];
-}
-
-function counterValues(o: GeneratorOptions): string[] {
-  if (o.mode === "none") return [""];
-  const step = Math.max(1, o.step);
-
-  if (o.mode === "letter") {
-    const a = (o.start || "A").toUpperCase().charCodeAt(0);
-    const b = (o.end || "A").toUpperCase().charCodeAt(0);
-    if (Number.isNaN(a) || Number.isNaN(b)) return [];
-    const dir = b >= a ? 1 : -1;
-    const out: string[] = [];
-    for (let c = a; dir > 0 ? c <= b : c >= b; c += dir * step) {
-      out.push(String.fromCharCode(c));
-    }
-    return out;
-  }
-
-  const a = Number(o.start);
-  const b = Number(o.end);
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return [];
-  const dir = b >= a ? 1 : -1;
-  const out: string[] = [];
-  for (let n = a; dir > 0 ? n <= b : n >= b; n += dir * step) {
-    out.push(String(Math.abs(n)).padStart(o.pad, "0"));
-    // A wide range would otherwise be easy to fat-finger into a hang.
-    if (out.length >= 2000) break;
-  }
-  return out;
-}
-
-function generateNames(o: GeneratorOptions): string[] {
-  const out: string[] = [];
-  for (const prefix of splitList(o.prefixes)) {
-    for (const counter of counterValues(o)) {
-      for (const suffix of splitList(o.suffixes)) {
-        const name = `${prefix}${counter}${suffix}`;
-        if (name.length > 0) out.push(name);
-      }
-    }
-  }
-  return out;
-}
+//
+// The composition itself lives in lib/nameGenerator so the setup wizard
+// applies identical semantics; this file is only the dialog around it.
 
 export function NameGeneratorDialog({
   onInsert,
@@ -75,15 +21,7 @@ export function NameGeneratorDialog({
   onInsert: (names: string[]) => void;
   onClose: () => void;
 }) {
-  const [opts, setOpts] = useState<GeneratorOptions>({
-    prefixes: "",
-    suffixes: "",
-    mode: "number",
-    start: "1",
-    end: "10",
-    step: 1,
-    pad: 0,
-  });
+  const [opts, setOpts] = useState<GeneratorOptions>(DEFAULT_GENERATOR);
 
   const names = useMemo(() => generateNames(opts), [opts]);
   const set = (patch: Partial<GeneratorOptions>) => setOpts({ ...opts, ...patch });

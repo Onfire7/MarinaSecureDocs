@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { db, id } from "../../lib/db";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
-import { useTextPrompt } from "../shared/TextPromptDialog";
+import { MultiSelectDialog } from "../shared/MultiSelectDialog";
+import { ReorderableList } from "../shared/ReorderableList";
 
 // Admin — Tours Setup (see docs/pages/admin-tours.html).
 // Gated by manage_locations rather than a dedicated permission, since a tour
@@ -20,7 +21,7 @@ const MODES = ["linear", "freeform", "randomized"] as const;
 
 function Tours() {
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [askText, promptNode] = useTextPrompt();
+  const [newName, setNewName] = useState("");
 
   const { data } = db.useQuery({
     tours: { checkpoints: { location: {} } },
@@ -38,27 +39,47 @@ function Tours() {
     [data],
   );
 
+  // Named inline rather than through a prompt dialog, matching how Location
+  // Types are added — one box, one button, no modal to dismiss.
   const addTour = async () => {
-    const name = await askText("New tour name:");
-    if (!name?.trim()) return;
+    if (!newName.trim()) return;
+    const tourId = id();
     await db.transact(
-      db.tx.tours[id()].update({ name: name.trim(), mode: "freeform" }),
+      db.tx.tours[tourId].update({ name: newName.trim(), mode: "freeform" }),
     );
+    setNewName("");
+    setExpanded(tourId);
   };
 
   return (
     <div>
-      {promptNode}
       <AdminHeader title="Tours">
-        <button type="button" className="btn btn-sm btn-primary" onClick={() => void addTour()}>
-          + Add tour
-        </button>
+        <div className="row">
+          <input
+            className="input select-inline"
+            style={{ minWidth: 180 }}
+            placeholder="New tour name"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void addTour();
+            }}
+          />
+          <button
+            type="button"
+            className="btn btn-sm btn-primary"
+            disabled={!newName.trim()}
+            onClick={() => void addTour()}
+          >
+            + Add tour
+          </button>
+        </div>
       </AdminHeader>
 
       {allCheckpoints.length === 0 && (
         <div className="badge badge-warn" style={{ display: "block", marginBottom: 12 }}>
-          No checkpoints exist yet — create them in Location Types & Locations
-          before assembling a tour.
+          No checkpoints exist yet — create them in Checkpoints (or from
+          Location Types & Locations) before assembling a tour.
         </div>
       )}
 
@@ -70,6 +91,7 @@ function Tours() {
             allCheckpoints={allCheckpoints}
             expanded={expanded === t.id}
             onToggle={() => setExpanded(expanded === t.id ? null : t.id)}
+            onDuplicated={setExpanded}
           />
         ))}
         {tours.length === 0 && (
@@ -86,7 +108,8 @@ type TourRow = {
   id: string;
   name: string;
   mode: string;
-  checkpointOrder?: string[];
+  /** Null once a tour has left linear mode — see setMode. */
+  checkpointOrder?: string[] | null;
   checkpoints?: { id: string; name: string; location?: { name: string } | null }[];
 };
 
@@ -95,13 +118,15 @@ function TourCard({
   allCheckpoints,
   expanded,
   onToggle,
+  onDuplicated,
 }: {
   tour: TourRow;
   allCheckpoints: { id: string; name: string; location?: { name: string } | null }[];
   expanded: boolean;
   onToggle: () => void;
+  onDuplicated: (tourId: string) => void;
 }) {
-  const [askText, promptNode] = useTextPrompt();
+  const [adding, setAdding] = useState(false);
   const members = useMemo(() => tour.checkpoints ?? [], [tour.checkpoints]);
   const memberIds = new Set(members.map((c) => c.id));
 
@@ -114,25 +139,35 @@ function TourCard({
     return [...inOrder, ...rest];
   }, [tour.checkpointOrder, members]);
 
+  const isLinear = tour.mode === "linear";
+
   const setMode = (mode: string) => {
     void db.transact(
       db.tx.tours[tour.id].update({
         mode,
         // Switching to linear seeds an order from the current set; leaving
         // linear drops it, since the other modes don't carry one.
-        checkpointOrder: mode === "linear" ? ordered.map((c) => c.id) : undefined,
+        //
+        // Cleared with null, not undefined: undefined keys are dropped from
+        // the transaction payload entirely, so the old order silently
+        // survived a round-trip through freeform and came back when linear
+        // was re-selected — resurrecting a stale sequence instead of
+        // reseeding from current membership.
+        checkpointOrder: mode === "linear" ? ordered.map((c) => c.id) : null,
       }),
     );
   };
 
-  const addCheckpoint = (checkpointId: string) => {
-    if (!checkpointId) return;
+  // One transaction however many are picked — the dialog is what makes
+  // "every checkpoint on Dock C" a single action instead of a dozen.
+  const addCheckpoints = (ids: string[]) => {
+    if (ids.length === 0) return;
     void db.transact(
       db.tx.tours[tour.id]
-        .link({ checkpoints: checkpointId })
+        .link({ checkpoints: ids })
         .update(
-          tour.mode === "linear"
-            ? { checkpointOrder: [...ordered.map((c) => c.id), checkpointId] }
+          isLinear
+            ? { checkpointOrder: [...ordered.map((c) => c.id), ...ids] }
             : {},
         ),
     );
@@ -143,7 +178,7 @@ function TourCard({
       db.tx.tours[tour.id]
         .unlink({ checkpoints: checkpointId })
         .update(
-          tour.mode === "linear"
+          isLinear
             ? {
                 checkpointOrder: ordered
                   .map((c) => c.id)
@@ -154,18 +189,20 @@ function TourCard({
     );
   };
 
-  const move = (index: number, delta: -1 | 1) => {
-    const ids = ordered.map((c) => c.id);
-    const target = index + delta;
-    if (target < 0 || target >= ids.length) return;
-    [ids[index], ids[target]] = [ids[target], ids[index]];
-    void db.transact(db.tx.tours[tour.id].update({ checkpointOrder: ids }));
-  };
-
-  const rename = async () => {
-    const name = await askText("Rename tour:", tour.name);
-    if (!name?.trim()) return;
-    await db.transact(db.tx.tours[tour.id].update({ name: name.trim() }));
+  const duplicate = async () => {
+    const copyId = id();
+    await db.transact(
+      db.tx.tours[copyId]
+        .update({
+          name: `${tour.name} (copy)`,
+          mode: tour.mode,
+          // The copy points at the same checkpoints, so the saved order
+          // transfers as-is.
+          ...(isLinear ? { checkpointOrder: ordered.map((c) => c.id) } : {}),
+        })
+        .link(members.length > 0 ? { checkpoints: members.map((c) => c.id) } : {}),
+    );
+    onDuplicated(copyId);
   };
 
   const remove = async () => {
@@ -175,10 +212,16 @@ function TourCard({
 
   return (
     <div className="card">
-      {promptNode}
       <div className="spread" style={{ flexWrap: "wrap" }}>
-        <div>
-          <div className="card-title">{tour.name}</div>
+        <div style={{ minWidth: 0 }}>
+          <input
+            className="input select-inline"
+            value={tour.name}
+            aria-label="Tour name"
+            onChange={(e) =>
+              void db.transact(db.tx.tours[tour.id].update({ name: e.target.value }))
+            }
+          />
           <div className="card-meta">
             {tour.mode.charAt(0).toUpperCase() + tour.mode.slice(1)} ·{" "}
             {members.length} checkpoint{members.length === 1 ? "" : "s"}
@@ -188,6 +231,7 @@ function TourCard({
           <select
             className="select select-inline"
             value={tour.mode}
+            aria-label="Tour mode"
             onChange={(e) => setMode(e.target.value)}
           >
             {MODES.map((m) => (
@@ -196,11 +240,15 @@ function TourCard({
               </option>
             ))}
           </select>
-          <button type="button" className="btn btn-sm btn-quiet" onClick={() => void rename()}>
-            Rename
-          </button>
           <button type="button" className="btn btn-sm btn-quiet" onClick={onToggle}>
             {expanded ? "Done" : "Checkpoints"}
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm btn-quiet"
+            onClick={() => void duplicate()}
+          >
+            Duplicate
           </button>
           <button type="button" className="btn btn-sm btn-danger" onClick={() => void remove()}>
             Delete
@@ -210,74 +258,53 @@ function TourCard({
 
       {expanded && (
         <div style={{ marginTop: 12 }}>
-          <div className="stack" style={{ gap: 4, marginBottom: 8 }}>
-            {ordered.map((c, i) => (
-              <div key={c.id} className="card spread">
+          <ReorderableList
+            items={ordered}
+            enabled={isLinear}
+            onReorder={(orderedIds) =>
+              void db.transact(
+                db.tx.tours[tour.id].update({ checkpointOrder: orderedIds }),
+              )
+            }
+            renderItem={(c, i) => (
+              <div className="card spread">
                 <span className="small">
-                  {tour.mode === "linear" && (
-                    <span className="muted">{i + 1}. </span>
-                  )}
+                  {isLinear && <span className="muted">{i + 1}. </span>}
                   {c.name}
                   {c.location?.name && (
                     <span className="muted"> · {c.location.name}</span>
                   )}
                 </span>
-                <span className="row" style={{ gap: 4 }}>
-                  {tour.mode === "linear" && (
-                    <>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-quiet"
-                        disabled={i === 0}
-                        onClick={() => move(i, -1)}
-                        aria-label="Move earlier"
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-quiet"
-                        disabled={i === ordered.length - 1}
-                        onClick={() => move(i, 1)}
-                        aria-label="Move later"
-                      >
-                        ↓
-                      </button>
-                    </>
-                  )}
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-quiet"
-                    onClick={() => removeCheckpoint(c.id)}
-                  >
-                    Remove
-                  </button>
-                </span>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-quiet"
+                  onClick={() => removeCheckpoint(c.id)}
+                >
+                  Remove
+                </button>
               </div>
-            ))}
-            {members.length === 0 && (
-              <span className="muted small">
-                No checkpoints yet — an empty tour saves fine, it just isn't
-                meaningfully assignable until it has some.
-              </span>
+            )}
+          />
+          {members.length === 0 && (
+            <span className="muted small">
+              No checkpoints yet — an empty tour saves fine, it just isn't
+              meaningfully assignable until it has some.
+            </span>
+          )}
+
+          <div className="row" style={{ marginTop: 8 }}>
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={allCheckpoints.length === memberIds.size}
+              onClick={() => setAdding(true)}
+            >
+              + Add checkpoints
+            </button>
+            {isLinear && members.length > 1 && (
+              <span className="muted small">Drag ⠿ to reorder.</span>
             )}
           </div>
-
-          <select
-            className="select select-inline"
-            value=""
-            onChange={(e) => addCheckpoint(e.target.value)}
-          >
-            <option value="">Add a checkpoint…</option>
-            {allCheckpoints
-              .filter((c) => !memberIds.has(c.id))
-              .map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                  {c.location?.name ? ` — ${c.location.name}` : ""}
-                </option>
-              ))}
-          </select>
 
           {tour.mode === "randomized" && members.length > 0 && members.length < 4 && (
             <p className="muted small" style={{ marginTop: 6 }}>
@@ -286,6 +313,22 @@ function TourCard({
             </p>
           )}
         </div>
+      )}
+
+      {adding && (
+        <MultiSelectDialog
+          title={`Add checkpoints to ${tour.name}`}
+          options={allCheckpoints
+            .filter((c) => !memberIds.has(c.id))
+            .map((c) => ({
+              id: c.id,
+              name: c.name,
+              group: c.location?.name ?? "No location",
+            }))}
+          onConfirm={addCheckpoints}
+          onClose={() => setAdding(false)}
+          emptyMessage="Every checkpoint is already on this tour."
+        />
       )}
     </div>
   );

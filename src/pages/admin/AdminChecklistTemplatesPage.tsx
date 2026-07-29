@@ -11,7 +11,8 @@ import {
   type StateCheckType,
 } from "../../lib/checklists";
 import { LocationPicker } from "../shared/LocationPicker";
-import { useTextPrompt } from "../shared/TextPromptDialog";
+import { MultiSelectDialog } from "../shared/MultiSelectDialog";
+import { ReorderableList } from "../shared/ReorderableList";
 import { AdminHeader } from "./AdminHomePage";
 
 // Admin — Checklist Templates (see docs/pages/admin-checklist-templates.html).
@@ -23,7 +24,6 @@ export function AdminChecklistTemplatesPage() {
   const current = useCurrent();
   const canManage = current.can("manage_checklists");
   const [editing, setEditing] = useState<string | null>(null);
-  const [askText, promptNode] = useTextPrompt();
 
   const { data } = db.useQuery({
     checklistTemplates: { items: {}, role: {}, creator: {}, checkpoints: {} },
@@ -45,18 +45,21 @@ export function AdminChecklistTemplatesPage() {
   const roles = data?.roles ?? [];
   const allCheckpoints = useMemo(
     () =>
-      [...(data?.checkpoints ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
+      [...(data?.checkpoints ?? [])].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { numeric: true }),
+      ),
     [data],
   );
 
+  // Created with a placeholder name and opened straight into the editor,
+  // where the name field already lives — a prompt first would just be a
+  // modal asking for something the next screen also asks for.
   const create = async (visibility: string) => {
-    const name = await askText("New template name:");
-    if (!name?.trim()) return;
     const templateId = id();
     await db.transact(
       db.tx.checklistTemplates[templateId]
         .update({
-          name: name.trim(),
+          name: visibility === "personal" ? "New personal template" : "New template",
           visibility,
           triggerType: "manual",
           assignmentMode: "triggering_user",
@@ -105,6 +108,7 @@ export function AdminChecklistTemplatesPage() {
             allCheckpoints={allCheckpoints}
             expanded={editing === t.id}
             onToggle={() => setEditing(editing === t.id ? null : t.id)}
+            onDuplicated={setEditing}
           />
         ))}
         {templates.length === 0 && (
@@ -114,10 +118,17 @@ export function AdminChecklistTemplatesPage() {
           </div>
         )}
       </div>
-      {promptNode}
     </div>
   );
 }
+
+type TemplateItemRow = {
+  id: string;
+  type: string;
+  label: string;
+  order: number;
+  config?: Record<string, unknown>;
+};
 
 type TemplateRow = {
   id: string;
@@ -129,13 +140,7 @@ type TemplateRow = {
   role?: { id: string; name: string } | null;
   creator?: { id: string; name: string } | null;
   checkpoints?: { id: string; name: string }[];
-  items?: {
-    id: string;
-    type: string;
-    label: string;
-    order: number;
-    config?: Record<string, unknown>;
-  }[];
+  items?: TemplateItemRow[];
 };
 
 const TRIGGERS = [
@@ -153,23 +158,25 @@ function TemplateCard({
   allCheckpoints,
   expanded,
   onToggle,
+  onDuplicated,
 }: {
   template: TemplateRow;
   roles: { id: string; name: string }[];
   allCheckpoints: { id: string; name: string; location?: { id: string; name: string } | null }[];
   expanded: boolean;
   onToggle: () => void;
+  onDuplicated: (templateId: string) => void;
 }) {
-  const [askText, promptNode] = useTextPrompt();
+  const [addingCheckpoints, setAddingCheckpoints] = useState(false);
   const update = (fields: Record<string, unknown>) =>
     void db.transact(db.tx.checklistTemplates[template.id].update(fields));
 
   const checkpointMembers = template.checkpoints ?? [];
   const checkpointMemberIds = new Set(checkpointMembers.map((c) => c.id));
-  const addCheckpoint = (checkpointId: string) => {
-    if (!checkpointId) return;
+  const addCheckpoints = (ids: string[]) => {
+    if (ids.length === 0) return;
     void db.transact(
-      db.tx.checklistTemplates[template.id].link({ checkpoints: checkpointId }),
+      db.tx.checklistTemplates[template.id].link({ checkpoints: ids }),
     );
   };
   const removeCheckpoint = (checkpointId: string) =>
@@ -177,16 +184,20 @@ function TemplateCard({
       db.tx.checklistTemplates[template.id].unlink({ checkpoints: checkpointId }),
     );
 
-  const items = [...(template.items ?? [])].sort((a, b) => a.order - b.order);
+  const items = useMemo(
+    () => [...(template.items ?? [])].sort((a, b) => a.order - b.order),
+    [template.items],
+  );
   const cfg = (template.triggerConfig ?? {}) as {
     timeStart?: string;
     timeEnd?: string;
     schedule?: string;
   };
 
-  const addItem = async (type: ItemType) => {
-    const label = await askText(`Label for the new ${ITEM_TYPE_LABEL[type]}:`);
-    if (!label?.trim()) return;
+  // The label starts as the type's own name and is edited inline on the row.
+  // Prompting for it first meant a modal per item, on a screen where twelve
+  // items is a normal template.
+  const addItem = (type: ItemType) => {
     // A door or pump needs a Location, and on a checkpoint-triggered template
     // the checkpoint's own location is almost always the right one — so
     // default it rather than making the admin set it item by item. Ambiguous
@@ -201,7 +212,7 @@ function TemplateCard({
       db.tx.checklistTemplateItems[id()]
         .update({
           type,
-          label: label.trim(),
+          label: ITEM_TYPE_LABEL[type],
           order: items.length,
           config: soleLocationId ? { locationId: soleLocationId } : {},
         })
@@ -209,20 +220,56 @@ function TemplateCard({
     );
   };
 
-  const moveItem = (index: number, delta: -1 | 1) => {
-    const target = index + delta;
-    if (target < 0 || target >= items.length) return;
-    const reordered = [...items];
-    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+  const duplicateItem = (item: TemplateItemRow) => {
     void db.transact(
-      reordered.map((it, i) =>
-        db.tx.checklistTemplateItems[it.id].update({ order: i }),
-      ),
+      db.tx.checklistTemplateItems[id()]
+        .update({
+          type: item.type,
+          label: `${item.label} (copy)`,
+          order: items.length,
+          config: item.config ?? {},
+        })
+        .link({ template: template.id }),
     );
   };
 
   const removeItem = (itemId: string) =>
     void db.transact(db.tx.checklistTemplateItems[itemId].delete());
+
+  const duplicate = async () => {
+    const copyId = id();
+    await db.transact([
+      db.tx.checklistTemplates[copyId]
+        .update({
+          name: `${template.name} (copy)`,
+          visibility: template.visibility,
+          triggerType: template.triggerType,
+          triggerConfig: template.triggerConfig ?? {},
+          assignmentMode: template.assignmentMode,
+        })
+        .link({
+          ...(template.role ? { role: template.role.id } : {}),
+          ...(template.creator ? { creator: template.creator.id } : {}),
+          ...(checkpointMembers.length > 0
+            ? { checkpoints: checkpointMembers.map((c) => c.id) }
+            : {}),
+        }),
+      // Items are their own entities, so a copy needs its own set rather
+      // than links to the originals' — editing the copy must not touch the
+      // template it came from.
+      ...items.map((it, i) =>
+        db.tx.checklistTemplateItems[id()]
+          .update({
+            type: it.type,
+            label: it.label,
+            order: i,
+            config: it.config ?? {},
+          })
+          .link({ template: copyId }),
+      ),
+    ]);
+    onDuplicated(copyId);
+  };
 
   const remove = async () => {
     // In-progress instances keep their own data; only future triggers stop.
@@ -237,7 +284,6 @@ function TemplateCard({
 
   return (
     <div className="card">
-      {promptNode}
       <div className="spread" style={{ flexWrap: "wrap" }}>
         <div>
           <div className="card-title">{template.name}</div>
@@ -254,6 +300,13 @@ function TemplateCard({
         <div className="row">
           <button type="button" className="btn btn-sm btn-quiet" onClick={onToggle}>
             {expanded ? "Done" : "Edit"}
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm btn-quiet"
+            onClick={() => void duplicate()}
+          >
+            Duplicate
           </button>
           <button type="button" className="btn btn-sm btn-danger" onClick={() => void remove()}>
             Delete
@@ -290,13 +343,16 @@ function TemplateCard({
                     className="select select-inline"
                     style={{ marginLeft: 6 }}
                     value={template.role?.id ?? ""}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      // The placeholder option carries no id — linking it
+                      // would write an empty ref.
+                      if (!e.target.value) return;
                       void db.transact(
                         db.tx.checklistTemplates[template.id].link({
                           role: e.target.value,
                         }),
-                      )
-                    }
+                      );
+                    }}
                   >
                     <option value="">Pick a role…</option>
                     {roles.map((r) => (
@@ -409,22 +465,15 @@ function TemplateCard({
                         </span>
                       )}
                     </div>
-                    <select
-                      className="select select-inline"
+                    <button
+                      type="button"
+                      className="btn btn-sm"
                       style={{ marginTop: 6 }}
-                      value=""
-                      onChange={(e) => addCheckpoint(e.target.value)}
+                      disabled={allCheckpoints.length === checkpointMemberIds.size}
+                      onClick={() => setAddingCheckpoints(true)}
                     >
-                      <option value="">Add a checkpoint…</option>
-                      {allCheckpoints
-                        .filter((c) => !checkpointMemberIds.has(c.id))
-                        .map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                            {c.location?.name ? ` — ${c.location.name}` : ""}
-                          </option>
-                        ))}
-                    </select>
+                      + Add checkpoints
+                    </button>
                   </div>
                 )}
                 {template.triggerType === "scheduled" && (
@@ -450,26 +499,31 @@ function TemplateCard({
 
             <div>
               <div className="section-title">Items</div>
-              <div className="stack" style={{ gap: 4 }}>
-                {items.map((item, i) => (
+              <ReorderableList
+                items={items}
+                onReorder={(orderedIds) =>
+                  void db.transact(
+                    orderedIds.map((itemId, i) =>
+                      db.tx.checklistTemplateItems[itemId].update({ order: i }),
+                    ),
+                  )
+                }
+                renderItem={(item) => (
                   <ItemRow
-                    key={item.id}
                     item={item}
-                    index={i}
-                    total={items.length}
-                    onMove={moveItem}
+                    onDuplicate={duplicateItem}
                     onRemove={removeItem}
                   />
-                ))}
-                {items.length === 0 && (
-                  <span className="muted small">No items yet.</span>
                 )}
-              </div>
+              />
+              {items.length === 0 && <span className="muted small">No items yet.</span>}
               <select
                 className="select select-inline"
                 style={{ marginTop: 8 }}
                 value=""
-                onChange={(e) => void addItem(e.target.value as ItemType)}
+                onChange={(e) => {
+                  if (e.target.value) addItem(e.target.value as ItemType);
+                }}
               >
                 <option value="">Add an item…</option>
                 {(Object.keys(ITEM_TYPE_LABEL) as ItemType[]).map((t) => (
@@ -478,9 +532,31 @@ function TemplateCard({
                   </option>
                 ))}
               </select>
+              {items.length > 1 && (
+                <p className="muted small" style={{ marginTop: 4 }}>
+                  Drag ⠿ to reorder.
+                </p>
+              )}
             </div>
           </div>
         </div>
+      )}
+
+      {addingCheckpoints && (
+        <MultiSelectDialog
+          title={`Attach ${template.name} to checkpoints`}
+          options={allCheckpoints
+            .filter((c) => !checkpointMemberIds.has(c.id))
+            .map((c) => ({
+              id: c.id,
+              name: c.name,
+              group: c.location?.name ?? "No location",
+            }))}
+          onConfirm={addCheckpoints}
+          onClose={() => setAddingCheckpoints(false)}
+          confirmLabel="Attach"
+          emptyMessage="Already attached to every checkpoint."
+        />
       )}
     </div>
   );
@@ -488,15 +564,11 @@ function TemplateCard({
 
 function ItemRow({
   item,
-  index,
-  total,
-  onMove,
+  onDuplicate,
   onRemove,
 }: {
-  item: { id: string; type: string; label: string; config?: Record<string, unknown> };
-  index: number;
-  total: number;
-  onMove: (index: number, delta: -1 | 1) => void;
+  item: TemplateItemRow;
+  onDuplicate: (item: TemplateItemRow) => void;
   onRemove: (itemId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -510,31 +582,21 @@ function ItemRow({
   return (
     <div className="card">
       <div className="spread">
-        <span className="small">
-          <span className="badge">
-            {itemTypeLabel(item.type)}
-          </span>{" "}
-          {item.label}
+        <span className="row" style={{ minWidth: 0 }}>
+          <span className="badge">{itemTypeLabel(item.type)}</span>
+          <input
+            className="input select-inline"
+            style={{ minWidth: 0 }}
+            value={item.label}
+            aria-label="Item label"
+            onChange={(e) =>
+              void db.transact(
+                db.tx.checklistTemplateItems[item.id].update({ label: e.target.value }),
+              )
+            }
+          />
         </span>
         <span className="row" style={{ gap: 2 }}>
-          <button
-            type="button"
-            className="btn btn-sm btn-quiet"
-            disabled={index === 0}
-            onClick={() => onMove(index, -1)}
-            aria-label="Move up"
-          >
-            ↑
-          </button>
-          <button
-            type="button"
-            className="btn btn-sm btn-quiet"
-            disabled={index === total - 1}
-            onClick={() => onMove(index, 1)}
-            aria-label="Move down"
-          >
-            ↓
-          </button>
           {item.type !== "simple_check" && (
             <button
               type="button"
@@ -544,6 +606,14 @@ function ItemRow({
               Config
             </button>
           )}
+          <button
+            type="button"
+            className="btn btn-sm btn-quiet"
+            title="Duplicate this item"
+            onClick={() => onDuplicate(item)}
+          >
+            ⧉
+          </button>
           <button
             type="button"
             className="btn btn-sm btn-quiet"
@@ -654,25 +724,33 @@ function LocationCheckConfig({
   cfg: Record<string, unknown>;
   setConfig: (patch: Record<string, unknown>) => void;
 }) {
-  const { data } = db.useQuery({ locations: {}, checklistTemplates: {} });
+  // A flat <select> of every location is unusable past a hundred slips, and
+  // it can't disambiguate the "Slip 14" that exists on every dock — which is
+  // exactly what LocationPicker's ancestor paths are for.
+  const { data } = db.useQuery({
+    locations: { parent: {}, type: {} },
+    checklistTemplates: {},
+  });
+  const locations = useMemo(
+    () => [...(data?.locations ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
+    [data],
+  );
+
   return (
-    <div className="row" style={{ flexWrap: "wrap" }}>
-      <select
-        className="select select-inline"
-        value={(cfg.locationId as string) ?? ""}
-        onChange={(e) => setConfig({ locationId: e.target.value })}
-      >
-        <option value="">Scoped to location…</option>
-        {(data?.locations ?? []).map((l) => (
-          <option key={l.id} value={l.id}>
-            {l.name}
-          </option>
-        ))}
-      </select>
+    <div className="stack" style={{ gap: 8 }}>
+      <div className="field" style={{ marginBottom: 0 }}>
+        <span className="field-label">Scoped to location</span>
+        <LocationPicker
+          locations={locations}
+          value={(cfg.locationId as string) ?? ""}
+          onChange={(next) => setConfig({ locationId: next || undefined })}
+          placeholder="Search locations…"
+        />
+      </div>
       <select
         className="select select-inline"
         value={(cfg.templateId as string) ?? ""}
-        onChange={(e) => setConfig({ templateId: e.target.value })}
+        onChange={(e) => setConfig({ templateId: e.target.value || undefined })}
       >
         <option value="">Nested template…</option>
         {(data?.checklistTemplates ?? []).map((t) => (

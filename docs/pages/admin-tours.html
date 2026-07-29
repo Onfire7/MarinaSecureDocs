@@ -53,9 +53,10 @@
     <h2>Actions</h2>
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
-      <tr><td>Create / edit a Tour</td><td><code>manage_locations</code></td><td></td></tr>
-      <tr><td>Reorder checkpoints</td><td><code>manage_locations</code></td><td>Only meaningful for Linear mode; drag-to-reorder.</td></tr>
-      <tr><td>Add / remove a checkpoint</td><td><code>manage_locations</code></td><td>Only existing Checkpoints (defined in <a href="admin-locations.html">Location Types &amp; Locations setup</a>) can be added — this screen doesn't create new checkpoints itself.</td></tr>
+      <tr><td>Create / edit a Tour</td><td><code>manage_locations</code></td><td>Named inline — one box and a button in the header, and the name stays editable in place on the card. No prompt dialog.</td></tr>
+      <tr><td>Duplicate a Tour</td><td><code>manage_locations</code></td><td>Copies mode, membership, and (for Linear) the sequence. The copy links the same Checkpoints — checkpoints are shared fixtures, not per-tour records — so only the tour itself is new.</td></tr>
+      <tr><td>Reorder checkpoints</td><td><code>manage_locations</code></td><td>Only meaningful for Linear mode; drag-to-reorder by the row handle, which is also arrow-key operable for keyboard users. The whole drag commits as one write on drop rather than one per position.</td></tr>
+      <tr><td>Add / remove a checkpoint</td><td><code>manage_locations</code></td><td>Only existing Checkpoints (from <a href="admin-checkpoints.html">Checkpoints</a> or <a href="admin-locations.html">Location Types &amp; Locations setup</a>) can be added — this screen doesn't create new checkpoints itself. Adding opens a searchable multi-select grouped by location, with per-group select-all, so "every checkpoint on Dock C" is one action and one transaction rather than one dropdown round-trip each.</td></tr>
       <tr><td>Change mode</td><td><code>manage_locations</code></td><td>Switching to/from Linear discards or requires establishing an order, since Freeform/Randomized don't carry one.</td></tr>
     </table>
 
@@ -67,10 +68,10 @@
     </ul>
 
     <h2>Mobile vs. desktop</h2>
-    <p>Desktop is the primary surface for reordering a Linear tour's checkpoint sequence. Mobile supports viewing and simple field edits (name, mode) but not drag-reordering a long checkpoint list.</p>
+    <p>Desktop is the primary surface for reordering a Linear tour's checkpoint sequence. Reordering is driven by pointer events rather than HTML5 drag-and-drop, so it does work under touch on a tablet; the arrow-key handle covers the case where a long list makes dragging impractical.</p>
 
     <div class="page-foot">
-      <a href="admin-locations.html">← Location Types &amp; Locations Setup</a>
+      <a href="admin-checkpoints.html">← Checkpoints</a>
       <a href="admin-incident-types.html">Incident Types →</a>
     </div>
   </main>
