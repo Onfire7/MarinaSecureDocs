@@ -91,9 +91,28 @@ const PLAN = [
     ns: "checklists",
     rows: [
       ["3bd508bc-d37c-4c40-8000-000000000000", "in-progress Fuel Dock instance created by the lock-check verify scan"],
+      ["0d8ac431-eb6d-42d9-8000-000000000000", "in-progress Resturaunt instance created to verify the door-check finalStateOnly option"],
     ],
   },
 ];
+
+// Second batch: cleanup for the finalStateOnly ("no initial expected state")
+// verify run against the Resturaunt template, 2026-07-29 ~03:23.
+PLAN.push(
+  {
+    ns: "checkIns",
+    rows: [
+      ["e4ebd575-f2aa-4219-a8ba-50d73c548de3", "manual check-in that started the finalStateOnly verify checklist"],
+    ],
+  },
+  {
+    ns: "checklistItemResults",
+    rows: [
+      ["abf898c7-fdc0-4d4f-be74-acd8d8794af1", "Back Door result from the finalStateOnly verify checklist"],
+      ["87052fac-9670-4633-9a88-bdf3d348cf7f", "Storage Door result from the finalStateOnly verify checklist"],
+    ],
+  },
+);
 
 // Resolve every id against live data first, so a stale/typo'd id is reported
 // rather than silently deleting nothing (or worse, the wrong thing).

@@ -679,10 +679,14 @@ function StateCheckConfigFields({
   );
   const locationId = (cfg.locationId as string) ?? "";
 
+  const finalStateOnly = Boolean(cfg.finalStateOnly);
+
   return (
     <div>
       <div className="row">
-        <span className="small muted">Expected state</span>
+        <span className="small muted">
+          {finalStateOnly ? "Expected final state" : "Expected state"}
+        </span>
         <select
           className="select select-inline"
           value={(cfg.expectedState as string) ?? spec.defaultState}
@@ -695,6 +699,17 @@ function StateCheckConfigFields({
           ))}
         </select>
       </div>
+      <label className="row" style={{ cursor: "pointer", marginTop: 8 }}>
+        <input
+          type="checkbox"
+          checked={finalStateOnly}
+          onChange={(e) => setConfig({ finalStateOnly: e.target.checked })}
+        />
+        <span className="small">
+          No initial expected state — only ask how this {spec.noun} was left, and
+          don't raise an incident over how it was found
+        </span>
+      </label>
       <div className="field" style={{ marginTop: 8, marginBottom: 0 }}>
         <span className="field-label">
           Location this {spec.noun} belongs to — required

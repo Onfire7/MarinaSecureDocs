@@ -69,6 +69,7 @@ export interface VerifyTaskConfig {
   requireAttemptBeforeReject?: boolean;
 }
 export interface DoorCheckConfig {
+  /** The expected state — of the final/left state only when finalStateOnly is set. */
   expectedState: DoorState;
   /**
    * The Location this door or pump belongs to — required, and what a mismatch
@@ -79,6 +80,14 @@ export interface DoorCheckConfig {
    * because items authored before it existed have none.
    */
   locationId?: string;
+  /**
+   * Some doors/locks have no legitimate "should already be" state — e.g. one
+   * that's meant to be unlocked during the day and locked overnight has no
+   * single expected state a guard could be checking it against on arrival.
+   * When set, the guard is only asked what state they're leaving it in; there
+   * is no "found" question and therefore no found-state incident.
+   */
+  finalStateOnly?: boolean;
 }
 export interface LocationCheckConfig {
   locationId: string;
