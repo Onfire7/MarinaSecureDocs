@@ -60,15 +60,13 @@ async function clearResult(existingId: string | undefined) {
  * a completed record, and its incidents and tickets actually exist.
  */
 function DoneCard({
-  badge,
   title,
   summary,
   tone = "done",
   onEdit,
 }: {
-  badge: string;
   title: string;
-  summary: ReactNode;
+  summary?: ReactNode;
   tone?: "done" | "plain";
   onEdit?: () => void;
 }) {
@@ -76,9 +74,8 @@ function DoneCard({
     <div className={"card" + (tone === "done" ? " card-done" : "")}>
       <div className="spread" style={{ alignItems: "flex-start" }}>
         <div>
-          <div className="badge">{badge}</div>
           <div className="card-title">{title}</div>
-          <div className="card-meta">{summary}</div>
+          {summary && <div className="card-meta">{summary}</div>}
         </div>
         {onEdit && (
           <button type="button" className="btn btn-sm btn-quiet" onClick={onEdit}>
@@ -109,7 +106,6 @@ export function SimpleCheckItem({
   if (done) {
     return (
       <DoneCard
-        badge="Simple Check"
         title={item.label}
         summary="✓ Complete"
         // "Complete" is this item's only state, so editing it can only mean
@@ -120,7 +116,6 @@ export function SimpleCheckItem({
   }
   return (
     <div className="card">
-      <div className="badge">Simple Check</div>
       <div className="card-title">{item.label}</div>
       <div className="row" style={{ marginTop: 10 }}>
         <button type="button" className="btn btn-primary" onClick={() => void complete()}>
@@ -187,7 +182,6 @@ export function VerifyTaskItem({
   if (done) {
     return (
       <DoneCard
-        badge="Verify Task"
         title={item.label}
         summary={verifyOutcomeLabel(existingResult)}
         onEdit={
@@ -205,7 +199,6 @@ export function VerifyTaskItem({
 
   return (
     <div className="card">
-      <div className="badge">Verify Task</div>
       <div className="card-title">{item.label}</div>
 
       {stage === "initial" && (
@@ -442,7 +435,6 @@ function StateCheckItem({
     const s = doorCheckSummary(existingResult);
     return (
       <DoneCard
-        badge={spec.label}
         title={item.label}
         summary={doneSummaryText(s)}
         tone={s.leftAsExpected ? "done" : "plain"}
@@ -469,7 +461,6 @@ function StateCheckItem({
   if (initialState) {
     return (
       <div className="card">
-        <div className="badge">{spec.label}</div>
         <div className="card-title">{item.label}</div>
         <div className="badge badge-bad" style={{ margin: "8px 0", display: "block" }}>
           Found {stateLabel(initialState).toLowerCase()} — expected{" "}
@@ -546,7 +537,6 @@ function StateCheckItem({
 
   return (
     <div className="card">
-      <div className="badge">{spec.label}</div>
       <div className="card-title">{item.label}</div>
       <div className="field-label" style={{ marginTop: 10 }}>
         Expected: {stateLabel(expectedState)} · how did you find it?
@@ -574,15 +564,19 @@ function capitalizeFirst(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function doneSummaryText(s: ReturnType<typeof doorCheckSummary>): string {
+function doneSummaryText(s: ReturnType<typeof doorCheckSummary>): string | undefined {
   // Historical rows never stored an "as found" state, so say what's actually
   // known rather than implying it was found correct.
   if (!s.foundKnown) {
-    return s.final
-      ? `${stateLabel(s.final)}${s.leftAsExpected ? " (matched)" : " — mismatch"}`
-      : "Recorded";
+    if (!s.final) return "Recorded";
+    // A routine match needs no explanation; a mismatch is the exceptional
+    // case worth surfacing.
+    return s.leftAsExpected ? undefined : `${stateLabel(s.final)} — mismatch`;
   }
-  if (s.foundAsExpected) return `Found ${stateLabel(s.initial!).toLowerCase()} — as expected`;
+  // Found-as-expected is the routine outcome — nothing to call out. Anomalies
+  // (corrected, or still not as expected) stay visible since they're what a
+  // reviewer needs to see.
+  if (s.foundAsExpected) return undefined;
   if (s.corrected)
     return `Found ${stateLabel(s.initial!).toLowerCase()} — corrected to ${stateLabel(s.final!).toLowerCase()}`;
   return `Found ${stateLabel(s.initial!).toLowerCase()} — left ${stateLabel(s.final!).toLowerCase()}, still not as expected`;
@@ -642,7 +636,6 @@ export function LocationCheckItem({ item, existing, checklistId, onSaved }: Item
 
   return (
     <div className={"card" + (nestedComplete ? " card-done" : "")}>
-      <div className="badge">Location-Based Check</div>
       <div className="card-title">{item.label}</div>
       <div className="card-meta">
         {locationName ? `Scoped to ${locationName}` : "Opens a nested sub-checklist"}
@@ -717,7 +710,6 @@ export function MeterReadingItem({
   if (done) {
     return (
       <DoneCard
-        badge="Meter Reading"
         title={item.label}
         summary={`Recorded ${existingResult.value}`}
         onEdit={
@@ -737,7 +729,6 @@ export function MeterReadingItem({
 
   return (
     <div className="card">
-      <div className="badge">Meter Reading</div>
       <div className="card-title">{item.label}</div>
 
       {!cfg.assetId && (
