@@ -114,6 +114,46 @@ PLAN.push(
   },
 );
 
+// Third batch: cleanup for the asset location / gallons meter type verify
+// run, 2026-07-29 ~04:26.
+PLAN.push(
+  {
+    ns: "activityLogEntries",
+    rows: [
+      ["118599d7-cdeb-4f15-a680-755c5283f6bc", "meter-updated log entry for the gallons verify asset"],
+    ],
+  },
+  {
+    ns: "assetMeterReadings",
+    rows: [
+      ["d3830375-c721-4956-b480-5972f9e93bd7", "500 gal test reading on the gallons verify asset"],
+    ],
+  },
+  {
+    ns: "assets",
+    rows: [
+      ["a6a362a5-8a6c-4164-b962-c848c106dc04", "\"Diesel Tank Test\" — created to verify the gallons meter type option"],
+    ],
+  },
+);
+
+// Fourth batch: cleanup for the assetLocation link write-path verify run,
+// right after the schema push, 2026-07-29 ~04:31.
+PLAN.push(
+  {
+    ns: "activityLogEntries",
+    rows: [
+      ["6e24e2e0-956a-4785-9a56-02491cb4e796", "location-changed log entry for the location-link verify asset"],
+    ],
+  },
+  {
+    ns: "assets",
+    rows: [
+      ["2697600a-2744-4206-b7be-3c4ed290273f", "\"Location Link Test\" — created to verify the new assets.location link post-schema-push"],
+    ],
+  },
+);
+
 // Resolve every id against live data first, so a stale/typo'd id is reported
 // rather than silently deleting nothing (or worse, the wrong thing).
 let found = 0;

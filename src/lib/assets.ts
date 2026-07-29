@@ -28,10 +28,28 @@ export function assetStatusBadgeClass(status: string | null | undefined): string
   }
 }
 
+export const METER_TYPE_OPTIONS: { value: string; label: string; unit: string }[] = [
+  { value: "hours", label: "Hours", unit: "hrs" },
+  { value: "mileage", label: "Mileage", unit: "mi" },
+  { value: "gallons", label: "Gallons", unit: "gal" },
+];
+
+/** The unit abbreviation for a meter type; unset/unrecognized defaults to hours. */
+export function meterUnit(meterType: string | null | undefined): string {
+  return METER_TYPE_OPTIONS.find((o) => o.value === meterType)?.unit ?? "hrs";
+}
+
+export function meterTypeLabel(meterType: string | null | undefined): string {
+  return METER_TYPE_OPTIONS.find((o) => o.value === meterType)?.label ?? "Hours";
+}
+
 /**
  * What the meter column reads. A metered asset shows its absolute reading
  * with the unit; a meterless one accrues hours instead, so the same stored
- * number means "hours accumulated" rather than "current odometer."
+ * number means "hours accumulated" rather than "current odometer." A
+ * meterless asset with nothing accrued yet has nothing worth reporting, so
+ * this returns "" rather than a placeholder — callers should omit the
+ * separator they'd otherwise put around it.
  */
 export function meterSummary(asset: {
   hasMeter: boolean;
@@ -40,12 +58,10 @@ export function meterSummary(asset: {
 }): string {
   const value = asset.meterReading;
   if (!asset.hasMeter) {
-    return value != null ? `${formatNumber(value)} hrs accrued` : "No hours logged";
+    return value != null ? `${formatNumber(value)} hrs accrued` : "";
   }
   if (value == null) return "No reading yet";
-  return asset.meterType === "mileage"
-    ? `${formatNumber(value)} mi`
-    : `${formatNumber(value)} hrs`;
+  return `${formatNumber(value)} ${meterUnit(asset.meterType)}`;
 }
 
 export function formatNumber(n: number): string {

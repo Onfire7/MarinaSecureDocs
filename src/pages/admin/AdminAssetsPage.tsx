@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { db } from "../../lib/db";
-import { formatNumber } from "../../lib/assets";
+import { formatNumber, meterTypeLabel, meterUnit } from "../../lib/assets";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
 
@@ -139,7 +139,7 @@ function AssetsAdmin() {
                       <div className="card-meta">
                         {rules.length} rule{rules.length === 1 ? "" : "s"} ·{" "}
                         {a.hasMeter
-                          ? `${a.meterType === "mileage" ? "mileage" : "hours"} meter`
+                          ? `${meterTypeLabel(a.meterType).toLowerCase()} meter`
                           : "meterless"}
                       </div>
                     </div>
@@ -190,7 +190,7 @@ function RuleEditor({
   const [every, setEvery] = useState("");
   const [label, setLabel] = useState("");
 
-  const unit = kind === "time" ? "days" : meterType === "mileage" ? "mi" : "hrs";
+  const unit = kind === "time" ? "days" : meterUnit(meterType);
 
   const add = () => {
     const n = Number(every);
@@ -208,7 +208,7 @@ function RuleEditor({
             <span>
               {r.label ? `${r.label} — ` : ""}
               every {formatNumber(r.every)}{" "}
-              {r.kind === "time" ? "days" : meterType === "mileage" ? "mi" : "hrs"}
+              {r.kind === "time" ? "days" : meterUnit(meterType)}
               <span className="muted"> ({r.kind}-based)</span>
             </span>
             <button

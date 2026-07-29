@@ -5,6 +5,7 @@ import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { statusLabel } from "../../lib/locations";
 import {
   COMMON_ASSET_STATUSES,
+  METER_TYPE_OPTIONS,
   assetStatusBadgeClass,
   meterSummary,
 } from "../../lib/assets";
@@ -21,7 +22,7 @@ export function AssetListPage() {
   const [adding, setAdding] = useState(false);
 
   const { data } = db.useQuery({
-    assets: { checkouts: { person: {} } },
+    assets: { checkouts: { person: {} }, location: {} },
   });
 
   const assets = useMemo(
@@ -112,6 +113,7 @@ export function AssetListPage() {
       <div className="stack" style={{ gap: 8 }}>
         {filtered.map((a) => {
           const open = openCheckoutOf(a);
+          const meter = meterSummary(a);
           return (
             <Link
               key={a.id}
@@ -122,7 +124,9 @@ export function AssetListPage() {
               <div>
                 <div className="card-title">{a.name}</div>
                 <div className="card-meta">
-                  {a.category ?? "Uncategorized"} · {meterSummary(a)}
+                  {a.category ?? "Uncategorized"}
+                  {meter && <> · {meter}</>}
+                  {a.location && <> · {a.location.name}</>}
                   {a.reservationEnabled && (
                     <>
                       {" "}
@@ -224,8 +228,11 @@ function AddAssetDialog({ onClose }: { onClose: () => void }) {
               value={meterType}
               onChange={(e) => setMeterType(e.target.value)}
             >
-              <option value="hours">Hours</option>
-              <option value="mileage">Mileage</option>
+              {METER_TYPE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
             </select>
           ) : (
             <p className="muted small" style={{ marginTop: 4 }}>

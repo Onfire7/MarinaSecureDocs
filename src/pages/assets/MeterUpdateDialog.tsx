@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { InstaQLEntity } from "@instantdb/react";
 import { db, id, type AppSchema } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { formatNumber } from "../../lib/assets";
+import { formatNumber, meterUnit } from "../../lib/assets";
 import {
   dueMeterMaintenanceRules,
   maintenanceRuleTitle,
@@ -90,11 +90,7 @@ export function MeterUpdateDialog({
     onClose();
   };
 
-  const unit = asset.hasMeter
-    ? asset.meterType === "mileage"
-      ? "mi"
-      : "hrs"
-    : "hrs";
+  const unit = asset.hasMeter ? meterUnit(asset.meterType) : "hrs";
 
   return (
     <div className="dialog-backdrop" onClick={onClose}>

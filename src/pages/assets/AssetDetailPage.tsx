@@ -2,15 +2,17 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { statusLabel } from "../../lib/locations";
+import { compareNames, statusLabel } from "../../lib/locations";
 import {
   COMMON_ASSET_STATUSES,
   assetStatusBadgeClass,
   formatNumber,
   meterSummary,
+  meterUnit,
 } from "../../lib/assets";
 import { displayName } from "../../lib/contacts";
 import { TargetActivity } from "../shared/TargetActivity";
+import { LocationPicker } from "../shared/LocationPicker";
 import { activityTx } from "../../lib/activityLog";
 import { CheckoutDialog } from "./CheckoutDialog";
 import { MeterUpdateDialog } from "./MeterUpdateDialog";
@@ -36,11 +38,16 @@ export function AssetDetailPage() {
             notes: { author: {} },
             incidents: {},
             tickets: {},
+            location: {},
           },
+          locations: {},
         }
       : null,
   );
   const asset = data?.assets?.[0];
+  const locationOptions = [...(data?.locations ?? [])].sort((a, b) =>
+    compareNames(a.name, b.name),
+  );
 
   if (!asset) {
     return (
@@ -78,13 +85,45 @@ export function AssetDetailPage() {
         new Date(a.expectedCheckin!).getTime() - new Date(b.expectedCheckin!).getTime(),
     )[0];
 
+  const reassignLocation = (locationId: string) => {
+    if (!locationId) return;
+    const to = locationOptions.find((l) => l.id === locationId);
+    void db.transact([
+      db.tx.assets[asset.id].link({ location: locationId }),
+      activityTx({
+        eventType: "asset.location_changed",
+        summary: `${asset.name} moved to ${to?.name ?? "another location"}`,
+        subjectType: "assets",
+        subjectId: asset.id,
+        actorId: current.user?.id,
+      }),
+    ]);
+  };
+  const clearLocation = () => {
+    if (!asset.location) return;
+    const from = asset.location.name;
+    void db.transact([
+      db.tx.assets[asset.id].unlink({ location: asset.location.id }),
+      activityTx({
+        eventType: "asset.location_changed",
+        summary: `${asset.name} removed from ${from}`,
+        subjectType: "assets",
+        subjectId: asset.id,
+        actorId: current.user?.id,
+      }),
+    ]);
+  };
+
+  const meter = meterSummary(asset);
+
   return (
     <div>
       <div className="page-head">
         <div>
           <h1 className="page-title">{asset.name}</h1>
           <div className="page-sub">
-            {asset.category ?? "Uncategorized"} · {meterSummary(asset)}
+            {asset.category ?? "Uncategorized"}
+            {meter && <> · {meter}</>}
           </div>
         </div>
         {canManage && (
@@ -128,6 +167,35 @@ export function AssetDetailPage() {
             </div>
           </div>
 
+          <div className="field">
+            <span className="field-label">Location</span>
+            <div className="field-value row">
+              {asset.location ? (
+                <Link to={`/locations/${asset.location.id}`}>{asset.location.name}</Link>
+              ) : (
+                <span className="muted">Unassigned</span>
+              )}
+              {canManage && (
+                <>
+                  <div style={{ minWidth: 240 }}>
+                    <LocationPicker
+                      locations={locationOptions}
+                      value=""
+                      onChange={reassignLocation}
+                      allowNone={false}
+                      placeholder="Assign a location…"
+                    />
+                  </div>
+                  {asset.location && (
+                    <button type="button" className="btn btn-sm btn-quiet" onClick={clearLocation}>
+                      Unassign
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
           {asset.reservationEnabled && (
             <div className="field">
               <span className="field-label">Reservations</span>
@@ -155,9 +223,7 @@ export function AssetDetailPage() {
                   <div key={i} className="card small">
                     {r.label ??
                       (r.kind === "meter"
-                        ? `Every ${formatNumber(r.every)} ${
-                            asset.meterType === "mileage" ? "mi" : "hrs"
-                          }`
+                        ? `Every ${formatNumber(r.every)} ${meterUnit(asset.meterType)}`
                         : `Every ${formatNumber(r.every)} days`)}
                     <span className="muted"> · {r.kind === "meter" ? "meter-based" : "time-based"}</span>
                   </div>

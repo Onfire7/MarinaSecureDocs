@@ -595,6 +595,12 @@ const _schema = i.schema({
       forward: { on: "assetMeterReadings", has: "one", label: "loggedBy" },
       reverse: { on: "users", has: "many", label: "meterReadings" },
     },
+    assetLocation: {
+      // Unlike currentBoat/currentVehicle, this isn't exclusive occupancy —
+      // a location can hold many assets at once.
+      forward: { on: "assets", has: "one", label: "location" },
+      reverse: { on: "locations", has: "many", label: "assets" },
+    },
 
     // reservations (target: exactly one of location | asset, app-enforced)
     reservationContact: {
