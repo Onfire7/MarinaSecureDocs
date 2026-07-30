@@ -73,25 +73,65 @@ export function checkpointGuidFromUrl(url: string): string | null {
 // downstream of a real click (the NFC toggle, the Write tag button), so that
 // should be satisfied; logging the false case anyway distinguishes "browser
 // rejected it" from "device haptics are just off," which otherwise look
-// identical from here.
-function vibrate(pattern: number | number[]): void {
-  if (typeof navigator === "undefined" || !("vibrate" in navigator)) return;
+// identical from here. Either way, a rejected/unsupported vibration falls
+// back to a synthesized chime — no permission prompt for that either, and it
+// gets through in cases (haptics disabled, iOS, desktop) vibration can't.
+function vibrate(pattern: number | number[]): boolean {
+  if (typeof navigator === "undefined" || !("vibrate" in navigator)) return false;
   const accepted = navigator.vibrate(pattern);
   if (!accepted) {
     console.warn(
       "navigator.vibrate() was rejected — no user gesture registered on this page yet.",
     );
   }
+  return accepted;
 }
 
-/** Brief haptic ack that a checkpoint tag was recognized while scanning. */
+let audioCtx: AudioContext | null = null;
+
+function getAudioContext(): AudioContext | null {
+  if (typeof window === "undefined" || !window.AudioContext) return null;
+  audioCtx ??= new window.AudioContext();
+  return audioCtx;
+}
+
+function beep(ctx: AudioContext, atTime: number, freqHz: number): void {
+  const durationSec = 0.09;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.value = freqHz;
+  // Ramped rather than a hard on/off edge, which clicks audibly at this
+  // short a duration.
+  gain.gain.setValueAtTime(0.0001, atTime);
+  gain.gain.exponentialRampToValueAtTime(0.2, atTime + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, atTime + durationSec);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(atTime);
+  osc.stop(atTime + durationSec + 0.02);
+}
+
+/** `beepCount` short tones in a row — the audible fallback for `vibrate()`. */
+function chime(beepCount: number): void {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  if (ctx.state === "suspended") void ctx.resume();
+  const start = ctx.currentTime;
+  for (let i = 0; i < beepCount; i++) {
+    beep(ctx, start + i * 0.14, 880);
+  }
+}
+
+/** Brief haptic ack (or chime, if vibration isn't available) that a
+ *  checkpoint tag was recognized while scanning. */
 export function vibrateScanAck(): void {
-  vibrate(200);
+  if (!vibrate(200)) chime(1);
 }
 
-/** Two short pulses acknowledging a tag was successfully written. */
+/** Two short pulses (or two tones) acknowledging a tag was successfully
+ *  written. */
 export function vibrateWriteAck(): void {
-  vibrate([150, 100, 150]);
+  if (!vibrate([150, 100, 150])) chime(2);
 }
 
 /** A short, guard-facing explanation for a failed read or write. */
