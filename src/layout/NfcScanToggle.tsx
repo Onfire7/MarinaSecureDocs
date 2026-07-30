@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { checkpointGuidFromUrl, nfcErrorMessage, nfcReadSupported, scanNfcUrls } from "../lib/nfc";
+import {
+  checkpointGuidFromUrl,
+  nfcErrorMessage,
+  nfcReadSupported,
+  scanNfcUrls,
+  vibrateScanAck,
+} from "../lib/nfc";
 
 /**
  * Lets a guard arm NFC scanning for the rest of the session, so tapping a
@@ -31,7 +37,10 @@ export function NfcScanToggle({ onScan }: { onScan: (checkpointGuid: string) => 
     try {
       await scanNfcUrls((url) => {
         const guid = checkpointGuidFromUrl(url);
-        if (guid) onScan(guid);
+        if (guid) {
+          vibrateScanAck();
+          onScan(guid);
+        }
       }, controller.signal);
       setActive(true);
     } catch (err) {

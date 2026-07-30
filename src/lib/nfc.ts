@@ -65,6 +65,25 @@ export function checkpointGuidFromUrl(url: string): string | null {
   return match ? match[1] : null;
 }
 
+// The Vibration API needs no permission and no capability check beyond its
+// own presence — missing on iOS Safari and desktop entirely, harmless to
+// call anyway since `"vibrate" in navigator` gates it.
+function vibrate(pattern: number | number[]): void {
+  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+    navigator.vibrate(pattern);
+  }
+}
+
+/** Brief haptic ack that a checkpoint tag was recognized while scanning. */
+export function vibrateScanAck(): void {
+  vibrate(80);
+}
+
+/** Two short pulses acknowledging a tag was successfully written. */
+export function vibrateWriteAck(): void {
+  vibrate([80, 80, 80]);
+}
+
 /** A short, guard-facing explanation for a failed read or write. */
 export function nfcErrorMessage(err: unknown): string {
   const name = err instanceof DOMException ? err.name : "";

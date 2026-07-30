@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { nfcErrorMessage, nfcWriteSupported, writeNfcUrl } from "../../lib/nfc";
+import { nfcErrorMessage, nfcWriteSupported, vibrateWriteAck, writeNfcUrl } from "../../lib/nfc";
 
 /**
  * Programs a blank NFC tag with a checkpoint's check-in URL. Shared between
@@ -32,6 +32,7 @@ export function NfcWriteDialog({
     controllerRef.current = controller;
     try {
       await writeNfcUrl(url, controller.signal);
+      vibrateWriteAck();
       setStatus("success");
     } catch (err) {
       // Aborting (Cancel below) rejects the write too — that's the user's
