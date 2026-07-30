@@ -16,7 +16,6 @@ import { MorePage } from "./pages/shared/MorePage";
 import { ConfigMissingPage } from "./pages/shared/ConfigMissingPage";
 import { ChecklistListPage } from "./pages/checklists/ChecklistListPage";
 import { ChecklistRoute } from "./pages/checklists/ChecklistRoute";
-import { TourProgressPage } from "./pages/checklists/TourProgressPage";
 import { CheckpointCheckinPage } from "./pages/checklists/CheckpointCheckinPage";
 import { LocationListPage } from "./pages/locations/LocationListPage";
 import { LocationDetailPage } from "./pages/locations/LocationDetailPage";
@@ -86,7 +85,9 @@ export default function App() {
                   returnTo, and it resumes here. */}
               <Route path="/checkin/:guidUrl" element={<CheckpointCheckinPage />} />
               <Route path="/checklists" element={<ChecklistListPage />} />
-              <Route path="/checklists/tours/:tourId" element={<TourProgressPage />} />
+              {/* Tour steps moved inline onto the Checklist list; old links
+                  and bookmarks land there rather than 404ing. */}
+              <Route path="/checklists/tours/:tourId" element={<Navigate to="/checklists" replace />} />
               <Route path="/checklists/:id" element={<ChecklistRoute />} />
               <Route path="/locations" element={<LocationListPage />} />
               <Route

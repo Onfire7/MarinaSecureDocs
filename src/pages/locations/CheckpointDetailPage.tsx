@@ -128,7 +128,7 @@ export function CheckpointDetailPage() {
             {(checkpoint.tours ?? []).map((t) => (
               <Link
                 key={t.id}
-                to={`/checklists/tours/${t.id}`}
+                to="/checklists"
                 className="card spread"
                 style={{ textDecoration: "none", color: "inherit" }}
               >

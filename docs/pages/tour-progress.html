@@ -36,11 +36,11 @@
 
   <main class="content">
     <span class="eyebrow">Checklists &amp; Tours · Page Specification</span>
-    <h1>Tour Progress View</h1>
-    <p class="lede">Security-only view of where a guard stands within their current Tour — presentation differs by tour mode, since Randomized mode must not reveal the full remaining route.</p>
+    <h1>Tour Progress</h1>
+    <p class="lede">Security-only view of where a guard stands within a Tour — rendered as an inline section of <a href="checklist-list.html">Checklist list</a>, not a separate page. Presentation differs by tour mode, since Randomized mode must not reveal the full remaining route.</p>
 
     <h2>Purpose</h2>
-    <p>Reached from the Tours tab on <a href="checklist-list.html">Checklist list</a>. Read-only progress tracker — actual check-ins happen through <a href="checkpoint-checkin.html">Checkpoint check-in</a> or the <a href="manual-checkin-dialog.html">manual dialog</a>, not here.</p>
+    <p>One section per tour, directly below the open checklists on <a href="checklist-list.html">Checklist list</a>, under a small heading carrying the tour's name, mode, remaining count, and progress bar. A guard typically has exactly one active tour, so a dedicated page put its steps two navigations from where every round starts; <code>/checklists/tours/:tourId</code> now redirects to the Checklist list so old links and bookmarks still land. Read-only progress tracker — actual check-ins happen through <a href="checkpoint-checkin.html">Checkpoint check-in</a> or the <a href="manual-checkin-dialog.html">manual dialog</a>, not here.</p>
     <p><strong>Ordering principle: remaining stops lead the page; visited ones drop into one collapsed "Visited this shift · N" section at the bottom</strong> (grouped by location, each linking to its checkpoint). Mid-round the visited list only grows, so interleaving it with the route buried the round's actual state deeper with every scan. A header badge ("4 of 6 remaining" / "All visited this shift ✓") and a progress bar answer the state question before any list is read.</p>
 
     <h2>Data shown, by mode</h2>
@@ -66,7 +66,7 @@
     </ul>
 
     <h2>Mobile vs. desktop</h2>
-    <p>Mobile is the primary surface — used in the field mid-round. A desktop rendering is useful for a manager watching a guard's progress live from the office; same data, read-only either way, with desktop showing a larger map alongside the list.</p>
+    <p>Mobile is the primary surface — used in the field mid-round. The inline section renders identically on desktop; a manager watching a guard's progress does so through <a href="reports-home.html">Reports</a> rather than this guard-scoped view, whose progress is always the signed-in user's own check-ins.</p>
 
     <div class="page-foot">
       <a href="manual-checkin-dialog.html">← Manual Check-In Dialog</a>

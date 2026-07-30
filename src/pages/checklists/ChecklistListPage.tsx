@@ -2,33 +2,30 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { useIsMobile } from "../../hooks/useIsMobile";
 import { activityTx } from "../../lib/activityLog";
 import { triggeredByLabel, type TriggeredBy } from "../../lib/checklists";
 import { ManualCheckinDialog } from "./ManualCheckinDialog";
+import { TourSection } from "./TourSection";
 import { useShiftVisits } from "./useShiftVisits";
 
 // Checklists & Tours — Checklist List (see pages/checklist-list.html).
 //
 // A guard's work queue, not an audit table. Open work — in-progress and
-// not-started checklists, tours with unvisited checkpoints — sits front and
-// center as tappable cards; finished work drops into a collapsed section at
-// the bottom. The old layout was the reverse: a four-column metadata table
-// defaulting to "All", where this shift's completions crowded out the row
-// that actually needed attention. History lives in Reports and each
+// not-started checklists, then each tour's remaining checkpoints — sits
+// front and center as tappable cards; finished work drops into collapsed
+// sections. Tours render inline under a small heading per tour rather than
+// behind a tab and a second page: a guard typically has exactly one active
+// tour, and the old arrangement made its steps two navigations away from
+// the page they start every round on. History lives in Reports and each
 // checklist's own detail page, so this screen only owes a glance backwards.
 export function ChecklistListPage() {
   const current = useCurrent();
   const navigate = useNavigate();
   const userId = current.user?.id;
   const isSecurity = current.roleNames.includes("Security");
-  const isMobile = useIsMobile();
-  const [mobileTab, setMobileTab] = useState<"checklists" | "tours">("checklists");
   const [showManualCheckin, setShowManualCheckin] = useState(false);
   const [starting, setStarting] = useState<string | null>(null);
   const [manualTemplateId, setManualTemplateId] = useState("");
-  const showChecklists = !isMobile || mobileTab === "checklists";
-  const showTours = isSecurity && (!isMobile || mobileTab === "tours");
 
   const roleIds = (current.user?.roles ?? []).map((r) => r.id);
 
@@ -201,28 +198,7 @@ export function ChecklistListPage() {
         </div>
       </div>
 
-      {isSecurity && isMobile && (
-        <div className="chip-row">
-          <button
-            type="button"
-            className={"chip" + (mobileTab === "checklists" ? " active" : "")}
-            onClick={() => setMobileTab("checklists")}
-          >
-            Checklists
-          </button>
-          <button
-            type="button"
-            className={"chip" + (mobileTab === "tours" ? " active" : "")}
-            onClick={() => setMobileTab("tours")}
-          >
-            Tours
-          </button>
-        </div>
-      )}
-
-      <div className={isSecurity ? "grid-2" : undefined}>
-        {showChecklists && (
-          <div>
+      <div>
             <div className="stack">
               {open.map((c) => (
                 <Link
@@ -250,15 +226,16 @@ export function ChecklistListPage() {
             </div>
 
             {open.length === 0 && (
-              <div className="placeholder">
-                <div className="big">Nothing to do right now</div>
+              <p className="muted small" style={{ marginTop: 4 }}>
                 {checklists.length === 0
                   ? roleIds.length === 0
-                    ? "You hold no roles with checklist assignments."
-                    : "Check back once a checkpoint visit, schedule, or clock event triggers one."
-                  : "Everything assigned to you is complete."}
-              </div>
+                    ? "No open checklists — you hold no roles with checklist assignments."
+                    : "No open checklists — one appears when a checkpoint visit, schedule, or clock event triggers it."
+                  : "No open checklists — everything assigned to you is complete."}
+              </p>
             )}
+
+            {isSecurity && <ToursInline />}
 
             {completed.length > 0 && (
               <details className="section-collapse" style={{ marginTop: 14 }}>
@@ -290,14 +267,6 @@ export function ChecklistListPage() {
                 </p>
               </details>
             )}
-          </div>
-        )}
-
-        {showTours && (
-          <div>
-            <ToursPanel />
-          </div>
-        )}
       </div>
 
       {showManualCheckin && (
@@ -307,85 +276,42 @@ export function ChecklistListPage() {
   );
 }
 
-function ToursPanel() {
-  const { data } = db.useQuery({ tours: { checkpoints: {} } });
+// Every tour, rendered as an inline section — the guard typically has one,
+// and its steps belong on the same page as the checklists that trigger at
+// its checkpoints. Tours with work left sort above finished ones.
+function ToursInline() {
+  const { data } = db.useQuery({
+    tours: { checkpoints: { location: {} } },
+  });
   const { activeShift, visitedIds } = useShiftVisits();
   const tours = data?.tours ?? [];
+  if (tours.length === 0) return null;
 
-  // Tours with work left float above finished ones — same rule as the
-  // checklist column: open in front, done in the background.
-  const ranked = [...tours]
-    .map((t) => {
-      const total = (t.checkpoints ?? []).length;
-      const remaining = (t.checkpoints ?? []).filter(
-        (c) => !visitedIds.has(c.id),
-      ).length;
-      return { tour: t, total, remaining };
-    })
-    .sort(
-      (a, b) =>
-        (a.remaining === 0 ? 1 : 0) - (b.remaining === 0 ? 1 : 0) ||
-        a.tour.name.localeCompare(b.tour.name),
+  const ranked = [...tours].sort((a, b) => {
+    const rem = (t: (typeof tours)[number]) =>
+      (t.checkpoints ?? []).filter((c) => !visitedIds.has(c.id)).length;
+    return (
+      (rem(a) === 0 ? 1 : 0) - (rem(b) === 0 ? 1 : 0) ||
+      a.name.localeCompare(b.name)
     );
+  });
 
   return (
     <div>
-      <div className="section-title">
-        Tours <span className="badge badge-accent">Security</span>
-      </div>
-      {tours.length === 0 && (
-        <div className="placeholder">
-          <div className="big">No tours configured</div>
-          Set these up in Admin → Tours setup.
-        </div>
-      )}
-      {tours.length > 0 && !activeShift && (
-        <p className="muted small" style={{ marginBottom: 8 }}>
-          Start a shift from the Dashboard to track progress — visits reset
-          each shift.
+      {!activeShift && (
+        <p className="muted small" style={{ marginTop: 14, marginBottom: 0 }}>
+          Start a shift from the Dashboard to track tour progress — visits
+          reset each shift.
         </p>
       )}
-      <div className="stack">
-        {ranked.map(({ tour: t, total, remaining }) => {
-          const done = activeShift && total > 0 && remaining === 0;
-          return (
-            <Link
-              key={t.id}
-              to={`/checklists/tours/${t.id}`}
-              className="card"
-              style={{
-                textDecoration: "none",
-                color: "inherit",
-                ...(done ? { opacity: 0.6 } : {}),
-              }}
-            >
-              <div className="spread">
-                <span className="card-title">{t.name}</span>
-                {activeShift && total > 0 && (
-                  <span className={"badge" + (done ? " badge-good" : " badge-warn")}>
-                    {done ? "Complete ✓" : `${remaining} left`}
-                  </span>
-                )}
-              </div>
-              <div className="card-meta">
-                {modeLabel(t.mode)} · {total} checkpoint{total === 1 ? "" : "s"}
-              </div>
-              {activeShift && total > 0 && (
-                <div className="progress-track" style={{ marginTop: 8 }}>
-                  <div
-                    className="progress-fill"
-                    style={{ width: `${((total - remaining) / total) * 100}%` }}
-                  />
-                </div>
-              )}
-            </Link>
-          );
-        })}
-      </div>
+      {ranked.map((t) => (
+        <TourSection
+          key={t.id}
+          tour={t}
+          shiftId={activeShift?.id}
+          visitedIds={visitedIds}
+        />
+      ))}
     </div>
   );
-}
-
-function modeLabel(mode: string): string {
-  return mode.charAt(0).toUpperCase() + mode.slice(1);
 }
