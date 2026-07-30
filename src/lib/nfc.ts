@@ -65,26 +65,17 @@ export function checkpointGuidFromUrl(url: string): string | null {
   return match ? match[1] : null;
 }
 
-// The Vibration API has no permission prompt (unlike camera/mic/geolocation)
-// — Chrome just silently no-ops navigator.vibrate() and returns false if the
-// frame has never seen a genuine user gesture (sticky activation, so a click
-// anywhere on the page satisfies it permanently — it isn't a narrow "must be
-// within this same event handler" window). Both call sites here are already
-// downstream of a real click (the NFC toggle, the Write tag button), so that
-// should be satisfied; logging the false case anyway distinguishes "browser
-// rejected it" from "device haptics are just off," which otherwise look
-// identical from here. Either way, a rejected/unsupported vibration falls
-// back to a synthesized chime — no permission prompt for that either, and it
-// gets through in cases (haptics disabled, iOS, desktop) vibration can't.
+// TEMPORARY: neither vibration nor the chime were confirmed felt/heard on a
+// real device, and there's no computer on hand for remote debugging. Each ack
+// below pops a single alert() reporting exactly what it tried and what the
+// browser told it, wrapped so a thrown exception shows up as an alert too
+// instead of silently aborting mid-function (which, before this, could have
+// left onScan()/setStatus("success") never reached). Remove once we know why.
+const DEBUG_ALERT = true;
+
 function vibrate(pattern: number | number[]): boolean {
   if (typeof navigator === "undefined" || !("vibrate" in navigator)) return false;
-  const accepted = navigator.vibrate(pattern);
-  if (!accepted) {
-    console.warn(
-      "navigator.vibrate() was rejected — no user gesture registered on this page yet.",
-    );
-  }
-  return accepted;
+  return navigator.vibrate(pattern);
 }
 
 let audioCtx: AudioContext | null = null;
@@ -112,26 +103,49 @@ function beep(ctx: AudioContext, atTime: number, freqHz: number): void {
 }
 
 /** `beepCount` short tones in a row — the audible fallback for `vibrate()`. */
-function chime(beepCount: number): void {
+function chime(beepCount: number): string {
   const ctx = getAudioContext();
-  if (!ctx) return;
-  if (ctx.state === "suspended") void ctx.resume();
+  if (!ctx) return "AudioContext unavailable (no window.AudioContext)";
+  const resumeNeeded = ctx.state === "suspended";
+  if (resumeNeeded) void ctx.resume();
   const start = ctx.currentTime;
   for (let i = 0; i < beepCount; i++) {
     beep(ctx, start + i * 0.14, 880);
+  }
+  return `AudioContext state=${ctx.state}${resumeNeeded ? " (resume() called)" : ""}, ${beepCount} beep(s) scheduled`;
+}
+
+function ack(pattern: number | number[], beepCount: number, label: string): void {
+  const lines: string[] = [];
+  try {
+    const hasVibrate = typeof navigator !== "undefined" && "vibrate" in navigator;
+    lines.push(`vibrate supported: ${hasVibrate}`);
+    let vibrated = false;
+    if (hasVibrate) {
+      vibrated = vibrate(pattern);
+      lines.push(`navigator.vibrate(${JSON.stringify(pattern)}) returned: ${vibrated}`);
+    }
+    if (!vibrated) {
+      lines.push(chime(beepCount));
+    }
+  } catch (err) {
+    lines.push(`THREW: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`);
+  }
+  if (DEBUG_ALERT) {
+    alert(`NFC ${label} ack debug —\n` + lines.join("\n"));
   }
 }
 
 /** Brief haptic ack (or chime, if vibration isn't available) that a
  *  checkpoint tag was recognized while scanning. */
 export function vibrateScanAck(): void {
-  if (!vibrate(200)) chime(1);
+  ack(200, 1, "scan");
 }
 
 /** Two short pulses (or two tones) acknowledging a tag was successfully
  *  written. */
 export function vibrateWriteAck(): void {
-  if (!vibrate([150, 100, 150])) chime(2);
+  ack([150, 100, 150], 2, "write");
 }
 
 /** A short, guard-facing explanation for a failed read or write. */
