@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   checkpointGuidFromUrl,
-  nfcDebugLog,
   nfcErrorMessage,
   nfcReadSupported,
   scanNfcUrls,
@@ -33,39 +32,28 @@ export function NfcScanToggle({ onScan }: { onScan: (checkpointGuid: string) => 
 
   const start = async () => {
     setError("");
-    nfcDebugLog("NFC toggle: start() clicked");
     const controller = new AbortController();
     controllerRef.current = controller;
     try {
       await scanNfcUrls((url) => {
         const guid = checkpointGuidFromUrl(url);
-        nfcDebugLog(
-          guid
-            ? `checkpointGuidFromUrl matched: ${guid}`
-            : `checkpointGuidFromUrl did NOT match "${url}" against origin ${window.location.origin}`,
-        );
         if (guid) {
           // vibrateScanAck() has its own internal try/catch, but this is the
           // one call standing between a matched tag and onScan() actually
           // opening the checkpoint — an unexpected throw here must never be
-          // able to silently swallow the scan the way the earlier alert()
-          // did.
+          // able to silently swallow the scan.
           try {
             vibrateScanAck();
           } catch (err) {
-            nfcDebugLog(
-              `vibrateScanAck() THREW (ignored): ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`,
-            );
+            console.warn("vibrateScanAck() threw (ignored):", err);
           }
           onScan(guid);
         }
       }, controller.signal);
       setActive(true);
-      nfcDebugLog("NFC toggle: now armed");
     } catch (err) {
       controllerRef.current = null;
       setActive(false);
-      nfcDebugLog(`NFC toggle: start() failed — ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`);
       setError(nfcErrorMessage(err));
     }
   };

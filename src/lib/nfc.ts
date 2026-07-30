@@ -2,30 +2,6 @@
 // no capability to feature-test beyond the constructor's presence; both
 // reading and writing only fail once actually attempted.
 
-// TEMPORARY: a non-blocking on-screen log (no computer to remote-debug with,
-// and a blocking alert() here previously broke the scan pipeline outright —
-// this only ever appends DOM nodes, never intercepts or pauses anything).
-// Remove this and its call sites once scanning is confirmed working.
-let debugPanel: HTMLDivElement | null = null;
-export function nfcDebugLog(message: string): void {
-  if (typeof document === "undefined") return;
-  if (!debugPanel) {
-    debugPanel = document.createElement("div");
-    debugPanel.style.cssText =
-      "position:fixed;top:0;left:0;right:0;z-index:999999;background:#111;color:#0f0;" +
-      "font:11px/1.4 monospace;padding:8px;white-space:pre-wrap;word-break:break-all;" +
-      "max-height:55vh;overflow-y:auto;pointer-events:none;";
-    document.body.appendChild(debugPanel);
-  }
-  const line = document.createElement("div");
-  const t = new Date();
-  const stamp = `${t.getMinutes().toString().padStart(2, "0")}:${t.getSeconds().toString().padStart(2, "0")}.${t.getMilliseconds().toString().padStart(3, "0")}`;
-  line.textContent = `[${stamp}] ${message}`;
-  debugPanel.appendChild(line);
-  // Keep it from growing forever across a long test session.
-  while (debugPanel.childNodes.length > 40) debugPanel.removeChild(debugPanel.firstChild!);
-}
-
 function nfcSupported(): boolean {
   return typeof window !== "undefined" && "NDEFReader" in window;
 }
@@ -62,28 +38,20 @@ export async function scanNfcUrls(
   signal: AbortSignal,
 ): Promise<void> {
   if (!window.NDEFReader) {
-    nfcDebugLog("scanNfcUrls: window.NDEFReader missing");
     throw new DOMException("Web NFC isn't available in this browser.", "NotSupportedError");
   }
   const reader = new window.NDEFReader();
   reader.onreading = (event) => {
-    nfcDebugLog(
-      `onreading fired — serialNumber=${event.serialNumber || "(none)"}, ` +
-        `records=${event.message.records.map((r) => r.recordType).join(",") || "(none)"}`,
-    );
     const url = urlFromMessage(event.message);
-    nfcDebugLog(`extracted url: ${url ?? "(no url/absolute-url record with data)"}`);
     if (url) onUrl(url);
   };
-  // Never wired up before now — if a tag's NDEF data doesn't parse cleanly,
-  // Chrome fires this instead of onreading, and until now that failure was
-  // completely invisible: no event, no console output, nothing.
+  // A tag whose NDEF data doesn't parse cleanly fires this instead of
+  // onreading — logged rather than silently dropped, though there's nothing
+  // actionable to do about a single bad read beyond trying again.
   reader.onreadingerror = () => {
-    nfcDebugLog("onreadingerror fired — tag was detected but couldn't be read");
+    console.warn("NFC tag detected but couldn't be read (onreadingerror).");
   };
-  nfcDebugLog("calling reader.scan()…");
   await reader.scan({ signal });
-  nfcDebugLog("reader.scan() resolved — now listening for taps");
 }
 
 /**
@@ -146,31 +114,24 @@ function chime(beepCount: number): void {
 // Wrapped in try/catch so a thrown exception here (vibrate/AudioContext
 // misbehaving on some device) can never abort the caller mid-callback —
 // onScan()/setStatus("success") must still run regardless of whether the
-// ack itself worked. Deliberately no alert()/blocking dialog: one sat here
-// briefly for on-device debugging and turned out to itself break the scan
-// pipeline (a synchronous dialog colliding with the NFC reading callback,
-// and/or Chrome auto-suppressing repeated dialogs after a few taps) —
-// console.warn only from here on.
+// ack itself worked.
 function ack(pattern: number | number[], beepCount: number): void {
   try {
-    nfcDebugLog(`ack() entered, pattern=${JSON.stringify(pattern)}`);
     const vibrated = vibrate(pattern);
-    nfcDebugLog(`ack: navigator.vibrate(${JSON.stringify(pattern)}) returned ${vibrated}`);
     // Not gated on vibrate's reported success — a `true` return only means
     // the browser accepted the call, not that the phone actually physically
-    // vibrated. Android's vibration/haptics setting can suppress the motor
-    // independently of ringer/silent mode, with no way for the page to tell
-    // the difference, so the one channel we can actually confirm worked
-    // shouldn't be skipped on the other's word for it.
+    // vibrated. Confirmed on-device: navigator.vibrate() can return true
+    // with no felt vibration at all, since Android's vibration/haptics
+    // setting can suppress the motor independently of ringer/silent mode,
+    // with no way for the page to tell the difference. So the one channel
+    // we can actually confirm worked shouldn't be skipped on the other's
+    // word for it.
     chime(beepCount);
-    nfcDebugLog(`ack: chime(${beepCount}) called`);
     if (!vibrated) {
       console.warn("navigator.vibrate() was rejected or unsupported; chimed instead.");
     }
   } catch (err) {
-    nfcDebugLog(
-      `ack THREW: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`,
-    );
+    console.warn("NFC ack failed:", err);
   }
 }
 
