@@ -18,6 +18,11 @@ import { useShiftVisits } from "./useShiftVisits";
 // tour, and the old arrangement made its steps two navigations away from
 // the page they start every round on. History lives in Reports and each
 // checklist's own detail page, so this screen only owes a glance backwards.
+//
+// Desktop puts checklists and tours in adjacent columns; without tour
+// access there is no second column, so the freed width goes to information
+// density instead — open-checklist cards flow two per row. Mobile is one
+// column either way.
 export function ChecklistListPage() {
   const current = useCurrent();
   const navigate = useNavigate();
@@ -198,8 +203,9 @@ export function ChecklistListPage() {
         </div>
       </div>
 
-      <div>
-            <div className="stack">
+      <div className={isSecurity ? "grid-2" : undefined}>
+        <div>
+            <div className={isSecurity ? "stack" : "two-col-cards"}>
               {open.map((c) => (
                 <Link
                   key={c.id}
@@ -235,8 +241,6 @@ export function ChecklistListPage() {
               </p>
             )}
 
-            {isSecurity && <ToursInline />}
-
             {completed.length > 0 && (
               <details className="section-collapse" style={{ marginTop: 14 }}>
                 <summary>
@@ -267,6 +271,13 @@ export function ChecklistListPage() {
                 </p>
               </details>
             )}
+        </div>
+
+        {isSecurity && (
+          <div>
+            <ToursInline />
+          </div>
+        )}
       </div>
 
       {showManualCheckin && (
@@ -297,9 +308,9 @@ function ToursInline() {
   });
 
   return (
-    <div>
+    <div className="stack" style={{ gap: 18 }}>
       {!activeShift && (
-        <p className="muted small" style={{ marginTop: 14, marginBottom: 0 }}>
+        <p className="muted small" style={{ margin: 0 }}>
           Start a shift from the Dashboard to track tour progress — visits
           reset each shift.
         </p>

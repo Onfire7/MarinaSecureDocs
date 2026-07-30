@@ -903,6 +903,49 @@ h3 {
 
 /* ---------- Shift progress ---------- */
 
+/* Open-checklist cards flow into two columns on desktop when the page has
+   no tours column — the width freed up goes to information density. */
+.two-col-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+@media (min-width: 900px) {
+  .two-col-cards {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Checkpoint buttons inside a location container, color-coded by this-shift
+   status: visited reads green at a glance, remaining stays actionable. */
+.cp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.86rem;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 7px 12px;
+  text-decoration: none;
+  max-width: 100%;
+}
+.cp-btn:hover {
+  background: var(--fill);
+}
+.cp-btn-visited {
+  color: var(--good);
+  background: var(--good-bg);
+  border-color: transparent;
+}
+.cp-btn-visited:hover {
+  background: var(--good-bg);
+  opacity: 0.85;
+}
+
 .progress-track {
   height: 6px;
   border-radius: 3px;

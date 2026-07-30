@@ -6,9 +6,12 @@ import { groupByLocation } from "../../lib/checkpoints";
 // typically has exactly one active tour, so its steps live directly on the
 // work-queue page under a small heading rather than behind a navigation hop.
 //
-// Same work-first rule as the rest of the page: remaining stops render in
-// full, visited ones drop into a collapsed disclosure. Progress derives from
-// the guard's own check-ins within the current shift.
+// Same work-first rule as the rest of the page, expressed per mode: freeform
+// shows every checkpoint as a status-colored button inside its location's
+// container (visited green, remaining neutral); linear and randomized hide
+// visited stops from their sequence view and drop them into a collapsed
+// disclosure instead. Progress derives from the guard's own check-ins within
+// the current shift.
 
 export type TourCheckpoint = {
   id: string;
@@ -42,7 +45,7 @@ export function TourSection({
   const done = shiftId && checkpoints.length > 0 && remaining.length === 0;
 
   return (
-    <section style={{ marginTop: 18, ...(done ? { opacity: 0.65 } : {}) }}>
+    <section style={done ? { opacity: 0.65 } : undefined}>
       <div className="group-heading">
         <span>
           {tour.name}
@@ -71,7 +74,13 @@ export function TourSection({
           visitedIds={shiftId ? visitedIds : new Set()}
         />
       )}
-      {tour.mode === "freeform" && <FreeformRemaining remaining={remaining} />}
+      {tour.mode === "freeform" && (
+        <FreeformCheckpoints
+          checkpoints={checkpoints}
+          visitedIds={shiftId ? visitedIds : new Set()}
+          tracking={Boolean(shiftId)}
+        />
+      )}
       {tour.mode === "randomized" && (
         <RandomizedNext
           tourId={tour.id}
@@ -81,7 +90,7 @@ export function TourSection({
         />
       )}
 
-      {visited.length > 0 && (
+      {tour.mode !== "freeform" && visited.length > 0 && (
         <details className="section-collapse" style={{ marginTop: 10 }}>
           <summary>
             <span className="small" style={{ fontWeight: 650 }}>
@@ -190,39 +199,70 @@ function LinearRemaining({
   );
 }
 
-function FreeformRemaining({ remaining }: { remaining: TourCheckpoint[] }) {
-  if (remaining.length === 0) {
-    return (
-      <p className="muted small">
-        Round complete — every checkpoint visited this shift.
-      </p>
-    );
+// One container per location, its checkpoints as buttons color-coded by
+// this-shift status — visited green, remaining neutral. Freeform imposes no
+// sequence, so the location is the unit a guard works in ("finish this dock,
+// move on"), and color carries the done/left split without hiding either.
+// Locations still fully unvisited sort first; finished ones sink and dim.
+function FreeformCheckpoints({
+  checkpoints,
+  visitedIds,
+  tracking,
+}: {
+  checkpoints: TourCheckpoint[];
+  visitedIds: Set<string>;
+  tracking: boolean;
+}) {
+  if (checkpoints.length === 0) {
+    return <p className="muted small">No checkpoints on this tour yet.</p>;
   }
-  // Freeform imposes no sequence, so the remaining stops group by location —
-  // which is also how a guard works a round: finish this dock, move on.
+  const groups = groupByLocation(checkpoints)
+    .map((g) => {
+      const left = g.items.filter((c) => !visitedIds.has(c.id)).length;
+      return { ...g, left };
+    })
+    .sort((a, b) => (a.left === 0 ? 1 : 0) - (b.left === 0 ? 1 : 0));
+
   return (
-    <div>
-      {groupByLocation(remaining).map((g) => (
-        <div key={g.locationId || "none"}>
-          <div className="group-heading">
-            <span>{g.label}</span>
-            <span>{g.items.length}</span>
+    <div className="stack" style={{ gap: 8 }}>
+      {groups.map((g) => {
+        const done = tracking && g.left === 0;
+        return (
+          <div
+            key={g.locationId || "none"}
+            className="card"
+            style={done ? { opacity: 0.65 } : undefined}
+          >
+            <div className="spread" style={{ marginBottom: 8 }}>
+              <span className="card-title">{g.label}</span>
+              {tracking && (
+                <span className={"small " + (done ? "" : "muted")}>
+                  {done ? (
+                    <span className="badge badge-good">✓</span>
+                  ) : (
+                    `${g.items.length - g.left}/${g.items.length}`
+                  )}
+                </span>
+              )}
+            </div>
+            <div className="row" style={{ flexWrap: "wrap", gap: 6 }}>
+              {g.items.map((cp) => {
+                const visited = tracking && visitedIds.has(cp.id);
+                return (
+                  <Link
+                    key={cp.id}
+                    to={`/locations/checkpoints/${cp.id}`}
+                    className={"cp-btn" + (visited ? " cp-btn-visited" : "")}
+                  >
+                    {visited && "✓ "}
+                    {cp.name}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
-          <div className="stack" style={{ gap: 4 }}>
-            {g.items.map((cp) => (
-              <Link
-                key={cp.id}
-                to={`/locations/checkpoints/${cp.id}`}
-                className="card spread"
-                style={{ textDecoration: "none", color: "inherit" }}
-              >
-                <span className="card-title">{cp.name}</span>
-                <span className="badge">Remaining</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
