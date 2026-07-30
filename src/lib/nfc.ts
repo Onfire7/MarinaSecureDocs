@@ -65,14 +65,6 @@ export function checkpointGuidFromUrl(url: string): string | null {
   return match ? match[1] : null;
 }
 
-// TEMPORARY: neither vibration nor the chime were confirmed felt/heard on a
-// real device, and there's no computer on hand for remote debugging. Each ack
-// below pops a single alert() reporting exactly what it tried and what the
-// browser told it, wrapped so a thrown exception shows up as an alert too
-// instead of silently aborting mid-function (which, before this, could have
-// left onScan()/setStatus("success") never reached). Remove once we know why.
-const DEBUG_ALERT = true;
-
 function vibrate(pattern: number | number[]): boolean {
   if (typeof navigator === "undefined" || !("vibrate" in navigator)) return false;
   return navigator.vibrate(pattern);
@@ -103,39 +95,39 @@ function beep(ctx: AudioContext, atTime: number, freqHz: number): void {
 }
 
 /** `beepCount` short tones in a row — the audible fallback for `vibrate()`. */
-function chime(beepCount: number): string {
+function chime(beepCount: number): void {
   const ctx = getAudioContext();
-  if (!ctx) return "AudioContext unavailable (no window.AudioContext)";
-  const resumeNeeded = ctx.state === "suspended";
-  if (resumeNeeded) void ctx.resume();
+  if (!ctx) return;
+  if (ctx.state === "suspended") void ctx.resume();
   const start = ctx.currentTime;
   for (let i = 0; i < beepCount; i++) {
     beep(ctx, start + i * 0.14, 880);
   }
-  return `AudioContext state=${ctx.state}${resumeNeeded ? " (resume() called)" : ""}, ${beepCount} beep(s) scheduled`;
 }
 
-function ack(pattern: number | number[], beepCount: number, label: string): void {
-  const lines: string[] = [];
+// Wrapped in try/catch so a thrown exception here (vibrate/AudioContext
+// misbehaving on some device) can never abort the caller mid-callback —
+// onScan()/setStatus("success") must still run regardless of whether the
+// ack itself worked. Deliberately no alert()/blocking dialog: one sat here
+// briefly for on-device debugging and turned out to itself break the scan
+// pipeline (a synchronous dialog colliding with the NFC reading callback,
+// and/or Chrome auto-suppressing repeated dialogs after a few taps) —
+// console.warn only from here on.
+function ack(pattern: number | number[], beepCount: number): void {
   try {
-    const hasVibrate = typeof navigator !== "undefined" && "vibrate" in navigator;
-    lines.push(`vibrate supported: ${hasVibrate}`);
-    if (hasVibrate) {
-      const vibrated = vibrate(pattern);
-      lines.push(`navigator.vibrate(${JSON.stringify(pattern)}) returned: ${vibrated}`);
-    }
+    const vibrated = vibrate(pattern);
     // Not gated on vibrate's reported success — a `true` return only means
     // the browser accepted the call, not that the phone actually physically
     // vibrated. Android's vibration/haptics setting can suppress the motor
     // independently of ringer/silent mode, with no way for the page to tell
     // the difference, so the one channel we can actually confirm worked
     // shouldn't be skipped on the other's word for it.
-    lines.push(chime(beepCount));
+    chime(beepCount);
+    if (!vibrated) {
+      console.warn("navigator.vibrate() was rejected or unsupported; chimed instead.");
+    }
   } catch (err) {
-    lines.push(`THREW: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`);
-  }
-  if (DEBUG_ALERT) {
-    alert(`NFC ${label} ack debug —\n` + lines.join("\n"));
+    console.warn("NFC ack failed:", err);
   }
 }
 
@@ -143,13 +135,13 @@ function ack(pattern: number | number[], beepCount: number, label: string): void
  *  scanning — both attempted regardless of whether the other reports success,
  *  since vibrate() can claim success without the phone actually vibrating. */
 export function vibrateScanAck(): void {
-  ack(200, 1, "scan");
+  ack(200, 1);
 }
 
 /** Two vibration pulses and two tones acknowledging a tag was successfully
  *  written — same both-channels reasoning as vibrateScanAck. */
 export function vibrateWriteAck(): void {
-  ack([150, 100, 150], 2, "write");
+  ack([150, 100, 150], 2);
 }
 
 /** A short, guard-facing explanation for a failed read or write. */
