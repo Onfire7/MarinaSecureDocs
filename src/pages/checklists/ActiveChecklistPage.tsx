@@ -1,10 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
-import { ITEM_TYPE_LABEL, normalizeItemType, type ItemType } from "../../lib/checklists";
+import {
+  ITEM_TYPE_LABEL,
+  isStateCheck,
+  normalizeItemType,
+  type DoorCheckConfig,
+  type ItemType,
+  type TriggeredBy,
+} from "../../lib/checklists";
 import { activityTx } from "../../lib/activityLog";
 import {
   buildPendingEffectTxns,
@@ -132,6 +139,45 @@ export function ChecklistItemsPanel({
   );
   const nestedStatusById = new Map(
     (nestedData?.checklists ?? []).map((c) => [c.id, c.status]),
+  );
+
+  // Some checklists span several nearby buildings in one pass (e.g. one
+  // "Resturaunt" checklist covering The Point, Parlor Room, and the Condo,
+  // each with their own Front/Side Door items) — a door/lock check away from
+  // the checkpoint's own location gets a small header naming which one it's
+  // at, so "Front Door" at one building doesn't read as the same card as
+  // "Front Door" at another. Nothing to compare against for a non-checkpoint
+  // trigger (clock in/out, manual, scheduled), so this is a no-op there.
+  const triggeredBy = checklist?.triggeredBy as TriggeredBy | undefined;
+  const checkpointId = triggeredBy?.type === "checkpoint" ? triggeredBy.checkpointId : undefined;
+  const { data: checkpointData } = db.useQuery(
+    checkpointId ? { checkpoints: { $: { where: { id: checkpointId } }, location: {} } } : null,
+  );
+  const checkpointLocationId = checkpointData?.checkpoints?.[0]?.location?.id;
+
+  const itemLocationId = (item: (typeof items)[number]): string | undefined =>
+    isStateCheck(item.type) ? (item.config as DoorCheckConfig | undefined)?.locationId : undefined;
+
+  // Without a resolved checkpoint location there's no baseline to call
+  // anything "off-site" relative to — treating every item's own location as
+  // a deviation would header even a single-location checklist the moment it
+  // wasn't checkpoint-triggered (or the checkpoint simply has no location).
+  const offSiteLocationIds = checkpointLocationId
+    ? [
+        ...new Set(
+          items
+            .map(itemLocationId)
+            .filter((id): id is string => Boolean(id) && id !== checkpointLocationId),
+        ),
+      ]
+    : [];
+  const { data: offSiteLocationsData } = db.useQuery(
+    offSiteLocationIds.length > 0
+      ? { locations: { $: { where: { id: { $in: offSiteLocationIds } } } } }
+      : null,
+  );
+  const offSiteLocationNameById = new Map(
+    (offSiteLocationsData?.locations ?? []).map((l) => [l.id, l.name]),
   );
 
   if (!checklist) {
@@ -271,18 +317,45 @@ export function ChecklistItemsPanel({
         className={isMobile || compact ? "stack" : "grid-2"}
         style={compact ? { marginTop: 8 } : undefined}
       >
-        {items.map((item) => {
-          const Component = componentFor(item.type);
-          return (
-            <Component
-              key={item.id}
-              item={item}
-              existing={resultByItemId.get(item.id)}
-              checklistId={checklist.id}
-              onSaved={() => {}}
-            />
-          );
-        })}
+        {(() => {
+          const spansColumns = !isMobile && !compact;
+          const nodes: ReactNode[] = [];
+          // A header appears once per run of consecutive items at the same
+          // off-site location — not once per card, and not again immediately
+          // after returning to it, only once the run is actually broken by a
+          // different location (including "back at the checkpoint's own").
+          let previousLocationId = checkpointLocationId;
+          for (const item of items) {
+            const locationId = itemLocationId(item) ?? checkpointLocationId;
+            if (locationId !== checkpointLocationId && locationId !== previousLocationId) {
+              const name = offSiteLocationNameById.get(locationId!);
+              if (name) {
+                nodes.push(
+                  <div
+                    key={`loc-${item.id}`}
+                    className="group-heading"
+                    style={spansColumns ? { gridColumn: "1 / -1" } : undefined}
+                  >
+                    <span>{name}</span>
+                  </div>,
+                );
+              }
+            }
+            previousLocationId = locationId;
+
+            const Component = componentFor(item.type);
+            nodes.push(
+              <Component
+                key={item.id}
+                item={item}
+                existing={resultByItemId.get(item.id)}
+                checklistId={checklist.id}
+                onSaved={() => {}}
+              />,
+            );
+          }
+          return nodes;
+        })()}
       </div>
 
       {items.length === 0 && (
