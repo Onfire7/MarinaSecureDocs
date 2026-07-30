@@ -154,6 +154,7 @@ function chime(beepCount: number): void {
 function ack(pattern: number | number[], beepCount: number): void {
   try {
     const vibrated = vibrate(pattern);
+    nfcDebugLog(`ack: navigator.vibrate(${JSON.stringify(pattern)}) returned ${vibrated}`);
     // Not gated on vibrate's reported success — a `true` return only means
     // the browser accepted the call, not that the phone actually physically
     // vibrated. Android's vibration/haptics setting can suppress the motor
