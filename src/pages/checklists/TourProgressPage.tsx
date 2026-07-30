@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { db } from "../../lib/db";
+import { groupByLocation } from "../../lib/checkpoints";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { ManualCheckinDialog } from "./ManualCheckinDialog";
 
@@ -131,7 +132,11 @@ function modeLabel(mode: string): string {
   return mode.charAt(0).toUpperCase() + mode.slice(1);
 }
 
-type Checkpoint = { id: string; name: string };
+type Checkpoint = {
+  id: string;
+  name: string;
+  location?: { id: string; name: string } | null;
+};
 
 function LinearProgress({
   checkpointsById,
@@ -165,6 +170,9 @@ function LinearProgress({
                 <Link to={`/locations/checkpoints/${cpId}`}>
                   {isNext ? <strong>{cp.name} (next)</strong> : cp.name}
                 </Link>
+                {cp.location?.name && (
+                  <div className="muted small">{cp.location.name}</div>
+                )}
               </td>
             </tr>
           );
@@ -181,20 +189,35 @@ function FreeformProgress({
   checkpoints: Checkpoint[];
   visitedIds: Set<string | undefined>;
 }) {
+  // Freeform imposes no sequence, so the list groups by location — which is
+  // also how a guard thinks about a round: finish this dock, move to the next.
+  const groups = groupByLocation(checkpoints);
   return (
-    <div className="stack">
-      {checkpoints.map((cp) => (
-        <Link
-          key={cp.id}
-          to={`/locations/checkpoints/${cp.id}`}
-          className="card spread"
-          style={{ textDecoration: "none", color: "inherit" }}
-        >
-          <span className="card-title">{cp.name}</span>
-          <span className={"badge" + (visitedIds.has(cp.id) ? " badge-good" : "")}>
-            {visitedIds.has(cp.id) ? "Visited" : "Remaining"}
-          </span>
-        </Link>
+    <div>
+      {groups.map((g) => (
+        <div key={g.locationId || "none"}>
+          <div className="group-heading">
+            <span>{g.label}</span>
+            <span>
+              {g.items.filter((c) => visitedIds.has(c.id)).length}/{g.items.length}
+            </span>
+          </div>
+          <div className="stack">
+            {g.items.map((cp) => (
+              <Link
+                key={cp.id}
+                to={`/locations/checkpoints/${cp.id}`}
+                className="card spread"
+                style={{ textDecoration: "none", color: "inherit" }}
+              >
+                <span className="card-title">{cp.name}</span>
+                <span className={"badge" + (visitedIds.has(cp.id) ? " badge-good" : "")}>
+                  {visitedIds.has(cp.id) ? "Visited" : "Remaining"}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
       ))}
     </div>
   );
@@ -234,6 +257,9 @@ function RandomizedProgress({
       <div className="card">
         <div className="card-meta">NEXT CHECKPOINT</div>
         <div className="card-title">{next.name}</div>
+        {next.location?.name && (
+          <div className="muted small">{next.location.name}</div>
+        )}
         <div className="row" style={{ marginTop: 8 }}>
           <Link to={`/locations/checkpoints/${next.id}`} className="btn btn-sm">
             View checkpoint

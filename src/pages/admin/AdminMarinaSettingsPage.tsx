@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { db, id } from "../../lib/db";
 import { AdminGate } from "./AdminGate";
+import { DraftInput, DraftNumberInput } from "../shared/DraftInput";
 import { AdminHeader } from "./AdminHomePage";
 
 // Admin — Marina Settings (see docs/pages/admin-marina-settings.html).
@@ -100,22 +101,24 @@ function MarinaSettings() {
         <div>
           <div className="field">
             <span className="field-label">Marina name</span>
-            <input
+            <DraftInput
               className="input"
+              aria-label="Marina name"
               value={settings.marinaName ?? ""}
-              onChange={(e) => update({ marinaName: e.target.value })}
+              onCommit={(marinaName) => update({ marinaName })}
             />
           </div>
 
           <div className="field">
             <span className="field-label">GPS validation radius default (meters)</span>
-            <input
-              type="number"
+            <DraftNumberInput
               className="input select-inline"
+              aria-label="GPS validation radius default"
               value={settings.gpsValidationRadiusDefault}
-              onChange={(e) =>
-                update({ gpsValidationRadiusDefault: Number(e.target.value) })
-              }
+              // Required, so a cleared box is ignored rather than written as
+              // undefined (which would silently drop the key and keep the old
+              // value anyway, just less obviously).
+              onCommit={(next) => next != null && update({ gpsValidationRadiusDefault: next })}
             />
             <p className="muted small" style={{ marginTop: 4 }}>
               Used by any checkpoint without its own override.
@@ -124,13 +127,14 @@ function MarinaSettings() {
 
           <div className="field">
             <span className="field-label">Activity Log retention (days)</span>
-            <input
-              type="number"
+            <DraftNumberInput
               className="input select-inline"
+              aria-label="Activity Log retention days"
               value={settings.activityLogRetentionDays}
-              onChange={(e) =>
-                update({ activityLogRetentionDays: Number(e.target.value) })
-              }
+              // Required, so a cleared box is ignored rather than written as
+              // undefined (which would silently drop the key and keep the old
+              // value anyway, just less obviously).
+              onCommit={(next) => next != null && update({ activityLogRetentionDays: next })}
             />
             <p className="muted small" style={{ marginTop: 4 }}>
               Applies at the next scheduled purge, not retroactively. Entries

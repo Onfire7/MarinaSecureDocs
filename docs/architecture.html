@@ -172,6 +172,15 @@ Shift-report email
       <a href="terminology.html">← Terminology</a>
       <a href="data-model.html">Data Model →</a>
     </div>
+  
+    <h2>Inline editing and the local-first echo</h2>
+    <p>Admin edits fields in place rather than through save-buttoned forms. The naive implementation — write to InstantDB on every <code>onChange</code> and read <code>value</code> straight back from <code>useQuery</code> — is broken, and was: the round-trip is asynchronous, so React re-renders mid-word with the previous stored value. The caret jumps to the end, and on mobile the IME, which composes against the DOM value it last observed, reinserts what it believes is still pending and duplicates text after the caret. Deleting is worst, because the echo restores the character just removed.</p>
+    <p>Every inline field therefore goes through the shared draft components in <code>pages/shared/DraftInput.tsx</code>. The rule they enforce: <strong>while a field has focus, the local draft is the single source of truth and incoming values are ignored.</strong> External edits are adopted on blur, so a co-admin's change still lands, just never underneath someone's cursor. Writes are debounced while typing and flushed on blur and on unmount, so collapsing a card or navigating away cannot lose the last keystrokes. A number variant keeps the raw string locally — so a half-typed value stays editable — and reports <code>undefined</code> when cleared, which is how the schema spells "fall back to the default".</p>
+    <p>This is a general consequence of a local-first store, not a quirk of one screen: any controlled input bound directly to synced state has the same defect.</p>
+
+    <h2>Mobile layout constraints</h2>
+    <p>The shell is a desktop sidenav and a mobile tab bar over the same pages, so every layout primitive has to survive a 375px viewport. Two rules in <code>styles/app.css</code> carry most of that weight, because flex and grid children default to <code>min-width: auto</code> and so refuse to shrink below their content — a long location path or a wide inline control pushes out of its card instead of compressing. <code>.row</code>, <code>.spread</code>, <code>.grid-2</code> and <code>.stack</code> children are therefore given <code>min-width: 0</code>, <code>.select-inline</code> is capped at <code>max-width: 100%</code>, and below 900px <code>.row</code> and <code>.spread</code> wrap, since a card header pairing a name field with three or four buttons genuinely cannot fit on one line. Content that is legitimately wider than a phone — the permission matrix, long scan URLs — scrolls or breaks inside its own container rather than widening the page.</p>
+
   </main>
 </div>
 </body>

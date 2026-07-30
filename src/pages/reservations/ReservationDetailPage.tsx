@@ -4,6 +4,7 @@ import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { DEFAULT_POST_RESERVATION_STATUS, statusLabel } from "../../lib/locations";
 import { activityTx } from "../../lib/activityLog";
+import { DraftNumberInput } from "../shared/DraftInput";
 import {
   RESERVATION_STATUSES,
   isBillable,
@@ -215,13 +216,13 @@ export function ReservationDetailPage() {
               <div className="field" key={f}>
                 <span className="field-label">{statusLabel(f)}</span>
                 {canManage ? (
-                  <input
-                    type="number"
+                  <DraftNumberInput
                     className="input select-inline"
-                    value={reservation[f] ?? ""}
-                    onChange={(e) =>
-                      update({ [f]: e.target.value === "" ? null : Number(e.target.value) })
-                    }
+                    aria-label={statusLabel(f)}
+                    value={reservation[f]}
+                    // null, not undefined: clearing a billing figure has to
+                    // actually erase it, and undefined keys are dropped.
+                    onCommit={(next) => update({ [f]: next ?? null })}
                   />
                 ) : (
                   <div className="field-value">

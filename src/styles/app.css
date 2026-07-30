@@ -353,6 +353,13 @@ h3 {
   .main {
     padding: 14px 14px calc(var(--tabbar-h) + 24px);
   }
+  /* A card header pairing a name field with three or four buttons cannot fit
+     on one line at 375px. Wrapping is the only honest answer — the
+     alternative is a row that silently escapes its card. */
+  .row,
+  .spread {
+    flex-wrap: wrap;
+  }
   .appbar {
     position: sticky;
     top: 0;
@@ -443,6 +450,15 @@ h3 {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+/* Flex and grid children default to min-width:auto, so a long name or a wide
+   inline input refuses to shrink and overflows the container instead. Every
+   layout primitive here wants the opposite. */
+.row > *,
+.spread > *,
+.grid-2 > *,
+.stack > * {
+  min-width: 0;
 }
 .muted {
   color: var(--mute);
@@ -885,6 +901,30 @@ h3 {
   background: var(--fill);
 }
 
+/* ---------- Grouped lists (checkpoints under their location) ---------- */
+
+.group-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 14px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line-lt);
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: var(--mute);
+}
+.group-heading:first-child {
+  margin-top: 0;
+}
+/* The path can be long; it should wrap rather than widen the container. */
+.group-heading > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 /* ---------- Drag-to-reorder ---------- */
 
 .reorder-row {
@@ -1195,6 +1235,9 @@ h3 {
 
 .select-inline {
   width: auto;
+  /* Without this an inline control keeps its intrinsic width and pushes out
+     of a narrow card — the main source of right-edge overflow on phones. */
+  max-width: 100%;
   font-size: 0.82rem;
   padding: 4px 8px;
 }

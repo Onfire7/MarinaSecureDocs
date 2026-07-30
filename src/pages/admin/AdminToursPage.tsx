@@ -4,6 +4,8 @@ import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
 import { MultiSelectDialog } from "../shared/MultiSelectDialog";
 import { ReorderableList } from "../shared/ReorderableList";
+import { DraftInput } from "../shared/DraftInput";
+import { groupByLocation, locationPathResolver } from "../../lib/checkpoints";
 
 // Admin — Tours Setup (see docs/pages/admin-tours.html).
 // Gated by manage_locations rather than a dedicated permission, since a tour
@@ -26,6 +28,9 @@ function Tours() {
   const { data } = db.useQuery({
     tours: { checkpoints: { location: {} } },
     checkpoints: { location: {} },
+    // Ancestor paths for group labels — a bare location name can repeat
+    // between docks, which is the ambiguity grouping exists to remove.
+    locations: { parent: {} },
   });
   const tours = useMemo(
     () => [...(data?.tours ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
@@ -36,6 +41,10 @@ function Tours() {
       [...(data?.checkpoints ?? [])].sort((a, b) =>
         a.name.localeCompare(b.name, undefined, { numeric: true }),
       ),
+    [data],
+  );
+  const pathOf = useMemo(
+    () => locationPathResolver(data?.locations ?? []),
     [data],
   );
 
@@ -89,6 +98,7 @@ function Tours() {
             key={t.id}
             tour={t}
             allCheckpoints={allCheckpoints}
+            pathOf={pathOf}
             expanded={expanded === t.id}
             onToggle={() => setExpanded(expanded === t.id ? null : t.id)}
             onDuplicated={setExpanded}
@@ -110,18 +120,20 @@ type TourRow = {
   mode: string;
   /** Null once a tour has left linear mode — see setMode. */
   checkpointOrder?: string[] | null;
-  checkpoints?: { id: string; name: string; location?: { name: string } | null }[];
+  checkpoints?: { id: string; name: string; location?: { id: string; name: string } | null }[];
 };
 
 function TourCard({
   tour,
   allCheckpoints,
+  pathOf,
   expanded,
   onToggle,
   onDuplicated,
 }: {
   tour: TourRow;
-  allCheckpoints: { id: string; name: string; location?: { name: string } | null }[];
+  allCheckpoints: { id: string; name: string; location?: { id: string; name: string } | null }[];
+  pathOf: (locationId: string) => string;
   expanded: boolean;
   onToggle: () => void;
   onDuplicated: (tourId: string) => void;
@@ -140,6 +152,7 @@ function TourCard({
   }, [tour.checkpointOrder, members]);
 
   const isLinear = tour.mode === "linear";
+  const memberGroups = useMemo(() => groupByLocation(members, pathOf), [members, pathOf]);
 
   const setMode = (mode: string) => {
     void db.transact(
@@ -214,13 +227,11 @@ function TourCard({
     <div className="card">
       <div className="spread" style={{ flexWrap: "wrap" }}>
         <div style={{ minWidth: 0 }}>
-          <input
+          <DraftInput
             className="input select-inline"
             value={tour.name}
             aria-label="Tour name"
-            onChange={(e) =>
-              void db.transact(db.tx.tours[tour.id].update({ name: e.target.value }))
-            }
+            onCommit={(name) => void db.transact(db.tx.tours[tour.id].update({ name }))}
           />
           <div className="card-meta">
             {tour.mode.charAt(0).toUpperCase() + tour.mode.slice(1)} ·{" "}
@@ -258,33 +269,62 @@ function TourCard({
 
       {expanded && (
         <div style={{ marginTop: 12 }}>
-          <ReorderableList
-            items={ordered}
-            enabled={isLinear}
-            onReorder={(orderedIds) =>
-              void db.transact(
-                db.tx.tours[tour.id].update({ checkpointOrder: orderedIds }),
-              )
-            }
-            renderItem={(c, i) => (
-              <div className="card spread">
-                <span className="small">
-                  {isLinear && <span className="muted">{i + 1}. </span>}
-                  {c.name}
-                  {c.location?.name && (
-                    <span className="muted"> · {c.location.name}</span>
-                  )}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-quiet"
-                  onClick={() => removeCheckpoint(c.id)}
-                >
-                  Remove
-                </button>
+          {/* Linear mode's sequence *is* its meaning, so it stays a single
+              ordered list — grouping would scatter the very thing being
+              edited. The unordered modes have no such constraint, so they
+              group under the parent location like every other checkpoint
+              list. */}
+          {isLinear ? (
+            <ReorderableList
+              items={ordered}
+              enabled
+              onReorder={(orderedIds) =>
+                void db.transact(
+                  db.tx.tours[tour.id].update({ checkpointOrder: orderedIds }),
+                )
+              }
+              renderItem={(c, i) => (
+                <div className="card spread">
+                  <span className="small">
+                    <span className="muted">{i + 1}. </span>
+                    {c.name}
+                    {c.location?.name && (
+                      <span className="muted"> · {c.location.name}</span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-quiet"
+                    onClick={() => removeCheckpoint(c.id)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            />
+          ) : (
+            memberGroups.map((g) => (
+              <div key={g.locationId || "none"}>
+                <div className="group-heading">
+                  <span>{g.label}</span>
+                </div>
+                <div className="stack" style={{ gap: 4 }}>
+                  {g.items.map((c) => (
+                    <div key={c.id} className="card spread">
+                      <span className="small">{c.name}</span>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-quiet"
+                        onClick={() => removeCheckpoint(c.id)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
-            )}
-          />
+            ))
+          )}
           {members.length === 0 && (
             <span className="muted small">
               No checkpoints yet — an empty tour saves fine, it just isn't
@@ -323,7 +363,7 @@ function TourCard({
             .map((c) => ({
               id: c.id,
               name: c.name,
-              group: c.location?.name ?? "No location",
+              group: c.location ? pathOf(c.location.id) : "No location",
             }))}
           onConfirm={addCheckpoints}
           onClose={() => setAdding(false)}

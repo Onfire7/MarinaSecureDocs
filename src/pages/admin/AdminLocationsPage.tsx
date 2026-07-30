@@ -14,6 +14,10 @@ import { LocationPicker, type PickerLocation } from "../shared/LocationPicker";
 import { NameGeneratorDialog } from "./NameGeneratorDialog";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
+import {
+  DraftInput,
+  DraftNumberInput,
+} from "../shared/DraftInput";
 
 const EXPANDED_KEY = "marinasecure.admin.locations.expanded";
 const LAST_USED_KEY = "marinasecure.admin.locations.lastUsed";
@@ -139,10 +143,11 @@ function TypesTab() {
             <div key={t.id} className="card">
               <div className="spread" style={{ flexWrap: "wrap" }}>
                 <div>
-                  <input
+                  <DraftInput
                     className="input select-inline"
+                    aria-label="Type name"
                     value={t.name}
-                    onChange={(e) => update({ name: e.target.value })}
+                    onCommit={(name) => update({ name })}
                   />
                   <span className="muted small">
                     {" "}
@@ -534,10 +539,10 @@ function LocationRow({
             <div>
               <div className="field">
                 <span className="field-label">Name</span>
-                <input
+                <DraftInput
                   className="input"
                   value={location.name}
-                  onChange={(e) => update({ name: e.target.value })}
+                  onCommit={(name) => update({ name })}
                 />
               </div>
               {/* Containers and roots have no meaningful occupancy, so the
@@ -583,27 +588,19 @@ function LocationRow({
               <div className="field">
                 <span className="field-label">GPS coordinates</span>
                 <div className="row">
-                  <input
-                    type="number"
+                  <DraftNumberInput
                     className="input select-inline"
                     placeholder="lat"
-                    value={location.gpsLat ?? ""}
-                    onChange={(e) =>
-                      update({
-                        gpsLat: e.target.value === "" ? undefined : Number(e.target.value),
-                      })
-                    }
+                    aria-label="Latitude"
+                    value={location.gpsLat}
+                    onCommit={(gpsLat) => update({ gpsLat })}
                   />
-                  <input
-                    type="number"
+                  <DraftNumberInput
                     className="input select-inline"
                     placeholder="lng"
-                    value={location.gpsLng ?? ""}
-                    onChange={(e) =>
-                      update({
-                        gpsLng: e.target.value === "" ? undefined : Number(e.target.value),
-                      })
-                    }
+                    aria-label="Longitude"
+                    value={location.gpsLng}
+                    onCommit={(gpsLng) => update({ gpsLng })}
                   />
                 </div>
               </div>
@@ -809,13 +806,12 @@ function CheckpointRow({
   return (
     <div className="card">
       <div className="spread" style={{ flexWrap: "wrap" }}>
-        <input
+        <DraftInput
           className="input select-inline"
+          aria-label="Checkpoint name"
           value={checkpoint.name}
-          onChange={(e) =>
-            void db.transact(
-              db.tx.checkpoints[checkpoint.id].update({ name: e.target.value }),
-            )
+          onCommit={(name) =>
+            void db.transact(db.tx.checkpoints[checkpoint.id].update({ name }))
           }
         />
         <div className="row">
@@ -835,18 +831,15 @@ function CheckpointRow({
       </div>
       <div className="row" style={{ marginTop: 6 }}>
         <span className="small muted">GPS radius override (m)</span>
-        <input
-          type="number"
+        <DraftNumberInput
           className="input select-inline"
           style={{ width: 100 }}
           placeholder="marina default"
-          value={checkpoint.gpsValidationRadius ?? ""}
-          onChange={(e) =>
+          aria-label="GPS radius override"
+          value={checkpoint.gpsValidationRadius}
+          onCommit={(gpsValidationRadius) =>
             void db.transact(
-              db.tx.checkpoints[checkpoint.id].update({
-                gpsValidationRadius:
-                  e.target.value === "" ? undefined : Number(e.target.value),
-              }),
+              db.tx.checkpoints[checkpoint.id].update({ gpsValidationRadius }),
             )
           }
         />

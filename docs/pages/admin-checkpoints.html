@@ -47,7 +47,7 @@
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Name</td><td>Checkpoint.name</td><td>Edited inline on the row.</td></tr>
-      <tr><td>Location</td><td>Checkpoint.location</td><td>Shown as the full ancestor path — "Slip 14" is ambiguous when every dock has one. A checkpoint with no location is flagged.</td></tr>
+      <tr><td>Location</td><td>Checkpoint.location</td><td>Not shown on the row at all — checkpoints are <strong>grouped under their parent location</strong>, with the group heading carrying the full ancestor path. That is what lets a checkpoint simply be called "Gate": three doors at the Main Office read as Back Door / Conference Door / Front Door under one heading, instead of each name having to repeat where it is. Checkpoints with no location group last under "No location", since that's a defect to fix rather than a place to look.</td></tr>
       <tr><td>Usage</td><td>Checkpoint.tours + Checkpoint.checklist_templates</td><td>How many tours include it and how many templates it triggers. Both empty earns an <strong>Unused</strong> badge — a checkpoint nothing references is almost always an oversight, and is otherwise invisible.</td></tr>
       <tr><td>GPS &amp; radius</td><td>Checkpoint.gps_coordinates / gps_validation_radius</td><td>Under Details. Radius falls back to the marina-wide default from <a href="admin-marina-settings.html">Marina Settings</a> when empty.</td></tr>
       <tr><td>Scan URL</td><td>Checkpoint.guid_url</td><td>Copyable, as on <a href="admin-locations.html">Location setup</a> — the two places the GUID URL is exposed. Still not shown on <a href="checkpoint-detail.html">Checkpoint detail</a>.</td></tr>
@@ -61,12 +61,13 @@
       <tr><td>Edit GPS / radius</td><td><code>manage_locations</code></td><td>Under Details. Clearing the radius restores the marina default rather than storing zero.</td></tr>
       <tr><td>Add selected to a tour</td><td><code>manage_locations</code></td><td>Select rows, pick a tour. Checkpoints already on that tour are skipped rather than duplicated. On a Linear tour they append to <code>checkpoint_order</code>, ready to be dragged into place on <a href="admin-tours.html">Tours setup</a>.</td></tr>
       <tr><td>Delete (single or selected)</td><td><code>manage_locations</code></td><td>Confirmation states the real consequence: the scan URL stops working and any physical NFC tag or QR sticker encoding it becomes dead. Past <code>CheckIn</code> records are kept.</td></tr>
+      <tr><td>Select a whole location's checkpoints</td><td>—</td><td>Each group heading carries an All/None toggle with its count, so handing one dock's checkpoints to a tour is two clicks.</td></tr>
       <tr><td>Filter</td><td>—</td><td>By name or location path, using the same short-term matching rule as the location picker ("c" matches the start of a word, so "dock c 14" doesn't match Dock A's Slip 14). A separate toggle narrows to checkpoints on no tour and no template.</td></tr>
     </table>
 
     <h2>States &amp; edge cases</h2>
     <ul>
-      <li><strong>Checkpoint with no location</strong> — possible if its location was deleted; flagged with a badge rather than hidden, since it can never be reached by a location-scoped tour and needs either relinking or deleting.</li>
+      <li><strong>Checkpoint with no location</strong> — possible if its location was deleted. Collected into a "No location" group sorted last rather than hidden, since it can never be reached by a location-scoped tour and needs either relinking or deleting.</li>
       <li><strong>Unused checkpoint</strong> — surfaced, not blocked. A checkpoint created ahead of the tour that will use it is a normal mid-setup state; the badge exists so it doesn't stay that way silently.</li>
       <li><strong>Bulk-creating at a location that already has one</strong> — allowed. The new checkpoint's name gets a numeric suffix so the two are distinguishable without a rename.</li>
       <li><strong>Adding to a tour that already contains some of the selection</strong> — the overlap is skipped, so the action is safely repeatable and never produces duplicate membership.</li>

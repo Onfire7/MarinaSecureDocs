@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { db, id } from "../../lib/db";
 import { matchesTerms, queryTerms } from "../../lib/search";
+import { groupByLocation, locationPathResolver } from "../../lib/checkpoints";
 import { MultiSelectDialog } from "../shared/MultiSelectDialog";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
+import { DraftInput, DraftNumberInput } from "../shared/DraftInput";
 
 // Admin — Checkpoints (see docs/pages/admin-checkpoints.html).
 // Gated by manage_locations, the same permission as Locations and Tours,
@@ -54,24 +56,9 @@ function Checkpoints() {
   const tours = data?.tours ?? [];
 
   // Full ancestor path per location — "Slip 14" is meaningless on its own
-  // when every dock has one, and the path is what the filter searches.
-  const pathOf = useMemo(() => {
-    const byId = new Map(locations.map((l) => [l.id, l]));
-    const cache = new Map<string, string>();
-    const resolve = (locationId: string, guard = 0): string => {
-      const cached = cache.get(locationId);
-      if (cached != null) return cached;
-      const l = byId.get(locationId);
-      if (!l) return "";
-      const parentId = l.parent?.id;
-      const prefix =
-        parentId && guard < 30 ? resolve(parentId, guard + 1) : "";
-      const full = prefix ? `${prefix} → ${l.name}` : l.name;
-      cache.set(locationId, full);
-      return full;
-    };
-    return resolve;
-  }, [locations]);
+  // when every dock has one, and the path is what the filter searches and
+  // what each group is headed by.
+  const pathOf = useMemo(() => locationPathResolver(locations), [locations]);
 
   const checkpoints = useMemo(() => {
     const all = (data?.checkpoints ?? []) as CheckpointRow[];
@@ -96,6 +83,10 @@ function Checkpoints() {
         );
       });
   }, [data, filter, onlyUnused, pathOf]);
+
+  // Grouped under their location, so the row itself only has to carry the
+  // checkpoint's own name.
+  const groups = useMemo(() => groupByLocation(checkpoints, pathOf), [checkpoints, pathOf]);
 
   const visibleIds = checkpoints.map((c) => c.id);
   const allVisibleSelected =
@@ -247,16 +238,44 @@ function Checkpoints() {
         </div>
       )}
 
+      <div>
+        {groups.map((g) => {
+          const ids = g.items.map((c) => c.id);
+          const allOn = ids.every((cid) => selected.has(cid));
+          return (
+            <div key={g.locationId || "none"}>
+              <div className="group-heading">
+                <span>{g.label}</span>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-quiet"
+                  onClick={() => {
+                    const next = new Set(selected);
+                    for (const cid of ids) {
+                      if (allOn) next.delete(cid);
+                      else next.add(cid);
+                    }
+                    setSelected(next);
+                  }}
+                >
+                  {allOn ? "None" : "All"} · {g.items.length}
+                </button>
+              </div>
+              <div className="stack" style={{ gap: 6 }}>
+                {g.items.map((c) => (
+                  <CheckpointCard
+                    key={c.id}
+                    checkpoint={c}
+                    selected={selected.has(c.id)}
+                    onToggleSelect={() => toggle(c.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
       <div className="stack" style={{ gap: 6 }}>
-        {checkpoints.map((c) => (
-          <CheckpointCard
-            key={c.id}
-            checkpoint={c}
-            path={c.location ? pathOf(c.location.id) : ""}
-            selected={selected.has(c.id)}
-            onToggleSelect={() => toggle(c.id)}
-          />
-        ))}
         {checkpoints.length === 0 && (
           <div className="placeholder">
             <div className="big">
@@ -304,12 +323,10 @@ function Checkpoints() {
 
 function CheckpointCard({
   checkpoint,
-  path,
   selected,
   onToggleSelect,
 }: {
   checkpoint: CheckpointRow;
-  path: string;
   selected: boolean;
   onToggleSelect: () => void;
 }) {
@@ -341,17 +358,15 @@ function CheckpointCard({
             aria-label={`Select ${checkpoint.name}`}
           />
           <span style={{ minWidth: 0 }}>
-            <input
+            <DraftInput
               className="input select-inline"
               value={checkpoint.name}
               aria-label="Checkpoint name"
-              onChange={(e) => update({ name: e.target.value })}
+              onCommit={(name) => update({ name })}
             />
-            <span className="card-meta" style={{ display: "block" }}>
-              {path || (
-                <span className="badge badge-warn">No location</span>
-              )}
-            </span>
+            {/* The group heading already states where this is; repeating the
+                path on every row is the noise that pushed marinas into
+                naming checkpoints after their location in the first place. */}
           </span>
         </span>
         <div className="row">
@@ -383,43 +398,30 @@ function CheckpointCard({
         <div style={{ marginTop: 10 }}>
           <div className="row" style={{ flexWrap: "wrap" }}>
             <span className="small muted">GPS</span>
-            <input
-              type="number"
+            <DraftNumberInput
               className="input select-inline"
               style={{ width: 120 }}
               placeholder="lat"
-              value={checkpoint.gpsLat ?? ""}
-              onChange={(e) =>
-                update({
-                  gpsLat: e.target.value === "" ? undefined : Number(e.target.value),
-                })
-              }
+              aria-label="Latitude"
+              value={checkpoint.gpsLat}
+              onCommit={(gpsLat) => update({ gpsLat })}
             />
-            <input
-              type="number"
+            <DraftNumberInput
               className="input select-inline"
               style={{ width: 120 }}
               placeholder="lng"
-              value={checkpoint.gpsLng ?? ""}
-              onChange={(e) =>
-                update({
-                  gpsLng: e.target.value === "" ? undefined : Number(e.target.value),
-                })
-              }
+              aria-label="Longitude"
+              value={checkpoint.gpsLng}
+              onCommit={(gpsLng) => update({ gpsLng })}
             />
             <span className="small muted">radius (m)</span>
-            <input
-              type="number"
+            <DraftNumberInput
               className="input select-inline"
               style={{ width: 110 }}
               placeholder="marina default"
-              value={checkpoint.gpsValidationRadius ?? ""}
-              onChange={(e) =>
-                update({
-                  gpsValidationRadius:
-                    e.target.value === "" ? undefined : Number(e.target.value),
-                })
-              }
+              aria-label="GPS radius override"
+              value={checkpoint.gpsValidationRadius}
+              onCommit={(gpsValidationRadius) => update({ gpsValidationRadius })}
             />
           </div>
 

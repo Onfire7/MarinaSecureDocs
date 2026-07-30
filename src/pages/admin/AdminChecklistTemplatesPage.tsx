@@ -14,6 +14,8 @@ import { LocationPicker } from "../shared/LocationPicker";
 import { MultiSelectDialog } from "../shared/MultiSelectDialog";
 import { ReorderableList } from "../shared/ReorderableList";
 import { AdminHeader } from "./AdminHomePage";
+import { DraftInput } from "../shared/DraftInput";
+import { groupByLocation, locationPathResolver } from "../../lib/checkpoints";
 
 // Admin — Checklist Templates (see docs/pages/admin-checklist-templates.html).
 // manage_checklists governs Global and Role-restricted templates. Personal
@@ -29,6 +31,7 @@ export function AdminChecklistTemplatesPage() {
     checklistTemplates: { items: {}, role: {}, creator: {}, checkpoints: {} },
     roles: {},
     checkpoints: { location: {} },
+    locations: { parent: {} },
   });
 
   const templates = useMemo(() => {
@@ -43,6 +46,10 @@ export function AdminChecklistTemplatesPage() {
   }, [data, canManage, current.user]);
 
   const roles = data?.roles ?? [];
+  const pathOf = useMemo(
+    () => locationPathResolver(data?.locations ?? []),
+    [data],
+  );
   const allCheckpoints = useMemo(
     () =>
       [...(data?.checkpoints ?? [])].sort((a, b) =>
@@ -106,6 +113,7 @@ export function AdminChecklistTemplatesPage() {
             template={t}
             roles={roles}
             allCheckpoints={allCheckpoints}
+            pathOf={pathOf}
             expanded={editing === t.id}
             onToggle={() => setEditing(editing === t.id ? null : t.id)}
             onDuplicated={setEditing}
@@ -156,6 +164,7 @@ function TemplateCard({
   template,
   roles,
   allCheckpoints,
+  pathOf,
   expanded,
   onToggle,
   onDuplicated,
@@ -163,6 +172,7 @@ function TemplateCard({
   template: TemplateRow;
   roles: { id: string; name: string }[];
   allCheckpoints: { id: string; name: string; location?: { id: string; name: string } | null }[];
+  pathOf: (locationId: string) => string;
   expanded: boolean;
   onToggle: () => void;
   onDuplicated: (templateId: string) => void;
@@ -171,8 +181,25 @@ function TemplateCard({
   const update = (fields: Record<string, unknown>) =>
     void db.transact(db.tx.checklistTemplates[template.id].update(fields));
 
-  const checkpointMembers = template.checkpoints ?? [];
+  // Memoized because `?? []` mints a new array each render, which would
+  // rebuild the grouping below every time.
+  const checkpointMembers = useMemo(
+    () => template.checkpoints ?? [],
+    [template.checkpoints],
+  );
   const checkpointMemberIds = new Set(checkpointMembers.map((c) => c.id));
+  // template.checkpoints carries no location, so resolve each against the
+  // full list before grouping.
+  const attachedGroups = useMemo(
+    () =>
+      groupByLocation(
+        checkpointMembers.map(
+          (m) => allCheckpoints.find((c) => c.id === m.id) ?? { ...m, location: null },
+        ),
+        pathOf,
+      ),
+    [checkpointMembers, allCheckpoints, pathOf],
+  );
   const addCheckpoints = (ids: string[]) => {
     if (ids.length === 0) return;
     void db.transact(
@@ -320,10 +347,10 @@ function TemplateCard({
             <div>
               <div className="field">
                 <span className="field-label">Name</span>
-                <input
+                <DraftInput
                   className="input"
                   value={template.name}
-                  onChange={(e) => update({ name: e.target.value })}
+                  onCommit={(name) => update({ name })}
                 />
               </div>
 
@@ -382,12 +409,13 @@ function TemplateCard({
                   <div style={{ marginTop: 6 }}>
                     <div className="row">
                       <span className="small muted">Applies between</span>
-                      <input
+                      <DraftInput
                         type="time"
                         className="input select-inline"
+                        aria-label="Start of window"
                         value={cfg.timeStart ?? ""}
-                        onChange={(e) =>
-                          update({ triggerConfig: { ...cfg, timeStart: e.target.value } })
+                        onCommit={(timeStart) =>
+                          update({ triggerConfig: { ...cfg, timeStart } })
                         }
                       />
                       {cfg.timeStart && (
@@ -403,12 +431,13 @@ function TemplateCard({
                         </button>
                       )}
                       <span className="small muted">and</span>
-                      <input
+                      <DraftInput
                         type="time"
                         className="input select-inline"
+                        aria-label="End of window"
                         value={cfg.timeEnd ?? ""}
-                        onChange={(e) =>
-                          update({ triggerConfig: { ...cfg, timeEnd: e.target.value } })
+                        onCommit={(timeEnd) =>
+                          update({ triggerConfig: { ...cfg, timeEnd } })
                         }
                       />
                       {cfg.timeEnd && (
@@ -432,13 +461,14 @@ function TemplateCard({
                   </div>
                 )}
                 {template.triggerType === "scheduled" && (
-                  <input
+                  <DraftInput
                     className="input select-inline"
                     style={{ marginTop: 6 }}
                     placeholder="Schedule expression, e.g. 0 6 * * *"
+                    aria-label="Schedule expression"
                     value={cfg.schedule ?? ""}
-                    onChange={(e) =>
-                      update({ triggerConfig: { ...cfg, schedule: e.target.value } })
+                    onCommit={(schedule) =>
+                      update({ triggerConfig: { ...cfg, schedule } })
                     }
                   />
                 )}
@@ -446,16 +476,23 @@ function TemplateCard({
                   <div style={{ marginTop: 6 }}>
                     <span className="small muted">Checkpoints</span>
                     <div className="stack" style={{ gap: 4, marginTop: 4 }}>
-                      {checkpointMembers.map((c) => (
-                        <div key={c.id} className="row spread">
-                          <span className="small">{c.name}</span>
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-quiet"
-                            onClick={() => removeCheckpoint(c.id)}
-                          >
-                            Remove
-                          </button>
+                      {attachedGroups.map((g) => (
+                        <div key={g.locationId || "none"}>
+                          <div className="group-heading">
+                            <span>{g.label}</span>
+                          </div>
+                          {g.items.map((c) => (
+                            <div key={c.id} className="row spread">
+                              <span className="small">{c.name}</span>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-quiet"
+                                onClick={() => removeCheckpoint(c.id)}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       ))}
                       {checkpointMembers.length === 0 && (
@@ -550,7 +587,7 @@ function TemplateCard({
             .map((c) => ({
               id: c.id,
               name: c.name,
-              group: c.location?.name ?? "No location",
+              group: c.location ? pathOf(c.location.id) : "No location",
             }))}
           onConfirm={addCheckpoints}
           onClose={() => setAddingCheckpoints(false)}
@@ -584,14 +621,14 @@ function ItemRow({
       <div className="spread">
         <span className="row" style={{ minWidth: 0 }}>
           <span className="badge">{itemTypeLabel(item.type)}</span>
-          <input
+          <DraftInput
             className="input select-inline"
             style={{ minWidth: 0 }}
             value={item.label}
             aria-label="Item label"
-            onChange={(e) =>
+            onCommit={(label) =>
               void db.transact(
-                db.tx.checklistTemplateItems[item.id].update({ label: e.target.value }),
+                db.tx.checklistTemplateItems[item.id].update({ label }),
               )
             }
           />

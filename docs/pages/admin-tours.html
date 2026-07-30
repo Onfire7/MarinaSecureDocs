@@ -47,7 +47,7 @@
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Name</td><td>Tour.name</td><td></td></tr>
       <tr><td>Mode</td><td>Tour.mode</td><td>Linear / Freeform / Randomized — see <a href="../workflows.html">Role Workflows</a> for the guard-facing behavior each implies.</td></tr>
-      <tr><td>Checkpoints</td><td>Tour.checkpoints</td><td>Ordered for Linear mode; an unordered set for Freeform/Randomized.</td></tr>
+      <tr><td>Checkpoints</td><td>Tour.checkpoints</td><td>Ordered for Linear mode; an unordered set for Freeform/Randomized. Presentation follows that split: Linear stays one flat ordered list, because the sequence <em>is</em> what's being edited and grouping would scatter it. The unordered modes group under the parent location like every other checkpoint list, so member names don't have to repeat where they are.</td></tr>
     </table>
 
     <h2>Actions</h2>

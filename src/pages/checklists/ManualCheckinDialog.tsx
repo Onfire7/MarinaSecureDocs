@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { db } from "../../lib/db";
 import { distanceMeters } from "../../lib/geo";
+import { groupByLocation } from "../../lib/checkpoints";
 import { useCheckpointVisit } from "./useCheckpointVisit";
 
 // Checklists & Tours — Manual Check-In Dialog (see pages/manual-checkin-dialog.html).
@@ -85,20 +86,35 @@ export function ManualCheckinDialog({
                 <option value="">
                   {here ? "Select — nearest first…" : "Select…"}
                 </option>
-                {checkpoints.map((cp) => {
-                  const d = (cp as { distance?: number }).distance;
-                  const near =
-                    d != null && Number.isFinite(d)
-                      ? ` · ${d < 1000 ? `${Math.round(d)} m` : `${(d / 1000).toFixed(1)} km`} away`
-                      : "";
-                  return (
-                    <option key={cp.id} value={cp.id}>
-                      {cp.name}
-                      {cp.location?.name ? ` — ${cp.location.name}` : ""}
-                      {near}
-                    </option>
-                  );
-                })}
+                {/* With GPS the useful order is by distance, which grouping
+                    would destroy — so the location rides along on each row.
+                    Without GPS there's no meaningful order to preserve, so
+                    the list groups under its location instead and each
+                    option carries only the checkpoint's own name. */}
+                {here
+                  ? checkpoints.map((cp) => {
+                      const d = (cp as { distance?: number }).distance;
+                      const near =
+                        d != null && Number.isFinite(d)
+                          ? ` · ${d < 1000 ? `${Math.round(d)} m` : `${(d / 1000).toFixed(1)} km`} away`
+                          : "";
+                      return (
+                        <option key={cp.id} value={cp.id}>
+                          {cp.name}
+                          {cp.location?.name ? ` — ${cp.location.name}` : ""}
+                          {near}
+                        </option>
+                      );
+                    })
+                  : groupByLocation(checkpoints).map((g) => (
+                      <optgroup key={g.locationId || "none"} label={g.label}>
+                        {g.items.map((cp) => (
+                          <option key={cp.id} value={cp.id}>
+                            {cp.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
               </select>
             </div>
             <div className="field">

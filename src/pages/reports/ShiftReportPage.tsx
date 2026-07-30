@@ -20,7 +20,9 @@ export function ShiftReportPage() {
     shiftId
       ? {
           shifts: { $: { where: { id: shiftId } }, guard: {} },
-          checkIns: { checkpoint: {}, user: {} },
+          // The checkpoint's location comes along so the log can say where
+          // each check-in happened without the name having to carry it.
+          checkIns: { checkpoint: { location: {} }, user: {} },
           checklists: { template: {}, assignedTo: {} },
           incidents: { author: {} },
           tickets: { createdBy: {} },
@@ -126,7 +128,12 @@ export function ShiftReportPage() {
           <Section title={`Check-ins (${checkIns.length})`}>
             {checkIns.map((c) => (
               <div key={c.id} className="card spread">
-                <span>{c.checkpoint?.name ?? "Unknown checkpoint"}</span>
+                <span>
+                  {c.checkpoint?.name ?? "Unknown checkpoint"}
+                  {c.checkpoint?.location?.name && (
+                    <span className="muted"> · {c.checkpoint.location.name}</span>
+                  )}
+                </span>
                 <span className="muted small">
                   {c.method === "manual" ? "Manual" : "Scanned"}
                   {c.withinRadius === false && " · outside radius"} ·{" "}
