@@ -65,23 +65,33 @@ export function checkpointGuidFromUrl(url: string): string | null {
   return match ? match[1] : null;
 }
 
-// The Vibration API needs no permission and no capability check beyond its
-// own presence — missing on iOS Safari and desktop entirely, harmless to
-// call anyway since `"vibrate" in navigator` gates it.
+// The Vibration API has no permission prompt (unlike camera/mic/geolocation)
+// — Chrome just silently no-ops navigator.vibrate() and returns false if the
+// frame has never seen a genuine user gesture (sticky activation, so a click
+// anywhere on the page satisfies it permanently — it isn't a narrow "must be
+// within this same event handler" window). Both call sites here are already
+// downstream of a real click (the NFC toggle, the Write tag button), so that
+// should be satisfied; logging the false case anyway distinguishes "browser
+// rejected it" from "device haptics are just off," which otherwise look
+// identical from here.
 function vibrate(pattern: number | number[]): void {
-  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-    navigator.vibrate(pattern);
+  if (typeof navigator === "undefined" || !("vibrate" in navigator)) return;
+  const accepted = navigator.vibrate(pattern);
+  if (!accepted) {
+    console.warn(
+      "navigator.vibrate() was rejected — no user gesture registered on this page yet.",
+    );
   }
 }
 
 /** Brief haptic ack that a checkpoint tag was recognized while scanning. */
 export function vibrateScanAck(): void {
-  vibrate(80);
+  vibrate(200);
 }
 
 /** Two short pulses acknowledging a tag was successfully written. */
 export function vibrateWriteAck(): void {
-  vibrate([80, 80, 80]);
+  vibrate([150, 100, 150]);
 }
 
 /** A short, guard-facing explanation for a failed read or write. */
