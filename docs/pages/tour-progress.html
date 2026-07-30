@@ -41,13 +41,14 @@
 
     <h2>Purpose</h2>
     <p>Reached from the Tours tab on <a href="checklist-list.html">Checklist list</a>. Read-only progress tracker — actual check-ins happen through <a href="checkpoint-checkin.html">Checkpoint check-in</a> or the <a href="manual-checkin-dialog.html">manual dialog</a>, not here.</p>
+    <p><strong>Ordering principle: remaining stops lead the page; visited ones drop into one collapsed "Visited this shift · N" section at the bottom</strong> (grouped by location, each linking to its checkpoint). Mid-round the visited list only grows, so interleaving it with the route buried the round's actual state deeper with every scan. A header badge ("4 of 6 remaining" / "All visited this shift ✓") and a progress bar answer the state question before any list is read.</p>
 
     <h2>Data shown, by mode</h2>
     <table>
       <tr><th>Mode</th><th>Display</th></tr>
-      <tr><td>Linear</td><td>The full ordered checkpoint list from <code>Tour.checkpoints</code>, with completed checkpoints marked and the next one highlighted.</td></tr>
-      <tr><td>Freeform</td><td>The full checkpoint set, marked visited/remaining, in no particular order — all must be visited before shift end but order is the guard's choice.</td></tr>
-      <tr><td>Randomized</td><td>Only the currently-available next checkpoint(s) are shown, plus a remaining count. The rest of the set is deliberately withheld so patrol patterns stay unpredictable, per <a href="../workflows.html">Role Workflows</a>.</td></tr>
+      <tr><td>Linear</td><td>The next stop as a hero card ("NEXT — STOP 3 OF 6", name, location), then the rest of the route in order under "Then". Sequence numbers are positions in the full route, so they stay stable as stops are completed. Visited stops appear only in the collapsed section.</td></tr>
+      <tr><td>Freeform</td><td>The remaining set grouped by parent location — which is how a guard works a round: finish this dock, move on. All must be visited before shift end but order is the guard's choice.</td></tr>
+      <tr><td>Randomized</td><td>Only the currently-available next checkpoint is shown, plus a remaining count. The rest of the set is deliberately withheld so patrol patterns stay unpredictable, per <a href="../workflows.html">Role Workflows</a>. The collapsed visited section is shown as in the other modes — it reveals nothing about what remains.</td></tr>
     </table>
 
     <h2>Actions</h2>

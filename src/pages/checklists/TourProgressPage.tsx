@@ -2,56 +2,27 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { db } from "../../lib/db";
 import { groupByLocation } from "../../lib/checkpoints";
-import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { ManualCheckinDialog } from "./ManualCheckinDialog";
+import { useShiftVisits } from "./useShiftVisits";
 
 // Checklists & Tours — Tour Progress View (see pages/tour-progress.html).
 // Security-only. Progress is derived from the current guard's own check-ins
 // timestamped within their current Shift window — a new shift starts every
 // tour fresh, with no separate "reset" action.
+//
+// Work-first ordering: what's still to visit leads the page, and visited
+// checkpoints drop into one collapsed section at the bottom. Mid-round, the
+// visited list only grows — interleaving it with the remaining stops meant
+// the round's actual state was buried deeper with every scan.
 export function TourProgressPage() {
   const { tourId } = useParams();
-  const current = useCurrent();
-  const userId = current.user?.id;
   const [manualCheckin, setManualCheckin] = useState(false);
 
   const { data } = db.useQuery(
     tourId ? { tours: { $: { where: { id: tourId } }, checkpoints: { location: {} } } } : null,
   );
   const tour = data?.tours?.[0];
-
-  const { data: shiftData } = db.useQuery(
-    userId
-      ? { shifts: { $: { where: { "guard.id": userId, endedAt: { $isNull: true } } } } }
-      : null,
-  );
-  const activeShift = shiftData?.shifts?.[0];
-
-  const checkpointIds = (tour?.checkpoints ?? []).map((c) => c.id);
-  const { data: checkInData } = db.useQuery(
-    userId && activeShift && checkpointIds.length > 0
-      ? {
-          checkIns: {
-            $: {
-              where: {
-                "user.id": userId,
-                "checkpoint.id": { $in: checkpointIds },
-                timestamp: { $gt: new Date(activeShift.startedAt) },
-              },
-            },
-            // Filtering on checkpoint.id does not load the link — without
-            // this the rows come back with no checkpoint and nothing ever
-            // reads as visited.
-            checkpoint: {},
-          },
-        }
-      : null,
-  );
-  const visitedIds = new Set(
-    (checkInData?.checkIns ?? [])
-      .map((c) => c.checkpoint?.id)
-      .filter((cid): cid is string => Boolean(cid)),
-  );
+  const { activeShift, visitedIds } = useShiftVisits();
 
   if (!tour) {
     return (
@@ -61,7 +32,9 @@ export function TourProgressPage() {
     );
   }
 
-  const checkpointsById = new Map((tour.checkpoints ?? []).map((c) => [c.id, c]));
+  const checkpoints = tour.checkpoints ?? [];
+  const visited = checkpoints.filter((c) => visitedIds.has(c.id));
+  const remaining = checkpoints.filter((c) => !visitedIds.has(c.id));
 
   if (!activeShift) {
     return (
@@ -98,31 +71,74 @@ export function TourProgressPage() {
           Check in manually
         </button>
       </div>
-      <div className="badge" style={{ marginBottom: 10 }}>
-        {modeLabel(tour.mode)}
+      <div className="row" style={{ marginBottom: 10, flexWrap: "wrap" }}>
+        <span className="badge">{modeLabel(tour.mode)}</span>
+        <span className={"badge" + (remaining.length === 0 ? " badge-good" : " badge-warn")}>
+          {remaining.length === 0
+            ? "All visited this shift ✓"
+            : `${remaining.length} of ${checkpoints.length} remaining`}
+        </span>
       </div>
+      {checkpoints.length > 0 && (
+        <div className="progress-track" style={{ marginBottom: 14 }}>
+          <div
+            className="progress-fill"
+            style={{ width: `${(visited.length / checkpoints.length) * 100}%` }}
+          />
+        </div>
+      )}
 
       {manualCheckin && (
         <ManualCheckinDialog onClose={() => setManualCheckin(false)} />
       )}
 
       {tour.mode === "linear" && (
-        <LinearProgress
-          checkpointsById={checkpointsById}
+        <LinearRemaining
+          checkpoints={checkpoints}
           order={tour.checkpointOrder ?? []}
           visitedIds={visitedIds}
         />
       )}
       {tour.mode === "freeform" && (
-        <FreeformProgress checkpoints={tour.checkpoints ?? []} visitedIds={visitedIds} />
+        <FreeformRemaining remaining={remaining} />
       )}
       {tour.mode === "randomized" && (
-        <RandomizedProgress
+        <RandomizedNext
           tourId={tour.id}
           shiftId={activeShift.id}
-          checkpoints={tour.checkpoints ?? []}
-          visitedIds={visitedIds}
+          remaining={remaining}
+          visitedCount={visited.length}
         />
+      )}
+
+      {visited.length > 0 && (
+        <details className="section-collapse" style={{ marginTop: 16 }}>
+          <summary>
+            <span className="section-title" style={{ marginBottom: 0 }}>
+              Visited this shift · {visited.length}
+            </span>
+          </summary>
+          <div className="stack" style={{ gap: 4, marginTop: 8 }}>
+            {groupByLocation(visited).map((g) => (
+              <div key={g.locationId || "none"}>
+                <div className="group-heading">
+                  <span>{g.label}</span>
+                </div>
+                {g.items.map((cp) => (
+                  <Link
+                    key={cp.id}
+                    to={`/locations/checkpoints/${cp.id}`}
+                    className="spread muted small"
+                    style={{ textDecoration: "none", padding: "4px 0" }}
+                  >
+                    <span>{cp.name}</span>
+                    <span className="badge badge-good">✓</span>
+                  </Link>
+                ))}
+              </div>
+            ))}
+          </div>
+        </details>
       )}
     </div>
   );
@@ -138,69 +154,100 @@ type Checkpoint = {
   location?: { id: string; name: string } | null;
 };
 
-function LinearProgress({
-  checkpointsById,
+// The next stop is a hero card — mid-round the only question is "where to
+// now?" — with the rest of the route listed in order beneath it. Visited
+// rows aren't shown here at all; they live in the shared collapsed section.
+function LinearRemaining({
+  checkpoints,
   order,
   visitedIds,
 }: {
-  checkpointsById: Map<string, Checkpoint>;
+  checkpoints: Checkpoint[];
   order: string[];
-  visitedIds: Set<string | undefined>;
+  visitedIds: Set<string>;
 }) {
-  const ids = order.length > 0 ? order : [...checkpointsById.keys()];
-  const nextIndex = ids.findIndex((id) => !visitedIds.has(id));
+  const byId = new Map(checkpoints.map((c) => [c.id, c]));
+  const ids = order.length > 0 ? order : checkpoints.map((c) => c.id);
+  const remainingIds = ids.filter((cpId) => byId.has(cpId) && !visitedIds.has(cpId));
+
+  if (remainingIds.length === 0) {
+    return (
+      <div className="placeholder">
+        <div className="big">Route complete</div>
+        Every checkpoint on this tour has been visited this shift.
+      </div>
+    );
+  }
+
+  const [nextId, ...upcoming] = remainingIds;
+  const next = byId.get(nextId)!;
+
   return (
-    <table className="table">
-      <thead>
-        <tr>
-          <th></th>
-          <th>Checkpoint</th>
-        </tr>
-      </thead>
-      <tbody>
-        {ids.map((cpId, i) => {
-          const cp = checkpointsById.get(cpId);
-          if (!cp) return null;
-          const visited = visitedIds.has(cpId);
-          const isNext = i === nextIndex;
-          return (
-            <tr key={cpId}>
-              <td>{visited ? <span className="badge badge-good">✓</span> : isNext ? "→" : ""}</td>
-              <td>
-                <Link to={`/locations/checkpoints/${cpId}`}>
-                  {isNext ? <strong>{cp.name} (next)</strong> : cp.name}
+    <div>
+      <Link
+        to={`/locations/checkpoints/${next.id}`}
+        className="card"
+        style={{ display: "block", textDecoration: "none", color: "inherit" }}
+      >
+        <div className="card-meta">NEXT — STOP {ids.indexOf(nextId) + 1} OF {ids.length}</div>
+        <div className="card-title" style={{ fontSize: "1.2rem" }}>
+          {next.name}
+        </div>
+        {next.location?.name && (
+          <div className="muted small">{next.location.name}</div>
+        )}
+      </Link>
+
+      {upcoming.length > 0 && (
+        <>
+          <div className="section-title" style={{ marginTop: 12 }}>
+            Then
+          </div>
+          <div className="stack" style={{ gap: 4 }}>
+            {upcoming.map((cpId) => {
+              const cp = byId.get(cpId)!;
+              return (
+                <Link
+                  key={cpId}
+                  to={`/locations/checkpoints/${cpId}`}
+                  className="card spread"
+                  style={{ textDecoration: "none", color: "inherit" }}
+                >
+                  <span className="small">
+                    <span className="muted">{ids.indexOf(cpId) + 1}. </span>
+                    {cp.name}
+                    {cp.location?.name && (
+                      <span className="muted"> · {cp.location.name}</span>
+                    )}
+                  </span>
                 </Link>
-                {cp.location?.name && (
-                  <div className="muted small">{cp.location.name}</div>
-                )}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
-function FreeformProgress({
-  checkpoints,
-  visitedIds,
-}: {
-  checkpoints: Checkpoint[];
-  visitedIds: Set<string | undefined>;
-}) {
-  // Freeform imposes no sequence, so the list groups by location — which is
-  // also how a guard thinks about a round: finish this dock, move to the next.
-  const groups = groupByLocation(checkpoints);
+function FreeformRemaining({ remaining }: { remaining: Checkpoint[] }) {
+  if (remaining.length === 0) {
+    return (
+      <div className="placeholder">
+        <div className="big">Round complete</div>
+        Every checkpoint on this tour has been visited this shift.
+      </div>
+    );
+  }
+  // Freeform imposes no sequence, so the remaining stops group by location —
+  // which is also how a guard works a round: finish this dock, move on.
   return (
     <div>
-      {groups.map((g) => (
+      {groupByLocation(remaining).map((g) => (
         <div key={g.locationId || "none"}>
           <div className="group-heading">
             <span>{g.label}</span>
-            <span>
-              {g.items.filter((c) => visitedIds.has(c.id)).length}/{g.items.length}
-            </span>
+            <span>{g.items.length}</span>
           </div>
           <div className="stack">
             {g.items.map((cp) => (
@@ -211,9 +258,7 @@ function FreeformProgress({
                 style={{ textDecoration: "none", color: "inherit" }}
               >
                 <span className="card-title">{cp.name}</span>
-                <span className={"badge" + (visitedIds.has(cp.id) ? " badge-good" : "")}>
-                  {visitedIds.has(cp.id) ? "Visited" : "Remaining"}
-                </span>
+                <span className="badge">Remaining</span>
               </Link>
             ))}
           </div>
@@ -224,39 +269,34 @@ function FreeformProgress({
 }
 
 // Randomized mode deliberately withholds the full remaining route — only the
-// next available checkpoint(s) are surfaced, chosen deterministically from
-// how many stops into this shift's round the guard is, so the pick is stable
+// next available checkpoint is surfaced, chosen deterministically from how
+// many stops into this shift's round the guard is, so the pick is stable
 // across reloads without ever exposing the rest of the set.
-function RandomizedProgress({
+function RandomizedNext({
   tourId,
   shiftId,
-  checkpoints,
-  visitedIds,
+  remaining,
+  visitedCount,
 }: {
   tourId: string;
   shiftId: string;
-  checkpoints: Checkpoint[];
-  visitedIds: Set<string | undefined>;
+  remaining: Checkpoint[];
+  visitedCount: number;
 }) {
-  const unvisited = checkpoints.filter((cp) => !visitedIds.has(cp.id));
-  if (unvisited.length === 0) {
+  if (remaining.length === 0) {
     return (
       <div className="placeholder">
         <div className="big">All checkpoints visited this shift</div>
       </div>
     );
   }
-  const idx = hashIndex(`${tourId}:${shiftId}:${visitedIds.size}`, unvisited.length);
-  const next = unvisited[idx];
+  const idx = hashIndex(`${tourId}:${shiftId}:${visitedCount}`, remaining.length);
+  const next = remaining[idx];
   return (
     <div>
-      <p className="muted small">
-        Only the next available checkpoint is shown — not the full remaining set — so patrol
-        patterns stay unpredictable.
-      </p>
       <div className="card">
         <div className="card-meta">NEXT CHECKPOINT</div>
-        <div className="card-title">{next.name}</div>
+        <div className="card-title" style={{ fontSize: "1.2rem" }}>{next.name}</div>
         {next.location?.name && (
           <div className="muted small">{next.location.name}</div>
         )}
@@ -266,9 +306,10 @@ function RandomizedProgress({
           </Link>
         </div>
       </div>
-      <div className="card-meta" style={{ marginTop: 8 }}>
-        {unvisited.length} checkpoint{unvisited.length === 1 ? "" : "s"} remaining (count only)
-      </div>
+      <p className="muted small" style={{ marginTop: 8 }}>
+        Only the next checkpoint is shown — {remaining.length} remaining in
+        total — so patrol patterns stay unpredictable.
+      </p>
     </div>
   );
 }

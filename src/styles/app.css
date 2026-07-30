@@ -901,6 +901,21 @@ h3 {
   background: var(--fill);
 }
 
+/* ---------- Shift progress ---------- */
+
+.progress-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--fill);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
 /* ---------- Grouped lists (checkpoints under their location) ---------- */
 
 .group-heading {
