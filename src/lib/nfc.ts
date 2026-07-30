@@ -120,12 +120,13 @@ function ack(pattern: number | number[], beepCount: number): void {
     const vibrated = vibrate(pattern);
     // Not gated on vibrate's reported success — a `true` return only means
     // the browser accepted the call, not that the phone actually physically
-    // vibrated. Confirmed on-device: navigator.vibrate() can return true
-    // with no felt vibration at all, since Android's vibration/haptics
-    // setting can suppress the motor independently of ringer/silent mode,
-    // with no way for the page to tell the difference. So the one channel
-    // we can actually confirm worked shouldn't be skipped on the other's
-    // word for it.
+    // vibrated. Confirmed on a Pixel 10 (Android 17): navigator.vibrate()
+    // returned true with no felt vibration at all, in both Chrome and
+    // Vivaldi, because Settings > Sound & vibration > Vibration & haptics >
+    // Interactive haptics > Touch Feedback was off — a system setting
+    // independent of ringer/silent mode, with no way for the page to
+    // detect it. So the one channel we can actually confirm worked
+    // shouldn't be skipped on the other's word for it.
     chime(beepCount);
     if (!vibrated) {
       console.warn("navigator.vibrate() was rejected or unsupported; chimed instead.");
