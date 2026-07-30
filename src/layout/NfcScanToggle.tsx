@@ -45,7 +45,18 @@ export function NfcScanToggle({ onScan }: { onScan: (checkpointGuid: string) => 
             : `checkpointGuidFromUrl did NOT match "${url}" against origin ${window.location.origin}`,
         );
         if (guid) {
-          vibrateScanAck();
+          // vibrateScanAck() has its own internal try/catch, but this is the
+          // one call standing between a matched tag and onScan() actually
+          // opening the checkpoint — an unexpected throw here must never be
+          // able to silently swallow the scan the way the earlier alert()
+          // did.
+          try {
+            vibrateScanAck();
+          } catch (err) {
+            nfcDebugLog(
+              `vibrateScanAck() THREW (ignored): ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`,
+            );
+          }
           onScan(guid);
         }
       }, controller.signal);

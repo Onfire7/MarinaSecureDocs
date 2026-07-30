@@ -153,6 +153,7 @@ function chime(beepCount: number): void {
 // console.warn only from here on.
 function ack(pattern: number | number[], beepCount: number): void {
   try {
+    nfcDebugLog(`ack() entered, pattern=${JSON.stringify(pattern)}`);
     const vibrated = vibrate(pattern);
     nfcDebugLog(`ack: navigator.vibrate(${JSON.stringify(pattern)}) returned ${vibrated}`);
     // Not gated on vibrate's reported success — a `true` return only means
@@ -162,11 +163,14 @@ function ack(pattern: number | number[], beepCount: number): void {
     // the difference, so the one channel we can actually confirm worked
     // shouldn't be skipped on the other's word for it.
     chime(beepCount);
+    nfcDebugLog(`ack: chime(${beepCount}) called`);
     if (!vibrated) {
       console.warn("navigator.vibrate() was rejected or unsupported; chimed instead.");
     }
   } catch (err) {
-    console.warn("NFC ack failed:", err);
+    nfcDebugLog(
+      `ack THREW: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`,
+    );
   }
 }
 
