@@ -56,6 +56,38 @@ const PLAN = [
       ["2697600a-2744-4206-b7be-3c4ed290273f", "\"Location Link Test\" — created to verify the new assets.location link post-schema-push"],
     ],
   },
+  // CheckpointScanModal verify runs against "The Point - Back Door" checkpoint
+  // (checkin-navigation regression check, then the inline-checklist-items
+  // feature, which was completed end to end), 2026-07-30.
+  {
+    ns: "checklistItemResults",
+    rows: [
+      ["6bd8b2b1-5fa8-4e07-a48d-47aa3764719b", "door_check result from the inline-items verify run (checklist 39fb2801)"],
+      ["3d6f2e1f-730a-4071-9590-fc1ba4b35ba2", "door_check result from the inline-items verify run (checklist 39fb2801)"],
+      ["cd6854f4-5ec5-4466-a468-cb9285acd5b6", "door_check result from the inline-items verify run (checklist 39fb2801)"],
+      ["0b46e63d-d396-47f5-b183-dd435518dd6e", "door_check result from the inline-items verify run (checklist 39fb2801)"],
+      ["b8b75aaa-bd77-4ec6-97a3-51c12915e598", "door_check result from the inline-items verify run (checklist 39fb2801)"],
+      ["67318e56-bd9a-4d70-9eee-d0cc6616faf5", "door_check result from the inline-items verify run (checklist 39fb2801)"],
+      ["90c4b041-de39-4a4e-98b9-0a2dbb63cf76", "door_check result from the inline-items verify run (checklist 39fb2801)"],
+      ["92841bdb-2b09-44e5-9485-bc4286a7f35b", "door_check result from the inline-items verify run (checklist 39fb2801)"],
+      ["9dfdcef5-8506-4b69-8467-30c9ee2aec8a", "door_check result from the inline-items verify run (checklist 39fb2801)"],
+      ["bf0933bc-ec86-4854-9373-ada57311e0f2", "door_check result from the inline-items verify run (checklist 39fb2801)"],
+    ],
+  },
+  {
+    ns: "checklists",
+    rows: [
+      ["2234e404-46f3-4f78-8000-000000000000", "left in_progress, no items answered — checkin-navigation regression check"],
+      ["39fb2801-7da5-4829-8000-000000000000", "completed end to end verifying inline checklist items in the scan modal"],
+    ],
+  },
+  {
+    ns: "checkIns",
+    rows: [
+      ["d71d74ee-c41f-4a8e-9eee-100995d45eec", "triggered checklist 2234e404"],
+      ["69b184f8-bd6d-4dc1-bf63-2b6fff015375", "triggered checklist 39fb2801"],
+    ],
+  },
 ];
 
 // Resolve every id against live data first, so a stale/typo'd id is reported

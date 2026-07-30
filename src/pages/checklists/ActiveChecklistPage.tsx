@@ -22,37 +22,75 @@ import {
 
 // Checklists & Tours — Active Checklist (see pages/active-checklist.html).
 // Item-by-item completion of an in-progress instance; every write here is
-// local-first InstantDB, so it works fully offline.
+// local-first InstantDB, so it works fully offline. The route wrapper below
+// just supplies the id and where to go afterward — ChecklistItemsPanel is
+// also embedded directly (compact, no navigation) by CheckpointScanModal, so
+// a checkpoint with one checklist (the common case) can be worked right from
+// the scan overlay instead of tapping through to this page.
 export function ActiveChecklistPage() {
   const { id: checklistId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo;
+
+  if (!checklistId) {
+    return (
+      <div className="placeholder">
+        <div className="big">Loading…</div>
+      </div>
+    );
+  }
+
+  return (
+    <ChecklistItemsPanel
+      checklistId={checklistId}
+      onSubmitted={() => navigate(returnTo ?? "/checklists")}
+      onComplete={() => navigate(`/checklists/${checklistId}`, { replace: true })}
+    />
+  );
+}
+
+export function ChecklistItemsPanel({
+  checklistId,
+  onSubmitted,
+  onComplete,
+  compact = false,
+}: {
+  checklistId: string;
+  /** Called right after a successful submit — optional since compact mode's
+   *  own "complete" branch above already reflects it, nothing else to do. */
+  onSubmitted?: () => void;
+  /**
+   * Called when the checklist turns out to already be complete (someone
+   * else finished it, or this same submit just did). Full-page mode hands
+   * off to the read-only detail page; compact mode ignores this — the
+   * "complete" branch below already renders its own small summary in place.
+   */
+  onComplete?: () => void;
+  /** Embedded inline (CheckpointScanModal) rather than as its own page. */
+  compact?: boolean;
+}) {
   const current = useCurrent();
   const isMobile = useIsMobile();
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo;
 
-  const { data } = db.useQuery(
-    checklistId
-      ? {
-          checklists: {
-            $: { where: { id: checklistId } },
-            template: { items: {} },
-            itemResults: { templateItem: {}, linkedTicket: {} },
-            assignedTo: {},
-            endedShift: {},
-          },
-        }
-      : null,
-  );
+  const { data } = db.useQuery({
+    checklists: {
+      $: { where: { id: checklistId } },
+      template: { items: {} },
+      itemResults: { templateItem: {}, linkedTicket: {} },
+      assignedTo: {},
+      endedShift: {},
+    },
+  });
   const checklist = data?.checklists?.[0];
 
   // Opening a Not Started checklist starts it — and, for a role-assigned
   // instance nobody has claimed yet, claims it for whoever opened it (see
   // pages/checklist-list.html — "opens (and implicitly claims) it"). Keyed by
   // checklist id since navigating into a nested Location-Based Check reuses
-  // this same route/component with a different id.
+  // this same component with a different id.
   const started = useRef<string | null>(null);
   useEffect(() => {
     if (!checklist || started.current === checklist.id) return;
@@ -105,7 +143,15 @@ export function ActiveChecklistPage() {
   }
 
   if (checklist.status === "complete") {
-    navigate(`/checklists/${checklist.id}`, { replace: true });
+    if (compact) {
+      return (
+        <div className="card card-done">
+          <div className="card-title">{checklist.template?.name ?? "Checklist"}</div>
+          <div className="card-meta">Complete</div>
+        </div>
+      );
+    }
+    onComplete?.();
     return null;
   }
 
@@ -173,7 +219,7 @@ export function ActiveChecklistPage() {
           ]
         : []),
     ]);
-    navigate(returnTo ?? "/checklists");
+    onSubmitted?.();
   };
 
   const componentFor = (type: string): ComponentType<ItemProps> => {
@@ -197,18 +243,34 @@ export function ActiveChecklistPage() {
 
   return (
     <div>
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">{checklist.template?.name ?? "Checklist"}</h1>
+      {compact ? (
+        <div className="spread" style={{ alignItems: "baseline" }}>
+          <div className="section-title" style={{ marginBottom: 0 }}>
+            {checklist.template?.name ?? "Checklist"}
+          </div>
           {items.length > 0 && (
-            <div className="page-sub">
+            <span className="muted small">
               {items.length - remaining} of {items.length} complete
-            </div>
+            </span>
           )}
         </div>
-      </div>
+      ) : (
+        <div className="page-head">
+          <div>
+            <h1 className="page-title">{checklist.template?.name ?? "Checklist"}</h1>
+            {items.length > 0 && (
+              <div className="page-sub">
+                {items.length - remaining} of {items.length} complete
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
-      <div className={isMobile ? "stack" : "grid-2"}>
+      <div
+        className={isMobile || compact ? "stack" : "grid-2"}
+        style={compact ? { marginTop: 8 } : undefined}
+      >
         {items.map((item) => {
           const Component = componentFor(item.type);
           return (
@@ -235,7 +297,7 @@ export function ActiveChecklistPage() {
         </div>
       )}
 
-      <div className="row" style={{ marginTop: 16 }}>
+      <div className="row" style={{ marginTop: compact ? 10 : 16 }}>
         <button
           type="button"
           className="btn btn-primary"
@@ -250,10 +312,12 @@ export function ActiveChecklistPage() {
         </button>
       </div>
 
-      <p className="muted small" style={{ marginTop: 10 }}>
-        Every item type here — {Object.values(ITEM_TYPE_LABEL).join(", ")} — writes locally
-        first and syncs automatically; leaving and resuming later preserves exact progress.
-      </p>
+      {!compact && (
+        <p className="muted small" style={{ marginTop: 10 }}>
+          Every item type here — {Object.values(ITEM_TYPE_LABEL).join(", ")} — writes locally
+          first and syncs automatically; leaving and resuming later preserves exact progress.
+        </p>
+      )}
     </div>
   );
 }

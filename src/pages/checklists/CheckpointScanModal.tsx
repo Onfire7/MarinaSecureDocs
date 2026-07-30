@@ -14,8 +14,13 @@ import { CheckpointCheckinView } from "./CheckpointCheckinPage";
  * Deliberately not `navigate("/checkin/:guidUrl")`: the guard might be
  * mid-checklist-item somewhere else in the app, and swapping the whole
  * screen out from under them would lose whatever they hadn't saved yet.
- * This sits on top instead — closing it (or heading into a checklist from
- * it) puts the guard back exactly where they were, untouched.
+ * This sits on top instead, and (via CheckpointCheckinView embedding
+ * ChecklistItemsPanel) the checklist's items are usable right here — a
+ * checkpoint almost always has exactly one, so there's no extra tap through
+ * a "Begin Checklist" link either. Closing just dismisses the overlay;
+ * whatever was underneath is exactly as it was. Raising an Incident is the
+ * one action that still navigates away — that's a deliberate bigger
+ * workflow, not something to cram into the overlay.
  */
 export function CheckpointScanModal({
   guidUrl,
@@ -71,7 +76,6 @@ export function CheckpointScanModal({
               onClose();
               navigate("/incidents/new", { state: { target } });
             }}
-            onNavigateAway={onClose}
           />
           {showNoteDialog && (
             <NoteDialog target={target} onClose={() => setShowNoteDialog(false)} />

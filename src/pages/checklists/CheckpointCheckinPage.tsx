@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import type { AttachmentTarget } from "../../lib/attachments";
 import { NoteDialog } from "../shared/NoteDialog";
 import { useCheckpointVisit } from "./useCheckpointVisit";
+import { ChecklistItemsPanel } from "./ActiveChecklistPage";
 
 const IDLE_TIMEOUT_MS = 10 * 60_000;
 
@@ -107,17 +108,12 @@ export function CheckpointCheckinView({
   canCreateIncidents,
   onNote,
   onIncident,
-  onNavigateAway,
 }: {
   checkpoint: { id: string; name: string; location?: { name: string } | null };
   visit: ReturnType<typeof useCheckpointVisit>;
   canCreateIncidents: boolean;
   onNote: () => void;
   onIncident: () => void;
-  /** Fired alongside the Begin/Resume Checklist link — a no-op on the full
-   *  page, but lets the scan modal dismiss itself as the guard heads into a
-   *  checklist rather than leaving a stale overlay behind. */
-  onNavigateAway?: () => void;
 }) {
   return (
     <>
@@ -136,26 +132,12 @@ export function CheckpointCheckinView({
           No checklist currently applies at this checkpoint.
         </div>
       ) : (
-        <div className="stack">
+        <div className="stack" style={{ gap: 14 }}>
+          {/* Almost always exactly one — shown ready to work right here
+              rather than behind an extra "Begin Checklist" tap. */}
           {visit.applicableChecklists.map((c) => (
             <div key={c.id} className="card">
-              <div className="card-title">{c.templateName}</div>
-              <div className="card-meta">
-                {c.status === "complete"
-                  ? "Complete"
-                  : c.status === "in_progress"
-                    ? "In Progress"
-                    : "Not Started"}
-              </div>
-              <div className="row" style={{ marginTop: 8 }}>
-                <Link
-                  to={`/checklists/${c.id}`}
-                  className="btn btn-primary btn-sm"
-                  onClick={onNavigateAway}
-                >
-                  {c.status === "not_started" ? "Begin Checklist" : "Resume Checklist"}
-                </Link>
-              </div>
+              <ChecklistItemsPanel checklistId={c.id} compact />
             </div>
           ))}
         </div>
