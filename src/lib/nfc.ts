@@ -120,14 +120,17 @@ function ack(pattern: number | number[], beepCount: number, label: string): void
   try {
     const hasVibrate = typeof navigator !== "undefined" && "vibrate" in navigator;
     lines.push(`vibrate supported: ${hasVibrate}`);
-    let vibrated = false;
     if (hasVibrate) {
-      vibrated = vibrate(pattern);
+      const vibrated = vibrate(pattern);
       lines.push(`navigator.vibrate(${JSON.stringify(pattern)}) returned: ${vibrated}`);
     }
-    if (!vibrated) {
-      lines.push(chime(beepCount));
-    }
+    // Not gated on vibrate's reported success — a `true` return only means
+    // the browser accepted the call, not that the phone actually physically
+    // vibrated. Android's vibration/haptics setting can suppress the motor
+    // independently of ringer/silent mode, with no way for the page to tell
+    // the difference, so the one channel we can actually confirm worked
+    // shouldn't be skipped on the other's word for it.
+    lines.push(chime(beepCount));
   } catch (err) {
     lines.push(`THREW: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`);
   }
@@ -136,14 +139,15 @@ function ack(pattern: number | number[], beepCount: number, label: string): void
   }
 }
 
-/** Brief haptic ack (or chime, if vibration isn't available) that a
- *  checkpoint tag was recognized while scanning. */
+/** Haptic ack and a short chime that a checkpoint tag was recognized while
+ *  scanning — both attempted regardless of whether the other reports success,
+ *  since vibrate() can claim success without the phone actually vibrating. */
 export function vibrateScanAck(): void {
   ack(200, 1, "scan");
 }
 
-/** Two short pulses (or two tones) acknowledging a tag was successfully
- *  written. */
+/** Two vibration pulses and two tones acknowledging a tag was successfully
+ *  written — same both-channels reasoning as vibrateScanAck. */
 export function vibrateWriteAck(): void {
   ack([150, 100, 150], 2, "write");
 }
