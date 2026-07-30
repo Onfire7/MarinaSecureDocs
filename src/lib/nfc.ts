@@ -2,6 +2,30 @@
 // no capability to feature-test beyond the constructor's presence; both
 // reading and writing only fail once actually attempted.
 
+// TEMPORARY: a non-blocking on-screen log (no computer to remote-debug with,
+// and a blocking alert() here previously broke the scan pipeline outright —
+// this only ever appends DOM nodes, never intercepts or pauses anything).
+// Remove this and its call sites once scanning is confirmed working.
+let debugPanel: HTMLDivElement | null = null;
+export function nfcDebugLog(message: string): void {
+  if (typeof document === "undefined") return;
+  if (!debugPanel) {
+    debugPanel = document.createElement("div");
+    debugPanel.style.cssText =
+      "position:fixed;top:0;left:0;right:0;z-index:999999;background:#111;color:#0f0;" +
+      "font:11px/1.4 monospace;padding:8px;white-space:pre-wrap;word-break:break-all;" +
+      "max-height:55vh;overflow-y:auto;pointer-events:none;";
+    document.body.appendChild(debugPanel);
+  }
+  const line = document.createElement("div");
+  const t = new Date();
+  const stamp = `${t.getMinutes().toString().padStart(2, "0")}:${t.getSeconds().toString().padStart(2, "0")}.${t.getMilliseconds().toString().padStart(3, "0")}`;
+  line.textContent = `[${stamp}] ${message}`;
+  debugPanel.appendChild(line);
+  // Keep it from growing forever across a long test session.
+  while (debugPanel.childNodes.length > 40) debugPanel.removeChild(debugPanel.firstChild!);
+}
+
 function nfcSupported(): boolean {
   return typeof window !== "undefined" && "NDEFReader" in window;
 }
@@ -38,14 +62,28 @@ export async function scanNfcUrls(
   signal: AbortSignal,
 ): Promise<void> {
   if (!window.NDEFReader) {
+    nfcDebugLog("scanNfcUrls: window.NDEFReader missing");
     throw new DOMException("Web NFC isn't available in this browser.", "NotSupportedError");
   }
   const reader = new window.NDEFReader();
   reader.onreading = (event) => {
+    nfcDebugLog(
+      `onreading fired — serialNumber=${event.serialNumber || "(none)"}, ` +
+        `records=${event.message.records.map((r) => r.recordType).join(",") || "(none)"}`,
+    );
     const url = urlFromMessage(event.message);
+    nfcDebugLog(`extracted url: ${url ?? "(no url/absolute-url record with data)"}`);
     if (url) onUrl(url);
   };
+  // Never wired up before now — if a tag's NDEF data doesn't parse cleanly,
+  // Chrome fires this instead of onreading, and until now that failure was
+  // completely invisible: no event, no console output, nothing.
+  reader.onreadingerror = () => {
+    nfcDebugLog("onreadingerror fired — tag was detected but couldn't be read");
+  };
+  nfcDebugLog("calling reader.scan()…");
   await reader.scan({ signal });
+  nfcDebugLog("reader.scan() resolved — now listening for taps");
 }
 
 /**

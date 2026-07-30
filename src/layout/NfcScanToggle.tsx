@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   checkpointGuidFromUrl,
+  nfcDebugLog,
   nfcErrorMessage,
   nfcReadSupported,
   scanNfcUrls,
@@ -32,20 +33,28 @@ export function NfcScanToggle({ onScan }: { onScan: (checkpointGuid: string) => 
 
   const start = async () => {
     setError("");
+    nfcDebugLog("NFC toggle: start() clicked");
     const controller = new AbortController();
     controllerRef.current = controller;
     try {
       await scanNfcUrls((url) => {
         const guid = checkpointGuidFromUrl(url);
+        nfcDebugLog(
+          guid
+            ? `checkpointGuidFromUrl matched: ${guid}`
+            : `checkpointGuidFromUrl did NOT match "${url}" against origin ${window.location.origin}`,
+        );
         if (guid) {
           vibrateScanAck();
           onScan(guid);
         }
       }, controller.signal);
       setActive(true);
+      nfcDebugLog("NFC toggle: now armed");
     } catch (err) {
       controllerRef.current = null;
       setActive(false);
+      nfcDebugLog(`NFC toggle: start() failed — ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`);
       setError(nfcErrorMessage(err));
     }
   };
