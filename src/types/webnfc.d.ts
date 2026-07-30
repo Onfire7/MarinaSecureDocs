@@ -18,8 +18,33 @@ interface NDEFWriteOptions {
   signal?: AbortSignal;
 }
 
+interface NDEFScanOptions {
+  signal?: AbortSignal;
+}
+
+interface NDEFRecord {
+  recordType: string;
+  mediaType?: string;
+  id?: string;
+  data?: DataView;
+  encoding?: string;
+  lang?: string;
+}
+
+interface NDEFMessage {
+  records: NDEFRecord[];
+}
+
+interface NDEFReadingEvent extends Event {
+  serialNumber: string;
+  message: NDEFMessage;
+}
+
 declare class NDEFReader extends EventTarget {
   write(message: string | NDEFMessageInit, options?: NDEFWriteOptions): Promise<void>;
+  scan(options?: NDEFScanOptions): Promise<void>;
+  onreading: ((this: NDEFReader, ev: NDEFReadingEvent) => void) | null;
+  onreadingerror: ((this: NDEFReader, ev: Event) => void) | null;
 }
 
 interface Window {

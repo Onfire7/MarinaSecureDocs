@@ -778,6 +778,19 @@ h3 {
   overflow-y: auto;
 }
 
+/* Checkpoint scan modal: replaces the whole viewport (not a centered card
+   like dialog-card) since the point is to look like the checkpoint check-in
+   screen without navigating — the app chrome underneath stays mounted,
+   untouched, and reappears exactly as it was once this closes. */
+.scan-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 52;
+  background: var(--bg);
+  overflow-y: auto;
+  padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+}
+
 /* ---------- Checklist items ---------- */
 
 .card-done {

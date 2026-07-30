@@ -13,6 +13,11 @@ const IDLE_TIMEOUT_MS = 10 * 60_000;
 // already established the Clerk session and the current-user context by the
 // time this renders — an unauthenticated scan detours through Sign In there
 // and resumes here afterward.
+//
+// A checkpoint scanned by NfcScanToggle while the app is already open takes
+// a different path entirely (CheckpointScanModal, a chrome-less overlay) —
+// this page is specifically what a *fresh* scan-launched tab lands on, which
+// is why window-close/idle-timeout behavior below only makes sense here.
 export function CheckpointCheckinPage() {
   const { guidUrl } = useParams();
   const navigate = useNavigate();
@@ -75,6 +80,47 @@ export function CheckpointCheckinPage() {
 
   return (
     <div>
+      <CheckpointCheckinView
+        checkpoint={checkpoint}
+        visit={visit}
+        canCreateIncidents={current.can("create_incidents")}
+        onNote={() => setShowNoteDialog(true)}
+        onIncident={() => navigate("/incidents/new", { state: { target } })}
+      />
+
+      {showNoteDialog && (
+        <NoteDialog target={target} onClose={() => setShowNoteDialog(false)} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * The checkpoint-visit UI itself, with no opinion on how it's framed — used
+ * both by the full page above (fresh scan-launched tab) and by
+ * CheckpointScanModal (a tag scanned while the app's already open). Pure
+ * presentation: all data comes in as props, all actions go out as callbacks.
+ */
+export function CheckpointCheckinView({
+  checkpoint,
+  visit,
+  canCreateIncidents,
+  onNote,
+  onIncident,
+  onNavigateAway,
+}: {
+  checkpoint: { id: string; name: string; location?: { name: string } | null };
+  visit: ReturnType<typeof useCheckpointVisit>;
+  canCreateIncidents: boolean;
+  onNote: () => void;
+  onIncident: () => void;
+  /** Fired alongside the Begin/Resume Checklist link — a no-op on the full
+   *  page, but lets the scan modal dismiss itself as the guard heads into a
+   *  checklist rather than leaving a stale overlay behind. */
+  onNavigateAway?: () => void;
+}) {
+  return (
+    <>
       <div className="page-head">
         <h1 className="page-title">{checkpoint.name}</h1>
         <GpsPill status={visit.gpsStatus} />
@@ -102,7 +148,11 @@ export function CheckpointCheckinPage() {
                     : "Not Started"}
               </div>
               <div className="row" style={{ marginTop: 8 }}>
-                <Link to={`/checklists/${c.id}`} className="btn btn-primary btn-sm">
+                <Link
+                  to={`/checklists/${c.id}`}
+                  className="btn btn-primary btn-sm"
+                  onClick={onNavigateAway}
+                >
                   {c.status === "not_started" ? "Begin Checklist" : "Resume Checklist"}
                 </Link>
               </div>
@@ -112,24 +162,16 @@ export function CheckpointCheckinPage() {
       )}
 
       <div className="row" style={{ marginTop: 16 }}>
-        <button type="button" className="btn btn-sm" onClick={() => setShowNoteDialog(true)}>
+        <button type="button" className="btn btn-sm" onClick={onNote}>
           + Note
         </button>
-        {current.can("create_incidents") && (
-          <button
-            type="button"
-            className="btn btn-sm"
-            onClick={() => navigate("/incidents/new", { state: { target } })}
-          >
+        {canCreateIncidents && (
+          <button type="button" className="btn btn-sm" onClick={onIncident}>
             + Incident
           </button>
         )}
       </div>
-
-      {showNoteDialog && (
-        <NoteDialog target={target} onClose={() => setShowNoteDialog(false)} />
-      )}
-    </div>
+    </>
   );
 }
 

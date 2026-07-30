@@ -11,6 +11,7 @@ import {
   type PlacementShape,
 } from "../../lib/locations";
 import { LocationPicker, type PickerLocation } from "../shared/LocationPicker";
+import { NfcWriteDialog } from "../shared/NfcWriteDialog";
 import { NameGeneratorDialog } from "./NameGeneratorDialog";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
@@ -795,6 +796,7 @@ function CheckpointRow({
   checkpoint: { id: string; name: string; guidUrl: string; gpsValidationRadius?: number };
 }) {
   const [copied, setCopied] = useState(false);
+  const [writingTag, setWritingTag] = useState(false);
   const url = `${window.location.origin}/checkin/${checkpoint.guidUrl}`;
 
   const copy = async () => {
@@ -819,6 +821,9 @@ function CheckpointRow({
               Checkpoint detail. */}
           <button type="button" className="btn btn-sm" onClick={() => void copy()}>
             {copied ? "Copied ✓" : "Copy URL"}
+          </button>
+          <button type="button" className="btn btn-sm" onClick={() => setWritingTag(true)}>
+            Write NFC tag
           </button>
           <button
             type="button"
@@ -847,6 +852,14 @@ function CheckpointRow({
       <code className="small muted" style={{ wordBreak: "break-all" }}>
         {url}
       </code>
+
+      {writingTag && (
+        <NfcWriteDialog
+          checkpointName={checkpoint.name}
+          url={url}
+          onClose={() => setWritingTag(false)}
+        />
+      )}
     </div>
   );
 }
