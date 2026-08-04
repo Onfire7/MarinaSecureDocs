@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, type ReactElement } from "react";
 import { getStoredTheme, setTheme, type ThemePref } from "../lib/theme";
 
-const OPTIONS: { value: ThemePref; label: string; icon: JSX.Element }[] = [
+const OPTIONS: { value: ThemePref; label: string; icon: ReactElement }[] = [
   {
     value: "light",
     label: "Light",
