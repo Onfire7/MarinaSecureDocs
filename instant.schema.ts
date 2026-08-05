@@ -134,6 +134,13 @@ const _schema = i.schema({
       triggerConfig: i.json<Record<string, unknown>>().optional(),
       assignmentMode: i.string(), // triggering_user / role
     }),
+    checklistTemplateSections: i.entity({
+      name: i.string(),
+      order: i.number(),
+      isActive: i.boolean(),
+      triggerType: i.string(), // manual / time_window / checkpoint / location / asset
+      triggerConfig: i.json<Record<string, unknown>>().optional(),
+    }),
     checklistTemplateItems: i.entity({
       type: i.string(), // simple_check / verify_task / door_check / gas_pump_check / location_check / meter_reading
       label: i.string(),
@@ -150,6 +157,8 @@ const _schema = i.schema({
       result: i.json<Record<string, unknown>>().optional(),
       note: i.string().optional(),
       completedAt: i.date().optional(),
+      userSkipped: i.boolean().optional(),
+      displayOrder: i.number().optional(),
     }),
 
     // ---- incidents, tickets & notes ----
@@ -427,9 +436,25 @@ const _schema = i.schema({
       forward: { on: "checklistTemplates", has: "one", label: "role" },
       reverse: { on: "roles", has: "many", label: "checklistTemplates" },
     },
-    templateItems: {
-      forward: { on: "checklistTemplateItems", has: "one", label: "template" },
-      reverse: { on: "checklistTemplates", has: "many", label: "items" },
+    templateSections: {
+      forward: { on: "checklistTemplateSections", has: "one", label: "template" },
+      reverse: { on: "checklistTemplates", has: "many", label: "sections" },
+    },
+    sectionCheckpointAttachments: {
+      forward: { on: "checklistTemplateSections", has: "many", label: "checkpoints" },
+      reverse: { on: "checkpoints", has: "many", label: "checklistTemplateSections" },
+    },
+    sectionLocationAttachments: {
+      forward: { on: "checklistTemplateSections", has: "many", label: "locations" },
+      reverse: { on: "locations", has: "many", label: "checklistTemplateSections" },
+    },
+    sectionAssetAttachments: {
+      forward: { on: "checklistTemplateSections", has: "many", label: "assets" },
+      reverse: { on: "assets", has: "many", label: "checklistTemplateSections" },
+    },
+    sectionItems: {
+      forward: { on: "checklistTemplateItems", has: "one", label: "section" },
+      reverse: { on: "checklistTemplateSections", has: "many", label: "items" },
     },
     checklistTemplate: {
       forward: { on: "checklists", has: "one", label: "template" },

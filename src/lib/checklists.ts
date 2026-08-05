@@ -302,6 +302,25 @@ export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   meter_reading: "Meter Reading",
 };
 
+// ---- ChecklistTemplateSection trigger types ----
+
+export type SectionTriggerType =
+  | "manual"
+  | "time_window"
+  | "checkpoint"
+  | "location"
+  | "asset";
+
+export interface SectionTriggerConfig {
+  // For "time_window": calendar recurrence (RFC 5545 RRULE format)
+  recurrenceRule?: string;
+
+  // For "checkpoint" / "location" / "asset":
+  applicableCheckpoints?: string[];
+  applicableLocations?: string[];
+  applicableAssets?: string[];
+}
+
 type ChecklistTemplate = InstaQLEntity<AppSchema, "checklistTemplates">;
 
 // Checkpoint-triggered templates carry an optional time-of-day window in
