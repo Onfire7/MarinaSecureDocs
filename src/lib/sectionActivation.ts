@@ -3,13 +3,25 @@
 
 import type { InstaQLEntity } from "@instantdb/react";
 import type { AppSchema } from "./db";
-import { RRuleSet } from "rrule";
+import { RRuleSet, rrulestr } from "rrule";
 
 type ChecklistTemplateSection = InstaQLEntity<
   AppSchema,
   "checklistTemplateSections"
->;
-type ChecklistTemplate = InstaQLEntity<AppSchema, "checklistTemplates">;
+> & {
+  id: string;
+  name: string;
+  isActive: boolean;
+  triggerType: string;
+  triggerConfig?: Record<string, unknown>;
+};
+
+type ChecklistTemplateForSections = {
+  visibility: string;
+  role?: { id: string };
+  creator?: { id: string };
+  sections?: ChecklistTemplateSection[];
+};
 
 export interface SectionActivationContext {
   currentTime: Date;
@@ -36,14 +48,16 @@ export function evaluateRecurrenceRule(
   if (!rrule) return true;
 
   try {
-    // Create a rule set with the DTSTART at the given time.
-    // We check if `now` falls on any occurrence of the rule.
+    // Parse and evaluate the recurrence rule for the given time.
+    // We check if `now` matches any occurrence of the rule.
     const ruleSet = new RRuleSet();
 
     // Set the start date to today at midnight in the local timezone
     const today = new Date(now);
     today.setHours(0, 0, 0, 0);
-    ruleSet.rrule(new (RRuleSet as any).rrule.fromString(rrule, { dtstart: today }));
+
+    const parsedRule = rrulestr(rrule, { dtstart: today });
+    ruleSet.rrule(parsedRule);
 
     // Check if `now` matches any occurrence within a day window
     // (since we're not storing exact occurrences, just checking if the
@@ -88,15 +102,12 @@ export function evaluateRecurrenceRule(
  *    - "personal": creator only (checked at template level, not section)
  */
 export function getSectionsForContext(
-  template: Pick<
-    ChecklistTemplate,
-    "visibility" | "role" | "sections" | "creator"
-  >,
+  template: ChecklistTemplateForSections,
   context: SectionActivationContext,
 ): ChecklistTemplateSection[] {
   const sections = template.sections ?? [];
 
-  return sections.filter((section) => {
+  return sections.filter((section: ChecklistTemplateSection) => {
     // 1. Section must be active (master switch)
     if (!section.isActive) return false;
 
@@ -162,10 +173,7 @@ export function getSectionsForContext(
  * checkpoint visit flow.
  */
 export function getSectionsForCheckpoint(
-  template: Pick<
-    ChecklistTemplate,
-    "visibility" | "role" | "sections" | "creator"
-  >,
+  template: ChecklistTemplateForSections,
   checkpoint: { id: string; locationId: string },
   userRoles: { id: string }[],
   now: Date = new Date(),
