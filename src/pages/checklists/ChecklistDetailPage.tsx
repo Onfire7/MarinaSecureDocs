@@ -1,8 +1,14 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { db } from "../../lib/db";
 import { useIsMobile } from "../../hooks/useIsMobile";
-import { doorCheckSummary, itemTypeLabel, type ItemResult } from "../../lib/checklists";
+import {
+  doorCheckSummary,
+  itemsOfSections,
+  itemTypeLabel,
+  sectionsForTemplate,
+  type ItemResult,
+} from "../../lib/checklists";
 
 // Checklists & Tours — Checklist Detail (see pages/checklist-detail.html).
 // Read-only record of a completed instance — no edit actions anywhere.
@@ -15,7 +21,7 @@ export function ChecklistDetailPage() {
       ? {
           checklists: {
             $: { where: { id: checklistId } },
-            template: { items: {} },
+            template: { items: {}, sections: { items: {} } },
             itemResults: { templateItem: {}, linkedTicket: {} },
             assignedTo: {},
           },
@@ -32,12 +38,22 @@ export function ChecklistDetailPage() {
     );
   }
 
-  const items = (checklist.template?.items ?? [])
-    .slice()
-    .sort((a, b) => a.order - b.order);
   const resultByItemId = new Map(
     (checklist.itemResults ?? []).map((r) => [r.templateItem?.id, r]),
   );
+
+  // This is a record of what happened, so sections are *not* re-filtered
+  // through their triggers here: a window that has since closed would hide
+  // the very items the guard filled in during it. Sections nobody recorded
+  // anything against are dropped instead — on a large template most sections
+  // never ran, and listing them all as "Not recorded" would bury the ones
+  // that did. A synthetic (legacy, un-sectioned) section is always kept, so
+  // pre-sections checklists still list every item exactly as before.
+  const sections = sectionsForTemplate(checklist.template).filter(
+    (s) => s.synthetic || s.items.some((i) => resultByItemId.has(i.id)),
+  );
+  const items = itemsOfSections(sections);
+  const showSectionHeadings = sections.length > 1;
 
   return (
     <div>
@@ -62,8 +78,22 @@ export function ChecklistDetailPage() {
 
       {isMobile ? (
         <div className="stack">
-          {items.map((item) => (
-            <ResultCard key={item.id} type={item.type} label={item.label} result={resultByItemId.get(item.id)} />
+          {sections.map((section) => (
+            <Fragment key={section.id}>
+              {showSectionHeadings && (
+                <div className="group-heading">
+                  <span>{section.name}</span>
+                </div>
+              )}
+              {section.items.map((item) => (
+                <ResultCard
+                  key={item.id}
+                  type={item.type}
+                  label={item.label}
+                  result={resultByItemId.get(item.id)}
+                />
+              ))}
+            </Fragment>
           ))}
         </div>
       ) : (
@@ -77,25 +107,36 @@ export function ChecklistDetailPage() {
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => {
-              const r = resultByItemId.get(item.id);
-              return (
-                <tr key={item.id}>
-                  <td>{item.label}</td>
-                  <td>{itemTypeLabel(item.type)}</td>
-                  <td>
-                    <ResultSummary type={item.type} result={r?.result as ItemResult | undefined} />
-                  </td>
-                  <td>
-                    {r?.linkedTicket ? (
-                      <Link to={`/tickets/${r.linkedTicket.id}`}>{r.linkedTicket.title}</Link>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+            {sections.map((section) => (
+              <Fragment key={section.id}>
+                {showSectionHeadings && (
+                  <tr>
+                    <th colSpan={4} className="group-heading">
+                      {section.name}
+                    </th>
+                  </tr>
+                )}
+                {section.items.map((item) => {
+                  const r = resultByItemId.get(item.id);
+                  return (
+                    <tr key={item.id}>
+                      <td>{item.label}</td>
+                      <td>{itemTypeLabel(item.type)}</td>
+                      <td>
+                        <ResultSummary type={item.type} result={r?.result as ItemResult | undefined} />
+                      </td>
+                      <td>
+                        {r?.linkedTicket ? (
+                          <Link to={`/tickets/${r.linkedTicket.id}`}>{r.linkedTicket.title}</Link>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </Fragment>
+            ))}
           </tbody>
         </table>
       )}
@@ -198,13 +239,13 @@ function NestedChecklistSummary({ nestedChecklistId }: { nestedChecklistId: stri
   const { data } = db.useQuery({
     checklists: {
       $: { where: { id: nestedChecklistId } },
-      template: { items: {} },
+      template: { items: {}, sections: { items: {} } },
       itemResults: { templateItem: {}, linkedTicket: {} },
     },
   });
   const nested = data?.checklists?.[0];
   if (!nested) return null;
-  const items = (nested.template?.items ?? []).slice().sort((a, b) => a.order - b.order);
+  const items = itemsOfSections(sectionsForTemplate(nested.template));
   const resultByItemId = new Map((nested.itemResults ?? []).map((r) => [r.templateItem?.id, r]));
 
   return (

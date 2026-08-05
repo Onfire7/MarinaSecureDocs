@@ -1,187 +1,117 @@
-// Section activation logic — determines which sections of a checklist template
-// should be visible based on time, location/checkpoint/asset context, and user roles.
-
-import type { InstaQLEntity } from "@instantdb/react";
-import type { AppSchema } from "./db";
-import { RRuleSet, rrulestr } from "rrule";
-
-type ChecklistTemplateSection = InstaQLEntity<
-  AppSchema,
-  "checklistTemplateSections"
-> & {
-  id: string;
-  name: string;
-  isActive: boolean;
-  triggerType: string;
-  triggerConfig?: Record<string, unknown>;
-};
-
-type ChecklistTemplateForSections = {
-  visibility: string;
-  role?: { id: string };
-  creator?: { id: string };
-  sections?: ChecklistTemplateSection[];
-};
+// Which sections of a checklist template are live right now.
+//
+// A template is one checklist (e.g. "Night Security"); its sections are the
+// parts of it that come and go — by clock ("dock walk, 9pm–5am") or by place
+// ("Gate A", opened when Gate A's checkpoint is scanned). Filtering happens
+// here rather than at the query, because whether a section applies depends on
+// the moment and the checkpoint in hand, neither of which is a stored field.
+import { rrulestr } from "rrule";
+import type { ResolvedSection, SectionTriggerConfig } from "./checklists";
 
 export interface SectionActivationContext {
   currentTime: Date;
-  currentCheckpoint?: { id: string; locationId: string };
+  /** The checkpoint just scanned, if this evaluation came from a check-in. */
+  currentCheckpoint?: { id: string; locationId?: string };
   currentLocation?: { id: string };
   currentAsset?: { id: string };
-  userRoles: { id: string }[];
 }
 
+/** Default window a time_window section stays open for, when unset. */
+const DEFAULT_WINDOW_MINUTES = 60;
+
 /**
- * Evaluates a single recurrence rule (RFC 5545 RRULE format) to determine
- * if the given time matches. Uses the rrule library to handle complex
- * recurrence patterns (daily, weekly, monthly, etc.) and time-of-day windows.
+ * Whether `now` falls inside an occurrence window of a recurrence rule.
  *
- * Examples:
- * - "FREQ=DAILY;BYHOUR=21;BYMINUTE=0" → every night at 9 PM
- * - "FREQ=DAILY;BYHOUR=21,22,23,0,1,2,3,4" → 9 PM to 5 AM daily
- * - "FREQ=WEEKLY;BYDAY=MO,WE,FR;BYHOUR=9" → Monday, Wednesday, Friday at 9 AM
+ * An RRULE names *instants*, not spans — "FREQ=DAILY;BYHOUR=21" is 9pm every
+ * night, a point. A section needs a span, so each occurrence opens a window
+ * `durationMinutes` long and the rule is live while `now` sits inside one:
+ * that pair expresses "9pm to 5am" as BYHOUR=21 + 480 minutes, and gets
+ * midnight-wrapping for free rather than by comparing hour numbers.
+ *
+ * Implemented as a lookback: an occurrence in `[now - duration, now]` is
+ * exactly an occurrence O with `O <= now < O + duration`.
  */
 export function evaluateRecurrenceRule(
-  rrule: string,
+  rule: string,
   now: Date,
+  durationMinutes: number = DEFAULT_WINDOW_MINUTES,
 ): boolean {
-  if (!rrule) return true;
+  // No rule configured = no time restriction. An admin who picks the
+  // time_window trigger and saves nothing yet should see the section, not
+  // lose it silently until they fill the field in.
+  if (!rule.trim()) return true;
+
+  const durationMs = Math.max(1, durationMinutes) * 60_000;
+  const windowStart = new Date(now.getTime() - durationMs);
 
   try {
-    // Parse and evaluate the recurrence rule for the given time.
-    // We check if `now` matches any occurrence of the rule.
-    const ruleSet = new RRuleSet();
-
-    // Set the start date to today at midnight in the local timezone
-    const today = new Date(now);
-    today.setHours(0, 0, 0, 0);
-
-    const parsedRule = rrulestr(rrule, { dtstart: today });
-    ruleSet.rrule(parsedRule);
-
-    // Check if `now` matches any occurrence within a day window
-    // (since we're not storing exact occurrences, just checking if the
-    // current time matches the recurrence pattern)
-    const occurrences = ruleSet.between(
-      new Date(now.getTime() - 1000 * 60 * 60 * 24), // 24 hours ago
-      new Date(now.getTime() + 1000 * 60 * 60 * 24), // 24 hours from now
-      true,
-    );
-
-    // If there's an occurrence within the window, check if we're close enough
-    // to it time-wise (within the minute)
-    if (occurrences.length > 0) {
-      // For simplicity, if the rule generates any occurrence on this day, we
-      // assume it's active. A more precise check would evaluate the specific
-      // time components (BYHOUR, BYMINUTE, etc.) of the rule.
-      return true;
-    }
-
-    return false;
+    // dtstart must precede the lookback window or the rule generates nothing
+    // inside it; a week back covers every FREQ we expose without making
+    // expansion expensive.
+    const dtstart = new Date(now.getTime() - 7 * 24 * 60 * 60_000);
+    const parsed = rrulestr(rule, { dtstart });
+    return parsed.between(windowStart, now, true).length > 0;
   } catch (error) {
-    console.error("Invalid recurrence rule:", rrule, error);
-    return false;
+    // A malformed rule shouldn't hide a section — an admin typo would quietly
+    // drop items off a guard's checklist, which is worse than showing extra.
+    console.error("Invalid section recurrence rule:", rule, error);
+    return true;
   }
 }
 
-/**
- * Determines which sections of a template should be active based on the
- * current context (time, location/checkpoint, user roles).
- *
- * A section is active if:
- * 1. Section.isActive === true
- * 2. Section trigger matches the current context:
- *    - "manual": always active (user-triggered)
- *    - "time_window": recurrence rule matches current time
- *    - "checkpoint": current checkpoint ID is in applicableCheckpoints
- *    - "location": current location ID is in applicableLocations
- *    - "asset": current asset ID is in applicableAssets
- * 3. Template visibility allows the user to see it
- *    - "global": all users
- *    - "role_restricted": user has the restricted role
- *    - "personal": creator only (checked at template level, not section)
- */
-export function getSectionsForContext(
-  template: ChecklistTemplateForSections,
+/** Whether one section's trigger matches the given moment and place. */
+export function sectionApplies(
+  section: ResolvedSection,
   context: SectionActivationContext,
-): ChecklistTemplateSection[] {
-  const sections = template.sections ?? [];
+): boolean {
+  if (!section.isActive) return false;
 
-  return sections.filter((section: ChecklistTemplateSection) => {
-    // 1. Section must be active (master switch)
-    if (!section.isActive) return false;
+  const cfg: SectionTriggerConfig = section.triggerConfig ?? {};
 
-    // 2. Template visibility must allow the user
-    if (template.visibility === "role_restricted" && template.role) {
-      const userHasRole = context.userRoles.some(
-        (r) => r.id === template.role?.id,
+  switch (section.triggerType) {
+    // Always on: the section is part of the checklist whenever the checklist
+    // is. This is also what legacy (pre-sections) templates resolve to.
+    case "manual":
+      return true;
+
+    case "time_window":
+      return evaluateRecurrenceRule(
+        cfg.recurrenceRule ?? "",
+        context.currentTime,
+        cfg.durationMinutes,
       );
-      if (!userHasRole) return false;
+
+    case "checkpoint": {
+      if (!context.currentCheckpoint) return false;
+      return (cfg.applicableCheckpoints ?? []).includes(
+        context.currentCheckpoint.id,
+      );
     }
 
-    // 3. Section trigger must match
-    const triggerConfig = section.triggerConfig ?? {};
-
-    switch (section.triggerType) {
-      case "manual":
-        // Always active; user manually starts
-        return true;
-
-      case "time_window": {
-        // Check if current time matches recurrence rule
-        const rrule = (triggerConfig as { recurrenceRule?: string })
-          .recurrenceRule;
-        return evaluateRecurrenceRule(rrule ?? "", context.currentTime);
-      }
-
-      case "checkpoint": {
-        // Active if current checkpoint is in applicable list
-        if (!context.currentCheckpoint) return false;
-        const applicable = (triggerConfig as { applicableCheckpoints?: string[] })
-          .applicableCheckpoints ?? [];
-        return applicable.includes(context.currentCheckpoint.id);
-      }
-
-      case "location": {
-        // Active if current location (or checkpoint's location) is in applicable list
-        if (!context.currentLocation && !context.currentCheckpoint) return false;
-        const applicable = (triggerConfig as { applicableLocations?: string[] })
-          .applicableLocations ?? [];
-        const currentLocationId =
-          context.currentLocation?.id ||
-          context.currentCheckpoint?.locationId;
-        return currentLocationId ? applicable.includes(currentLocationId) : false;
-      }
-
-      case "asset": {
-        // Active if current asset is in applicable list
-        if (!context.currentAsset) return false;
-        const applicable = (triggerConfig as { applicableAssets?: string[] })
-          .applicableAssets ?? [];
-        return applicable.includes(context.currentAsset.id);
-      }
-
-      default:
-        return false;
+    case "location": {
+      // A checkpoint stands in for its location: scanning Gate A opens the
+      // sections filed under the dock Gate A belongs to, without every
+      // section having to enumerate checkpoints.
+      const locationId =
+        context.currentLocation?.id ?? context.currentCheckpoint?.locationId;
+      if (!locationId) return false;
+      return (cfg.applicableLocations ?? []).includes(locationId);
     }
-  });
+
+    case "asset": {
+      if (!context.currentAsset) return false;
+      return (cfg.applicableAssets ?? []).includes(context.currentAsset.id);
+    }
+
+    default:
+      return false;
+  }
 }
 
-/**
- * Determines which sections are visible/active for a given checkpoint scan.
- * This is a convenience wrapper around getSectionsForContext for the
- * checkpoint visit flow.
- */
-export function getSectionsForCheckpoint(
-  template: ChecklistTemplateForSections,
-  checkpoint: { id: string; locationId: string },
-  userRoles: { id: string }[],
-  now: Date = new Date(),
-): ChecklistTemplateSection[] {
-  return getSectionsForContext(template, {
-    currentTime: now,
-    currentCheckpoint: checkpoint,
-    currentLocation: { id: checkpoint.locationId },
-    userRoles,
-  });
+/** The subset of `sections` live for the given context, order preserved. */
+export function activeSections(
+  sections: ResolvedSection[],
+  context: SectionActivationContext,
+): ResolvedSection[] {
+  return sections.filter((s) => sectionApplies(s, context));
 }

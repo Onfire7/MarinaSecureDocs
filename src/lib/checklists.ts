@@ -312,13 +312,121 @@ export type SectionTriggerType =
   | "asset";
 
 export interface SectionTriggerConfig {
-  // For "time_window": calendar recurrence (RFC 5545 RRULE format)
+  /**
+   * For "time_window": an RFC 5545 RRULE naming when the window *opens* —
+   * e.g. "FREQ=DAILY;BYHOUR=21;BYMINUTE=0" for 9pm nightly. Paired with
+   * durationMinutes to make a span; see lib/sectionActivation.ts.
+   */
   recurrenceRule?: string;
+  /** How long the section stays open from each occurrence. Default 60. */
+  durationMinutes?: number;
 
   // For "checkpoint" / "location" / "asset":
   applicableCheckpoints?: string[];
   applicableLocations?: string[];
   applicableAssets?: string[];
+}
+
+/**
+ * A section as the UI consumes it: always present, always with its items
+ * sorted, whether it came from a real ChecklistTemplateSection row or was
+ * synthesised around a legacy template's direct items.
+ */
+export interface ResolvedSection {
+  id: string;
+  name: string;
+  order: number;
+  isActive: boolean;
+  triggerType: SectionTriggerType;
+  triggerConfig: SectionTriggerConfig;
+  items: TemplateItemLike[];
+  /** True when this wraps pre-sections items rather than a stored section. */
+  synthetic: boolean;
+}
+
+/** The parts of a ChecklistTemplateItem every consumer here relies on. */
+export interface TemplateItemLike {
+  id: string;
+  type: string;
+  label: string;
+  order: number;
+  config?: Record<string, unknown>;
+}
+
+interface TemplateSectionLike {
+  id: string;
+  name: string;
+  order: number;
+  isActive: boolean;
+  triggerType: string;
+  triggerConfig?: Record<string, unknown>;
+  items?: TemplateItemLike[];
+}
+
+/** Id of the synthetic section wrapping a legacy template's direct items. */
+export const LEGACY_SECTION_ID = "__legacy__";
+
+/**
+ * One list of sections for a template regardless of how it was authored.
+ *
+ * Templates written before sections existed hang their items straight off the
+ * template, and those rows are not migrated — the link stays, and they're
+ * wrapped here in a single always-on section instead. That keeps every caller
+ * on one shape (`section.items`) without a "does this template have sections?"
+ * branch at each call site, and means an un-migrated template behaves exactly
+ * as it did before: every item visible, no activation filtering.
+ *
+ * A template with both (mid-migration, or an admin who added a section to an
+ * old template) lists the legacy section first, since its items predate the
+ * ones deliberately filed into sections.
+ */
+export function sectionsForTemplate(
+  template:
+    | {
+        items?: TemplateItemLike[];
+        sections?: TemplateSectionLike[];
+      }
+    | null
+    | undefined,
+): ResolvedSection[] {
+  const byOrder = (a: { order: number }, b: { order: number }) => a.order - b.order;
+
+  const stored = (template?.sections ?? []).slice().sort(byOrder).map(
+    (s): ResolvedSection => ({
+      id: s.id,
+      name: s.name,
+      order: s.order,
+      isActive: s.isActive,
+      triggerType: (s.triggerType as SectionTriggerType) ?? "manual",
+      triggerConfig: (s.triggerConfig ?? {}) as SectionTriggerConfig,
+      items: (s.items ?? []).slice().sort(byOrder),
+      synthetic: false,
+    }),
+  );
+
+  const legacyItems = (template?.items ?? []).slice().sort(byOrder);
+  if (legacyItems.length === 0) return stored;
+
+  return [
+    {
+      id: LEGACY_SECTION_ID,
+      name: "Checklist",
+      order: -1,
+      isActive: true,
+      // "manual" is the always-on trigger — an un-sectioned template must keep
+      // showing every item, never get filtered out by a time or place rule.
+      triggerType: "manual",
+      triggerConfig: {},
+      items: legacyItems,
+      synthetic: true,
+    },
+    ...stored,
+  ];
+}
+
+/** Every item across the given sections, in section-then-item order. */
+export function itemsOfSections(sections: ResolvedSection[]): TemplateItemLike[] {
+  return sections.flatMap((s) => s.items);
 }
 
 type ChecklistTemplate = InstaQLEntity<AppSchema, "checklistTemplates">;

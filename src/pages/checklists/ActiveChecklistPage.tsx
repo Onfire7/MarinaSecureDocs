@@ -7,11 +7,14 @@ import { useIsMobile } from "../../hooks/useIsMobile";
 import {
   ITEM_TYPE_LABEL,
   isStateCheck,
+  itemsOfSections,
   normalizeItemType,
+  sectionsForTemplate,
   type DoorCheckConfig,
   type ItemType,
   type TriggeredBy,
 } from "../../lib/checklists";
+import { activeSections } from "../../lib/sectionActivation";
 import { activityTx } from "../../lib/activityLog";
 import {
   buildPendingEffectTxns,
@@ -85,7 +88,10 @@ export function ChecklistItemsPanel({
   const { data } = db.useQuery({
     checklists: {
       $: { where: { id: checklistId } },
-      template: { items: {} },
+      // `items` is the pre-sections shape and is still queried so templates
+      // that were never migrated keep working — sectionsForTemplate() folds
+      // whichever of the two a template actually has into one list.
+      template: { items: {}, sections: { items: {} } },
       itemResults: { templateItem: {}, linkedTicket: {} },
       assignedTo: {},
       endedShift: {},
@@ -112,15 +118,41 @@ export function ChecklistItemsPanel({
     void db.transact(update);
   }, [checklist, current.user]);
 
+  // Some checklists span several nearby buildings in one pass (e.g. one
+  // "Resturaunt" checklist covering The Point, Parlor Room, and the Condo,
+  // each with their own Front/Side Door items) — a door/lock check away from
+  // the checkpoint's own location gets a small header naming which one it's
+  // at, so "Front Door" at one building doesn't read as the same card as
+  // "Front Door" at another. Nothing to compare against for a non-checkpoint
+  // trigger (clock in/out, manual, scheduled), so this is a no-op there.
+  // Resolved before the section filter below, which also keys off it.
+  const triggeredBy = checklist?.triggeredBy as TriggeredBy | undefined;
+  const checkpointId = triggeredBy?.type === "checkpoint" ? triggeredBy.checkpointId : undefined;
+  const { data: checkpointData } = db.useQuery(
+    checkpointId ? { checkpoints: { $: { where: { id: checkpointId } }, location: {} } } : null,
+  );
+  const checkpointLocationId = checkpointData?.checkpoints?.[0]?.location?.id;
+
+  // Which sections apply is judged once per mount rather than per render.
+  // A live `new Date()` would differ every render — the same trap the
+  // check-in dedupe window documents — and would also let items appear or
+  // vanish under a guard mid-checklist as a window opened or closed, which
+  // is worse than deciding the set when they opened it.
+  const [evaluatedAt] = useState(() => new Date());
+
   // Every hook below must run on every render regardless of whether the
   // checklist has loaded yet — a hook after the "not loaded" early return
   // used to only run once data arrived, changing the hook count between
   // renders (React error #310). Computed off optional chaining instead so
   // the shape is stable: empty items/no nested query while loading, real
   // values once `checklist` resolves.
-  const items = (checklist?.template?.items ?? [])
-    .slice()
-    .sort((a, b) => a.order - b.order);
+  const sections = activeSections(sectionsForTemplate(checklist?.template), {
+    currentTime: evaluatedAt,
+    currentCheckpoint: checkpointId
+      ? { id: checkpointId, locationId: checkpointLocationId }
+      : undefined,
+  });
+  const items = itemsOfSections(sections);
   const resultByItemId = new Map(
     (checklist?.itemResults ?? []).map((r) => [r.templateItem?.id, r]),
   );
@@ -140,20 +172,6 @@ export function ChecklistItemsPanel({
   const nestedStatusById = new Map(
     (nestedData?.checklists ?? []).map((c) => [c.id, c.status]),
   );
-
-  // Some checklists span several nearby buildings in one pass (e.g. one
-  // "Resturaunt" checklist covering The Point, Parlor Room, and the Condo,
-  // each with their own Front/Side Door items) — a door/lock check away from
-  // the checkpoint's own location gets a small header naming which one it's
-  // at, so "Front Door" at one building doesn't read as the same card as
-  // "Front Door" at another. Nothing to compare against for a non-checkpoint
-  // trigger (clock in/out, manual, scheduled), so this is a no-op there.
-  const triggeredBy = checklist?.triggeredBy as TriggeredBy | undefined;
-  const checkpointId = triggeredBy?.type === "checkpoint" ? triggeredBy.checkpointId : undefined;
-  const { data: checkpointData } = db.useQuery(
-    checkpointId ? { checkpoints: { $: { where: { id: checkpointId } }, location: {} } } : null,
-  );
-  const checkpointLocationId = checkpointData?.checkpoints?.[0]?.location?.id;
 
   const itemLocationId = (item: (typeof items)[number]): string | undefined =>
     isStateCheck(item.type) ? (item.config as DoorCheckConfig | undefined)?.locationId : undefined;
@@ -320,39 +338,59 @@ export function ChecklistItemsPanel({
         {(() => {
           const spansColumns = !isMobile && !compact;
           const nodes: ReactNode[] = [];
-          // A header appears once per run of consecutive items at the same
-          // off-site location — not once per card, and not again immediately
-          // after returning to it, only once the run is actually broken by a
-          // different location (including "back at the checkpoint's own").
-          let previousLocationId = checkpointLocationId;
-          for (const item of items) {
-            const locationId = itemLocationId(item) ?? checkpointLocationId;
-            if (locationId !== checkpointLocationId && locationId !== previousLocationId) {
-              const name = offSiteLocationNameById.get(locationId!);
-              if (name) {
-                nodes.push(
-                  <div
-                    key={`loc-${item.id}`}
-                    className="group-heading"
-                    style={spansColumns ? { gridColumn: "1 / -1" } : undefined}
-                  >
-                    <span>{name}</span>
-                  </div>,
-                );
-              }
-            }
-            previousLocationId = locationId;
+          // One heading is enough when there's nothing to tell apart: a
+          // single section (or a legacy template's synthetic one) would just
+          // repeat the checklist's own title above the only group of cards.
+          const showSectionHeadings = sections.length > 1;
 
-            const Component = componentFor(item.type);
-            nodes.push(
-              <Component
-                key={item.id}
-                item={item}
-                existing={resultByItemId.get(item.id)}
-                checklistId={checklist.id}
-                onSaved={() => {}}
-              />,
-            );
+          for (const section of sections) {
+            if (showSectionHeadings) {
+              nodes.push(
+                <div
+                  key={`section-${section.id}`}
+                  className="group-heading"
+                  style={spansColumns ? { gridColumn: "1 / -1" } : undefined}
+                >
+                  <span>{section.name}</span>
+                </div>,
+              );
+            }
+
+            // A header appears once per run of consecutive items at the same
+            // off-site location — not once per card, and not again immediately
+            // after returning to it, only once the run is actually broken by a
+            // different location (including "back at the checkpoint's own").
+            // Reset per section so a run can't straddle a section boundary.
+            let previousLocationId = checkpointLocationId;
+            for (const item of section.items) {
+              const locationId = itemLocationId(item) ?? checkpointLocationId;
+              if (locationId !== checkpointLocationId && locationId !== previousLocationId) {
+                const name = offSiteLocationNameById.get(locationId!);
+                if (name) {
+                  nodes.push(
+                    <div
+                      key={`loc-${item.id}`}
+                      className="group-heading"
+                      style={spansColumns ? { gridColumn: "1 / -1" } : undefined}
+                    >
+                      <span>{name}</span>
+                    </div>,
+                  );
+                }
+              }
+              previousLocationId = locationId;
+
+              const Component = componentFor(item.type);
+              nodes.push(
+                <Component
+                  key={item.id}
+                  item={item}
+                  existing={resultByItemId.get(item.id)}
+                  checklistId={checklist.id}
+                  onSaved={() => {}}
+                />,
+              );
+            }
           }
           return nodes;
         })()}
@@ -360,7 +398,14 @@ export function ChecklistItemsPanel({
 
       {items.length === 0 && (
         <div className="placeholder">
-          <div className="big">This checklist has no items</div>
+          <div className="big">
+            {/* Distinguish an empty template from a full one whose sections
+                are all out of window — the second is the normal state of a
+                time-gated checklist outside its hours, not a misconfiguration. */}
+            {sectionsForTemplate(checklist.template).length > 0
+              ? "Nothing on this checklist is active right now"
+              : "This checklist has no items"}
+          </div>
         </div>
       )}
 

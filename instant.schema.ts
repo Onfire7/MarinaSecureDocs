@@ -436,6 +436,16 @@ const _schema = i.schema({
       forward: { on: "checklistTemplates", has: "one", label: "role" },
       reverse: { on: "roles", has: "many", label: "checklistTemplates" },
     },
+    templateItems: {
+      // Legacy: items authored before sections existed hang directly off the
+      // template. Kept so pushing the section schema doesn't orphan them —
+      // read them through sectionsForTemplate() in lib/checklists.ts, which
+      // wraps any it finds in a synthetic always-on section. New items are
+      // written against `sectionItems` below; this link is never written to
+      // again and can be dropped once no template carries one.
+      forward: { on: "checklistTemplateItems", has: "one", label: "template" },
+      reverse: { on: "checklistTemplates", has: "many", label: "items" },
+    },
     templateSections: {
       forward: { on: "checklistTemplateSections", has: "one", label: "template" },
       reverse: { on: "checklistTemplates", has: "many", label: "sections" },
