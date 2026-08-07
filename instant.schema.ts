@@ -136,9 +136,11 @@ const _schema = i.schema({
       name: i.string(),
       triggerType: i.string().indexed(), // manual / clock_in / clock_out / checkpoint / recurring
       triggerConfig: i.json<Record<string, unknown>>().optional(), // recurring: { recurrenceRule: RRULE }
-      // true: the instance is assigned to whoever triggered it; false: left
-      // unclaimed for any holder of assignedRole to pick up.
-      assignedToUser: i.boolean(),
+      // true: the instance is assigned to whoever triggered it; false/absent:
+      // left unclaimed for any holder of assignedRole to pick up. Optional
+      // because templates authored before the restructure have no value —
+      // a required constraint can't land over them.
+      assignedToUser: i.boolean().optional(),
       hideUntilRule: i.string().optional(), // "HH:MM" → resolved to instance.hideUntil at creation
       dueBy: i
         .json<{ kind: "time"; time: string } | { kind: "offset"; minutes: number }>()
@@ -167,8 +169,9 @@ const _schema = i.schema({
       // Copy-on-edit: committing an edit writes a NEW row (version+1,
       // previousVersion link) and repoints the section's items link, so
       // instance items forever reference the exact row they were created
-      // from without snapshotting config per instance.
-      version: i.number(),
+      // from without snapshotting config per instance. Optional because
+      // pre-restructure rows carry none; absent reads as version 1.
+      version: i.number().optional(),
     }),
     checklistInstances: i.entity({
       status: i.string().indexed(), // not_started / in_progress / complete

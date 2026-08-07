@@ -34,7 +34,8 @@ export interface InstantiableSection {
 
 export interface InstantiableTemplate {
   id: string;
-  assignedToUser: boolean;
+  /** Absent (pre-restructure templates) reads as false: role-pool. */
+  assignedToUser?: boolean | null;
   hideUntilRule?: string | null;
   dueBy?: DueByRule | null;
   assignedRole?: { id: string } | null;

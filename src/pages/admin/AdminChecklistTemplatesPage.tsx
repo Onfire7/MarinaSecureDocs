@@ -171,7 +171,7 @@ type TemplateRow = {
   name: string;
   triggerType: string;
   triggerConfig?: Record<string, unknown>;
-  assignedToUser: boolean;
+  assignedToUser?: boolean;
   hideUntilRule?: string;
   dueBy?: DueByRule;
   assignedRole?: { id: string; name: string } | null;
@@ -253,7 +253,7 @@ function TemplateCard({
           name: `${template.name} (copy)`,
           triggerType: template.triggerType,
           triggerConfig: template.triggerConfig ?? {},
-          assignedToUser: template.assignedToUser,
+          assignedToUser: template.assignedToUser ?? false,
           ...(template.hideUntilRule ? { hideUntilRule: template.hideUntilRule } : {}),
           ...(template.dueBy ? { dueBy: template.dueBy } : {}),
         })
@@ -399,7 +399,7 @@ function TemplateCard({
                 <label className="row" style={{ cursor: "pointer", marginTop: 6 }}>
                   <input
                     type="checkbox"
-                    checked={template.assignedToUser}
+                    checked={template.assignedToUser ?? false}
                     onChange={(e) => update({ assignedToUser: e.target.checked })}
                   />
                   <span className="small">
