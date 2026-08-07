@@ -1,11 +1,14 @@
 import { useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import type { InstaQLEntity } from "@instantdb/react";
-import { db, id, type AppSchema } from "../../lib/db";
+import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { deterministicId } from "../../lib/detId";
 import { doorCheckSummary, doorStateLabel, STATE_CHECK_KINDS } from "../../lib/checklists";
+import {
+  buildInstanceTx,
+  TEMPLATE_INSTANTIATION_QUERY,
+} from "../../lib/checklistInstantiation";
 import type {
   DoorCheckConfig,
   DoorCheckResult,
@@ -17,41 +20,60 @@ import type {
   VerifyTaskConfig,
 } from "../../lib/checklists";
 
-type TemplateItem = InstaQLEntity<AppSchema, "checklistTemplateItems">;
-type ItemResultEntity = InstaQLEntity<
-  AppSchema,
-  "checklistItemResults",
-  { linkedTicket: object }
->;
+/** The pinned template item behind a row: what the guard is being asked. */
+export interface ItemSpec {
+  id: string;
+  type: string;
+  label: string;
+  config?: Record<string, unknown> | null;
+}
+
+/** The materialized instance-item row being answered. */
+export interface InstanceItemRow {
+  id: string;
+  result?: Record<string, unknown> | null;
+  note?: string | null;
+  completedAt?: number | string | null;
+  completedBy?: { id: string } | null;
+}
 
 export interface ItemProps {
-  item: TemplateItem;
-  existing: ItemResultEntity | undefined;
+  item: ItemSpec;
+  /** Always present now — instance items exist as rows from the moment
+   *  they're assigned. The name survives from when result rows were only
+   *  created on first answer. */
+  existing: InstanceItemRow;
+  /** The parent checklist instance — nested sub-checklists hang off it. */
   checklistId: string;
   onSaved: (result: ItemResult, ticketId?: string) => void;
-  /** False once the checklist is submitted — finished items become read-only. */
+  /** False for read-only viewers — finished items lose their Edit affordance. */
   editable?: boolean;
 }
 
-async function saveResult(
-  checklistId: string,
-  itemId: string,
-  existingId: string | undefined,
-  result: ItemResult,
-) {
-  const resultId = existingId ?? id();
-  // Reusing the existing row id means re-answering an item overwrites its
-  // result rather than stacking a second one beside it.
+async function saveResult(row: InstanceItemRow, result: ItemResult, userId?: string) {
   await db.transact(
-    db.tx.checklistItemResults[resultId]
-      .update({ result: result as unknown as Record<string, unknown>, completedAt: Date.now() })
-      .link({ checklist: checklistId, templateItem: itemId }),
+    db.tx.checklistInstanceItems[row.id]
+      .update({
+        result: result as unknown as Record<string, unknown>,
+        completedAt: Date.now(),
+      })
+      .link(userId ? { completedBy: userId } : {}),
   );
 }
 
-async function clearResult(existingId: string | undefined) {
-  if (!existingId) return;
-  await db.transact(db.tx.checklistItemResults[existingId].delete());
+async function clearResult(row: InstanceItemRow) {
+  // The row is the assignment, not the answer — clearing an answer resets
+  // its fields rather than deleting the row.
+  await db.transact([
+    db.tx.checklistInstanceItems[row.id].update({ result: null, completedAt: null }),
+    ...(row.completedBy
+      ? [
+          db.tx.checklistInstanceItems[row.id].unlink({
+            completedBy: row.completedBy.id,
+          }),
+        ]
+      : []),
+  ]);
 }
 
 /**
@@ -92,14 +114,14 @@ function DoneCard({
 export function SimpleCheckItem({
   item,
   existing,
-  checklistId,
   onSaved,
   editable = true,
 }: ItemProps) {
-  const done = existing?.result != null;
+  const current = useCurrent();
+  const done = existing.result != null;
   const complete = async () => {
     const result: ItemResult = { type: "simple_check", completedAt: Date.now() };
-    await saveResult(checklistId, item.id, existing?.id, result);
+    await saveResult(existing, result, current.user?.id);
     onSaved(result);
   };
 
@@ -110,7 +132,7 @@ export function SimpleCheckItem({
         summary="✓ Complete"
         // "Complete" is this item's only state, so editing it can only mean
         // undoing it — there's no form to reopen.
-        onEdit={editable ? () => void clearResult(existing?.id) : undefined}
+        onEdit={editable ? () => void clearResult(existing) : undefined}
       />
     );
   }
@@ -131,12 +153,12 @@ export function SimpleCheckItem({
 export function VerifyTaskItem({
   item,
   existing,
-  checklistId,
   onSaved,
   editable = true,
 }: ItemProps) {
+  const current = useCurrent();
   const cfg = (item.config ?? {}) as unknown as VerifyTaskConfig;
-  const existingResult = existing?.result as
+  const existingResult = existing.result as
     | Extract<ItemResult, { type: "verify_task" }>
     | undefined;
   const [stage, setStage] = useState<"initial" | "attempt" | "reason">("initial");
@@ -168,7 +190,7 @@ export function VerifyTaskItem({
           }
         : {}),
     };
-    await saveResult(checklistId, item.id, existing?.id, result);
+    await saveResult(existing, result, current.user?.id);
     setEditing(false);
     setStage("initial");
     onSaved(result, ticketId);
@@ -299,10 +321,10 @@ function StateCheckItem({
   kind,
   item,
   existing,
-  checklistId,
   onSaved,
   editable = true,
 }: ItemProps & { kind: StateCheckType }) {
+  const current = useCurrent();
   const spec = STATE_CHECK_KINDS[kind];
   const cfg = (item.config ?? {}) as unknown as DoorCheckConfig;
   // An item whose config was never opened in the template builder persists as
@@ -313,7 +335,7 @@ function StateCheckItem({
   // that's meant to be unlocked by day, locked overnight). These skip the
   // found question entirely and never raise a found-state incident.
   const finalOnly = cfg.finalStateOnly === true;
-  const existingResult = existing?.result as DoorCheckResult | undefined;
+  const existingResult = existing.result as DoorCheckResult | undefined;
 
   const [initialState, setInitialState] = useState<DoorState | null>(null);
   const [pendingFinal, setPendingFinal] = useState<DoorState | null>(null);
@@ -358,7 +380,7 @@ function StateCheckItem({
       initialState: found,
       finalState: found,
     };
-    await saveResult(checklistId, item.id, existing?.id, result);
+    await saveResult(existing, result, current.user?.id);
     setEditing(false);
     setInitialState(null);
     onSaved(result);
@@ -416,7 +438,7 @@ function StateCheckItem({
             }
           : {}),
       };
-      await saveResult(checklistId, item.id, existing?.id, result);
+      await saveResult(existing, result, current.user?.id);
       setEditing(false);
       setInitialState(null);
       setPendingFinal(null);
@@ -465,7 +487,7 @@ function StateCheckItem({
             }
           : {}),
       };
-      await saveResult(checklistId, item.id, existing?.id, result);
+      await saveResult(existing, result, current.user?.id);
       setEditing(false);
       setPendingFinal(null);
       onSaved(result, ticketId);
@@ -693,7 +715,7 @@ function stateLabel(s: DoorState): string {
 
 export function LocationCheckItem({ item, existing, checklistId, onSaved }: ItemProps) {
   const cfg = (item.config ?? {}) as unknown as LocationCheckConfig;
-  const existingResult = existing?.result as
+  const existingResult = existing.result as
     | Extract<ItemResult, { type: "location_check" }>
     | undefined;
   const navigate = useNavigate();
@@ -702,34 +724,47 @@ export function LocationCheckItem({ item, existing, checklistId, onSaved }: Item
 
   const { data: nestedData } = db.useQuery(
     existingResult
-      ? { checklists: { $: { where: { id: existingResult.nestedChecklistId } } } }
+      ? { checklistInstances: { $: { where: { id: existingResult.nestedChecklistId } } } }
       : null,
   );
   const { data: locationData } = db.useQuery(
     !existingResult ? { locations: { $: { where: { id: cfg.locationId } } } } : null,
   );
-  const nested = nestedData?.checklists?.[0];
+  // The nested template in instantiable shape — its sections and items are
+  // materialized as rows the moment the sub-checklist is created.
+  const { data: templateData } = db.useQuery(
+    !existingResult && cfg.templateId
+      ? {
+          checklistTemplates: {
+            $: { where: { id: cfg.templateId } },
+            ...TEMPLATE_INSTANTIATION_QUERY,
+          },
+        }
+      : null,
+  );
+  const template = templateData?.checklistTemplates?.[0];
+  const nested = nestedData?.checklistInstances?.[0];
   const locationName = locationData?.locations?.[0]?.name;
   const nestedComplete = nested?.status === "complete";
 
   const open = async () => {
     let nestedId = existingResult?.nestedChecklistId;
     if (!nestedId) {
-      nestedId = deterministicId(`location-check:${checklistId}:${item.id}`);
+      if (!template || !current.user) return;
+      nestedId = deterministicId(`location-check:${checklistId}:${existing.id}`);
       await db.transact([
-        db.tx.checklists[nestedId]
-          .update({
-            status: "not_started",
-            triggeredBy: {
-              type: "location_check",
-              parentChecklistId: checklistId,
-              locationId: cfg.locationId,
-            },
-          })
-          .link({ template: cfg.templateId, ...(current.user ? { assignedTo: current.user.id } : {}) }),
-        db.tx.checklistItemResults[existing?.id ?? id()]
-          .update({ result: { type: "location_check", nestedChecklistId: nestedId } })
-          .link({ checklist: checklistId, templateItem: item.id }),
+        ...buildInstanceTx({ template, instanceId: nestedId, userId: current.user.id }),
+        // Whoever opened it works it, whatever the template's assignment
+        // says — and parentItem keeps it out of the main checklist list.
+        db.tx.checklistInstances[nestedId].link({
+          assignedTo: current.user.id,
+          parentItem: existing.id,
+        }),
+        // No completedAt here — the sub-checklist's own submit sets it, so
+        // section completion times reflect when the work truly finished.
+        db.tx.checklistInstanceItems[existing.id].update({
+          result: { type: "location_check", nestedChecklistId: nestedId },
+        }),
       ]);
       onSaved({ type: "location_check", nestedChecklistId: nestedId });
     }
@@ -756,12 +791,12 @@ export function LocationCheckItem({ item, existing, checklistId, onSaved }: Item
 export function MeterReadingItem({
   item,
   existing,
-  checklistId,
   onSaved,
   editable = true,
 }: ItemProps) {
+  const current = useCurrent();
   const cfg = (item.config ?? {}) as unknown as MeterReadingConfig;
-  const existingResult = existing?.result as
+  const existingResult = existing.result as
     | Extract<ItemResult, { type: "meter_reading" }>
     | undefined;
   const [assetId, setAssetId] = useState(cfg.assetId ?? "");
@@ -804,7 +839,7 @@ export function MeterReadingItem({
         ...(needsCorrection && correctionReason ? { correctionReason } : {}),
       },
     };
-    await saveResult(checklistId, item.id, existing?.id, result);
+    await saveResult(existing, result, current.user?.id);
     setEditing(false);
     onSaved(result);
   };

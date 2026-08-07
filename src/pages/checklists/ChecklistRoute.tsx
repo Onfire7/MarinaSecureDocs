@@ -9,9 +9,9 @@ import { ChecklistDetailPage } from "./ChecklistDetailPage";
 export function ChecklistRoute() {
   const { id } = useParams();
   const { data, isLoading } = db.useQuery(
-    id ? { checklists: { $: { where: { id } } } } : null,
+    id ? { checklistInstances: { $: { where: { id } } } } : null,
   );
-  const status = data?.checklists?.[0]?.status;
+  const status = data?.checklistInstances?.[0]?.status;
 
   if (isLoading) {
     return (

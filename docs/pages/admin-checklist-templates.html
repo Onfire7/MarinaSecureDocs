@@ -37,38 +37,38 @@
   <main class="content">
     <span class="eyebrow">Admin · Page Specification</span>
     <h1>Checklist Templates</h1>
-    <p class="lede">Build and manage the reusable templates that generate real Checklists — items, triggers, and assignment, for Global and Role-restricted templates.</p>
+    <p class="lede">Build and manage the reusable templates that generate real Checklists — a role-owned template, its ordered sections (each with its own trigger, place attachment, and time rules), and the items inside them.</p>
 
     <h2>Purpose</h2>
-    <p>Reached from <a href="admin-home.html">Admin Home</a>, gated by <code>manage_checklists</code> for Global and Role-restricted templates. Personal templates are a deliberate exception — per <a href="../permissions.html">Permissions</a>, they're always editable by their own creator regardless of this permission, so this screen also surfaces a user's own Personal templates even without <code>manage_checklists</code>.</p>
+    <p>Reached from <a href="admin-home.html">Admin Home</a>, gated entirely by <code>manage_checklists</code>. Every template belongs to one role — there is no Global or Personal visibility (personal checklists return later as their own feature). Items are <strong>copy-on-edit</strong>: committing a change to an item's label or config writes a new row (version+1, <code>previous_version</code> link) and repoints the section's link, so checklists generated before the edit keep rendering exactly what they were created from — see <a href="../data-model.html">Data Model — ChecklistTemplateItem</a>.</p>
 
     <h2>Data shown</h2>
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
-      <tr><td>Name, visibility</td><td>ChecklistTemplate.name / visibility</td><td>Global / Role-restricted / Personal.</td></tr>
-      <tr><td>Trigger</td><td>ChecklistTemplate.trigger_type / trigger_config</td><td>Clock In/Out, Scheduled Time, Checkpoint Visit, Incident Type, or Manual — each with its own config shape (e.g. a schedule expression, or a checkpoint + time-of-day/season condition). For Checkpoint Visit, the time-of-day window is optional (a Clear action empties either bound) — leaving both empty means the template applies at any time — and an end time earlier than the start wraps past midnight (e.g. 5:00 PM–5:00 AM applies overnight).</td></tr>
-      <tr><td>Assignment</td><td>ChecklistTemplate.assignment_mode</td><td>To the triggering user, or to a specified Role.</td></tr>
-      <tr><td>Items</td><td>ChecklistTemplate.items → ChecklistTemplateItem, ordered</td><td>Each item's type (one of the 5), label, and type-specific config.</td></tr>
+      <tr><td>Name, assigned role</td><td>ChecklistTemplate.name / assigned_role</td><td>The role is required; flagged with a warning until set (instances created meanwhile fall back to assigning the triggering user rather than being orphaned).</td></tr>
+      <tr><td>Viewer roles</td><td>ChecklistTemplate.viewer_roles</td><td>Checkbox list of the other roles — read-only monitoring access.</td></tr>
+      <tr><td>Assignment</td><td>ChecklistTemplate.assigned_to_user</td><td>Checkbox: assign each checklist to whoever triggers it, vs. leave it unclaimed for the role pool.</td></tr>
+      <tr><td>Trigger</td><td>ChecklistTemplate.trigger_type / trigger_config</td><td>Manual, Clock In/Out, Checkpoint Visit, or Recurring (an RRULE day rule — days only; time of day belongs to Hide until). Checkpoint Visit templates trigger via the checkpoints named on their sections.</td></tr>
+      <tr><td>Hide until / Due by</td><td>hide_until_rule / due_by</td><td>Authored rules, resolved to concrete timestamps on each instance at creation; present on the template and on every section.</td></tr>
+      <tr><td>Sections</td><td>ChecklistTemplate.sections, ordered</td><td>Each with name, active toggle, its own trigger (Always / Recurring days / Checkpoint scan / Location visit / Asset), one location, checkpoints in that location, assets, its time rules, and its ordered items.</td></tr>
     </table>
 
     <h2>Actions</h2>
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
-      <tr><td>Create / edit a Global or Role-restricted template</td><td><code>manage_checklists</code></td><td>Created with a placeholder name and opened straight into the builder, where the name field already lives — prompting first would ask for something the next screen asks for again.</td></tr>
-      <tr><td>Create / edit one's own Personal template</td><td>Unrestricted for the creator, regardless of <code>manage_checklists</code></td><td>Not editable by anyone else, including <code>manage_checklists</code> holders.</td></tr>
-      <tr><td>Duplicate a template</td><td>Same as creating one of that visibility</td><td>Copies visibility, trigger and its config, assignment, role, and attached checkpoints, plus a fresh set of Items. Items are copied as new entities rather than shared — editing the copy must never reach back into the template it came from.</td></tr>
-      <tr><td>Add / reorder / remove an item</td><td>Same as editing the template</td><td>A new item's label starts as its type's name and is edited inline on the row; twelve items is a normal template, and a modal apiece was the dominant cost of building one. Item type is fixed once added but can be deleted and re-added as a different type. Reordering is drag-by-handle (also arrow-key operable), committing once on drop rather than one write per position.</td></tr>
-      <tr><td>Duplicate an item</td><td>Same as editing the template</td><td>Copies type and full config to the end of the list — the fast path for a run of near-identical door checks that differ only by location.</td></tr>
-      <tr><td>Configure a Door or Lock Check's expected state and Location, a Verify Task's retry-prompt flag, a Location-Based Check's nested checklist, or a Meter Reading's asset selection</td><td>Same as editing the template</td><td>Type-specific config, per <a href="../data-model.html">Data Model — ChecklistTemplateItem</a>. A Door or Lock Check <strong>requires</strong> a Location — it's what an Incident raised against it attaches to, and asking the guard for one mid-round was the alternative. It defaults to the checkpoint's own Location when the template is attached to exactly one checkpoint, and is flagged in the builder while unset.</td></tr>
-      <tr><td>Attach / detach checkpoints (Checkpoint Visit trigger only)</td><td>Same as editing the template</td><td>Multi-select against <code>Checkpoint.checklist_templates</code> — a searchable picker grouped by location, with per-group select-all, attaching any number in one transaction from every checkpoint not already attached; a Remove action per attached checkpoint. The attached list groups under each checkpoint's parent location — previously it showed bare names with no location at all, which is unreadable once two checkpoints share a name. A template stays inert (never triggers) until at least one checkpoint is attached.</td></tr>
+      <tr><td>Create / edit / duplicate / delete a template</td><td><code>manage_checklists</code></td><td>Created with a placeholder name and opened straight into the builder, where the name field already lives. Duplicate copies the template, its sections, and fresh item rows (restarting at version 1 — the copy has no history). Delete removes the template and its sections but <em>keeps item rows</em>: instance items on already-generated checklists render their label/type/config through them forever, the same way superseded versions survive an edit.</td></tr>
+      <tr><td>Add / reorder / remove a section</td><td>Same as editing the template</td><td>Sections are the unit of triggering and place: name edited inline, drag-by-handle reorder, delete confirmed (generated checklists keep their materialized copy). Inactive sections are never added to new checklists.</td></tr>
+      <tr><td>Set a section's location &amp; checkpoints</td><td>Same</td><td>A section has exactly one location, and its checkpoint picker only offers checkpoints in it — changing the location silently drops attachments that no longer match, which is how the invariant holds (checkpoints can't move between locations, so it can't drift afterward).</td></tr>
+      <tr><td>Add / reorder / remove an item</td><td>Same</td><td>Items live inside sections. A new item's label starts as its type's name and is edited inline; a Door or Lock Check's required Location defaults from its section's location. Reordering writes in place (order is presentation, never a version). <strong>Removal unlinks rather than deletes</strong> — instance items keep referencing the row.</td></tr>
+      <tr><td>Edit an item's label or config</td><td>Same</td><td>Copy-on-edit: each committed change (blur/save, not per keystroke) writes a new version row and repoints the section. Duplicate copies type and config to the end of the list as a fresh version-1 row.</td></tr>
     </table>
 
     <h2>States &amp; edge cases</h2>
     <ul>
-      <li><strong>Editing a Personal template as its non-creator</strong> — never offered, even to a <code>manage_checklists</code> holder; the permission's own description explicitly carves this out.</li>
-      <li><strong>Deleting a template with in-progress Checklist instances</strong> — existing instances are unaffected (a <code>Checklist</code> references its originating template but doesn't require the template to still exist for the instance's own data to remain valid); only future triggers stop generating new instances.</li>
-      <li><strong>Scheduled-time trigger with an unusual schedule</strong> — evaluated by the <code>checklist-triggers</code> Netlify Scheduled Function, per <a href="../api-structure.html">API Structure</a>; this screen just authors the <code>trigger_config</code>, it doesn't run it.</li>
-      <li><strong>Checkpoint Visit trigger with no checkpoints attached</strong> — shown plainly rather than hidden; the template simply never generates a Checklist until at least one is attached here.</li>
+      <li><strong>Template with no assigned role</strong> — flagged in the builder; until set, its instances fall back to whoever triggers them, so nothing is ever created unreachable.</li>
+      <li><strong>Deleting a template with in-progress instances</strong> — existing instances are unaffected; they're fully materialized rows and their items resolve through the (kept) item rows. Only future triggers stop.</li>
+      <li><strong>Checkpoint Visit trigger with no checkpoints on any section</strong> — shown plainly rather than hidden; the template simply never generates a checklist until a section here names one.</li>
+      <li><strong>Asset sections</strong> — configurable now, but no runtime event instantiates them yet; the builder says so.</li>
     </ul>
 
     <h2>Mobile vs. desktop</h2>

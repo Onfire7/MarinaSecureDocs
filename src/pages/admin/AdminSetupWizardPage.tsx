@@ -54,6 +54,7 @@ type Step = 1 | 2 | 3;
 type TxOp =
   | ReturnType<(typeof db.tx.locations)[string]["update"]>
   | ReturnType<(typeof db.tx.checkpoints)[string]["update"]>
+  | ReturnType<(typeof db.tx.checklistTemplateSections)[string]["update"]>
   | ReturnType<(typeof db.tx.tours)[string]["update"]>
   | ReturnType<(typeof db.tx.checklistTemplates)[string]["link"]>;
 
@@ -99,7 +100,7 @@ function SetupWizard() {
   const { data } = db.useQuery({
     locations: { parent: {}, type: {}, checkpoints: {} },
     locationTypes: {},
-    checklistTemplates: { $: { where: { triggerType: "checkpoint" } } },
+    checklistTemplates: { $: { where: { triggerType: "checkpoint" } }, sections: {} },
   });
 
   const locations = useMemo(() => data?.locations ?? [], [data]);
@@ -239,7 +240,9 @@ function SetupWizard() {
       const containerOps: TxOp[] = [];
       const childOps: TxOp[] = [];
       const checkpointOps: TxOp[] = [];
-      const newCheckpointIds: string[] = [];
+      // Location rides along per checkpoint: checklist attachment is now via
+      // template sections, and a section belongs to exactly one location.
+      const newCheckpoints: { id: string; locationId: string; locationName: string }[] = [];
 
       for (const p of plan) {
         const containerId = p.row.existingId ?? id();
@@ -260,7 +263,7 @@ function SetupWizard() {
 
         if (p.row.checkpoint) {
           const cpId = id();
-          newCheckpointIds.push(cpId);
+          newCheckpoints.push({ id: cpId, locationId: containerId, locationName: p.row.name });
           checkpointOps.push(
             db.tx.checkpoints[cpId]
               .update({ name: p.row.name, guidUrl: crypto.randomUUID() })
@@ -281,7 +284,7 @@ function SetupWizard() {
           );
           if (childCheckpoints) {
             const cpId = id();
-            newCheckpointIds.push(cpId);
+            newCheckpoints.push({ id: cpId, locationId: childId, locationName: childName });
             checkpointOps.push(
               db.tx.checkpoints[cpId]
                 .update({ name: childName, guidUrl: crypto.randomUUID() })
@@ -290,6 +293,7 @@ function SetupWizard() {
           }
         }
       }
+      const newCheckpointIds = newCheckpoints.map((c) => c.id);
 
       const tailOps: TxOp[] = [];
       if (tourName.trim() && newCheckpointIds.length > 0) {
@@ -303,12 +307,30 @@ function SetupWizard() {
             .link({ checkpoints: newCheckpointIds }),
         );
       }
-      if (templateId && newCheckpointIds.length > 0) {
-        tailOps.push(
-          db.tx.checklistTemplates[templateId].link({
-            checkpoints: newCheckpointIds,
-          }),
-        );
+      if (templateId && newCheckpoints.length > 0) {
+        // Checkpoint attachment lives on template sections now, and a
+        // section has exactly one location — so the batch becomes one
+        // checkpoint-triggered section per location, named after it.
+        const template = templates.find((t) => t.id === templateId);
+        let order = template?.sections?.length ?? 0;
+        const byLocation = new Map<string, { name: string; cpIds: string[] }>();
+        for (const cp of newCheckpoints) {
+          const group = byLocation.get(cp.locationId) ?? { name: cp.locationName, cpIds: [] };
+          group.cpIds.push(cp.id);
+          byLocation.set(cp.locationId, group);
+        }
+        for (const [locationId, group] of byLocation) {
+          tailOps.push(
+            db.tx.checklistTemplateSections[id()]
+              .update({
+                name: group.name,
+                order: order++,
+                isActive: true,
+                triggerType: "checkpoint",
+              })
+              .link({ template: templateId, location: locationId, checkpoints: group.cpIds }),
+          );
+        }
       }
 
       const ordered = [...containerOps, ...childOps, ...checkpointOps, ...tailOps];

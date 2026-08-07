@@ -7,6 +7,7 @@ import {
   isStateCheck,
   itemTypeLabel,
   normalizeItemType,
+  type DueByRule,
   type ItemType,
   type StateCheckType,
 } from "../../lib/checklists";
@@ -15,39 +16,51 @@ import { MultiSelectDialog } from "../shared/MultiSelectDialog";
 import { ReorderableList } from "../shared/ReorderableList";
 import { AdminHeader } from "./AdminHomePage";
 import { DraftInput } from "../shared/DraftInput";
-import { groupByLocation, locationPathResolver } from "../../lib/checkpoints";
+import { locationPathResolver } from "../../lib/checkpoints";
 
 // Admin — Checklist Templates (see docs/pages/admin-checklist-templates.html).
-// manage_checklists governs Global and Role-restricted templates. Personal
-// templates are a deliberate carve-out: always editable by their creator
-// regardless of that permission, and never editable by anyone else — so this
-// page is reachable without manage_checklists, showing only one's own.
+// Authoring for the sectioned checklist model: a template belongs to one
+// role, contains ordered sections (each with its own trigger, visibility
+// rule, and place attachment), and sections contain the items. Template
+// items are copy-on-edit: committing a change writes a new row (version+1,
+// previousVersion link) and repoints the section, so instances created
+// before the edit keep rendering exactly what they were created from.
+// Personal templates were removed with the visibility field — they return
+// later as their own feature.
 export function AdminChecklistTemplatesPage() {
   const current = useCurrent();
   const canManage = current.can("manage_checklists");
   const [editing, setEditing] = useState<string | null>(null);
 
   const { data } = db.useQuery({
-    checklistTemplates: { items: {}, role: {}, creator: {}, checkpoints: {} },
+    checklistTemplates: {
+      assignedRole: {},
+      viewerRoles: {},
+      creator: {},
+      sections: { location: {}, checkpoints: {}, assets: {}, items: {} },
+    },
     roles: {},
     checkpoints: { location: {} },
-    locations: { parent: {} },
+    locations: { parent: {}, type: {} },
+    assets: {},
   });
 
-  const templates = useMemo(() => {
-    const all = data?.checklistTemplates ?? [];
-    return all
-      .filter((t) =>
-        t.visibility === "personal"
-          ? t.creator?.id === current.user?.id
-          : canManage,
-      )
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [data, canManage, current.user]);
+  const templates = useMemo(
+    () =>
+      [...(data?.checklistTemplates ?? [])].sort((a, b) =>
+        a.name.localeCompare(b.name),
+      ),
+    [data],
+  );
 
   const roles = data?.roles ?? [];
   const pathOf = useMemo(
     () => locationPathResolver(data?.locations ?? []),
+    [data],
+  );
+  const locations = useMemo(
+    () =>
+      [...(data?.locations ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
     [data],
   );
   const allCheckpoints = useMemo(
@@ -57,54 +70,51 @@ export function AdminChecklistTemplatesPage() {
       ),
     [data],
   );
+  const allAssets = useMemo(
+    () => [...(data?.assets ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
+    [data],
+  );
 
   // Created with a placeholder name and opened straight into the editor,
   // where the name field already lives — a prompt first would just be a
-  // modal asking for something the next screen also asks for.
-  const create = async (visibility: string) => {
+  // modal asking for something the next screen also asks for. The required
+  // role is asked for in the editor too, with a warning until it's set.
+  const create = async () => {
     const templateId = id();
     await db.transact(
       db.tx.checklistTemplates[templateId]
         .update({
-          name: visibility === "personal" ? "New personal template" : "New template",
-          visibility,
+          name: "New template",
           triggerType: "manual",
-          assignmentMode: "triggering_user",
+          assignedToUser: true,
         })
         .link(current.user ? { creator: current.user.id } : {}),
     );
     setEditing(templateId);
   };
 
+  if (!canManage) {
+    return (
+      <div>
+        <AdminHeader title="Checklist Templates" />
+        <p className="muted small">
+          Managing checklist templates needs <code>manage_checklists</code>.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div>
       <AdminHeader title="Checklist Templates">
-        <div className="row">
-          {canManage && (
-            <button
-              type="button"
-              className="btn btn-sm btn-primary"
-              onClick={() => void create("global")}
-            >
-              + New template
-            </button>
-          )}
-          <button
-            type="button"
-            className="btn btn-sm"
-            onClick={() => void create("personal")}
-          >
-            + Personal
-          </button>
-        </div>
+        <button
+          type="button"
+          className="btn btn-sm btn-primary"
+          onClick={() => void create()}
+        >
+          + New template
+        </button>
       </AdminHeader>
-
-      {!canManage && (
-        <p className="muted small" style={{ marginBottom: 12 }}>
-          Showing only your own personal templates — managing global and
-          role-restricted ones needs <code>manage_checklists</code>.
-        </p>
-      )}
 
       <div className="stack" style={{ gap: 8 }}>
         {templates.map((t) => (
@@ -112,7 +122,9 @@ export function AdminChecklistTemplatesPage() {
             key={t.id}
             template={t}
             roles={roles}
+            locations={locations}
             allCheckpoints={allCheckpoints}
+            allAssets={allAssets}
             pathOf={pathOf}
             expanded={editing === t.id}
             onToggle={() => setEditing(editing === t.id ? null : t.id)}
@@ -135,35 +147,61 @@ type TemplateItemRow = {
   type: string;
   label: string;
   order: number;
+  version?: number;
   config?: Record<string, unknown>;
+};
+
+type SectionRow = {
+  id: string;
+  name: string;
+  order: number;
+  isActive: boolean;
+  triggerType: string;
+  triggerConfig?: Record<string, unknown>;
+  hideUntilRule?: string;
+  dueBy?: DueByRule;
+  location?: { id: string; name: string } | null;
+  checkpoints?: { id: string; name: string }[];
+  assets?: { id: string; name: string }[];
+  items?: TemplateItemRow[];
 };
 
 type TemplateRow = {
   id: string;
   name: string;
-  visibility: string;
   triggerType: string;
   triggerConfig?: Record<string, unknown>;
-  assignmentMode: string;
-  role?: { id: string; name: string } | null;
+  assignedToUser: boolean;
+  hideUntilRule?: string;
+  dueBy?: DueByRule;
+  assignedRole?: { id: string; name: string } | null;
+  viewerRoles?: { id: string; name: string }[];
   creator?: { id: string; name: string } | null;
-  checkpoints?: { id: string; name: string }[];
-  items?: TemplateItemRow[];
+  sections?: SectionRow[];
 };
 
 const TRIGGERS = [
   { value: "manual", label: "Manual" },
   { value: "clock_in", label: "Clock In" },
   { value: "clock_out", label: "Clock Out" },
-  { value: "scheduled", label: "Scheduled time" },
   { value: "checkpoint", label: "Checkpoint visit" },
-  { value: "incident_type", label: "Incident type" },
+  { value: "recurring", label: "Recurring" },
+];
+
+const SECTION_TRIGGERS = [
+  { value: "manual", label: "Always (with the checklist)" },
+  { value: "recurring", label: "Recurring days" },
+  { value: "checkpoint", label: "Checkpoint scan" },
+  { value: "location", label: "Location visit" },
+  { value: "asset", label: "Asset" },
 ];
 
 function TemplateCard({
   template,
   roles,
+  locations,
   allCheckpoints,
+  allAssets,
   pathOf,
   expanded,
   onToggle,
@@ -171,102 +209,41 @@ function TemplateCard({
 }: {
   template: TemplateRow;
   roles: { id: string; name: string }[];
+  locations: { id: string; name: string; parent?: { id: string } | null }[];
   allCheckpoints: { id: string; name: string; location?: { id: string; name: string } | null }[];
+  allAssets: { id: string; name: string }[];
   pathOf: (locationId: string) => string;
   expanded: boolean;
   onToggle: () => void;
   onDuplicated: (templateId: string) => void;
 }) {
-  const [addingCheckpoints, setAddingCheckpoints] = useState(false);
   const update = (fields: Record<string, unknown>) =>
     void db.transact(db.tx.checklistTemplates[template.id].update(fields));
 
-  // Memoized because `?? []` mints a new array each render, which would
-  // rebuild the grouping below every time.
-  const checkpointMembers = useMemo(
-    () => template.checkpoints ?? [],
-    [template.checkpoints],
-  );
-  const checkpointMemberIds = new Set(checkpointMembers.map((c) => c.id));
-  // template.checkpoints carries no location, so resolve each against the
-  // full list before grouping.
-  const attachedGroups = useMemo(
+  const sections = useMemo(
     () =>
-      groupByLocation(
-        checkpointMembers.map(
-          (m) => allCheckpoints.find((c) => c.id === m.id) ?? { ...m, location: null },
-        ),
-        pathOf,
-      ),
-    [checkpointMembers, allCheckpoints, pathOf],
+      [...(template.sections ?? [])]
+        .sort((a, b) => a.order - b.order)
+        .map((s) => ({
+          ...s,
+          items: [...(s.items ?? [])].sort((a, b) => a.order - b.order),
+        })),
+    [template.sections],
   );
-  const addCheckpoints = (ids: string[]) => {
-    if (ids.length === 0) return;
-    void db.transact(
-      db.tx.checklistTemplates[template.id].link({ checkpoints: ids }),
-    );
-  };
-  const removeCheckpoint = (checkpointId: string) =>
-    void db.transact(
-      db.tx.checklistTemplates[template.id].unlink({ checkpoints: checkpointId }),
-    );
+  const itemCount = sections.reduce((n, s) => n + s.items.length, 0);
+  const viewerRoleIds = new Set((template.viewerRoles ?? []).map((r) => r.id));
 
-  const items = useMemo(
-    () => [...(template.items ?? [])].sort((a, b) => a.order - b.order),
-    [template.items],
-  );
-  const cfg = (template.triggerConfig ?? {}) as {
-    timeStart?: string;
-    timeEnd?: string;
-    schedule?: string;
-  };
-  // Two independent settings need a role: restricting who sees the template,
-  // and routing its checklists to a role's unclaimed queue. Either one alone
-  // is reason to ask for it.
-  const needsRole =
-    template.visibility === "role_restricted" || template.assignmentMode === "role";
-
-  // The label starts as the type's own name and is edited inline on the row.
-  // Prompting for it first meant a modal per item, on a screen where twelve
-  // items is a normal template.
-  const addItem = (type: ItemType) => {
-    // A door or pump needs a Location, and on a checkpoint-triggered template
-    // the checkpoint's own location is almost always the right one — so
-    // default it rather than making the admin set it item by item. Ambiguous
-    // when several checkpoints are attached, so only default from a single
-    // one and leave the rest to the picker.
-    const attached = template.checkpoints ?? [];
-    const soleLocationId =
-      isStateCheck(type) && attached.length === 1
-        ? (allCheckpoints.find((c) => c.id === attached[0].id)?.location?.id ?? undefined)
-        : undefined;
+  const addSection = () =>
     void db.transact(
-      db.tx.checklistTemplateItems[id()]
+      db.tx.checklistTemplateSections[id()]
         .update({
-          type,
-          label: ITEM_TYPE_LABEL[type],
-          order: items.length,
-          config: soleLocationId ? { locationId: soleLocationId } : {},
+          name: "New section",
+          order: sections.length,
+          isActive: true,
+          triggerType: "manual",
         })
         .link({ template: template.id }),
     );
-  };
-
-  const duplicateItem = (item: TemplateItemRow) => {
-    void db.transact(
-      db.tx.checklistTemplateItems[id()]
-        .update({
-          type: item.type,
-          label: `${item.label} (copy)`,
-          order: items.length,
-          config: item.config ?? {},
-        })
-        .link({ template: template.id }),
-    );
-  };
-
-  const removeItem = (itemId: string) =>
-    void db.transact(db.tx.checklistTemplateItems[itemId].delete());
 
   const duplicate = async () => {
     const copyId = id();
@@ -274,44 +251,75 @@ function TemplateCard({
       db.tx.checklistTemplates[copyId]
         .update({
           name: `${template.name} (copy)`,
-          visibility: template.visibility,
           triggerType: template.triggerType,
           triggerConfig: template.triggerConfig ?? {},
-          assignmentMode: template.assignmentMode,
+          assignedToUser: template.assignedToUser,
+          ...(template.hideUntilRule ? { hideUntilRule: template.hideUntilRule } : {}),
+          ...(template.dueBy ? { dueBy: template.dueBy } : {}),
         })
         .link({
-          ...(template.role ? { role: template.role.id } : {}),
-          ...(template.creator ? { creator: template.creator.id } : {}),
-          ...(checkpointMembers.length > 0
-            ? { checkpoints: checkpointMembers.map((c) => c.id) }
+          ...(template.assignedRole ? { assignedRole: template.assignedRole.id } : {}),
+          ...(template.viewerRoles?.length
+            ? { viewerRoles: template.viewerRoles.map((r) => r.id) }
             : {}),
+          ...(template.creator ? { creator: template.creator.id } : {}),
         }),
-      // Items are their own entities, so a copy needs its own set rather
-      // than links to the originals' — editing the copy must not touch the
-      // template it came from.
-      ...items.map((it, i) =>
-        db.tx.checklistTemplateItems[id()]
-          .update({
-            type: it.type,
-            label: it.label,
-            order: i,
-            config: it.config ?? {},
-          })
-          .link({ template: copyId }),
-      ),
+      // Sections and items are their own entities, so a copy needs its own
+      // set rather than links to the originals' — editing the copy must not
+      // touch the template it came from. Copied items restart at version 1
+      // with no previousVersion: the copy has no history of its own.
+      ...sections.flatMap((s) => {
+        const sectionCopyId = id();
+        return [
+          db.tx.checklistTemplateSections[sectionCopyId]
+            .update({
+              name: s.name,
+              order: s.order,
+              isActive: s.isActive,
+              triggerType: s.triggerType,
+              triggerConfig: s.triggerConfig ?? {},
+              ...(s.hideUntilRule ? { hideUntilRule: s.hideUntilRule } : {}),
+              ...(s.dueBy ? { dueBy: s.dueBy } : {}),
+            })
+            .link({
+              template: copyId,
+              ...(s.location ? { location: s.location.id } : {}),
+              ...(s.checkpoints?.length
+                ? { checkpoints: s.checkpoints.map((c) => c.id) }
+                : {}),
+              ...(s.assets?.length ? { assets: s.assets.map((a) => a.id) } : {}),
+            }),
+          ...s.items.map((it, i) =>
+            db.tx.checklistTemplateItems[id()]
+              .update({
+                type: it.type,
+                label: it.label,
+                order: i,
+                version: 1,
+                config: it.config ?? {},
+              })
+              .link({ section: sectionCopyId }),
+          ),
+        ];
+      }),
     ]);
     onDuplicated(copyId);
   };
 
   const remove = async () => {
-    // In-progress instances keep their own data; only future triggers stop.
     if (
       !window.confirm(
         `Delete "${template.name}"? Checklists already generated from it are unaffected.`,
       )
     )
       return;
-    await db.transact(db.tx.checklistTemplates[template.id].delete());
+    // The template and its sections go; item rows stay — instance items of
+    // already-generated checklists render their label/type/config through
+    // them, the same way superseded versions survive an edit.
+    await db.transact([
+      ...sections.map((s) => db.tx.checklistTemplateSections[s.id].delete()),
+      db.tx.checklistTemplates[template.id].delete(),
+    ]);
   };
 
   return (
@@ -320,13 +328,13 @@ function TemplateCard({
         <div>
           <div className="card-title">{template.name}</div>
           <div className="card-meta">
-            <span className="badge">{template.visibility.replace("_", "-")}</span>{" "}
+            <span className="badge">
+              {template.assignedRole?.name ?? "no role"}
+            </span>{" "}
             {TRIGGERS.find((t) => t.value === template.triggerType)?.label ??
               template.triggerType}{" "}
-            · {items.length} item{items.length === 1 ? "" : "s"}
-            {template.visibility === "personal" && template.creator && (
-              <span className="muted"> · {template.creator.name}'s</span>
-            )}
+            · {sections.length} section{sections.length === 1 ? "" : "s"} ·{" "}
+            {itemCount} item{itemCount === 1 ? "" : "s"}
           </div>
         </div>
         <div className="row">
@@ -360,53 +368,78 @@ function TemplateCard({
               </div>
 
               <div className="field">
-                <span className="field-label">Visibility</span>
+                <span className="field-label">Assigned role — required</span>
                 <select
                   className="select select-inline"
-                  value={template.visibility}
-                  onChange={(e) => update({ visibility: e.target.value })}
+                  value={template.assignedRole?.id ?? ""}
+                  onChange={(e) => {
+                    // The placeholder option carries no id — linking it
+                    // would write an empty ref.
+                    if (!e.target.value) return;
+                    void db.transact(
+                      db.tx.checklistTemplates[template.id].link({
+                        assignedRole: e.target.value,
+                      }),
+                    );
+                  }}
                 >
-                  <option value="global">Global</option>
-                  <option value="role_restricted">Role-restricted</option>
-                  <option value="personal">Personal</option>
+                  <option value="">Pick a role…</option>
+                  {roles.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
                 </select>
-                {/* One role field serves both settings that need one. It used
-                    to appear only for role-restricted visibility, which left
-                    "assign to a role" with no way to name the role — the
-                    resulting checklists were created unassigned and no query
-                    could reach them (the unclaimed queue looks them up by
-                    template.role.id). */}
-                {needsRole && (
-                  <select
-                    className="select select-inline"
-                    style={{ marginLeft: 6 }}
-                    value={template.role?.id ?? ""}
-                    onChange={(e) => {
-                      // The placeholder option carries no id — linking it
-                      // would write an empty ref.
-                      if (!e.target.value) return;
-                      void db.transact(
-                        db.tx.checklistTemplates[template.id].link({
-                          role: e.target.value,
-                        }),
-                      );
-                    }}
-                  >
-                    <option value="">Pick a role…</option>
-                    {roles.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {needsRole && !template.role && (
+                {!template.assignedRole && (
                   <p className="small muted" style={{ marginTop: 4 }}>
-                    {template.assignmentMode === "role"
-                      ? "Pick a role — until then these checklists are assigned to whoever triggers them."
-                      : "Pick a role — until then this template is visible to everyone."}
+                    Pick a role — until then these checklists are assigned to
+                    whoever triggers them.
                   </p>
                 )}
+                <label className="row" style={{ cursor: "pointer", marginTop: 6 }}>
+                  <input
+                    type="checkbox"
+                    checked={template.assignedToUser}
+                    onChange={(e) => update({ assignedToUser: e.target.checked })}
+                  />
+                  <span className="small">
+                    Assign each checklist to whoever triggers it — otherwise it
+                    stays unclaimed for anyone holding the role
+                  </span>
+                </label>
+              </div>
+
+              <div className="field">
+                <span className="field-label">
+                  Viewer roles — read-only monitoring
+                </span>
+                <div className="stack" style={{ gap: 2 }}>
+                  {roles
+                    .filter((r) => r.id !== template.assignedRole?.id)
+                    .map((r) => (
+                      <label key={r.id} className="row" style={{ cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={viewerRoleIds.has(r.id)}
+                          onChange={(e) =>
+                            void db.transact(
+                              e.target.checked
+                                ? db.tx.checklistTemplates[template.id].link({
+                                    viewerRoles: r.id,
+                                  })
+                                : db.tx.checklistTemplates[template.id].unlink({
+                                    viewerRoles: r.id,
+                                  }),
+                            )
+                          }
+                        />
+                        <span className="small">{r.name}</span>
+                      </label>
+                    ))}
+                  {roles.length <= 1 && (
+                    <span className="muted small">No other roles exist.</span>
+                  )}
+                </div>
               </div>
 
               <div className="field">
@@ -422,207 +455,598 @@ function TemplateCard({
                     </option>
                   ))}
                 </select>
-
-                {template.triggerType === "checkpoint" && (
-                  <div style={{ marginTop: 6 }}>
-                    <div className="row">
-                      <span className="small muted">Applies between</span>
-                      <DraftInput
-                        type="time"
-                        className="input select-inline"
-                        aria-label="Start of window"
-                        value={cfg.timeStart ?? ""}
-                        onCommit={(timeStart) =>
-                          update({ triggerConfig: { ...cfg, timeStart } })
-                        }
-                      />
-                      {cfg.timeStart && (
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-quiet"
-                          onClick={() => {
-                            const { timeStart: _drop, ...rest } = cfg;
-                            update({ triggerConfig: rest });
-                          }}
-                        >
-                          Clear
-                        </button>
-                      )}
-                      <span className="small muted">and</span>
-                      <DraftInput
-                        type="time"
-                        className="input select-inline"
-                        aria-label="End of window"
-                        value={cfg.timeEnd ?? ""}
-                        onCommit={(timeEnd) =>
-                          update({ triggerConfig: { ...cfg, timeEnd } })
-                        }
-                      />
-                      {cfg.timeEnd && (
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-quiet"
-                          onClick={() => {
-                            const { timeEnd: _drop, ...rest } = cfg;
-                            update({ triggerConfig: rest });
-                          }}
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                    <p className="muted small" style={{ marginTop: 4 }}>
-                      Leave both empty to apply at any time. An end time
-                      earlier than the start wraps past midnight (e.g. 5:00
-                      PM–5:00 AM applies overnight).
-                    </p>
-                  </div>
-                )}
-                {template.triggerType === "scheduled" && (
-                  <DraftInput
-                    className="input select-inline"
-                    style={{ marginTop: 6 }}
-                    placeholder="Schedule expression, e.g. 0 6 * * *"
-                    aria-label="Schedule expression"
-                    value={cfg.schedule ?? ""}
-                    onCommit={(schedule) =>
-                      update({ triggerConfig: { ...cfg, schedule } })
+                {template.triggerType === "recurring" && (
+                  <RecurrenceRuleField
+                    value={
+                      ((template.triggerConfig ?? {}) as { recurrenceRule?: string })
+                        .recurrenceRule ?? ""
+                    }
+                    onCommit={(recurrenceRule) =>
+                      update({
+                        triggerConfig: recurrenceRule ? { recurrenceRule } : {},
+                      })
                     }
                   />
                 )}
                 {template.triggerType === "checkpoint" && (
-                  <div style={{ marginTop: 6 }}>
-                    <span className="small muted">Checkpoints</span>
-                    <div className="stack" style={{ gap: 4, marginTop: 4 }}>
-                      {attachedGroups.map((g) => (
-                        <div key={g.locationId || "none"}>
-                          <div className="group-heading">
-                            <span>{g.label}</span>
-                          </div>
-                          {g.items.map((c) => (
-                            <div key={c.id} className="row spread">
-                              <span className="small">{c.name}</span>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-quiet"
-                                onClick={() => removeCheckpoint(c.id)}
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      ))}
-                      {checkpointMembers.length === 0 && (
-                        <span className="muted small">
-                          Not attached to any checkpoint yet — this template
-                          never triggers until it is.
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      style={{ marginTop: 6 }}
-                      disabled={allCheckpoints.length === checkpointMemberIds.size}
-                      onClick={() => setAddingCheckpoints(true)}
-                    >
-                      + Add checkpoints
-                    </button>
-                  </div>
-                )}
-                {template.triggerType === "scheduled" && (
                   <p className="muted small" style={{ marginTop: 4 }}>
-                    Evaluated by the scheduled-trigger function; this screen
-                    only authors the expression.
+                    Triggered by scanning a checkpoint named on one of this
+                    template's sections — attach checkpoints there.
                   </p>
                 )}
               </div>
 
-              <div className="field">
-                <span className="field-label">Assignment</span>
-                <select
-                  className="select select-inline"
-                  value={template.assignmentMode}
-                  onChange={(e) => update({ assignmentMode: e.target.value })}
-                >
-                  <option value="triggering_user">To the triggering user</option>
-                  <option value="role">To a role</option>
-                </select>
-              </div>
+              <RuleFields
+                hideUntilRule={template.hideUntilRule}
+                dueBy={template.dueBy}
+                onHideUntilRule={(hideUntilRule) =>
+                  update({ hideUntilRule: hideUntilRule || null })
+                }
+                onDueBy={(dueBy) => update({ dueBy: dueBy ?? null })}
+                nounPhrase="checklist"
+              />
             </div>
 
             <div>
-              <div className="section-title">Items</div>
+              <div className="section-title">Sections</div>
               <ReorderableList
-                items={items}
+                items={sections}
                 onReorder={(orderedIds) =>
                   void db.transact(
-                    orderedIds.map((itemId, i) =>
-                      db.tx.checklistTemplateItems[itemId].update({ order: i }),
+                    orderedIds.map((sectionId, i) =>
+                      db.tx.checklistTemplateSections[sectionId].update({ order: i }),
                     ),
                   )
                 }
-                renderItem={(item) => (
-                  <ItemRow
-                    item={item}
-                    onDuplicate={duplicateItem}
-                    onRemove={removeItem}
+                renderItem={(section) => (
+                  <SectionEditor
+                    section={section}
+                    locations={locations}
+                    allCheckpoints={allCheckpoints}
+                    allAssets={allAssets}
+                    pathOf={pathOf}
                   />
                 )}
               />
-              {items.length === 0 && <span className="muted small">No items yet.</span>}
-              <select
-                className="select select-inline"
-                style={{ marginTop: 8 }}
-                value=""
-                onChange={(e) => {
-                  if (e.target.value) addItem(e.target.value as ItemType);
-                }}
-              >
-                <option value="">Add an item…</option>
-                {(Object.keys(ITEM_TYPE_LABEL) as ItemType[]).map((t) => (
-                  <option key={t} value={t}>
-                    {ITEM_TYPE_LABEL[t]}
-                  </option>
-                ))}
-              </select>
-              {items.length > 1 && (
+              {sections.length === 0 && (
+                <span className="muted small">
+                  No sections yet — items live inside sections.
+                </span>
+              )}
+              <div style={{ marginTop: 8 }}>
+                <button type="button" className="btn btn-sm" onClick={addSection}>
+                  + Add section
+                </button>
+              </div>
+              {sections.length > 1 && (
                 <p className="muted small" style={{ marginTop: 4 }}>
-                  Drag ⠿ to reorder.
+                  Drag ⠿ to reorder sections.
                 </p>
               )}
             </div>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Sections
+
+function SectionEditor({
+  section,
+  locations,
+  allCheckpoints,
+  allAssets,
+  pathOf,
+}: {
+  section: SectionRow & { items: TemplateItemRow[] };
+  locations: { id: string; name: string; parent?: { id: string } | null }[];
+  allCheckpoints: { id: string; name: string; location?: { id: string; name: string } | null }[];
+  allAssets: { id: string; name: string }[];
+  pathOf: (locationId: string) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [addingCheckpoints, setAddingCheckpoints] = useState(false);
+  const [addingAssets, setAddingAssets] = useState(false);
+
+  const update = (fields: Record<string, unknown>) =>
+    void db.transact(db.tx.checklistTemplateSections[section.id].update(fields));
+
+  const items = section.items;
+  const cfg = (section.triggerConfig ?? {}) as { recurrenceRule?: string };
+
+  // A section belongs to exactly one location, and its checkpoints must be
+  // in it — so changing the location also drops any checkpoint that isn't.
+  const setLocation = (locationId: string | undefined) => {
+    const stale = (section.checkpoints ?? []).filter((c) => {
+      const full = allCheckpoints.find((a) => a.id === c.id);
+      return locationId ? full?.location?.id !== locationId : false;
+    });
+    void db.transact([
+      ...(locationId
+        ? [db.tx.checklistTemplateSections[section.id].link({ location: locationId })]
+        : section.location
+          ? [
+              db.tx.checklistTemplateSections[section.id].unlink({
+                location: section.location.id,
+              }),
+            ]
+          : []),
+      ...stale.map((c) =>
+        db.tx.checklistTemplateSections[section.id].unlink({ checkpoints: c.id }),
+      ),
+    ]);
+  };
+
+  const checkpointChoices = allCheckpoints.filter(
+    (c) => !section.location || c.location?.id === section.location.id,
+  );
+  const attachedCheckpointIds = new Set((section.checkpoints ?? []).map((c) => c.id));
+  const attachedAssetIds = new Set((section.assets ?? []).map((a) => a.id));
+
+  // Copy-on-edit: any change to what an item *asks* (label, config) writes a
+  // new row and repoints this section's link, so instances created before
+  // the edit keep the row they were created from. Order is presentation, not
+  // meaning — reorders write in place.
+  const versionItem = (
+    item: TemplateItemRow,
+    patch: { label?: string; config?: Record<string, unknown> },
+  ) => {
+    const newId = id();
+    void db.transact([
+      db.tx.checklistTemplateItems[newId]
+        .update({
+          type: item.type,
+          label: patch.label ?? item.label,
+          order: item.order,
+          version: (item.version ?? 1) + 1,
+          config: patch.config ?? item.config ?? {},
+        })
+        .link({ section: section.id, previousVersion: item.id }),
+      db.tx.checklistTemplateItems[item.id].unlink({ section: section.id }),
+    ]);
+  };
+
+  // The label starts as the type's own name and is edited inline on the row.
+  // A door or lock needs a Location, and the section's own location is
+  // almost always the right one — so default it.
+  const addItem = (type: ItemType) =>
+    void db.transact(
+      db.tx.checklistTemplateItems[id()]
+        .update({
+          type,
+          label: ITEM_TYPE_LABEL[type],
+          order: items.length,
+          version: 1,
+          config:
+            isStateCheck(type) && section.location
+              ? { locationId: section.location.id }
+              : {},
+        })
+        .link({ section: section.id }),
+    );
+
+  const duplicateItem = (item: TemplateItemRow) =>
+    void db.transact(
+      db.tx.checklistTemplateItems[id()]
+        .update({
+          type: item.type,
+          label: `${item.label} (copy)`,
+          order: items.length,
+          version: 1,
+          config: item.config ?? {},
+        })
+        .link({ section: section.id }),
+    );
+
+  // Removal unlinks rather than deletes: instance items on already-generated
+  // checklists render through this row forever.
+  const removeItem = (itemId: string) =>
+    void db.transact(
+      db.tx.checklistTemplateItems[itemId].unlink({ section: section.id }),
+    );
+
+  const removeSection = () => {
+    if (
+      !window.confirm(
+        `Delete section "${section.name}"? Checklists already generated keep their copy.`,
+      )
+    )
+      return;
+    void db.transact(db.tx.checklistTemplateSections[section.id].delete());
+  };
+
+  return (
+    <div className="card">
+      <div className="spread" style={{ flexWrap: "wrap" }}>
+        <span className="row" style={{ minWidth: 0 }}>
+          <DraftInput
+            className="input select-inline"
+            style={{ minWidth: 0 }}
+            value={section.name}
+            aria-label="Section name"
+            onCommit={(name) => update({ name })}
+          />
+          {!section.isActive && <span className="badge">Inactive</span>}
+        </span>
+        <span className="row" style={{ gap: 2 }}>
+          <span className="muted small">
+            {items.length} item{items.length === 1 ? "" : "s"}
+          </span>
+          <button
+            type="button"
+            className="btn btn-sm btn-quiet"
+            onClick={() => setOpen(!open)}
+          >
+            {open ? "Close" : "Open"}
+          </button>
+          <button type="button" className="btn btn-sm btn-quiet" onClick={removeSection}>
+            ✕
+          </button>
+        </span>
+      </div>
+
+      {open && (
+        <div style={{ marginTop: 8 }}>
+          <label className="row" style={{ cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={section.isActive}
+              onChange={(e) => update({ isActive: e.target.checked })}
+            />
+            <span className="small">
+              Active — inactive sections are never added to new checklists
+            </span>
+          </label>
+
+          <div className="field" style={{ marginTop: 8 }}>
+            <span className="field-label">Section trigger</span>
+            <select
+              className="select select-inline"
+              value={section.triggerType}
+              onChange={(e) => update({ triggerType: e.target.value })}
+            >
+              {SECTION_TRIGGERS.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+            {section.triggerType === "recurring" && (
+              <RecurrenceRuleField
+                value={cfg.recurrenceRule ?? ""}
+                onCommit={(recurrenceRule) =>
+                  update({ triggerConfig: recurrenceRule ? { recurrenceRule } : {} })
+                }
+              />
+            )}
+            {(section.triggerType === "checkpoint" ||
+              section.triggerType === "location") && (
+              <p className="muted small" style={{ marginTop: 4 }}>
+                Created when {section.triggerType === "checkpoint" ? "one of its checkpoints is scanned" : "its location is visited"} while the
+                checklist is open — set the place below.
+              </p>
+            )}
+            {section.triggerType === "asset" && (
+              <p className="muted small" style={{ marginTop: 4 }}>
+                Nothing creates asset sections automatically yet — attach the
+                assets below so it's ready when that lands.
+              </p>
+            )}
+          </div>
+
+          <div className="field">
+            <span className="field-label">Location</span>
+            <LocationPicker
+              locations={locations}
+              value={section.location?.id ?? ""}
+              onChange={(next) => setLocation(next || undefined)}
+              placeholder="Search locations…"
+            />
+            {section.location && (
+              <div style={{ marginTop: 6 }}>
+                <span className="small muted">
+                  Checkpoints — in {section.location.name} only
+                </span>
+                <div className="stack" style={{ gap: 2, marginTop: 4 }}>
+                  {(section.checkpoints ?? []).map((c) => (
+                    <div key={c.id} className="row spread">
+                      <span className="small">{c.name}</span>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-quiet"
+                        onClick={() =>
+                          void db.transact(
+                            db.tx.checklistTemplateSections[section.id].unlink({
+                              checkpoints: c.id,
+                            }),
+                          )
+                        }
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  style={{ marginTop: 4 }}
+                  disabled={
+                    checkpointChoices.filter((c) => !attachedCheckpointIds.has(c.id))
+                      .length === 0
+                  }
+                  onClick={() => setAddingCheckpoints(true)}
+                >
+                  + Add checkpoints
+                </button>
+              </div>
+            )}
+          </div>
+
+          {(section.triggerType === "asset" || (section.assets ?? []).length > 0) && (
+            <div className="field">
+              <span className="field-label">Assets</span>
+              <div className="stack" style={{ gap: 2 }}>
+                {(section.assets ?? []).map((a) => (
+                  <div key={a.id} className="row spread">
+                    <span className="small">{a.name}</span>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-quiet"
+                      onClick={() =>
+                        void db.transact(
+                          db.tx.checklistTemplateSections[section.id].unlink({
+                            assets: a.id,
+                          }),
+                        )
+                      }
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{ marginTop: 4 }}
+                onClick={() => setAddingAssets(true)}
+              >
+                + Add assets
+              </button>
+            </div>
+          )}
+
+          <RuleFields
+            hideUntilRule={section.hideUntilRule}
+            dueBy={section.dueBy}
+            onHideUntilRule={(hideUntilRule) =>
+              update({ hideUntilRule: hideUntilRule || null })
+            }
+            onDueBy={(dueBy) => update({ dueBy: dueBy ?? null })}
+            nounPhrase="section"
+          />
+
+          <div className="section-title" style={{ marginTop: 10 }}>
+            Items
+          </div>
+          <ReorderableList
+            items={items}
+            onReorder={(orderedIds) =>
+              void db.transact(
+                orderedIds.map((itemId, i) =>
+                  db.tx.checklistTemplateItems[itemId].update({ order: i }),
+                ),
+              )
+            }
+            renderItem={(item) => (
+              <ItemRow
+                item={item}
+                onEdit={versionItem}
+                onDuplicate={duplicateItem}
+                onRemove={removeItem}
+              />
+            )}
+          />
+          {items.length === 0 && <span className="muted small">No items yet.</span>}
+          <select
+            className="select select-inline"
+            style={{ marginTop: 8 }}
+            value=""
+            onChange={(e) => {
+              if (e.target.value) addItem(e.target.value as ItemType);
+            }}
+          >
+            <option value="">Add an item…</option>
+            {(Object.keys(ITEM_TYPE_LABEL) as ItemType[]).map((t) => (
+              <option key={t} value={t}>
+                {ITEM_TYPE_LABEL[t]}
+              </option>
+            ))}
+          </select>
+          {items.length > 1 && (
+            <p className="muted small" style={{ marginTop: 4 }}>
+              Drag ⠿ to reorder.
+            </p>
+          )}
+        </div>
+      )}
 
       {addingCheckpoints && (
         <MultiSelectDialog
-          title={`Attach ${template.name} to checkpoints`}
-          options={allCheckpoints
-            .filter((c) => !checkpointMemberIds.has(c.id))
+          title={`Attach checkpoints to ${section.name}`}
+          options={checkpointChoices
+            .filter((c) => !attachedCheckpointIds.has(c.id))
             .map((c) => ({
               id: c.id,
               name: c.name,
               group: c.location ? pathOf(c.location.id) : "No location",
             }))}
-          onConfirm={addCheckpoints}
+          onConfirm={(ids) => {
+            if (ids.length > 0)
+              void db.transact(
+                db.tx.checklistTemplateSections[section.id].link({ checkpoints: ids }),
+              );
+          }}
           onClose={() => setAddingCheckpoints(false)}
           confirmLabel="Attach"
-          emptyMessage="Already attached to every checkpoint."
+          emptyMessage="Every checkpoint in this location is already attached."
+        />
+      )}
+      {addingAssets && (
+        <MultiSelectDialog
+          title={`Attach assets to ${section.name}`}
+          options={allAssets
+            .filter((a) => !attachedAssetIds.has(a.id))
+            .map((a) => ({ id: a.id, name: a.name }))}
+          onConfirm={(ids) => {
+            if (ids.length > 0)
+              void db.transact(
+                db.tx.checklistTemplateSections[section.id].link({ assets: ids }),
+              );
+          }}
+          onClose={() => setAddingAssets(false)}
+          confirmLabel="Attach"
+          emptyMessage="Every asset is already attached."
         />
       )}
     </div>
   );
 }
 
+// ---------------------------------------------------------------- Rules
+
+function RecurrenceRuleField({
+  value,
+  onCommit,
+}: {
+  value: string;
+  onCommit: (rule: string) => void;
+}) {
+  return (
+    <div style={{ marginTop: 6 }}>
+      <DraftInput
+        className="input"
+        placeholder='RRULE, e.g. "FREQ=WEEKLY;BYDAY=TU" — empty = every day'
+        aria-label="Recurrence rule"
+        value={value}
+        onCommit={onCommit}
+      />
+      <p className="muted small" style={{ marginTop: 4 }}>
+        Days only — time of day belongs to "Hide until" below.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The two authored time rules shared by templates and sections: hide-until
+ * (WHEN the row becomes visible — creation is the trigger's business) and
+ * due-by (either a clock time or an offset from creation), both resolved to
+ * concrete timestamps on the instance at creation.
+ */
+function RuleFields({
+  hideUntilRule,
+  dueBy,
+  onHideUntilRule,
+  onDueBy,
+  nounPhrase,
+}: {
+  hideUntilRule: string | undefined;
+  dueBy: DueByRule | undefined;
+  onHideUntilRule: (rule: string) => void;
+  onDueBy: (rule: DueByRule | undefined) => void;
+  nounPhrase: string;
+}) {
+  const kind = dueBy?.kind ?? "";
+  return (
+    <>
+      <div className="field">
+        <span className="field-label">Hide until — optional</span>
+        <div className="row">
+          <DraftInput
+            type="time"
+            className="input select-inline"
+            aria-label="Hide until time of day"
+            value={hideUntilRule ?? ""}
+            onCommit={onHideUntilRule}
+          />
+          {hideUntilRule && (
+            <button
+              type="button"
+              className="btn btn-sm btn-quiet"
+              onClick={() => onHideUntilRule("")}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <p className="muted small" style={{ marginTop: 4 }}>
+          The {nounPhrase} exists from creation but stays hidden until this
+          time of day — and once shown, never re-hides.
+        </p>
+      </div>
+      <div className="field">
+        <span className="field-label">Due by — optional</span>
+        <div className="row">
+          <select
+            className="select select-inline"
+            value={kind}
+            onChange={(e) => {
+              const next = e.target.value;
+              if (!next) onDueBy(undefined);
+              else if (next === "time") onDueBy({ kind: "time", time: "05:00" });
+              else onDueBy({ kind: "offset", minutes: 60 });
+            }}
+          >
+            <option value="">No due time</option>
+            <option value="time">At a time of day</option>
+            <option value="offset">Within minutes of creation</option>
+          </select>
+          {dueBy?.kind === "time" && (
+            <DraftInput
+              type="time"
+              className="input select-inline"
+              aria-label="Due time of day"
+              value={dueBy.time}
+              onCommit={(time) => time && onDueBy({ kind: "time", time })}
+            />
+          )}
+          {dueBy?.kind === "offset" && (
+            <DraftInput
+              type="number"
+              className="input select-inline"
+              style={{ width: 90 }}
+              aria-label="Due within minutes"
+              value={String(dueBy.minutes)}
+              onCommit={(v) => {
+                const minutes = Number(v);
+                if (Number.isFinite(minutes) && minutes > 0)
+                  onDueBy({ kind: "offset", minutes });
+              }}
+            />
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- Items
+
 function ItemRow({
   item,
+  onEdit,
   onDuplicate,
   onRemove,
 }: {
   item: TemplateItemRow;
+  onEdit: (
+    item: TemplateItemRow,
+    patch: { label?: string; config?: Record<string, unknown> },
+  ) => void;
   onDuplicate: (item: TemplateItemRow) => void;
   onRemove: (itemId: string) => void;
 }) {
@@ -630,9 +1054,7 @@ function ItemRow({
   const cfg = (item.config ?? {}) as Record<string, unknown>;
 
   const setConfig = (patch: Record<string, unknown>) =>
-    void db.transact(
-      db.tx.checklistTemplateItems[item.id].update({ config: { ...cfg, ...patch } }),
-    );
+    onEdit(item, { config: { ...cfg, ...patch } });
 
   return (
     <div className="card">
@@ -644,11 +1066,9 @@ function ItemRow({
             style={{ minWidth: 0 }}
             value={item.label}
             aria-label="Item label"
-            onCommit={(label) =>
-              void db.transact(
-                db.tx.checklistTemplateItems[item.id].update({ label }),
-              )
-            }
+            onCommit={(label) => {
+              if (label !== item.label) onEdit(item, { label });
+            }}
           />
         </span>
         <span className="row" style={{ gap: 2 }}>

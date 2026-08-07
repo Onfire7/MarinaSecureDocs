@@ -1,9 +1,10 @@
-// Checklists & Tours — shared shapes for the opaque json fields on
-// ChecklistTemplateItem.config / ChecklistItemResult.result / Checklist.triggeredBy
-// (see instant.schema.ts — these are typed here rather than in the schema
-// itself since InstantDB's json columns are untyped storage).
-import type { InstaQLEntity } from "@instantdb/react";
-import type { AppSchema } from "./db";
+// Checklists — shared shapes for the opaque json fields on
+// ChecklistTemplateItem.config / ChecklistInstanceItem.result (typed here
+// rather than in the schema since InstantDB's json columns are untyped
+// storage), plus the rule-resolution helpers that turn a template's authored
+// rules (hideUntilRule, dueBy, recurrence) into concrete instance timestamps.
+// Trigger rules decide IF a row is created; hideUntil decides WHEN it shows.
+import { rrulestr } from "rrule";
 
 export type ItemType =
   | "simple_check"
@@ -212,39 +213,29 @@ export type ItemResult =
   | LocationCheckResult
   | MeterReadingResult;
 
-// ---- Checklist.triggeredBy ----
+// ---- Template trigger types ----
 
-export type TriggeredBy =
-  | { type: "clock_in" | "clock_out"; shiftId: string }
-  | { type: "checkpoint"; checkpointId: string; checkInId: string }
-  | { type: "scheduled" }
-  | { type: "manual" }
-  | { type: "incident_type"; incidentId: string }
-  | { type: "location_check"; parentChecklistId: string; locationId: string };
+// How an instance came to exist is not stored on it — the parent template's
+// triggerType says how instances of it get created (provenance details go to
+// the activity log at creation). Nested location_check sub-checklists are the
+// exception, marked by their parentItem link.
+export type TemplateTriggerType =
+  | "manual"
+  | "clock_in"
+  | "clock_out"
+  | "checkpoint"
+  | "recurring";
 
-export function triggeredByLabel(
-  t: TriggeredBy | null | undefined,
-  checkpointName?: string,
-): string {
-  if (!t) return "Manually started";
-  switch (t.type) {
-    case "clock_in":
-      return "Clock In";
-    case "clock_out":
-      return "Clock Out";
-    case "checkpoint":
-      return `Checkpoint: ${checkpointName ?? "—"}`;
-    case "scheduled":
-      return "Scheduled";
-    case "manual":
-      return "Manual";
-    case "incident_type":
-      return "Incident";
-    case "location_check":
-      return "Location-Based Check";
-    default:
-      return "—";
-  }
+export const TEMPLATE_TRIGGER_LABEL: Record<TemplateTriggerType, string> = {
+  manual: "Manual",
+  clock_in: "Clock In",
+  clock_out: "Clock Out",
+  checkpoint: "Checkpoint",
+  recurring: "Recurring",
+};
+
+export function triggerTypeLabel(t: string | null | undefined): string {
+  return TEMPLATE_TRIGGER_LABEL[t as TemplateTriggerType] ?? "—";
 }
 
 export function doorStateLabel(s: DoorState): string {
@@ -302,46 +293,26 @@ export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   meter_reading: "Meter Reading",
 };
 
-// ---- ChecklistTemplateSection trigger types ----
+// ---- Section trigger types ----
 
+// manual and recurring sections are created with their instance; checkpoint,
+// location and asset sections are created lazily onto an already-open
+// instance when that thing is actually visited. Nothing here is about
+// time-of-day — that's hideUntilRule's job.
 export type SectionTriggerType =
   | "manual"
-  | "time_window"
+  | "recurring"
   | "checkpoint"
   | "location"
   | "asset";
 
-export interface SectionTriggerConfig {
+export interface TriggerConfig {
   /**
-   * For "time_window": an RFC 5545 RRULE naming when the window *opens* —
-   * e.g. "FREQ=DAILY;BYHOUR=21;BYMINUTE=0" for 9pm nightly. Paired with
-   * durationMinutes to make a span; see lib/sectionActivation.ts.
+   * For "recurring" (sections and templates alike): an RFC 5545 RRULE naming
+   * which *days* apply — e.g. "FREQ=WEEKLY;BYDAY=TU" for Tuesdays. Purely a
+   * calendar-day gate on creation; any time-of-day component is ignored.
    */
   recurrenceRule?: string;
-  /** How long the section stays open from each occurrence. Default 60. */
-  durationMinutes?: number;
-
-  // For "checkpoint" / "location" / "asset":
-  applicableCheckpoints?: string[];
-  applicableLocations?: string[];
-  applicableAssets?: string[];
-}
-
-/**
- * A section as the UI consumes it: always present, always with its items
- * sorted, whether it came from a real ChecklistTemplateSection row or was
- * synthesised around a legacy template's direct items.
- */
-export interface ResolvedSection {
-  id: string;
-  name: string;
-  order: number;
-  isActive: boolean;
-  triggerType: SectionTriggerType;
-  triggerConfig: SectionTriggerConfig;
-  items: TemplateItemLike[];
-  /** True when this wraps pre-sections items rather than a stored section. */
-  synthetic: boolean;
 }
 
 /** The parts of a ChecklistTemplateItem every consumer here relies on. */
@@ -353,125 +324,132 @@ export interface TemplateItemLike {
   config?: Record<string, unknown>;
 }
 
-interface TemplateSectionLike {
-  id: string;
-  name: string;
-  order: number;
-  isActive: boolean;
-  triggerType: string;
-  triggerConfig?: Record<string, unknown>;
-  items?: TemplateItemLike[];
-}
+// ---- Rule resolution (template rules → instance timestamps) ----
 
-/** Id of the synthetic section wrapping a legacy template's direct items. */
-export const LEGACY_SECTION_ID = "__legacy__";
+export type DueByRule =
+  | { kind: "time"; time: string }
+  | { kind: "offset"; minutes: number };
 
-/**
- * One list of sections for a template regardless of how it was authored.
- *
- * Templates written before sections existed hang their items straight off the
- * template, and those rows are not migrated — the link stays, and they're
- * wrapped here in a single always-on section instead. That keeps every caller
- * on one shape (`section.items`) without a "does this template have sections?"
- * branch at each call site, and means an un-migrated template behaves exactly
- * as it did before: every item visible, no activation filtering.
- *
- * A template with both (mid-migration, or an admin who added a section to an
- * old template) lists the legacy section first, since its items predate the
- * ones deliberately filed into sections.
- */
-export function sectionsForTemplate(
-  template:
-    | {
-        items?: TemplateItemLike[];
-        sections?: TemplateSectionLike[];
-      }
-    | null
-    | undefined,
-): ResolvedSection[] {
-  const byOrder = (a: { order: number }, b: { order: number }) => a.order - b.order;
-
-  const stored = (template?.sections ?? []).slice().sort(byOrder).map(
-    (s): ResolvedSection => ({
-      id: s.id,
-      name: s.name,
-      order: s.order,
-      isActive: s.isActive,
-      triggerType: (s.triggerType as SectionTriggerType) ?? "manual",
-      triggerConfig: (s.triggerConfig ?? {}) as SectionTriggerConfig,
-      items: (s.items ?? []).slice().sort(byOrder),
-      synthetic: false,
-    }),
-  );
-
-  const legacyItems = (template?.items ?? []).slice().sort(byOrder);
-  if (legacyItems.length === 0) return stored;
-
-  return [
-    {
-      id: LEGACY_SECTION_ID,
-      name: "Checklist",
-      order: -1,
-      isActive: true,
-      // "manual" is the always-on trigger — an un-sectioned template must keep
-      // showing every item, never get filtered out by a time or place rule.
-      triggerType: "manual",
-      triggerConfig: {},
-      items: legacyItems,
-      synthetic: true,
-    },
-    ...stored,
-  ];
-}
-
-/** Every item across the given sections, in section-then-item order. */
-export function itemsOfSections(sections: ResolvedSection[]): TemplateItemLike[] {
-  return sections.flatMap((s) => s.items);
+/** Next occurrence of a local "HH:MM" strictly after `from`; null if malformed. */
+function nextOccurrenceOf(time: string, from: Date): Date | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
+  if (!m) return null;
+  const at = new Date(from);
+  at.setHours(Number(m[1]), Number(m[2]), 0, 0);
+  if (at.getTime() <= from.getTime()) at.setDate(at.getDate() + 1);
+  return at;
 }
 
 /**
- * Who a newly created checklist belongs to.
- *
- * "role" deliberately leaves it unassigned, for any holder of the template's
- * role to claim out of the unclaimed queue. But that queue finds checklists
- * by `template.role.id`, so it only works when a role is actually linked —
- * and assignmentMode could be set to "role" independently of ever naming one.
- * The result was a checklist created, owned by nobody, and matched by no
- * query in the app: invisible even to the guard who triggered it. Falling
- * back to the triggering user loses the role routing, which is a much
- * smaller loss than losing the checklist.
- *
- * Callers link `assignedTo` only when this returns "triggering_user".
+ * Past this horizon, a hide-until time is read as already-passed rather than
+ * upcoming. "Hide until 21:00" on an instance created at 22:00 means 9pm
+ * already came and went — not "hide for 23 hours" — while "hide until 02:00"
+ * created at 23:00 genuinely means 2am tonight. 20h splits the two readings:
+ * an instance lives one shift cycle, so a reveal that far out can only be a
+ * time that was meant for earlier today.
  */
-export function assigneeFor(template: {
-  assignmentMode: string;
-  role?: { id: string } | null;
-}): "triggering_user" | "role" {
-  if (template.assignmentMode !== "role") return "triggering_user";
-  return template.role ? "role" : "triggering_user";
+const HIDE_RULE_HORIZON_MS = 20 * 60 * 60_000;
+
+/**
+ * Resolve an authored hideUntilRule ("HH:MM") to a concrete timestamp at
+ * instantiation, or null for visible-immediately. Malformed rules resolve to
+ * visible — an admin typo must never hide assigned work.
+ */
+export function resolveHideUntil(
+  rule: string | null | undefined,
+  createdAt: Date = new Date(),
+): number | null {
+  if (!rule?.trim()) return null;
+  const next = nextOccurrenceOf(rule, createdAt);
+  if (!next) return null;
+  if (next.getTime() - createdAt.getTime() > HIDE_RULE_HORIZON_MS) return null;
+  return next.getTime();
 }
 
-type ChecklistTemplate = InstaQLEntity<AppSchema, "checklistTemplates">;
+/**
+ * Resolve a dueBy rule to a concrete timestamp at instantiation. "time" is
+ * the plain next occurrence — a due time always rolls forward (due 05:00,
+ * created 17:00 → 5am tomorrow), unlike hide-until there is no ambiguity.
+ */
+export function resolveDueBy(
+  rule: DueByRule | null | undefined,
+  createdAt: Date = new Date(),
+): number | null {
+  if (!rule) return null;
+  if (rule.kind === "offset") {
+    if (!Number.isFinite(rule.minutes) || rule.minutes <= 0) return null;
+    return createdAt.getTime() + rule.minutes * 60_000;
+  }
+  return nextOccurrenceOf(rule.time, createdAt)?.getTime() ?? null;
+}
 
-// Checkpoint-triggered templates carry an optional time-of-day window in
-// triggerConfig; every other trigger type (or one with no window configured)
-// always applies. Season-based conditions are not modeled yet.
-export function templateAppliesNow(
-  template: Pick<ChecklistTemplate, "triggerType" | "triggerConfig">,
-  now: Date = new Date(),
+/**
+ * Whether a recurrence rule has an occurrence on `day`'s local calendar day.
+ * No rule = applies every day. Malformed rules apply — a typo should create
+ * an extra checklist, not silently drop scheduled work.
+ */
+export function recurrenceMatchesDay(
+  rule: string | null | undefined,
+  day: Date = new Date(),
 ): boolean {
-  if (template.triggerType !== "checkpoint") return true;
-  const cfg = (template.triggerConfig ?? {}) as {
-    timeStart?: string;
-    timeEnd?: string;
-  };
-  if (!cfg.timeStart || !cfg.timeEnd) return true;
-  const [sh, sm] = cfg.timeStart.split(":").map(Number);
-  const [eh, em] = cfg.timeEnd.split(":").map(Number);
-  const minutes = now.getHours() * 60 + now.getMinutes();
-  const start = sh * 60 + sm;
-  const end = eh * 60 + em;
-  return start <= end
-    ? minutes >= start && minutes < end
-    : minutes >= start || minutes < end;
+  if (!rule?.trim()) return true;
+  const dayStart = new Date(day);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+  try {
+    // dtstart must precede the day being tested or the rule generates
+    // nothing there; a year back covers YEARLY at negligible expansion cost.
+    const dtstart = new Date(dayStart.getTime() - 366 * 24 * 60 * 60_000);
+    const parsed = rrulestr(rule, { dtstart });
+    return parsed.between(dayStart, dayEnd, true).length > 0;
+  } catch (error) {
+    console.error("Invalid recurrence rule:", rule, error);
+    return true;
+  }
+}
+
+/**
+ * Creation-day eligibility shared by templates and sections: any row with a
+ * recurrence rule gates on it — for "recurring" it's the whole trigger, but
+ * a checkpoint-triggered template can also carry one ("only on Tuesdays").
+ * No rule means eligible whenever the creating event happens.
+ */
+export function eligibleToday(
+  row: { triggerType: string; triggerConfig?: Record<string, unknown> | null },
+  day: Date = new Date(),
+): boolean {
+  return recurrenceMatchesDay((row.triggerConfig as TriggerConfig | null)?.recurrenceRule, day);
+}
+
+// ---- Instance visibility & derived completion ----
+
+/**
+ * hideUntil filter for instances and instance sections. Timestamps arrive as
+ * number or ISO string depending on how the row was written; normalize here.
+ * Once now passes hideUntil the row is permanently visible — nothing re-hides.
+ */
+export function isVisibleNow(
+  row: { hideUntil?: number | string | null },
+  now: number = Date.now(),
+): boolean {
+  if (row.hideUntil == null) return true;
+  return now >= new Date(row.hideUntil).getTime();
+}
+
+/**
+ * When a section finished: the latest of its items' completedAt, and only
+ * once every item has one. Derived at read time — storing it would mean an
+ * extra write on every item completion just to keep a summary in sync.
+ */
+export function sectionCompletionTime(
+  items: { completedAt?: number | string | null }[],
+): number | null {
+  if (items.length === 0) return null;
+  let latest = 0;
+  for (const it of items) {
+    if (it.completedAt == null) return null;
+    latest = Math.max(latest, new Date(it.completedAt).getTime());
+  }
+  return latest;
 }

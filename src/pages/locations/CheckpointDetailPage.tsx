@@ -1,7 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { templateAppliesNow } from "../../lib/checklists";
 
 // Locations — Checkpoint Detail (see pages/checkpoint-detail.html).
 // Read-oriented reference/audit view: identity, GUID URL, GPS validation
@@ -17,7 +16,7 @@ export function CheckpointDetailPage() {
           checkpoints: {
             $: { where: { id: checkpointId } },
             location: {},
-            checklistTemplates: {},
+            checklistTemplateSections: { template: {} },
             tours: {},
           },
           marinaSettings: {},
@@ -96,27 +95,21 @@ export function CheckpointDetailPage() {
             </div>
           )}
 
-          <div className="section-title">Applicable checklist templates</div>
+          <div className="section-title">Checklist sections here</div>
           <div className="stack" style={{ gap: 8, marginBottom: 16 }}>
-            {(checkpoint.checklistTemplates ?? []).map((t) => {
-              const cfg = (t.triggerConfig ?? {}) as { timeStart?: string; timeEnd?: string };
-              return (
-                <div key={t.id} className="card spread">
-                  <div>
-                    <div className="card-title">{t.name}</div>
-                    <div className="card-meta">
-                      {cfg.timeStart && cfg.timeEnd
-                        ? `${cfg.timeStart} – ${cfg.timeEnd}`
-                        : "Any time"}
-                    </div>
+            {(checkpoint.checklistTemplateSections ?? []).map((s) => (
+              <div key={s.id} className="card spread">
+                <div>
+                  <div className="card-title">{s.template?.name ?? "Checklist"}</div>
+                  <div className="card-meta">
+                    {s.name}
+                    {s.hideUntilRule ? ` · shows at ${s.hideUntilRule}` : ""}
                   </div>
-                  {templateAppliesNow(t) && (
-                    <span className="badge badge-good">Applies now</span>
-                  )}
                 </div>
-              );
-            })}
-            {(checkpoint.checklistTemplates ?? []).length === 0 && (
+                {!s.isActive && <span className="badge">Inactive</span>}
+              </div>
+            ))}
+            {(checkpoint.checklistTemplateSections ?? []).length === 0 && (
               <span className="muted small">
                 None configured — a guard can still check in and add a note or incident.
               </span>

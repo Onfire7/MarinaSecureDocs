@@ -4,14 +4,17 @@ import { db } from "../../lib/db";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import {
   doorCheckSummary,
-  itemsOfSections,
   itemTypeLabel,
-  sectionsForTemplate,
+  sectionCompletionTime,
   type ItemResult,
 } from "../../lib/checklists";
 
 // Checklists & Tours — Checklist Detail (see pages/checklist-detail.html).
-// Read-only record of a completed instance — no edit actions anywhere.
+// Read-only record of a completed instance — no edit actions anywhere. An
+// instance is fully materialized rows, so this renders exactly what was
+// assigned: every section that existed, every item, whoever completed each
+// and when. Section completion times are derived here (latest item, once
+// all are done) rather than stored.
 export function ChecklistDetailPage() {
   const { id: checklistId } = useParams();
   const isMobile = useIsMobile();
@@ -19,16 +22,18 @@ export function ChecklistDetailPage() {
   const { data } = db.useQuery(
     checklistId
       ? {
-          checklists: {
+          checklistInstances: {
             $: { where: { id: checklistId } },
-            template: { items: {}, sections: { items: {} } },
-            itemResults: { templateItem: {}, linkedTicket: {} },
+            template: {},
+            sections: {
+              items: { template: {}, linkedTicket: {}, completedBy: {} },
+            },
             assignedTo: {},
           },
         }
       : null,
   );
-  const checklist = data?.checklists?.[0];
+  const checklist = data?.checklistInstances?.[0];
 
   if (!checklist) {
     return (
@@ -38,22 +43,23 @@ export function ChecklistDetailPage() {
     );
   }
 
-  const resultByItemId = new Map(
-    (checklist.itemResults ?? []).map((r) => [r.templateItem?.id, r]),
-  );
-
-  // This is a record of what happened, so sections are *not* re-filtered
-  // through their triggers here: a window that has since closed would hide
-  // the very items the guard filled in during it. Sections nobody recorded
-  // anything against are dropped instead — on a large template most sections
-  // never ran, and listing them all as "Not recorded" would bury the ones
-  // that did. A synthetic (legacy, un-sectioned) section is always kept, so
-  // pre-sections checklists still list every item exactly as before.
-  const sections = sectionsForTemplate(checklist.template).filter(
-    (s) => s.synthetic || s.items.some((i) => resultByItemId.has(i.id)),
-  );
-  const items = itemsOfSections(sections);
+  const byOrder = (a: { order: number }, b: { order: number }) => a.order - b.order;
+  const sections = (checklist.sections ?? [])
+    .slice()
+    .sort(byOrder)
+    .map((s) => ({ ...s, items: (s.items ?? []).slice().sort(byOrder) }));
+  const items = sections.flatMap((s) => s.items);
   const showSectionHeadings = sections.length > 1;
+
+  const timeOf = (ts: number | string | null | undefined) =>
+    ts
+      ? new Date(ts).toLocaleString(undefined, {
+          hour: "numeric",
+          minute: "2-digit",
+          month: "short",
+          day: "numeric",
+        })
+      : null;
 
   return (
     <div>
@@ -65,14 +71,7 @@ export function ChecklistDetailPage() {
         <span className="field-label">Assigned to / completed</span>
         <div className="field-value">
           {checklist.assignedTo?.name ?? "—"}
-          {checklist.completedAt
-            ? ` · ${new Date(checklist.completedAt).toLocaleString(undefined, {
-                hour: "numeric",
-                minute: "2-digit",
-                month: "short",
-                day: "numeric",
-              })}`
-            : ""}
+          {checklist.completedAt ? ` · ${timeOf(checklist.completedAt)}` : ""}
         </div>
       </div>
 
@@ -82,16 +81,14 @@ export function ChecklistDetailPage() {
             <Fragment key={section.id}>
               {showSectionHeadings && (
                 <div className="group-heading">
-                  <span>{section.name}</span>
+                  <span>
+                    {section.label}
+                    <SectionCompletion items={section.items} />
+                  </span>
                 </div>
               )}
               {section.items.map((item) => (
-                <ResultCard
-                  key={item.id}
-                  type={item.type}
-                  label={item.label}
-                  result={resultByItemId.get(item.id)}
-                />
+                <ResultCard key={item.id} item={item} />
               ))}
             </Fragment>
           ))}
@@ -103,6 +100,7 @@ export function ChecklistDetailPage() {
               <th>Item</th>
               <th>Type</th>
               <th>Result</th>
+              <th>Completed</th>
               <th>Linked ticket</th>
             </tr>
           </thead>
@@ -111,30 +109,45 @@ export function ChecklistDetailPage() {
               <Fragment key={section.id}>
                 {showSectionHeadings && (
                   <tr>
-                    <th colSpan={4} className="group-heading">
-                      {section.name}
+                    <th colSpan={5} className="group-heading">
+                      {section.label}
+                      <SectionCompletion items={section.items} />
                     </th>
                   </tr>
                 )}
-                {section.items.map((item) => {
-                  const r = resultByItemId.get(item.id);
-                  return (
-                    <tr key={item.id}>
-                      <td>{item.label}</td>
-                      <td>{itemTypeLabel(item.type)}</td>
-                      <td>
-                        <ResultSummary type={item.type} result={r?.result as ItemResult | undefined} />
-                      </td>
-                      <td>
-                        {r?.linkedTicket ? (
-                          <Link to={`/tickets/${r.linkedTicket.id}`}>{r.linkedTicket.title}</Link>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {section.items.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.template?.label ?? "—"}</td>
+                    <td>{item.template ? itemTypeLabel(item.template.type) : "—"}</td>
+                    <td>
+                      <ResultSummary
+                        type={item.template?.type ?? ""}
+                        result={item.result as ItemResult | undefined}
+                      />
+                    </td>
+                    <td className="small">
+                      {item.completedAt ? (
+                        <>
+                          {timeOf(item.completedAt)}
+                          {item.completedBy && (
+                            <span className="muted"> · {item.completedBy.name}</span>
+                          )}
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td>
+                      {item.linkedTicket ? (
+                        <Link to={`/tickets/${item.linkedTicket.id}`}>
+                          {item.linkedTicket.title}
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  </tr>
+                ))}
               </Fragment>
             ))}
           </tbody>
@@ -150,30 +163,64 @@ export function ChecklistDetailPage() {
   );
 }
 
-function ResultCard({
-  type,
-  label,
-  result,
+/**
+ * Derived, not stored: the section finished when its last item did — and
+ * only once every item has a completion time.
+ */
+function SectionCompletion({
+  items,
 }: {
-  type: string;
-  label: string;
-  result: { result?: unknown; linkedTicket?: { id: string; title: string } } | undefined;
+  items: { completedAt?: number | string | null }[];
 }) {
+  const done = sectionCompletionTime(items);
+  if (done == null) return null;
+  return (
+    <span className="muted small">
+      {" · completed "}
+      {new Date(done).toLocaleTimeString(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      })}
+    </span>
+  );
+}
+
+interface ItemRowLike {
+  id: string;
+  result?: unknown;
+  completedAt?: number | string | null;
+  completedBy?: { name: string } | null;
+  linkedTicket?: { id: string; title: string } | null;
+  template?: { type: string; label: string } | null;
+}
+
+function ResultCard({ item }: { item: ItemRowLike }) {
+  const type = item.template?.type ?? "";
   return (
     <div className="card">
       <div className="badge">{itemTypeLabel(type)}</div>
-      <div className="card-title">{label}</div>
+      <div className="card-title">{item.template?.label ?? "—"}</div>
       <div className="card-meta">
-        <ResultSummary type={type} result={result?.result as ItemResult | undefined} />
+        <ResultSummary type={type} result={item.result as ItemResult | undefined} />
+        {item.completedAt && (
+          <span className="muted">
+            {" · "}
+            {new Date(item.completedAt).toLocaleTimeString(undefined, {
+              hour: "numeric",
+              minute: "2-digit",
+            })}
+            {item.completedBy ? ` by ${item.completedBy.name}` : ""}
+          </span>
+        )}
       </div>
-      {result?.linkedTicket && (
+      {item.linkedTicket && (
         <div style={{ marginTop: 6 }}>
-          <Link to={`/tickets/${result.linkedTicket.id}`}>{result.linkedTicket.title}</Link>
+          <Link to={`/tickets/${item.linkedTicket.id}`}>{item.linkedTicket.title}</Link>
         </div>
       )}
-      {type === "location_check" && result?.result != null && (
+      {type === "location_check" && item.result != null && (
         <NestedChecklistSummary
-          nestedChecklistId={(result.result as { nestedChecklistId: string }).nestedChecklistId}
+          nestedChecklistId={(item.result as { nestedChecklistId: string }).nestedChecklistId}
         />
       )}
     </div>
@@ -229,24 +276,31 @@ function ResultSummary({ type, result }: { type: string; result: ItemResult | un
 }
 
 function NestedChecklistStatus({ nestedChecklistId }: { nestedChecklistId: string }) {
-  const { data } = db.useQuery({ checklists: { $: { where: { id: nestedChecklistId } } } });
-  const status = data?.checklists?.[0]?.status;
+  const { data } = db.useQuery({
+    checklistInstances: { $: { where: { id: nestedChecklistId } } },
+  });
+  const status = data?.checklistInstances?.[0]?.status;
   return <span>Nested checklist {status === "complete" ? "complete" : (status ?? "…").replace("_", " ")}</span>;
 }
 
 function NestedChecklistSummary({ nestedChecklistId }: { nestedChecklistId: string }) {
   const [expanded, setExpanded] = useState(false);
   const { data } = db.useQuery({
-    checklists: {
+    checklistInstances: {
       $: { where: { id: nestedChecklistId } },
-      template: { items: {}, sections: { items: {} } },
-      itemResults: { templateItem: {}, linkedTicket: {} },
+      template: {},
+      sections: {
+        items: { template: {}, linkedTicket: {}, completedBy: {} },
+      },
     },
   });
-  const nested = data?.checklists?.[0];
+  const nested = data?.checklistInstances?.[0];
   if (!nested) return null;
-  const items = itemsOfSections(sectionsForTemplate(nested.template));
-  const resultByItemId = new Map((nested.itemResults ?? []).map((r) => [r.templateItem?.id, r]));
+  const byOrder = (a: { order: number }, b: { order: number }) => a.order - b.order;
+  const items = (nested.sections ?? [])
+    .slice()
+    .sort(byOrder)
+    .flatMap((s) => (s.items ?? []).slice().sort(byOrder));
 
   return (
     <div style={{ marginTop: 8 }}>
@@ -256,12 +310,7 @@ function NestedChecklistSummary({ nestedChecklistId }: { nestedChecklistId: stri
       {expanded && (
         <div className="stack" style={{ marginTop: 8 }}>
           {items.map((item) => (
-            <ResultCard
-              key={item.id}
-              type={item.type}
-              label={item.label}
-              result={resultByItemId.get(item.id)}
-            />
+            <ResultCard key={item.id} item={item} />
           ))}
         </div>
       )}

@@ -10,7 +10,7 @@ import type { Permission } from "./permissions";
 
 /** Entity namespaces an entry can be about. */
 export type SubjectType =
-  | "checklists"
+  | "checklistInstances"
   | "checkIns"
   | "tickets"
   | "incidents"
@@ -51,7 +51,7 @@ export function subjectPermission(subjectType: string): Permission | undefined {
 /** Route to a subject's own detail page, or null when it has none. */
 export function subjectPath(subjectType: string, subjectId: string): string | null {
   switch (subjectType as SubjectType) {
-    case "checklists":
+    case "checklistInstances":
       return `/checklists/${subjectId}`;
     case "tickets":
       return `/tickets/${subjectId}`;
@@ -79,7 +79,7 @@ export function subjectPath(subjectType: string, subjectId: string): string | nu
 }
 
 export const SUBJECT_LABEL: Record<SubjectType, string> = {
-  checklists: "Checklist",
+  checklistInstances: "Checklist",
   checkIns: "Check-in",
   tickets: "Ticket",
   incidents: "Incident",

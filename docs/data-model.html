@@ -145,7 +145,7 @@
         <tr><td>guid_url</td><td>text</td><td>Unique URL containing a GUID; bound to an NFC tag or QR code.</td></tr>
         <tr><td>gps_coordinates</td><td>lat/lng</td><td>Defaults from Location, may be refined per checkpoint.</td></tr>
         <tr><td>gps_validation_radius</td><td>number (meters)</td><td>Overrides the marina-wide default; used to reject spoofed check-ins.</td></tr>
-        <tr><td>checklist_templates</td><td>ref[] → ChecklistTemplate</td><td>Multiple templates may apply, gated by trigger conditions (time of day, season, etc.).</td></tr>
+        <tr><td>checklist_template_sections</td><td>ref[] → ChecklistTemplateSection</td><td>Checklist attachment is per <em>section</em>, not per template — scanning this checkpoint opens (or lazily creates) the sections that name it.</td></tr>
         <tr><td>tours</td><td>ref[] → Tour</td><td>Tours this checkpoint participates in.</td></tr>
       </table>
     </div>
@@ -171,59 +171,93 @@
       <tr><td>reason</td><td>text</td><td>Required when method = Manual.</td></tr>
       <tr><td>gps_at_checkin</td><td>lat/lng</td><td>Device-reported location, compared against the checkpoint's validation radius.</td></tr>
       <tr><td>within_radius</td><td>boolean</td><td>Result of the GPS validation check; flagged for review if false.</td></tr>
-      <tr><td>generated_checklist</td><td>ref → Checklist</td><td>Nullable — not every check-in produces a checklist.</td></tr>
+      <tr><td>generated_checklist</td><td>ref → ChecklistInstance</td><td>Nullable — not every check-in produces a checklist.</td></tr>
     </table>
 
     <div class="fathom">checklists</div>
 
-    <h2>ChecklistTemplate &amp; Checklist</h2>
+    <h2>Checklist templates &amp; instances</h2>
+    <p>Templates are authored per role and organized into <em>sections</em>; instances are fully materialized copies — every section and item of an instance exists as a database row from the moment it's assigned, so display logic only ever renders rows. Two rule families govern behavior: <strong>trigger rules decide IF a row gets created</strong> (day/date recurrence, a checkpoint scan, a clock event), and <strong>hide-until rules decide WHEN it becomes visible</strong> (a time of day, resolved to a concrete timestamp at creation). Nothing ever re-hides once shown, and nothing runs in the background — every creation happens because someone used the app.</p>
 
     <div class="schema-entity">
-      <div class="head"><span>ChecklistTemplate</span><span class="tag">admin/user-defined</span></div>
+      <div class="head"><span>ChecklistTemplate</span><span class="tag">admin-defined</span></div>
       <table>
         <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
         <tr><td>name</td><td>text</td><td></td></tr>
-        <tr><td>visibility</td><td>enum</td><td>Global (marina-wide) / Role-restricted / Personal (creator only).</td></tr>
-        <tr><td>trigger_type</td><td>enum</td><td>Clock In/Out, Scheduled Time, Checkpoint Visit, Incident Type, Manual.</td></tr>
-        <tr><td>trigger_config</td><td>structured</td><td>Shape depends on trigger_type — e.g. a schedule expression, or a checkpoint + condition (time of day / season).</td></tr>
-        <tr><td>assignment_mode</td><td>enum</td><td>Assign to triggering user, or to a specified Role.</td></tr>
+        <tr><td>assigned_role</td><td>ref → Role</td><td>Required — every template belongs to exactly one role; there is no global or personal visibility. (Personal checklists return later as their own feature.)</td></tr>
+        <tr><td>viewer_roles</td><td>ref[] → Role</td><td>Read-only cross-role monitoring — e.g. the office watching maintenance's progress without holding the role.</td></tr>
+        <tr><td>assigned_to_user</td><td>boolean</td><td>True: each instance is assigned to whoever triggered it. False: left unclaimed for any holder of assigned_role to pick up.</td></tr>
+        <tr><td>trigger_type</td><td>enum</td><td>Manual / Clock In / Clock Out / Checkpoint Visit / Recurring. Recurring instances are created by the first role-holder to open the app on a matching day (deterministic id — racing clients converge on one row).</td></tr>
+        <tr><td>trigger_config</td><td>structured</td><td>For Recurring (or as a day-gate on any type): an RFC 5545 RRULE naming which <em>days</em> apply. Purely a calendar-day gate — time of day belongs to hide_until_rule.</td></tr>
+        <tr><td>hide_until_rule</td><td>text ("HH:MM"), nullable</td><td>Resolved to the instance's hide_until at creation.</td></tr>
+        <tr><td>due_by</td><td>structured, nullable</td><td>A rule — a clock time, or an offset from creation — resolved to the instance's due_by timestamp at creation.</td></tr>
+        <tr><td>sections</td><td>ref[] → ChecklistTemplateSection</td><td>Ordered. Items live inside sections.</td></tr>
+      </table>
+    </div>
+
+    <div class="schema-entity">
+      <div class="head"><span>ChecklistTemplateSection</span><span class="tag">admin-defined</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>name / order / is_active</td><td>text / number / boolean</td><td>Inactive sections are never instantiated.</td></tr>
+        <tr><td>trigger_type</td><td>enum</td><td>Manual and Recurring sections are created with the instance (Recurring only when the day matches). Checkpoint / Location / Asset sections are created <em>lazily</em>, onto an already-open instance, when that thing is actually visited.</td></tr>
+        <tr><td>trigger_config</td><td>structured</td><td>Recurring: an RRULE day rule, same semantics as the template's.</td></tr>
+        <tr><td>hide_until_rule / due_by</td><td>as on the template</td><td>Resolved onto the instance section at creation.</td></tr>
+        <tr><td>location</td><td>ref → Location</td><td>At most one — and this section's checkpoints must belong to it (enforced by the admin editor; checkpoints can't move between locations, so it can't drift).</td></tr>
+        <tr><td>checkpoints</td><td>ref[] → Checkpoint</td><td>Scanning one of these opens/creates this section.</td></tr>
+        <tr><td>assets</td><td>ref[] → Asset</td><td>Configurable now; no runtime event instantiates asset sections yet.</td></tr>
         <tr><td>items</td><td>ref[] → ChecklistTemplateItem</td><td>Ordered.</td></tr>
       </table>
     </div>
 
     <div class="schema-entity">
-      <div class="head"><span>ChecklistTemplateItem</span><span class="tag">admin/user-defined</span></div>
+      <div class="head"><span>ChecklistTemplateItem</span><span class="tag">admin-defined · copy-on-edit</span></div>
       <table>
         <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
         <tr><td>type</td><td>enum</td><td>Simple Check / Verify Task / Door Check / Lock Check / Location-Based Check / Meter Reading.</td></tr>
         <tr><td>label</td><td>text</td><td></td></tr>
-        <tr><td>config</td><td>structured</td><td>Type-specific: e.g. a Door or Lock Check's expected state and the required Location it belongs to (what a mismatch Incident attaches to, since neither is an entity of its own; defaulted from the checkpoint's Location on creation); Verify Task's "prompt retry after rejection" flag; Location-Based Check's nested checklist reference; Meter Reading's asset selection (a fixed Asset, or user-selected at completion time — e.g. "select your patrol vehicle").</td></tr>
-        <tr><td>order</td><td>number</td><td></td></tr>
+        <tr><td>config</td><td>structured</td><td>Type-specific: e.g. a Door or Lock Check's expected state and the required Location it belongs to (what a mismatch Incident attaches to, since neither is an entity of its own; defaulted from the section's Location on creation); Verify Task's "prompt retry after rejection" flag; Location-Based Check's nested checklist reference; Meter Reading's asset selection (a fixed Asset, or user-selected at completion time — e.g. "select your patrol vehicle").</td></tr>
+        <tr><td>order</td><td>number</td><td>Presentation only — reorders write in place; they don't version.</td></tr>
+        <tr><td>version / previous_version</td><td>number / ref → self</td><td>Editing an item's label or config writes a <em>new</em> row (version+1, previous_version link) and repoints the section's items link, orphaning the old row — which existing instance items still reference, so history renders exactly as instantiated without snapshotting config per instance. The chain is for debugging and a possible future history viewer; there is no forward "current" pointer.</td></tr>
       </table>
     </div>
 
     <div class="schema-entity">
-      <div class="head"><span>Checklist</span><span class="tag">instance</span></div>
+      <div class="head"><span>ChecklistInstance</span><span class="tag">instance</span></div>
       <table>
         <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
-        <tr><td>template</td><td>ref → ChecklistTemplate</td><td></td></tr>
-        <tr><td>assigned_to</td><td>ref → User</td><td></td></tr>
+        <tr><td>template</td><td>ref → ChecklistTemplate</td><td>How an instance came to exist is not stored on it — the template's trigger_type says how its instances get created, and creation details go to the activity log.</td></tr>
+        <tr><td>assigned_to</td><td>ref → User</td><td>Nullable — an unclaimed role-pool instance until someone opens (and thereby claims) it.</td></tr>
         <tr><td>status</td><td>enum</td><td>Not Started / In Progress / Complete.</td></tr>
-        <tr><td>triggered_by</td><td>structured</td><td>Reference to the check-in, clock event, schedule fire, or manual action that created it.</td></tr>
-        <tr><td>started_at / completed_at</td><td>datetime</td><td></td></tr>
-        <tr><td>item_results</td><td>ref[] → ChecklistItemResult</td><td></td></tr>
+        <tr><td>started_at / completed_at</td><td>datetime</td><td>completed_at is the whole checklist's submission time; per-item times live on the items.</td></tr>
+        <tr><td>hide_until / due_by</td><td>datetime, nullable</td><td>Resolved from the template's rules at creation. Visible when hide_until is absent or past — permanently, once shown.</td></tr>
+        <tr><td>sections</td><td>ref[] → ChecklistInstanceSection</td><td></td></tr>
+        <tr><td>parent_item</td><td>ref → ChecklistInstanceItem</td><td>Set only on nested instances spawned by a Location-Based Check item; keeps sub-checklists out of the main list.</td></tr>
       </table>
     </div>
 
     <div class="schema-entity">
-      <div class="head"><span>ChecklistItemResult</span><span class="tag">instance</span></div>
+      <div class="head"><span>ChecklistInstanceSection</span><span class="tag">instance</span></div>
       <table>
         <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
-        <tr><td>template_item</td><td>ref → ChecklistTemplateItem</td><td></td></tr>
-        <tr><td>result</td><td>structured</td><td>Type-specific: boolean for Simple Check; Confirmed/Rejected-Reason/Rejected-Ticket for Verify Task; for Door Check, the state <em>as found</em> and <em>as left</em> recorded separately (plus the Incident logged when the two differ from expected) — a door corrected on arrival must still report as having been insecure, which a single observed state cannot express. Rows written before this carry an older observed-state-plus-retry-history shape and are read through the same helper.</td></tr>
+        <tr><td>template</td><td>ref → ChecklistTemplateSection</td><td></td></tr>
+        <tr><td>label / order</td><td>text / number</td><td>Label copied from the template section's name at creation — the one field that would otherwise need section versioning.</td></tr>
+        <tr><td>hide_until / due_by</td><td>datetime, nullable</td><td>Resolved at creation.</td></tr>
+        <tr><td>location / checkpoints / assets</td><td>refs, copied</td><td>Snapshotted from the template section at instantiation — same idea as item versioning, without versioning sections.</td></tr>
+        <tr><td>items</td><td>ref[] → ChecklistInstanceItem</td><td>Created eagerly at section instantiation — the assignment exists as rows from the start. Section completion time is <em>derived</em> at read: the latest item completed_at, once every item has one.</td></tr>
+      </table>
+    </div>
+
+    <div class="schema-entity">
+      <div class="head"><span>ChecklistInstanceItem</span><span class="tag">instance</span></div>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+        <tr><td>template</td><td>ref → ChecklistTemplateItem</td><td>Pins the exact item version this row was created from; label, type and config are always read through it, never copied.</td></tr>
+        <tr><td>order</td><td>number</td><td>Inherited from the template item at creation; the guard may reorder freely afterward — the row's own order is always what sorts.</td></tr>
+        <tr><td>result</td><td>structured</td><td>Type-specific: boolean for Simple Check; Confirmed/Rejected-Reason/Rejected-Ticket for Verify Task; for Door Check, the state <em>as found</em> and <em>as left</em> recorded separately (plus the Incident logged when the two differ from expected) — a door corrected on arrival must still report as having been insecure, which a single observed state cannot express.</td></tr>
         <tr><td>note</td><td>text</td><td>Optional freeform addition.</td></tr>
         <tr><td>linked_ticket</td><td>ref → Ticket</td><td>Set when a Verify Task fails, or a Door Check is left in a state that still isn't the expected one.</td></tr>
-        <tr><td>completed_at</td><td>datetime</td><td></td></tr>
+        <tr><td>completed_at / completed_by</td><td>datetime / ref → User</td><td>Per-item completion time and who did it — on an hour-long checklist, when each thing happened, not just that it all happened by submission.</td></tr>
       </table>
     </div>
 
@@ -412,7 +446,7 @@
         <tr><td>guard</td><td>ref → User</td><td></td></tr>
         <tr><td>started_at</td><td>datetime</td><td>Set from the dashboard.</td></tr>
         <tr><td>ended_at</td><td>datetime</td><td>Set either by submitting the end-of-shift checklist (if defined) or by manually ending the shift.</td></tr>
-        <tr><td>end_of_shift_checklist</td><td>ref → Checklist</td><td>Nullable.</td></tr>
+        <tr><td>end_of_shift_checklist</td><td>ref → ChecklistInstance</td><td>Nullable.</td></tr>
         <tr><td>report_sent_at</td><td>datetime</td><td></td></tr>
       </table>
       <p style="padding:0 18px 16px; margin:0; font-size:0.9rem; color:var(--slate);">Other records (checklists, incidents, tickets, check-ins) are <strong>not</strong> directly linked to a Shift by reference — association is computed from timestamps falling within the shift's start/end window. This avoids needing every writable entity to carry a shift reference.</p>

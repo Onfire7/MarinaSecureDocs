@@ -127,38 +127,67 @@ const _schema = i.schema({
     }),
 
     // ---- checklists ----
+    // Templates are authored per role and instantiated as fully materialized
+    // copies: every section and item of an instance exists as a row from the
+    // moment it's assigned, so display logic only ever renders rows. Trigger
+    // rules decide IF a row gets created; hideUntil decides WHEN it becomes
+    // visible — and once visible, nothing ever re-hides.
     checklistTemplates: i.entity({
       name: i.string(),
-      visibility: i.string(), // global / role_restricted / personal
-      triggerType: i.string().indexed(), // clock_in / clock_out / scheduled / checkpoint / incident_type / manual
-      triggerConfig: i.json<Record<string, unknown>>().optional(),
-      assignmentMode: i.string(), // triggering_user / role
+      triggerType: i.string().indexed(), // manual / clock_in / clock_out / checkpoint / recurring
+      triggerConfig: i.json<Record<string, unknown>>().optional(), // recurring: { recurrenceRule: RRULE }
+      // true: the instance is assigned to whoever triggered it; false: left
+      // unclaimed for any holder of assignedRole to pick up.
+      assignedToUser: i.boolean(),
+      hideUntilRule: i.string().optional(), // "HH:MM" → resolved to instance.hideUntil at creation
+      dueBy: i
+        .json<{ kind: "time"; time: string } | { kind: "offset"; minutes: number }>()
+        .optional(), // resolved to instance.dueBy at creation
     }),
     checklistTemplateSections: i.entity({
       name: i.string(),
       order: i.number(),
-      isActive: i.boolean(),
-      triggerType: i.string(), // manual / time_window / checkpoint / location / asset
-      triggerConfig: i.json<Record<string, unknown>>().optional(),
+      isActive: i.boolean(), // authoring switch: inactive sections are never instantiated
+      // manual and recurring sections are created with the instance
+      // (recurring only when the rule matches that day); checkpoint /
+      // location / asset sections are created lazily when that thing is
+      // actually visited, onto an already-open instance.
+      triggerType: i.string(),
+      triggerConfig: i.json<Record<string, unknown>>().optional(), // recurring: { recurrenceRule: RRULE }
+      hideUntilRule: i.string().optional(), // "HH:MM" — same semantics as the template's
+      dueBy: i
+        .json<{ kind: "time"; time: string } | { kind: "offset"; minutes: number }>()
+        .optional(),
     }),
     checklistTemplateItems: i.entity({
       type: i.string(), // simple_check / verify_task / door_check / gas_pump_check / location_check / meter_reading
       label: i.string(),
       config: i.json<Record<string, unknown>>().optional(),
       order: i.number(),
+      // Copy-on-edit: committing an edit writes a NEW row (version+1,
+      // previousVersion link) and repoints the section's items link, so
+      // instance items forever reference the exact row they were created
+      // from without snapshotting config per instance.
+      version: i.number(),
     }),
-    checklists: i.entity({
+    checklistInstances: i.entity({
       status: i.string().indexed(), // not_started / in_progress / complete
-      triggeredBy: i.json<Record<string, unknown>>().optional(),
       startedAt: i.date().indexed().optional(),
       completedAt: i.date().indexed().optional(),
+      hideUntil: i.date().optional(), // absent or past = visible
+      dueBy: i.date().indexed().optional(),
     }),
-    checklistItemResults: i.entity({
+    checklistInstanceSections: i.entity({
+      label: i.string(), // copied from the template section's name at creation
+      order: i.number(),
+      hideUntil: i.date().optional(),
+      dueBy: i.date().optional(),
+    }),
+    checklistInstanceItems: i.entity({
+      order: i.number(), // copied from the template item; user-reorderable afterward
+      completedAt: i.date().optional(), // per-item completion time; unset = open
       result: i.json<Record<string, unknown>>().optional(),
       note: i.string().optional(),
-      completedAt: i.date().optional(),
-      userSkipped: i.boolean().optional(),
-      displayOrder: i.number().optional(),
     }),
 
     // ---- incidents, tickets & notes ----
@@ -405,10 +434,6 @@ const _schema = i.schema({
       forward: { on: "checkpoints", has: "one", label: "location" },
       reverse: { on: "locations", has: "many", label: "checkpoints" },
     },
-    checkpointTemplates: {
-      forward: { on: "checkpoints", has: "many", label: "checklistTemplates" },
-      reverse: { on: "checklistTemplates", has: "many", label: "checkpoints" },
-    },
     checkpointTours: {
       forward: { on: "checkpoints", has: "many", label: "tours" },
       reverse: { on: "tours", has: "many", label: "checkpoints" },
@@ -423,7 +448,7 @@ const _schema = i.schema({
     },
     checkInGeneratedChecklist: {
       forward: { on: "checkIns", has: "one", label: "generatedChecklist" },
-      reverse: { on: "checklists", has: "one", label: "sourceCheckIn" },
+      reverse: { on: "checklistInstances", has: "one", label: "sourceCheckIn" },
     },
 
     // checklists
@@ -431,32 +456,34 @@ const _schema = i.schema({
       forward: { on: "checklistTemplates", has: "one", label: "creator" },
       reverse: { on: "users", has: "many", label: "createdChecklistTemplates" },
     },
-    templateRole: {
-      // Role restriction (visibility) and/or role assignment target.
-      forward: { on: "checklistTemplates", has: "one", label: "role" },
+    templateAssignedRole: {
+      // Every template belongs to exactly one role (admin UI enforces it) —
+      // that role's members see and work its instances. There is no global
+      // or personal visibility anymore.
+      forward: { on: "checklistTemplates", has: "one", label: "assignedRole" },
       reverse: { on: "roles", has: "many", label: "checklistTemplates" },
     },
-    templateItems: {
-      // Legacy: items authored before sections existed hang directly off the
-      // template. Kept so pushing the section schema doesn't orphan them —
-      // read them through sectionsForTemplate() in lib/checklists.ts, which
-      // wraps any it finds in a synthetic always-on section. New items are
-      // written against `sectionItems` below; this link is never written to
-      // again and can be dropped once no template carries one.
-      forward: { on: "checklistTemplateItems", has: "one", label: "template" },
-      reverse: { on: "checklistTemplates", has: "many", label: "items" },
+    templateViewerRoles: {
+      // Read-only cross-role monitoring: e.g. office watches maintenance's
+      // progress without holding the role. Client-side only until the
+      // permissions overhaul.
+      forward: { on: "checklistTemplates", has: "many", label: "viewerRoles" },
+      reverse: { on: "roles", has: "many", label: "viewableChecklistTemplates" },
     },
     templateSections: {
       forward: { on: "checklistTemplateSections", has: "one", label: "template" },
       reverse: { on: "checklistTemplates", has: "many", label: "sections" },
     },
+    sectionLocation: {
+      // A section sits in at most one location; its checkpoints must belong
+      // to that location (admin UI enforces — checkpoints can't move between
+      // locations, so this can't drift after authoring).
+      forward: { on: "checklistTemplateSections", has: "one", label: "location" },
+      reverse: { on: "locations", has: "many", label: "checklistTemplateSections" },
+    },
     sectionCheckpointAttachments: {
       forward: { on: "checklistTemplateSections", has: "many", label: "checkpoints" },
       reverse: { on: "checkpoints", has: "many", label: "checklistTemplateSections" },
-    },
-    sectionLocationAttachments: {
-      forward: { on: "checklistTemplateSections", has: "many", label: "locations" },
-      reverse: { on: "locations", has: "many", label: "checklistTemplateSections" },
     },
     sectionAssetAttachments: {
       forward: { on: "checklistTemplateSections", has: "many", label: "assets" },
@@ -466,25 +493,68 @@ const _schema = i.schema({
       forward: { on: "checklistTemplateItems", has: "one", label: "section" },
       reverse: { on: "checklistTemplateSections", has: "many", label: "items" },
     },
-    checklistTemplate: {
-      forward: { on: "checklists", has: "one", label: "template" },
+    itemPreviousVersion: {
+      // Copy-on-edit trail. No forward "current" pointer: the live version
+      // is whichever row the section's items link points at; older rows are
+      // orphaned from the section but keep their instance references.
+      forward: { on: "checklistTemplateItems", has: "one", label: "previousVersion" },
+      reverse: { on: "checklistTemplateItems", has: "many", label: "laterVersions" },
+    },
+    instanceTemplate: {
+      forward: { on: "checklistInstances", has: "one", label: "template" },
       reverse: { on: "checklistTemplates", has: "many", label: "instances" },
     },
-    checklistAssignee: {
-      forward: { on: "checklists", has: "one", label: "assignedTo" },
-      reverse: { on: "users", has: "many", label: "checklists" },
+    instanceAssignee: {
+      forward: { on: "checklistInstances", has: "one", label: "assignedTo" },
+      reverse: { on: "users", has: "many", label: "checklistInstances" },
     },
-    itemResultChecklist: {
-      forward: { on: "checklistItemResults", has: "one", label: "checklist" },
-      reverse: { on: "checklists", has: "many", label: "itemResults" },
+    instanceSections: {
+      forward: { on: "checklistInstanceSections", has: "one", label: "instance" },
+      reverse: { on: "checklistInstances", has: "many", label: "sections" },
     },
-    itemResultTemplateItem: {
-      forward: { on: "checklistItemResults", has: "one", label: "templateItem" },
-      reverse: { on: "checklistTemplateItems", has: "many", label: "results" },
+    instanceSectionTemplate: {
+      forward: { on: "checklistInstanceSections", has: "one", label: "template" },
+      reverse: { on: "checklistTemplateSections", has: "many", label: "instances" },
     },
-    itemResultTicket: {
-      forward: { on: "checklistItemResults", has: "one", label: "linkedTicket" },
+    // Location/checkpoint/asset context is copied from the template section
+    // at instantiation — the same snapshot idea as item versioning, without
+    // needing to version sections.
+    instanceSectionLocation: {
+      forward: { on: "checklistInstanceSections", has: "one", label: "location" },
+      reverse: { on: "locations", has: "many", label: "checklistInstanceSections" },
+    },
+    instanceSectionCheckpoints: {
+      forward: { on: "checklistInstanceSections", has: "many", label: "checkpoints" },
+      reverse: { on: "checkpoints", has: "many", label: "checklistInstanceSections" },
+    },
+    instanceSectionAssets: {
+      forward: { on: "checklistInstanceSections", has: "many", label: "assets" },
+      reverse: { on: "assets", has: "many", label: "checklistInstanceSections" },
+    },
+    instanceItemSection: {
+      forward: { on: "checklistInstanceItems", has: "one", label: "section" },
+      reverse: { on: "checklistInstanceSections", has: "many", label: "items" },
+    },
+    instanceItemTemplate: {
+      // Pins the exact item version this row was created from; label, type,
+      // and config are always read through here, never copied.
+      forward: { on: "checklistInstanceItems", has: "one", label: "template" },
+      reverse: { on: "checklistTemplateItems", has: "many", label: "instances" },
+    },
+    instanceItemCompletedBy: {
+      forward: { on: "checklistInstanceItems", has: "one", label: "completedBy" },
+      reverse: { on: "users", has: "many", label: "completedChecklistItems" },
+    },
+    instanceItemTicket: {
+      forward: { on: "checklistInstanceItems", has: "one", label: "linkedTicket" },
       reverse: { on: "tickets", has: "one", label: "sourceChecklistItem" },
+    },
+    instanceParentItem: {
+      // Set only on nested instances spawned by a location_check item.
+      // Replaces the old triggeredBy json marker: the checklist list shows
+      // instances where this is absent, so sub-checklists don't double-list.
+      forward: { on: "checklistInstances", has: "one", label: "parentItem" },
+      reverse: { on: "checklistInstanceItems", has: "one", label: "nestedInstance" },
     },
 
     // notes (attachment target: exactly one of five, app-enforced)
@@ -696,7 +766,7 @@ const _schema = i.schema({
     },
     shiftEndChecklist: {
       forward: { on: "shifts", has: "one", label: "endOfShiftChecklist" },
-      reverse: { on: "checklists", has: "one", label: "endedShift" },
+      reverse: { on: "checklistInstances", has: "one", label: "endedShift" },
     },
     activityActor: {
       forward: { on: "activityLogEntries", has: "one", label: "actor" },

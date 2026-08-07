@@ -1,9 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { activityTx } from "../../lib/activityLog";
-import { assigneeFor, triggeredByLabel, type TriggeredBy } from "../../lib/checklists";
+import { deterministicId } from "../../lib/detId";
+import { eligibleToday, isVisibleNow, triggerTypeLabel } from "../../lib/checklists";
+import {
+  buildInstanceTx,
+  TEMPLATE_INSTANTIATION_QUERY,
+} from "../../lib/checklistInstantiation";
 import { ManualCheckinDialog } from "./ManualCheckinDialog";
 import { TourSection } from "./TourSection";
 import { useShiftVisits } from "./useShiftVisits";
@@ -18,6 +23,12 @@ import { useShiftVisits } from "./useShiftVisits";
 // tour, and the old arrangement made its steps two navigations away from
 // the page they start every round on. History lives in Reports and each
 // checklist's own detail page, so this screen only owes a glance backwards.
+//
+// This page is also where recurring templates become real checklists: there
+// is no server-side scheduler, so the first role-holder to open the app on a
+// matching day creates that day's instance (deterministic id — clients
+// racing converge on the same row). Templates the user's roles only *view*
+// (viewerRoles) appear in a read-only Monitoring section.
 //
 // Desktop puts checklists and tours in adjacent columns; without tour
 // access there is no second column, so the freed width goes to information
@@ -34,50 +45,105 @@ export function ChecklistListPage() {
 
   const roleIds = (current.user?.roles ?? []).map((r) => r.id);
 
-  const { data: manualTemplateData } = db.useQuery({
+  // Manual templates feed the Start button; recurring ones feed the
+  // auto-create effect below. Both need the full instantiation shape.
+  const { data: templateData } = db.useQuery({
     checklistTemplates: {
-      $: { where: { triggerType: "manual" } },
-      role: {},
-      creator: {},
+      $: { where: { triggerType: { $in: ["manual", "recurring"] } } },
+      ...TEMPLATE_INSTANTIATION_QUERY,
     },
   });
-  const manualTemplates = (manualTemplateData?.checklistTemplates ?? []).filter((t) => {
-    if (t.visibility === "personal") return t.creator?.id === userId;
-    if (t.visibility === "role_restricted") return t.role && roleIds.includes(t.role.id);
-    return true;
-  });
+  const myTemplates = (templateData?.checklistTemplates ?? []).filter(
+    (t) => t.assignedRole && roleIds.includes(t.assignedRole.id),
+  );
+  const manualTemplates = myTemplates.filter((t) => t.triggerType === "manual");
 
   const startChecklist = async (template: (typeof manualTemplates)[number]) => {
     if (!userId || starting) return;
     setStarting(template.id);
-    const checklistId = id();
+    const instanceId = id();
     await db.transact([
-      db.tx.checklists[checklistId]
-        .update({ status: "not_started", triggeredBy: { type: "manual" } })
-        .link({
-          template: template.id,
-          // See assigneeFor: "role" only survives if a role is actually
-          // linked, otherwise this checklist would be unreachable — and here
-          // the user is watching, having just pressed Start.
-          ...(assigneeFor(template) === "triggering_user" ? { assignedTo: userId } : {}),
-        }),
+      ...buildInstanceTx({ template, instanceId, userId }),
       activityTx({
         eventType: "checklist.started",
         summary: `${template.name} started manually by ${current.user?.name ?? "a user"}`,
-        subjectType: "checklists",
-        subjectId: checklistId,
+        subjectType: "checklistInstances",
+        subjectId: instanceId,
         actorId: userId,
       }),
     ]);
     setStarting(null);
-    navigate(`/checklists/${checklistId}`);
+    navigate(`/checklists/${instanceId}`);
   };
+
+  // ---- Recurring auto-create ----
+  // One instance per template per local day, id derived from both so any
+  // number of role-holders opening the page create it exactly once. Pinned
+  // to the day this page mounted — a client left open across midnight picks
+  // the new day up on its next visit here, which is fine: creation is
+  // usage-driven by design.
+  const [today] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate(),
+    ).padStart(2, "0")}`;
+  });
+  const dueToday = myTemplates.filter(
+    (t) => t.triggerType === "recurring" && eligibleToday(t),
+  );
+  const expectedRecurringIds = dueToday.map((t) =>
+    deterministicId(`recurring:${t.id}:${today}`),
+  );
+  const { data: existingRecurringData } = db.useQuery(
+    expectedRecurringIds.length > 0
+      ? {
+          checklistInstances: {
+            $: { where: { id: { $in: expectedRecurringIds } } },
+          },
+        }
+      : null,
+  );
+  const creatingRecurring = useRef(false);
+  useEffect(() => {
+    if (!userId || creatingRecurring.current) return;
+    if (dueToday.length === 0 || !existingRecurringData) return;
+    const existing = new Set(
+      (existingRecurringData.checklistInstances ?? []).map((c) => c.id),
+    );
+    const missing = dueToday.filter(
+      (t) => !existing.has(deterministicId(`recurring:${t.id}:${today}`)),
+    );
+    if (missing.length === 0) return;
+    creatingRecurring.current = true;
+    void db
+      .transact(
+        missing.flatMap((t) => {
+          const instanceId = deterministicId(`recurring:${t.id}:${today}`);
+          return [
+            ...buildInstanceTx({ template: t, instanceId, userId }),
+            activityTx({
+              eventType: "checklist.created",
+              summary: `${t.name} created on its recurring schedule`,
+              subjectType: "checklistInstances",
+              subjectId: instanceId,
+              actorId: userId,
+            }),
+          ];
+        }),
+      )
+      .catch(console.error);
+  }, [userId, dueToday, existingRecurringData, today]);
 
   const { data: mineData } = db.useQuery(
     userId
       ? {
-          checklists: {
-            $: { where: { "assignedTo.id": userId } },
+          checklistInstances: {
+            $: {
+              where: {
+                "assignedTo.id": userId,
+                parentItem: { $isNull: true },
+              },
+            },
             template: {},
           },
         }
@@ -86,12 +152,13 @@ export function ChecklistListPage() {
   const { data: unclaimedData } = db.useQuery(
     roleIds.length > 0
       ? {
-          checklists: {
+          checklistInstances: {
             $: {
               where: {
                 assignedTo: { $isNull: true },
                 status: { $in: ["not_started", "in_progress"] },
-                "template.role.id": { $in: roleIds },
+                "template.assignedRole.id": { $in: roleIds },
+                parentItem: { $isNull: true },
               },
             },
             template: {},
@@ -99,45 +166,56 @@ export function ChecklistListPage() {
         }
       : null,
   );
+  // Read-only monitoring: instances of templates whose viewerRoles include
+  // one of mine but whose assignedRole doesn't — e.g. the office watching
+  // maintenance work through. Client-side only until the perms overhaul.
+  const { data: viewerData } = db.useQuery(
+    roleIds.length > 0
+      ? {
+          checklistInstances: {
+            $: {
+              where: {
+                "template.viewerRoles.id": { $in: roleIds },
+                status: { $in: ["not_started", "in_progress"] },
+                parentItem: { $isNull: true },
+              },
+            },
+            template: { assignedRole: {} },
+            assignedTo: {},
+          },
+        }
+      : null,
+  );
 
   const checklists = useMemo(() => {
-    const mine = mineData?.checklists ?? [];
-    const unclaimed = unclaimedData?.checklists ?? [];
+    const mine = mineData?.checklistInstances ?? [];
+    const unclaimed = unclaimedData?.checklistInstances ?? [];
     const seen = new Set(mine.map((c) => c.id));
     return [...mine, ...unclaimed.filter((c) => !seen.has(c.id))];
   }, [mineData, unclaimedData]);
 
-  const checkpointIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const c of checklists) {
-      const t = c.triggeredBy as TriggeredBy | undefined;
-      if (t?.type === "checkpoint") ids.add(t.checkpointId);
-    }
-    return [...ids];
-  }, [checklists]);
-  const { data: cpData } = db.useQuery(
-    checkpointIds.length > 0
-      ? { checkpoints: { $: { where: { id: { $in: checkpointIds } } } } }
-      : null,
-  );
-  const checkpointNameById = new Map(
-    (cpData?.checkpoints ?? []).map((c) => [c.id, c.name]),
-  );
+  const monitoring = useMemo(() => {
+    const actionable = new Set(checklists.map((c) => c.id));
+    return (viewerData?.checklistInstances ?? []).filter(
+      (c) =>
+        !actionable.has(c.id) &&
+        !(c.template?.assignedRole && roleIds.includes(c.template.assignedRole.id)) &&
+        isVisibleNow(c),
+    );
+    // roleIds is rebuilt per render but stable in value; the memo exists for
+    // the Set, not referential purity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewerData, checklists]);
 
   const triggerLabel = (c: (typeof checklists)[number]) =>
-    triggeredByLabel(
-      c.triggeredBy as TriggeredBy | undefined,
-      (c.triggeredBy as TriggeredBy | undefined)?.type === "checkpoint"
-        ? checkpointNameById.get(
-            (c.triggeredBy as { checkpointId: string }).checkpointId,
-          )
-        : undefined,
-    );
+    triggerTypeLabel(c.template?.triggerType);
 
   // In-progress outranks not-started: half-done work goes stale in a way
-  // unstarted work doesn't.
+  // unstarted work doesn't. Instances still inside their hideUntil are
+  // filtered out entirely — they exist, but aren't anyone's work yet.
   const open = checklists
     .filter((c) => c.status === "in_progress" || c.status === "not_started")
+    .filter((c) => isVisibleNow(c))
     .sort((a, b) => {
       const rank = (s: string) => (s === "in_progress" ? 0 : 1);
       const r = rank(a.status) - rank(b.status);
@@ -221,6 +299,7 @@ export function ChecklistListPage() {
                     <span className="card-meta" style={{ display: "block" }}>
                       {triggerLabel(c)}
                       {c.startedAt && ` · started ${when(c.startedAt)}`}
+                      {c.dueBy && ` · due ${when(c.dueBy)}`}
                     </span>
                   </span>
                   <span
@@ -242,6 +321,39 @@ export function ChecklistListPage() {
                     : "No open checklists — one appears when a checkpoint visit, schedule, or clock event triggers it."
                   : "No open checklists — everything assigned to you is complete."}
               </p>
+            )}
+
+            {monitoring.length > 0 && (
+              <div style={{ marginTop: 14 }}>
+                <div className="section-title">Monitoring</div>
+                <div className="stack" style={{ gap: 4 }}>
+                  {monitoring.map((c) => (
+                    <Link
+                      key={c.id}
+                      to={`/checklists/${c.id}`}
+                      className="spread muted"
+                      style={{ textDecoration: "none", padding: "4px 0" }}
+                    >
+                      <span className="small" style={{ minWidth: 0 }}>
+                        {c.template?.name ?? "Checklist"}
+                        <span className="muted">
+                          {" · "}
+                          {c.assignedTo?.name ??
+                            c.template?.assignedRole?.name ??
+                            "unclaimed"}
+                        </span>
+                      </span>
+                      <span
+                        className={
+                          "badge" + (c.status === "in_progress" ? " badge-warn" : "")
+                        }
+                      >
+                        {c.status === "in_progress" ? "In progress" : "Not started"}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
             )}
 
             {completed.length > 0 && (

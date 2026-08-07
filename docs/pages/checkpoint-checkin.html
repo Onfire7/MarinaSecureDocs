@@ -46,8 +46,8 @@
     <p>GPS acquisition is the one step here that can take anywhere from under a second to several seconds depending on signal, so it's deliberately taken off the critical path — the guard is never staring at a spinner waiting for it:</p>
     <ol>
       <li>Create a Check-In record immediately: <code>checkpoint</code>, <code>user</code> (current session), <code>timestamp</code>, <code>method</code> = Scanned, with <code>gps_at_checkin</code> and <code>within_radius</code> both left null/pending. This is a local-first InstantDB write, so it completes practically instantly regardless of connectivity.</li>
-      <li>Evaluate <code>Checkpoint.checklist_templates</code> against their trigger conditions (time of day, season, etc.) to find which apply right now.</li>
-      <li>Present the matching checklist(s) for completion, and/or a place to add a note or log an incident even if none apply — the guard can start working immediately, before GPS has resolved.</li>
+      <li>In the same transaction, materialize what the scan triggers: template sections anchored to this checkpoint (or its location) whose parent instance is already open get created as instance-section rows now, if missing; and a checkpoint-triggered <em>template</em> with a section here and no open instance gets a whole new instance (its eager sections included). Both use deterministic ids, so a re-scan converges on the same rows instead of duplicating.</li>
+      <li>Present every visible instance section for this place — each headed by its parent checklist's name, items workable inline — and/or a place to add a note or log an incident even if none apply; the guard can start working immediately, before GPS has resolved. A section attached to specific checkpoints belongs to those only; one attached to just a location belongs to every checkpoint in it.</li>
       <li>In parallel with steps 2–3, request device GPS. Once it resolves, update the <em>same</em> Check-In record with <code>gps_at_checkin</code> and <code>within_radius</code> (computed against <code>Checkpoint.gps_validation_radius</code>, falling back to <code>MarinaSettings.gps_validation_radius_default</code>).</li>
     </ol>
 
@@ -66,7 +66,7 @@
     <h3>Tab pileup (not installed as a PWA)</h3>
     <p>When the app is installed, an NFC tap or QR scan reopens the existing app window rather than spawning a new browser tab, which avoids this problem at the root. Where it isn't installed, each tab instead tries to close itself once it's no longer needed, rather than being left to accumulate:</p>
     <ul>
-      <li><strong>On completion</strong> — once every Checklist this check-in triggered (<code>Checklist.triggered_by</code> referencing it) reaches Complete, or, if none applied, once the guard has had the chance to add a note/incident, the tab calls <code>window.close()</code>.</li>
+      <li><strong>On completion</strong> — once every section shown for this checkpoint is complete, or, if none applied, once the guard has had the chance to add a note/incident, the tab calls <code>window.close()</code>.</li>
       <li><strong>On a 10-minute idle timeout</strong> — if the tab has been open more than 10 minutes with nothing left unfinished, it attempts the same close.</li>
       <li><strong>On reactivation, as a fallback</strong> — browsers only allow a script to close a tab it also opened, and a tab launched by an OS-level NFC/QR intent may or may not qualify depending on platform. Where <code>window.close()</code> is silently refused, the same completion/idle check re-runs every time the tab regains focus, so a tab that couldn't close itself right away closes the next time the guard actually looks at it — old tabs cascade closed one at a time as they're encountered, rather than needing a manual mass-cleanup.</li>
       <li><strong>If never revisited</strong> — a tab that can't close and is never reactivated simply redirects to the Dashboard once its completion/idle condition is met, so anything left behind at least shows something current rather than a dead checkpoint screen.</li>
@@ -78,13 +78,13 @@
       <tr><td>Checkpoint name &amp; location</td><td>Checkpoint.name, Checkpoint.location</td><td></td></tr>
       <tr><td>GPS pending indicator</td><td>Check-In.gps_at_checkin / within_radius = null</td><td>Small, unobtrusive "Saving…" pill (generic copy — see note below), shown only while GPS hasn't resolved yet; never blocks the rest of the screen.</td></tr>
       <tr><td>GPS validation result</td><td>Check-In.within_radius</td><td>Shown only once resolved and flagged false — otherwise the pending indicator just clears silently.</td></tr>
-      <tr><td>Applicable checklist(s)</td><td>Checkpoint.checklist_templates, trigger-evaluated</td><td>Zero, one, or more.</td></tr>
+      <tr><td>Applicable section(s)</td><td>ChecklistInstanceSections referencing this checkpoint or its location, on open instances</td><td>Zero, one, or more — each headed by its parent checklist's name.</td></tr>
     </table>
 
     <h2>Actions</h2>
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
-      <tr><td>Begin an applicable checklist</td><td>Must be signed in</td><td>Routes into <a href="active-checklist.html">Active checklist</a> for that instance.</td></tr>
+      <tr><td>Work an applicable section</td><td>Must be signed in</td><td>The section's items are workable right on this screen; once it's done, a pointer to the full <a href="active-checklist.html">Active checklist</a> appears when other sections remain. Working a section here doesn't claim the whole checklist — only deliberately opening the full checklist does.</td></tr>
       <tr><td>Add a note / log an incident with no checklist</td><td><code>create_incidents</code> for incidents; notes unrestricted</td><td>Opens the relevant dialog, pre-attached to this checkpoint.</td></tr>
     </table>
 
@@ -95,7 +95,7 @@
       <li><strong>GPS outside the checkpoint's radius</strong> — once GPS resolves, the check-in record updates to <code>within_radius</code> = false; it isn't blocked (the check-in already exists and the guard may already be mid-checklist), but is flagged for later review, matching the data model's spoof-guard-not-spoof-block design.</li>
       <li><strong>GPS never resolves</strong> — after a reasonable timeout, the pending indicator settles to "unavailable" and the Check-In record simply keeps <code>gps_at_checkin</code>/<code>within_radius</code> null. The check-in itself is still valid; it's just unvalidated, same as a manual check-in with no GPS (see <a href="manual-checkin-dialog.html">Manual Check-In Dialog</a>).</li>
       <li><strong>User navigates into a checklist before GPS resolves</strong> — expected and unblocked by design; the pending indicator follows along (or the resulting flag appears) regardless of which sub-screen the guard has moved to, since it's tied to the Check-In record, not this particular screen.</li>
-      <li><strong>Multiple applicable checklists</strong> — presented as a short list to work through in sequence rather than merged into one.</li>
+      <li><strong>Multiple applicable sections</strong> — presented as a short list to work through in sequence rather than merged into one, each under its parent checklist's header.</li>
       <li><strong>Offline scan</strong> — both the initial Check-In write and the later GPS update succeed locally and sync on reconnect, identical to any other InstantDB write; GPS itself is a device capability and doesn't require connectivity to resolve.</li>
       <li><strong>Reload before the URL rewrite lands</strong> — a reload in the brief window before <code>history.replaceState</code> completes falls back to the time-window dedupe check rather than the URL check; either path resumes the same Check-In instead of duplicating it.</li>
       <li><strong>Tab won't close</strong> — if the browser refuses <code>window.close()</code> (a tab it didn't itself open), it isn't retried in a loop; it waits for the next focus/visibility event or falls back to redirecting to the Dashboard, per "Avoiding duplicate check-ins &amp; tab pileup" above.</li>

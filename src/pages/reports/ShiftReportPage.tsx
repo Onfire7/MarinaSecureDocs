@@ -23,7 +23,7 @@ export function ShiftReportPage() {
           // The checkpoint's location comes along so the log can say where
           // each check-in happened without the name having to carry it.
           checkIns: { checkpoint: { location: {} }, user: {} },
-          checklists: { template: {}, assignedTo: {} },
+          checklistInstances: { template: {}, assignedTo: {} },
           incidents: { author: {} },
           tickets: { createdBy: {} },
         }
@@ -49,7 +49,7 @@ export function ShiftReportPage() {
   const checkIns = (data?.checkIns ?? []).filter(
     (c) => withinWindow(c.timestamp, window) && (!guardId || c.user?.id === guardId),
   );
-  const checklists = (data?.checklists ?? []).filter(
+  const checklists = (data?.checklistInstances ?? []).filter(
     (c) =>
       withinWindow(c.completedAt ?? c.startedAt, window) &&
       (!guardId || !c.assignedTo || c.assignedTo.id === guardId),

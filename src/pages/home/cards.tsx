@@ -5,6 +5,10 @@ import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import type { CurrentUser } from "../../lib/auth/useCurrentUser";
 import { activityTx } from "../../lib/activityLog";
+import {
+  buildInstanceTx,
+  TEMPLATE_INSTANTIATION_QUERY,
+} from "../../lib/checklistInstantiation";
 
 // Dashboard cards (see pages/dashboard.html — Available cards).
 // A card's availability gate is exactly the permission that governs the data
@@ -137,18 +141,21 @@ function ShiftCard() {
           },
           checklistTemplates: {
             $: { where: { triggerType: { $in: ["clock_in", "clock_out"] } } },
+            ...TEMPLATE_INSTANTIATION_QUERY,
           },
         }
       : null,
   );
 
   const activeShift = data?.shifts?.[0];
-  const clockInTemplate = data?.checklistTemplates?.find(
-    (t) => t.triggerType === "clock_in",
+  // Clock templates are role-scoped like everything else — a maintenance
+  // clock-in checklist shouldn't fire for a security guard.
+  const roleIds = (current.user?.roles ?? []).map((r) => r.id);
+  const clockTemplates = (data?.checklistTemplates ?? []).filter(
+    (t) => t.assignedRole && roleIds.includes(t.assignedRole.id),
   );
-  const clockOutTemplate = data?.checklistTemplates?.find(
-    (t) => t.triggerType === "clock_out",
-  );
+  const clockInTemplate = clockTemplates.find((t) => t.triggerType === "clock_in");
+  const clockOutTemplate = clockTemplates.find((t) => t.triggerType === "clock_out");
 
   // Re-render each minute so elapsed time stays fresh.
   const [, tick] = useState(0);
@@ -175,12 +182,18 @@ function ShiftCard() {
       }),
       ...(clockInTemplate && checklistId
         ? [
-            db.tx.checklists[checklistId]
-              .update({
-                status: "not_started",
-                triggeredBy: { type: "clock_in", shiftId },
-              })
-              .link({ template: clockInTemplate.id, assignedTo: userId }),
+            ...buildInstanceTx({
+              template: clockInTemplate,
+              instanceId: checklistId,
+              userId,
+            }),
+            activityTx({
+              eventType: "checklist.created",
+              summary: `${clockInTemplate.name} created by clock-in`,
+              subjectType: "checklistInstances",
+              subjectId: checklistId,
+              actorId: userId,
+            }),
           ]
         : []),
     ]);
@@ -206,15 +219,21 @@ function ShiftCard() {
   const startEndOfShiftChecklist = async () => {
     if (!activeShift || !clockOutTemplate || !userId) return;
     const checklistId = id();
-    await db.transact(
-      db.tx.checklists[checklistId]
-        .update({
-          status: "not_started",
-          triggeredBy: { type: "clock_out", shiftId: activeShift.id },
-        })
-        .link({ template: clockOutTemplate.id, assignedTo: userId })
-        .link({ endedShift: activeShift.id }),
-    );
+    await db.transact([
+      ...buildInstanceTx({
+        template: clockOutTemplate,
+        instanceId: checklistId,
+        userId,
+      }),
+      db.tx.checklistInstances[checklistId].link({ endedShift: activeShift.id }),
+      activityTx({
+        eventType: "checklist.created",
+        summary: `${clockOutTemplate.name} created by clock-out`,
+        subjectType: "checklistInstances",
+        subjectId: checklistId,
+        actorId: userId,
+      }),
+    ]);
     navigate(`/checklists/${checklistId}`);
   };
 

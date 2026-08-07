@@ -126,18 +126,23 @@ export function CheckpointCheckinView({
       <div className="section-title" style={{ marginTop: 16 }}>
         Applicable now
       </div>
-      {visit.applicableChecklists.length === 0 ? (
+      {visit.applicableSections.length === 0 ? (
         <div className="placeholder">
           <div className="big">Nothing triggers right now</div>
-          No checklist currently applies at this checkpoint.
+          No checklist section currently applies at this checkpoint.
         </div>
       ) : (
         <div className="stack" style={{ gap: 14 }}>
-          {/* Almost always exactly one — shown ready to work right here
-              rather than behind an extra "Begin Checklist" tap. */}
-          {visit.applicableChecklists.map((c) => (
-            <div key={c.id} className="card">
-              <ChecklistItemsPanel checklistId={c.id} compact />
+          {/* Each applicable section of each open checklist, headed by its
+              parent checklist's name and ready to work right here rather
+              than behind an extra "Begin Checklist" tap. */}
+          {visit.applicableSections.map((s) => (
+            <div key={s.id} className="card">
+              <ChecklistItemsPanel
+                checklistId={s.instanceId}
+                sectionId={s.id}
+                compact
+              />
             </div>
           ))}
         </div>

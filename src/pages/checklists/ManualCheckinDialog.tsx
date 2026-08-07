@@ -62,9 +62,9 @@ export function ManualCheckinDialog({
     undefined,
   );
 
-  const open = (id: string) => {
+  const open = (instanceId: string) => {
     onClose();
-    navigate(`/checklists/${id}`);
+    navigate(`/checklists/${instanceId}`);
   };
 
   return (
@@ -143,7 +143,7 @@ export function ManualCheckinDialog({
           </>
         ) : visit.loading || !visit.checkInId ? (
           <div className="muted">Logging check-in…</div>
-        ) : visit.applicableChecklists.length === 0 ? (
+        ) : visit.applicableSections.length === 0 ? (
           <>
             <p className="muted small">Check-in logged. Nothing currently applies here.</p>
             <button type="button" className="btn" onClick={onClose}>
@@ -154,14 +154,16 @@ export function ManualCheckinDialog({
           <>
             <p className="muted small">Check-in logged.</p>
             <div className="stack">
-              {visit.applicableChecklists.map((c) => (
+              {visit.applicableSections.map((s) => (
                 <button
-                  key={c.id}
+                  key={s.id}
                   type="button"
                   className="btn btn-block"
-                  onClick={() => open(c.id)}
+                  onClick={() => open(s.instanceId)}
                 >
-                  {c.templateName}
+                  {s.checklistName}
+                  {s.label !== s.checklistName ? ` — ${s.label}` : ""}
+                  {s.itemsTotal > 0 ? ` (${s.itemsDone}/${s.itemsTotal})` : ""}
                 </button>
               ))}
             </div>

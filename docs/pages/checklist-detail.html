@@ -45,11 +45,13 @@
     <h2>Data shown</h2>
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
-      <tr><td>Template &amp; assignment</td><td>Checklist.template, Checklist.assigned_to</td><td></td></tr>
-      <tr><td>Timing</td><td>Checklist.started_at / completed_at</td><td></td></tr>
-      <tr><td>Item results</td><td>Checklist.item_results → ChecklistItemResult</td><td>Each item's recorded result, including Door Check retry history and Verify Task rejection reasons.</td></tr>
-      <tr><td>Linked tickets</td><td>ChecklistItemResult.linked_ticket</td><td>Shown inline against the item that raised them, linking to <a href="ticket-detail.html">Ticket detail</a>.</td></tr>
-      <tr><td>Nested Location-Based Checks</td><td>Nested Checklist instances</td><td>Shown expandable under their parent item rather than as separate top-level entries.</td></tr>
+      <tr><td>Template &amp; assignment</td><td>ChecklistInstance.template, .assigned_to</td><td></td></tr>
+      <tr><td>Timing</td><td>ChecklistInstance.started_at / completed_at</td><td>Submission time for the whole checklist; per-item times below.</td></tr>
+      <tr><td>Sections &amp; items</td><td>ChecklistInstance.sections → items, ordered</td><td>Exactly the materialized rows as assigned — every section that existed, every item, grouped under its section heading. Item label/type/config resolve through the pinned template-item version, so the record renders as it was instantiated even after later template edits.</td></tr>
+      <tr><td>Section completion time</td><td>Derived at read</td><td>The latest item <code>completed_at</code>, shown on the heading once every item in the section has one — never stored.</td></tr>
+      <tr><td>Per-item completion</td><td>item.completed_at / completed_by</td><td>When each item was done and by whom.</td></tr>
+      <tr><td>Linked tickets</td><td>item.linked_ticket</td><td>Shown inline against the item that raised them, linking to <a href="ticket-detail.html">Ticket detail</a>.</td></tr>
+      <tr><td>Nested Location-Based Checks</td><td>Nested ChecklistInstances (via <code>parent_item</code>)</td><td>Shown expandable under their parent item rather than as separate top-level entries.</td></tr>
     </table>
 
     <h2>Actions</h2>

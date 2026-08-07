@@ -35,7 +35,9 @@ type CheckpointRow = {
   gpsValidationRadius?: number;
   location?: { id: string; name: string; parent?: { id: string } | null } | null;
   tours?: { id: string; name: string }[];
-  checklistTemplates?: { id: string; name: string }[];
+  // Checkpoint use by checklists is now through template sections — the
+  // section carries the template it belongs to.
+  checklistTemplateSections?: { id: string; name: string; template?: { id: string; name: string } | null }[];
 };
 
 function Checkpoints() {
@@ -46,7 +48,7 @@ function Checkpoints() {
   const [onlyUnused, setOnlyUnused] = useState(false);
 
   const { data } = db.useQuery({
-    checkpoints: { location: { parent: {} }, tours: {}, checklistTemplates: {} },
+    checkpoints: { location: { parent: {} }, tours: {}, checklistTemplateSections: { template: {} } },
     locations: { parent: {}, checkpoints: {} },
     tours: { checkpoints: {} },
   });
@@ -72,7 +74,7 @@ function Checkpoints() {
       .filter((c) =>
         onlyUnused
           ? (c.tours ?? []).length === 0 &&
-            (c.checklistTemplates ?? []).length === 0
+            (c.checklistTemplateSections ?? []).length === 0
           : true,
       )
       .sort((a, b) => {
@@ -346,7 +348,13 @@ function CheckpointCard({
   };
 
   const tourNames = (checkpoint.tours ?? []).map((t) => t.name);
-  const templateNames = (checkpoint.checklistTemplates ?? []).map((t) => t.name);
+  const templateNames = [
+    ...new Set(
+      (checkpoint.checklistTemplateSections ?? [])
+        .map((s) => s.template?.name)
+        .filter((n): n is string => Boolean(n)),
+    ),
+  ];
   const unused = tourNames.length === 0 && templateNames.length === 0;
 
   return (

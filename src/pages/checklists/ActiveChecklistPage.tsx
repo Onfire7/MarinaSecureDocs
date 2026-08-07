@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useEffect } from "react";
 import type { ComponentType, ReactNode } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { db } from "../../lib/db";
@@ -7,14 +8,11 @@ import { useIsMobile } from "../../hooks/useIsMobile";
 import {
   ITEM_TYPE_LABEL,
   isStateCheck,
-  itemsOfSections,
+  isVisibleNow,
   normalizeItemType,
-  sectionsForTemplate,
   type DoorCheckConfig,
   type ItemType,
-  type TriggeredBy,
 } from "../../lib/checklists";
-import { activeSections } from "../../lib/sectionActivation";
 import { activityTx } from "../../lib/activityLog";
 import {
   buildPendingEffectTxns,
@@ -32,11 +30,16 @@ import {
 
 // Checklists & Tours — Active Checklist (see pages/active-checklist.html).
 // Item-by-item completion of an in-progress instance; every write here is
-// local-first InstantDB, so it works fully offline. The route wrapper below
-// just supplies the id and where to go afterward — ChecklistItemsPanel is
-// also embedded directly (compact, no navigation) by CheckpointScanModal, so
-// a checkpoint with one checklist (the common case) can be worked right from
-// the scan overlay instead of tapping through to this page.
+// local-first InstantDB, so it works fully offline. An instance is fully
+// materialized rows — sections and items exist in the database from the
+// moment they were assigned — so this page renders exactly what's stored:
+// no template resolution, no activation windows, just rows, with sections
+// still inside their hideUntil filtered out until their moment arrives.
+//
+// The route wrapper below just supplies the id and where to go afterward —
+// ChecklistItemsPanel is also embedded directly (compact, scoped to one
+// section) by the checkpoint screens, so the section a scan opened can be
+// worked right at the checkpoint instead of tapping through to this page.
 export function ActiveChecklistPage() {
   const { id: checklistId } = useParams();
   const navigate = useNavigate();
@@ -62,11 +65,18 @@ export function ActiveChecklistPage() {
 
 export function ChecklistItemsPanel({
   checklistId,
+  sectionId,
   onSubmitted,
   onComplete,
   compact = false,
 }: {
   checklistId: string;
+  /**
+   * Render just this one instance section — the checkpoint screens embed the
+   * section a scan opened, headed by its parent checklist's name, rather
+   * than the whole checklist.
+   */
+  sectionId?: string;
   /** Called right after a successful submit — optional since compact mode's
    *  own "complete" branch above already reflects it, nothing else to do. */
   onSubmitted?: () => void;
@@ -77,118 +87,123 @@ export function ChecklistItemsPanel({
    * "complete" branch below already renders its own small summary in place.
    */
   onComplete?: () => void;
-  /** Embedded inline (CheckpointScanModal) rather than as its own page. */
+  /** Embedded inline (checkpoint screens) rather than as its own page. */
   compact?: boolean;
 }) {
   const current = useCurrent();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [reorderingSection, setReorderingSection] = useState<string | null>(null);
 
   const { data } = db.useQuery({
-    checklists: {
+    checklistInstances: {
       $: { where: { id: checklistId } },
-      // `items` is the pre-sections shape and is still queried so templates
-      // that were never migrated keep working — sectionsForTemplate() folds
-      // whichever of the two a template actually has into one list.
-      template: { items: {}, sections: { items: {} } },
-      itemResults: { templateItem: {}, linkedTicket: {} },
+      template: { assignedRole: {} },
+      sections: {
+        location: {},
+        items: { template: {}, completedBy: {} },
+      },
       assignedTo: {},
       endedShift: {},
+      parentItem: {},
     },
   });
-  const checklist = data?.checklists?.[0];
+  const checklist = data?.checklistInstances?.[0];
+
+  // Who may work this checklist: its assignee, any holder of the template's
+  // assignedRole, or anyone at all if the template somehow has no role (the
+  // orphan guard). viewerRoles members and other onlookers get a read-only
+  // rendering — client-side only until the permissions overhaul.
+  const roleIds = (current.user?.roles ?? []).map((r) => r.id);
+  const userId = current.user?.id;
+  const canAct = Boolean(
+    checklist &&
+      userId &&
+      (checklist.assignedTo?.id === userId ||
+        !checklist.template?.assignedRole ||
+        roleIds.includes(checklist.template.assignedRole.id)),
+  );
 
   // Opening a Not Started checklist starts it — and, for a role-assigned
   // instance nobody has claimed yet, claims it for whoever opened it (see
   // pages/checklist-list.html — "opens (and implicitly claims) it"). Keyed by
   // checklist id since navigating into a nested Location-Based Check reuses
-  // this same component with a different id.
+  // this same component with a different id. Read-only viewers do neither.
   const started = useRef<string | null>(null);
   useEffect(() => {
-    if (!checklist || started.current === checklist.id) return;
+    if (!checklist || !canAct || started.current === checklist.id) return;
+    // The checkpoint screens embed single sections of a checklist the guard
+    // is only passing through — working a section shouldn't claim the whole
+    // nightly checklist for them, only deliberate opens do that.
+    if (sectionId) return;
     const needsStart = checklist.status === "not_started";
     const needsClaim = !checklist.assignedTo && Boolean(current.user);
     if (!needsStart && !needsClaim) return;
     started.current = checklist.id;
-    let update = db.tx.checklists[checklist.id].update({
+    let update = db.tx.checklistInstances[checklist.id].update({
       ...(needsStart ? { status: "in_progress", startedAt: Date.now() } : {}),
     });
     if (needsClaim) update = update.link({ assignedTo: current.user!.id });
     void db.transact(update);
-  }, [checklist, current.user]);
+  }, [checklist, current.user, canAct, sectionId]);
 
-  // Some checklists span several nearby buildings in one pass (e.g. one
-  // "Resturaunt" checklist covering The Point, Parlor Room, and the Condo,
-  // each with their own Front/Side Door items) — a door/lock check away from
-  // the checkpoint's own location gets a small header naming which one it's
-  // at, so "Front Door" at one building doesn't read as the same card as
-  // "Front Door" at another. Nothing to compare against for a non-checkpoint
-  // trigger (clock in/out, manual, scheduled), so this is a no-op there.
-  // Resolved before the section filter below, which also keys off it.
-  const triggeredBy = checklist?.triggeredBy as TriggeredBy | undefined;
-  const checkpointId = triggeredBy?.type === "checkpoint" ? triggeredBy.checkpointId : undefined;
-  const { data: checkpointData } = db.useQuery(
-    checkpointId ? { checkpoints: { $: { where: { id: checkpointId } }, location: {} } } : null,
-  );
-  const checkpointLocationId = checkpointData?.checkpoints?.[0]?.location?.id;
+  const byOrder = (a: { order: number }, b: { order: number }) => a.order - b.order;
+  // All hooks below must run on every render regardless of load state —
+  // computed off optional chaining so the shape is stable while loading.
+  const allSections = (checklist?.sections ?? []).slice().sort(byOrder);
+  // Sections still inside their hideUntil exist but aren't anyone's work
+  // yet. Their items still count toward "remaining" below — a checklist
+  // can't be submitted before a section has even revealed itself.
+  const hiddenSections = allSections.filter((s) => !isVisibleNow(s));
+  const visibleSections = allSections
+    .filter((s) => isVisibleNow(s))
+    .filter((s) => (sectionId ? s.id === sectionId : true))
+    .map((s) => ({
+      ...s,
+      items: (s.items ?? []).slice().sort(byOrder),
+    }));
 
-  // Which sections apply is judged once per mount rather than per render.
-  // A live `new Date()` would differ every render — the same trap the
-  // check-in dedupe window documents — and would also let items appear or
-  // vanish under a guard mid-checklist as a window opened or closed, which
-  // is worse than deciding the set when they opened it.
-  const [evaluatedAt] = useState(() => new Date());
+  const allItems = allSections.flatMap((s) => s.items ?? []);
 
-  // Every hook below must run on every render regardless of whether the
-  // checklist has loaded yet — a hook after the "not loaded" early return
-  // used to only run once data arrived, changing the hook count between
-  // renders (React error #310). Computed off optional chaining instead so
-  // the shape is stable: empty items/no nested query while loading, real
-  // values once `checklist` resolves.
-  const sections = activeSections(sectionsForTemplate(checklist?.template), {
-    currentTime: evaluatedAt,
-    currentCheckpoint: checkpointId
-      ? { id: checkpointId, locationId: checkpointLocationId }
-      : undefined,
-  });
-  const items = itemsOfSections(sections);
-  const resultByItemId = new Map(
-    (checklist?.itemResults ?? []).map((r) => [r.templateItem?.id, r]),
-  );
-
-  const locationCheckNestedIds = items
-    .filter((i) => i.type === "location_check")
-    .map((i) => resultByItemId.get(i.id))
-    .filter((r): r is NonNullable<typeof r> => r != null)
-    .map((r) => (r.result as { nestedChecklistId?: string })?.nestedChecklistId)
+  const locationCheckNestedIds = allItems
+    .filter((i) => i.template?.type === "location_check")
+    .map((i) => (i.result as { nestedChecklistId?: string } | undefined)?.nestedChecklistId)
     .filter((v): v is string => Boolean(v));
 
   const { data: nestedData } = db.useQuery(
     locationCheckNestedIds.length > 0
-      ? { checklists: { $: { where: { id: { $in: locationCheckNestedIds } } } } }
+      ? {
+          checklistInstances: {
+            $: { where: { id: { $in: locationCheckNestedIds } } },
+          },
+        }
       : null,
   );
   const nestedStatusById = new Map(
-    (nestedData?.checklists ?? []).map((c) => [c.id, c.status]),
+    (nestedData?.checklistInstances ?? []).map((c) => [c.id, c.status]),
   );
 
-  const itemLocationId = (item: (typeof items)[number]): string | undefined =>
-    isStateCheck(item.type) ? (item.config as DoorCheckConfig | undefined)?.locationId : undefined;
+  type ItemRow = (typeof allItems)[number];
+  const itemLocationId = (item: ItemRow): string | undefined =>
+    item.template && isStateCheck(item.template.type)
+      ? (item.template.config as DoorCheckConfig | undefined)?.locationId
+      : undefined;
 
-  // Without a resolved checkpoint location there's no baseline to call
-  // anything "off-site" relative to — treating every item's own location as
-  // a deviation would header even a single-location checklist the moment it
-  // wasn't checkpoint-triggered (or the checkpoint simply has no location).
-  const offSiteLocationIds = checkpointLocationId
-    ? [
-        ...new Set(
-          items
-            .map(itemLocationId)
-            .filter((id): id is string => Boolean(id) && id !== checkpointLocationId),
-        ),
-      ]
-    : [];
+  // A door/lock check away from its section's own location gets a small
+  // header naming where it is — "Front Door" at one building shouldn't read
+  // as the same card as "Front Door" at another. A section without a
+  // location has no baseline, so every bound location headers there.
+  const offSiteLocationIds = [
+    ...new Set(
+      allSections.flatMap((s) =>
+        (s.items ?? [])
+          .map(itemLocationId)
+          .filter((id): id is string => Boolean(id) && id !== s.location?.id),
+      ),
+    ),
+  ];
   const { data: offSiteLocationsData } = db.useQuery(
     offSiteLocationIds.length > 0
       ? { locations: { $: { where: { id: { $in: offSiteLocationIds } } } } }
@@ -219,18 +234,21 @@ export function ChecklistItemsPanel({
     return null;
   }
 
-  const isDone = (itemId: string, type: string) => {
-    const r = resultByItemId.get(itemId);
-    if (!r) return false;
-    if (type === "location_check") {
-      const nestedId = (r.result as { nestedChecklistId?: string })?.nestedChecklistId;
+  const isDone = (item: ItemRow) => {
+    if (item.result == null) return false;
+    if (item.template?.type === "location_check") {
+      const nestedId = (item.result as { nestedChecklistId?: string })?.nestedChecklistId;
       return nestedId ? nestedStatusById.get(nestedId) === "complete" : false;
     }
     return true;
   };
 
-  const remaining = items.filter((i) => !isDone(i.id, i.type)).length;
-  const allDone = items.length > 0 && remaining === 0;
+  // Submit gates on every item of every section — including ones still
+  // hidden: their work exists, it just hasn't revealed yet.
+  const remainingAll = allItems.filter((i) => !isDone(i)).length;
+  const allDone = allItems.length > 0 && remainingAll === 0;
+  const shownItems = visibleSections.flatMap((s) => s.items);
+  const remainingShown = shownItems.filter((i) => !isDone(i)).length;
 
   const submit = async () => {
     if (submitting) return;
@@ -254,19 +272,32 @@ export function ChecklistItemsPanel({
     // tickets, meter readings — is written here, in the same transaction
     // that completes the checklist. Until this point an item could still be
     // reopened and changed, which is only safe because none of it existed.
-    const collected = collectPendingEffects(checklist.itemResults ?? []);
+    const collected = collectPendingEffects(allItems);
     const effectTxns = await buildPendingEffectTxns(collected, current.user?.id);
     await db.transact([
       ...effectTxns,
-      // Link each raised ticket back to the item result that raised it.
-      ...[...collected.ticketByResultId].map(([resultId, ticketId]) =>
-        db.tx.checklistItemResults[resultId].link({ linkedTicket: ticketId }),
+      // Link each raised ticket back to the item that raised it.
+      ...[...collected.ticketByResultId].map(([itemRowId, ticketId]) =>
+        db.tx.checklistInstanceItems[itemRowId].link({ linkedTicket: ticketId }),
       ),
-      db.tx.checklists[checklist.id].update({ status: "complete", completedAt: Date.now() }),
+      db.tx.checklistInstances[checklist.id].update({
+        status: "complete",
+        completedAt: Date.now(),
+      }),
+      // A nested location-check instance completes its spawning item too, so
+      // the parent's section completion time reflects when the sub-checklist
+      // actually finished.
+      ...(checklist.parentItem
+        ? [
+            db.tx.checklistInstanceItems[checklist.parentItem.id]
+              .update({ completedAt: Date.now() })
+              .link(current.user ? { completedBy: current.user.id } : {}),
+          ]
+        : []),
       activityTx({
         eventType: "checklist.completed",
         summary: `"${templateName}" completed`,
-        subjectType: "checklists",
+        subjectType: "checklistInstances",
         subjectId: checklist.id,
         actorId: current.user?.id,
       }),
@@ -305,30 +336,64 @@ export function ChecklistItemsPanel({
     }
   };
 
+  // Reordering swaps the two rows' order values — the row order is the
+  // guard's own working order from then on (it started as the template's).
+  const move = (section: (typeof visibleSections)[number], index: number, dir: -1 | 1) => {
+    const a = section.items[index];
+    const b = section.items[index + dir];
+    if (!a || !b) return;
+    void db.transact([
+      db.tx.checklistInstanceItems[a.id].update({ order: b.order }),
+      db.tx.checklistInstanceItems[b.id].update({ order: a.order }),
+    ]);
+  };
+
+  const title = checklist.template?.name ?? "Checklist";
+  const sectionLabel = sectionId
+    ? allSections.find((s) => s.id === sectionId)?.label
+    : undefined;
+
+  const dueText = (ts: number | string | null | undefined) =>
+    ts
+      ? new Date(ts).toLocaleTimeString(undefined, {
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : null;
+
   return (
     <div>
       {compact ? (
         <div className="spread" style={{ alignItems: "baseline" }}>
           <div className="section-title" style={{ marginBottom: 0 }}>
-            {checklist.template?.name ?? "Checklist"}
+            {title}
+            {sectionLabel ? ` — ${sectionLabel}` : ""}
           </div>
-          {items.length > 0 && (
+          {shownItems.length > 0 && (
             <span className="muted small">
-              {items.length - remaining} of {items.length} complete
+              {shownItems.length - remainingShown} of {shownItems.length} complete
             </span>
           )}
         </div>
       ) : (
         <div className="page-head">
           <div>
-            <h1 className="page-title">{checklist.template?.name ?? "Checklist"}</h1>
-            {items.length > 0 && (
+            <h1 className="page-title">{title}</h1>
+            {shownItems.length > 0 && (
               <div className="page-sub">
-                {items.length - remaining} of {items.length} complete
+                {shownItems.length - remainingShown} of {shownItems.length} complete
+                {checklist.dueBy && ` · due ${dueText(checklist.dueBy)}`}
               </div>
             )}
           </div>
         </div>
+      )}
+
+      {!canAct && (
+        <p className="muted small" style={{ marginTop: 4 }}>
+          Read-only — this checklist belongs to{" "}
+          {checklist.template?.assignedRole?.name ?? "another role"}.
+        </p>
       )}
 
       <div
@@ -339,32 +404,88 @@ export function ChecklistItemsPanel({
           const spansColumns = !isMobile && !compact;
           const nodes: ReactNode[] = [];
           // One heading is enough when there's nothing to tell apart: a
-          // single section (or a legacy template's synthetic one) would just
-          // repeat the checklist's own title above the only group of cards.
-          const showSectionHeadings = sections.length > 1;
+          // single section would just repeat the checklist's own title above
+          // the only group of cards. A section embed already has its header.
+          const showSectionHeadings = !sectionId && visibleSections.length > 1;
 
-          for (const section of sections) {
+          for (const section of visibleSections) {
+            const reordering = reorderingSection === section.id;
             if (showSectionHeadings) {
               nodes.push(
                 <div
                   key={`section-${section.id}`}
-                  className="group-heading"
+                  className="group-heading spread"
                   style={spansColumns ? { gridColumn: "1 / -1" } : undefined}
                 >
-                  <span>{section.name}</span>
+                  <span>
+                    {section.label}
+                    {section.dueBy && (
+                      <span className="muted small"> · due {dueText(section.dueBy)}</span>
+                    )}
+                  </span>
+                  {canAct && section.items.length > 1 && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-quiet"
+                      onClick={() =>
+                        setReorderingSection(reordering ? null : section.id)
+                      }
+                    >
+                      {reordering ? "Done" : "Reorder"}
+                    </button>
+                  )}
                 </div>,
               );
+            }
+
+            if (reordering) {
+              // Compact reorder rows instead of full item cards — moving
+              // things shouldn't require scrolling past every open form.
+              section.items.forEach((item, i) => {
+                nodes.push(
+                  <div
+                    key={item.id}
+                    className="card spread"
+                    style={spansColumns ? { gridColumn: "1 / -1" } : undefined}
+                  >
+                    <span className="small" style={{ minWidth: 0 }}>
+                      {isDone(item) ? "✓ " : ""}
+                      {item.template?.label ?? "Item"}
+                    </span>
+                    <span className="row" style={{ gap: 4 }}>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-quiet"
+                        disabled={i === 0}
+                        onClick={() => move(section, i, -1)}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-quiet"
+                        disabled={i === section.items.length - 1}
+                        onClick={() => move(section, i, 1)}
+                      >
+                        ↓
+                      </button>
+                    </span>
+                  </div>,
+                );
+              });
+              continue;
             }
 
             // A header appears once per run of consecutive items at the same
             // off-site location — not once per card, and not again immediately
             // after returning to it, only once the run is actually broken by a
-            // different location (including "back at the checkpoint's own").
-            // Reset per section so a run can't straddle a section boundary.
-            let previousLocationId = checkpointLocationId;
+            // different location. Reset per section so a run can't straddle a
+            // section boundary.
+            let previousLocationId = section.location?.id;
             for (const item of section.items) {
-              const locationId = itemLocationId(item) ?? checkpointLocationId;
-              if (locationId !== checkpointLocationId && locationId !== previousLocationId) {
+              if (!item.template) continue;
+              const locationId = itemLocationId(item) ?? section.location?.id;
+              if (locationId !== section.location?.id && locationId !== previousLocationId) {
                 const name = offSiteLocationNameById.get(locationId!);
                 if (name) {
                   nodes.push(
@@ -380,14 +501,15 @@ export function ChecklistItemsPanel({
               }
               previousLocationId = locationId;
 
-              const Component = componentFor(item.type);
+              const Component = componentFor(item.template.type);
               nodes.push(
                 <Component
                   key={item.id}
-                  item={item}
-                  existing={resultByItemId.get(item.id)}
+                  item={item.template}
+                  existing={item}
                   checklistId={checklist.id}
                   onSaved={() => {}}
+                  editable={canAct}
                 />,
               );
             }
@@ -396,17 +518,25 @@ export function ChecklistItemsPanel({
         })()}
       </div>
 
-      {items.length === 0 && (
+      {shownItems.length === 0 && (
         <div className="placeholder">
           <div className="big">
-            {/* Distinguish an empty template from a full one whose sections
-                are all out of window — the second is the normal state of a
-                time-gated checklist outside its hours, not a misconfiguration. */}
-            {sectionsForTemplate(checklist.template).length > 0
-              ? "Nothing on this checklist is active right now"
+            {/* Distinguish an empty checklist from one whose sections are all
+                still hidden — the second is the normal state of a time-gated
+                checklist before its hours, not a misconfiguration. */}
+            {allSections.length > 0
+              ? "Nothing on this checklist is open yet"
               : "This checklist has no items"}
           </div>
         </div>
+      )}
+
+      {hiddenSections.length > 0 && !sectionId && (
+        <p className="muted small" style={{ marginTop: 10 }}>
+          {hiddenSections.length === 1
+            ? `1 more section unlocks at ${dueText(hiddenSections[0].hideUntil) ?? "a later time"}.`
+            : `${hiddenSections.length} more sections unlock later.`}
+        </p>
       )}
 
       {submitError && (
@@ -415,20 +545,37 @@ export function ChecklistItemsPanel({
         </div>
       )}
 
-      <div className="row" style={{ marginTop: compact ? 10 : 16 }}>
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={!allDone || submitting}
-          onClick={() => void submit()}
-        >
-          {submitting
-            ? "Submitting…"
-            : allDone
-              ? "Submit Checklist"
-              : `Submit Checklist — ${remaining} item${remaining === 1 ? "" : "s"} remaining`}
-        </button>
-      </div>
+      {canAct && (
+        <div className="row" style={{ marginTop: compact ? 10 : 16 }}>
+          {sectionId && !allDone ? (
+            // Working one section at a checkpoint: submitting is the whole
+            // checklist's affair, so once this section's done point at it.
+            remainingShown === 0 && shownItems.length > 0 ? (
+              <button
+                type="button"
+                className="btn"
+                onClick={() => navigate(`/checklists/${checklist.id}`)}
+              >
+                Section complete — {remainingAll} item
+                {remainingAll === 1 ? "" : "s"} elsewhere
+              </button>
+            ) : null
+          ) : (
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!allDone || submitting}
+              onClick={() => void submit()}
+            >
+              {submitting
+                ? "Submitting…"
+                : allDone
+                  ? "Submit Checklist"
+                  : `Submit Checklist — ${remainingAll} item${remainingAll === 1 ? "" : "s"} remaining`}
+            </button>
+          )}
+        </div>
+      )}
 
       {!compact && (
         <p className="muted small" style={{ marginTop: 10 }}>
