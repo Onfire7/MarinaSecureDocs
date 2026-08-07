@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { activityTx } from "../../lib/activityLog";
-import { triggeredByLabel, type TriggeredBy } from "../../lib/checklists";
+import { assigneeFor, triggeredByLabel, type TriggeredBy } from "../../lib/checklists";
 import { ManualCheckinDialog } from "./ManualCheckinDialog";
 import { TourSection } from "./TourSection";
 import { useShiftVisits } from "./useShiftVisits";
@@ -56,7 +56,10 @@ export function ChecklistListPage() {
         .update({ status: "not_started", triggeredBy: { type: "manual" } })
         .link({
           template: template.id,
-          ...(template.assignmentMode === "triggering_user" ? { assignedTo: userId } : {}),
+          // See assigneeFor: "role" only survives if a role is actually
+          // linked, otherwise this checklist would be unreachable — and here
+          // the user is watching, having just pressed Start.
+          ...(assigneeFor(template) === "triggering_user" ? { assignedTo: userId } : {}),
         }),
       activityTx({
         eventType: "checklist.started",

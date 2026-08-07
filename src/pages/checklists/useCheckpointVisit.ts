@@ -9,7 +9,7 @@ import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { deterministicId } from "../../lib/detId";
 import { distanceMeters } from "../../lib/geo";
-import { templateAppliesNow } from "../../lib/checklists";
+import { assigneeFor, templateAppliesNow } from "../../lib/checklists";
 import { activityTx } from "../../lib/activityLog";
 
 const DEDUPE_WINDOW_MS = 5 * 60_000;
@@ -22,6 +22,7 @@ export interface ApplicableChecklist {
   templateName: string;
   status: string;
 }
+
 
 export function useCheckpointVisit(
   checkpointId: string | undefined,
@@ -38,7 +39,10 @@ export function useCheckpointVisit(
           checkpoints: {
             $: { where: { id: checkpointId } },
             location: {},
-            checklistTemplates: {},
+            // `role` is needed to tell a genuinely role-routed template from
+            // one merely *marked* role-assigned with no role behind it —
+            // see the assignee decision below.
+            checklistTemplates: { role: {} },
           },
           marinaSettings: {},
         }
@@ -112,7 +116,14 @@ export function useCheckpointVisit(
         })
         .link({
           template: t.id,
-          ...(t.assignmentMode === "triggering_user" ? { assignedTo: userId } : {}),
+          // Left unassigned only when a role can actually be reached: the
+          // unclaimed queue finds these by `template.role.id`, so a template
+          // set to "assign to a role" without a role linked produced a
+          // checklist no query could ever return — created, owned by nobody,
+          // invisible to everyone including the guard who triggered it.
+          // Falling back to the triggering user loses the role routing, which
+          // is a far smaller loss than losing the checklist.
+          ...(assigneeFor(t) === "triggering_user" ? { assignedTo: userId } : {}),
         });
     });
 

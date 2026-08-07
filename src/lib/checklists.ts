@@ -429,6 +429,28 @@ export function itemsOfSections(sections: ResolvedSection[]): TemplateItemLike[]
   return sections.flatMap((s) => s.items);
 }
 
+/**
+ * Who a newly created checklist belongs to.
+ *
+ * "role" deliberately leaves it unassigned, for any holder of the template's
+ * role to claim out of the unclaimed queue. But that queue finds checklists
+ * by `template.role.id`, so it only works when a role is actually linked —
+ * and assignmentMode could be set to "role" independently of ever naming one.
+ * The result was a checklist created, owned by nobody, and matched by no
+ * query in the app: invisible even to the guard who triggered it. Falling
+ * back to the triggering user loses the role routing, which is a much
+ * smaller loss than losing the checklist.
+ *
+ * Callers link `assignedTo` only when this returns "triggering_user".
+ */
+export function assigneeFor(template: {
+  assignmentMode: string;
+  role?: { id: string } | null;
+}): "triggering_user" | "role" {
+  if (template.assignmentMode !== "role") return "triggering_user";
+  return template.role ? "role" : "triggering_user";
+}
+
 type ChecklistTemplate = InstaQLEntity<AppSchema, "checklistTemplates">;
 
 // Checkpoint-triggered templates carry an optional time-of-day window in

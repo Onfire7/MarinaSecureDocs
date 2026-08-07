@@ -220,6 +220,11 @@ function TemplateCard({
     timeEnd?: string;
     schedule?: string;
   };
+  // Two independent settings need a role: restricting who sees the template,
+  // and routing its checklists to a role's unclaimed queue. Either one alone
+  // is reason to ask for it.
+  const needsRole =
+    template.visibility === "role_restricted" || template.assignmentMode === "role";
 
   // The label starts as the type's own name and is edited inline on the row.
   // Prompting for it first meant a modal per item, on a screen where twelve
@@ -365,7 +370,13 @@ function TemplateCard({
                   <option value="role_restricted">Role-restricted</option>
                   <option value="personal">Personal</option>
                 </select>
-                {template.visibility === "role_restricted" && (
+                {/* One role field serves both settings that need one. It used
+                    to appear only for role-restricted visibility, which left
+                    "assign to a role" with no way to name the role — the
+                    resulting checklists were created unassigned and no query
+                    could reach them (the unclaimed queue looks them up by
+                    template.role.id). */}
+                {needsRole && (
                   <select
                     className="select select-inline"
                     style={{ marginLeft: 6 }}
@@ -388,6 +399,13 @@ function TemplateCard({
                       </option>
                     ))}
                   </select>
+                )}
+                {needsRole && !template.role && (
+                  <p className="small muted" style={{ marginTop: 4 }}>
+                    {template.assignmentMode === "role"
+                      ? "Pick a role — until then these checklists are assigned to whoever triggers them."
+                      : "Pick a role — until then this template is visible to everyone."}
+                  </p>
                 )}
               </div>
 
