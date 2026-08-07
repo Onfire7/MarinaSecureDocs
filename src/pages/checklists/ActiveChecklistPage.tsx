@@ -410,7 +410,14 @@ export function ChecklistItemsPanel({
 
           for (const section of visibleSections) {
             const reordering = reorderingSection === section.id;
-            if (showSectionHeadings) {
+            // The heading row also carries the Reorder control, which a
+            // single-section checklist still needs — so it renders (label
+            // suppressed, since it would just repeat the page title) even
+            // when there's only one section, as long as there's something
+            // to reorder. Compact embeds skip it: reordering is the full
+            // page's affair.
+            const showReorder = !compact && canAct && section.items.length > 1;
+            if (showSectionHeadings || showReorder) {
               nodes.push(
                 <div
                   key={`section-${section.id}`}
@@ -418,12 +425,12 @@ export function ChecklistItemsPanel({
                   style={spansColumns ? { gridColumn: "1 / -1" } : undefined}
                 >
                   <span>
-                    {section.label}
-                    {section.dueBy && (
+                    {showSectionHeadings ? section.label : ""}
+                    {showSectionHeadings && section.dueBy && (
                       <span className="muted small"> · due {dueText(section.dueBy)}</span>
                     )}
                   </span>
-                  {canAct && section.items.length > 1 && (
+                  {showReorder && (
                     <button
                       type="button"
                       className="btn btn-sm btn-quiet"
