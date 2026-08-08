@@ -922,6 +922,7 @@ function SectionEditor({
   // The item whose name should be focused and selected — set when a row is
   // added, cleared once the field has taken the cursor.
   const [namingItemId, setNamingItemId] = useState<string | null>(null);
+  const [lastAddedType, setLastAddedType] = useState<ItemType | null>(null);
   const toggleItem = (itemId: string) =>
     setOpenItemIds((prev) => {
       const next = new Set(prev);
@@ -1034,6 +1035,7 @@ function SectionEditor({
     );
     setOpenItemIds((prev) => new Set(prev).add(newId));
     setNamingItemId(newId);
+    setLastAddedType(type);
   };
 
   const duplicateItem = (item: TemplateItemRow) =>
@@ -1103,7 +1105,21 @@ function SectionEditor({
               <span style={ELLIPSIS}>{section.name}</span>
               <span className="muted small" style={{ flex: "none" }}>
                 | {items.length} item{items.length === 1 ? "" : "s"}
+                {(section.checkpoints ?? []).length > 0 ? " ·" : ""}
               </span>
+              {/* The checkpoints are the part of a section you can't guess
+                  from its name — the place usually is the name. However many
+                  reach the end of the line is the right number to show; the
+                  rest fade out rather than wrapping the row to two lines. */}
+              {(section.checkpoints ?? []).length > 0 && (
+                <span className="badge-marquee">
+                  {(section.checkpoints ?? []).map((c) => (
+                    <span key={c.id} className="badge">
+                      {c.name}
+                    </span>
+                  ))}
+                </span>
+              )}
             </button>
           )}
           {!open && !section.isActive && (
@@ -1300,21 +1316,34 @@ function SectionEditor({
             )}
           />
           {items.length === 0 && <span className="muted small">No items yet.</span>}
-          <select
-            className="select select-inline"
-            style={{ marginTop: 8 }}
-            value=""
-            onChange={(e) => {
-              if (e.target.value) addItem(e.target.value as ItemType);
-            }}
-          >
-            <option value="">Add an item…</option>
-            {(Object.keys(ITEM_TYPE_LABEL) as ItemType[]).map((t) => (
-              <option key={t} value={t}>
-                {ITEM_TYPE_LABEL[t]}
-              </option>
-            ))}
-          </select>
+          <div className="row" style={{ marginTop: 8, gap: 6 }}>
+            <select
+              className="select select-inline"
+              value=""
+              onChange={(e) => {
+                if (e.target.value) addItem(e.target.value as ItemType);
+              }}
+            >
+              <option value="">Add an item…</option>
+              {(Object.keys(ITEM_TYPE_LABEL) as ItemType[]).map((t) => (
+                <option key={t} value={t}>
+                  {ITEM_TYPE_LABEL[t]}
+                </option>
+              ))}
+            </select>
+            {/* Items come in runs — four door checks for four doors — and the
+                menu resets after every use, so the second one cost the same
+                three taps as the first. */}
+            {lastAddedType && (
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => addItem(lastAddedType)}
+              >
+                + another {ITEM_TYPE_LABEL[lastAddedType]}
+              </button>
+            )}
+          </div>
           {items.length > 1 && (
             <p className="muted small" style={{ marginTop: 4 }}>
               Drag ⠿ to reorder.

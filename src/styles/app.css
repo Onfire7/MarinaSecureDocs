@@ -262,6 +262,30 @@ h3 {
   font: inherit;
   cursor: pointer;
 }
+/* A single line of bubbles that shows as many as reach the edge and fades
+   the rest out. Counting what fits would mean measuring after layout and
+   re-rendering; the fade says "there are more" without the second pass, and
+   keeps the row one line however many there are. */
+.badge-marquee {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  /* Basis zero so this takes only what's left over: the section's name is
+     the thing you're reading, and it shouldn't be squeezed to "Main…" to
+     make room for checkpoints that are already fading off the edge. */
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    #000 calc(100% - 18px),
+    transparent
+  );
+  mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent);
+}
+.badge-marquee > .badge {
+  flex: none;
+}
 .picker-check {
   display: flex;
   align-items: center;
