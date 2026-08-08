@@ -993,7 +993,7 @@ function TemplateCard({
               </div>
               {sections.length > 1 && (
                 <p className="muted small" style={{ marginTop: 4 }}>
-                  Drag ⠿ to reorder sections.
+                  Drag ⠿ to reorder.
                 </p>
               )}
             </div>
@@ -1450,7 +1450,10 @@ function SectionEditor({
           )}
 
           <div className="section-title" style={{ marginTop: 10 }}>
-            Items
+            Items{" "}
+            <span className="muted small" style={{ fontWeight: 400 }}>
+              {items.length}
+            </span>
           </div>
           <ReorderableList
             items={items}
