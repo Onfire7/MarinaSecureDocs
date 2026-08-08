@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import {
@@ -273,6 +273,75 @@ function write(what: string, tx: Parameters<typeof db.transact>[0]) {
 }
 
 /**
+ * Roles chosen from a dropdown, checkbox per row, shown closed as the same
+ * bubbles a role wears everywhere else in the app. Reads as one line at rest
+ * however many are picked, where a checkbox list cost a row per role
+ * whether or not it was one of them.
+ */
+function RoleSelect({
+  roles,
+  selectedIds,
+  onToggle,
+  placeholder,
+}: {
+  roles: { id: string; name: string }[];
+  selectedIds: Set<string>;
+  onToggle: (roleId: string, on: boolean) => void;
+  placeholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (!boxRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  const selected = roles.filter((r) => selectedIds.has(r.id));
+
+  return (
+    <div className="picker field-control" ref={boxRef}>
+      <button
+        type="button"
+        className="input chip-select"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        {selected.length > 0 ? (
+          selected.map((r) => (
+            <span key={r.id} className="badge">
+              {r.name}
+            </span>
+          ))
+        ) : (
+          <span className="muted">{placeholder}</span>
+        )}
+      </button>
+      {open && (
+        <div className="picker-menu">
+          {roles.map((r) => (
+            <label key={r.id} className="picker-check">
+              <input
+                type="checkbox"
+                checked={selectedIds.has(r.id)}
+                onChange={(e) => onToggle(r.id, e.target.checked)}
+              />
+              <span>{r.name}</span>
+            </label>
+          ))}
+          {roles.length === 0 && (
+            <div className="picker-option muted small">No other roles exist.</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * The name a new item arrives with. A door check in a section that is a
  * place is "Main Office Door" far more often than it is anything else, so
  * that is what it gets — pre-selected, to be typed over when it isn't.
@@ -326,7 +395,7 @@ function NewSectionDialog({
         </div>
 
         <div className="field">
-          <span className="field-label">Location — optional</span>
+          <span className="field-label">Location</span>
           <LocationPicker
             locations={locations}
             value={locationId}
@@ -576,53 +645,75 @@ function TemplateCard({
 
   return (
     <div className="card">
-      <div className="spread" style={{ flexWrap: "wrap" }}>
-        <div>
-          <div className="card-title">{template.name}</div>
-          <div className="card-meta">
-            <span className="badge">
-              {template.assignedRole?.name ?? "no role"}
-            </span>{" "}
-            {TRIGGERS.find((t) => t.value === template.triggerType)?.label ??
-              template.triggerType}{" "}
-            · {sections.length} section{sections.length === 1 ? "" : "s"} ·{" "}
-            {itemCount} item{itemCount === 1 ? "" : "s"}
-          </div>
-        </div>
-        <div className="row">
-          <button type="button" className="btn btn-sm btn-quiet" onClick={onToggle}>
-            {expanded ? "Done" : "Edit"}
+      <div className="spread row-nowrap">
+        <span className="row row-nowrap" style={{ minWidth: 0, flex: 1, gap: 6 }}>
+          <DisclosureToggle
+            open={expanded}
+            label={expanded ? "Collapse template" : "Expand template"}
+            onToggle={onToggle}
+          />
+          {/* The title *is* the name field once open — a separate "Name" box
+              below was asking for the same string twice. */}
+          {expanded ? (
+            <DraftInput
+              className="input select-inline"
+              style={{ minWidth: 0, flex: 1 }}
+              value={template.name}
+              aria-label="Template name"
+              onCommit={(name) => update({ name })}
+            />
+          ) : (
+            <button
+              type="button"
+              className="btn-bare row row-nowrap"
+              style={{ minWidth: 0, flex: 1, gap: 6 }}
+              onClick={onToggle}
+            >
+              <span className="card-title" style={ELLIPSIS}>
+                {template.name}
+              </span>
+            </button>
+          )}
+        </span>
+        <span className="row row-nowrap" style={{ gap: 2, flex: "none" }}>
+          <button
+            type="button"
+            className="btn btn-sm btn-quiet btn-icon"
+            title="Duplicate this template"
+            aria-label="Duplicate this template"
+            onClick={() => void duplicate()}
+          >
+            ⧉
           </button>
           <button
             type="button"
-            className="btn btn-sm btn-quiet"
-            onClick={() => void duplicate()}
+            className="btn btn-sm btn-quiet btn-icon btn-icon-danger"
+            title="Delete this template"
+            aria-label="Delete this template"
+            onClick={() => void remove()}
           >
-            Duplicate
+            <TrashIcon />
           </button>
-          <button type="button" className="btn btn-sm btn-danger" onClick={() => void remove()}>
-            Delete
-          </button>
-        </div>
+        </span>
       </div>
+      {!expanded && (
+        <div className="card-meta">
+          <span className="badge">{template.assignedRole?.name ?? "no role"}</span>{" "}
+          {TRIGGERS.find((t) => t.value === template.triggerType)?.label ??
+            template.triggerType}{" "}
+          · {sections.length} section{sections.length === 1 ? "" : "s"} ·{" "}
+          {itemCount} item{itemCount === 1 ? "" : "s"}
+        </div>
+      )}
 
       {expanded && (
         <div style={{ marginTop: 12 }}>
           <div className="grid-2">
             <div>
-              <div className="field">
-                <span className="field-label">Name</span>
-                <DraftInput
-                  className="input"
-                  value={template.name}
-                  onCommit={(name) => update({ name })}
-                />
-              </div>
-
-              <div className="field">
-                <span className="field-label">Assigned role — required</span>
+              <div className="field-inline">
+                <span className="field-label">Role</span>
                 <select
-                  className="select select-inline"
+                  className="select field-control"
                   value={template.assignedRole?.id ?? ""}
                   onChange={(e) => {
                     // The placeholder option carries no id — linking it
@@ -642,67 +733,46 @@ function TemplateCard({
                     </option>
                   ))}
                 </select>
-                {!template.assignedRole && (
-                  <p className="small muted" style={{ marginTop: 4 }}>
-                    Pick a role — until then these checklists are assigned to
-                    whoever triggers them.
-                  </p>
-                )}
-                <label className="row" style={{ cursor: "pointer", marginTop: 6 }}>
-                  <input
-                    type="checkbox"
-                    checked={template.assignedToUser ?? false}
-                    onChange={(e) => update({ assignedToUser: e.target.checked })}
-                  />
-                  <span className="small">Assign to triggering user.</span>
-                </label>
+              </div>
+              {!template.assignedRole && (
+                <p className="small muted" style={{ marginTop: 0, marginBottom: 6 }}>
+                  Pick a role — until then these checklists are assigned to
+                  whoever triggers them.
+                </p>
+              )}
+              <label className="row" style={{ cursor: "pointer", marginBottom: 6 }}>
+                <input
+                  type="checkbox"
+                  checked={template.assignedToUser ?? false}
+                  onChange={(e) => update({ assignedToUser: e.target.checked })}
+                />
+                <span className="small">Assign to triggering user</span>
+              </label>
+
+              <div className="field-inline">
+                <span className="field-label">Read only</span>
+                <RoleSelect
+                  roles={roles.filter((r) => r.id !== template.assignedRole?.id)}
+                  selectedIds={viewerRoleIds}
+                  placeholder="Nobody else"
+                  onToggle={(roleId, on) =>
+                    void db.transact(
+                      on
+                        ? db.tx.checklistTemplates[template.id].link({
+                            viewerRoles: roleId,
+                          })
+                        : db.tx.checklistTemplates[template.id].unlink({
+                            viewerRoles: roleId,
+                          }),
+                    )
+                  }
+                />
               </div>
 
-              {/* Picked through the same multi-select the checkpoint and
-                  asset attachments use, rather than a checkbox per role: the
-                  list is only ever read to answer "which roles are on here",
-                  and every unchecked box was paying rent to say "not this
-                  one". */}
-              <div className="field">
-                <span className="field-label">Read Only Roles</span>
-                <div className="stack" style={{ gap: 2 }}>
-                  {(template.viewerRoles ?? []).map((r) => (
-                    <div key={r.id} className="row spread">
-                      <span className="small">{r.name}</span>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-quiet"
-                        onClick={() =>
-                          void db.transact(
-                            db.tx.checklistTemplates[template.id].unlink({
-                              viewerRoles: r.id,
-                            }),
-                          )
-                        }
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                  {(template.viewerRoles ?? []).length === 0 && (
-                    <span className="muted small">None — nobody else sees these.</span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  style={{ marginTop: 4 }}
-                  disabled={viewerRoleChoices.length === 0}
-                  onClick={() => setAddingViewerRoles(true)}
-                >
-                  + Add read only roles
-                </button>
-              </div>
-
-              <div className="field">
+              <div className="field-inline">
                 <span className="field-label">Trigger</span>
                 <select
-                  className="select select-inline"
+                  className="select field-control"
                   value={template.triggerType}
                   onChange={(e) => update({ triggerType: e.target.value })}
                 >
@@ -712,6 +782,8 @@ function TemplateCard({
                     </option>
                   ))}
                 </select>
+              </div>
+              <div>
                 {template.triggerType === "recurring" && (
                   <RecurrenceRuleField
                     value={
@@ -1034,40 +1106,44 @@ function SectionEditor({
               </span>
             </button>
           )}
-          {!section.isActive && (
+          {!open && !section.isActive && (
             <span className="badge" style={{ flex: "none" }}>
               Inactive
             </span>
           )}
         </span>
         {open && (
-          <button
-            type="button"
-            className="btn btn-sm btn-quiet btn-icon btn-icon-danger"
-            title="Delete section"
-            aria-label="Delete section"
-            onClick={removeSection}
-          >
-            <TrashIcon />
-          </button>
+          <span className="row row-nowrap" style={{ gap: 4, flex: "none" }}>
+            {/* Whether the section runs at all belongs beside its name, not
+                buried under the fields that describe how it runs. */}
+            <label className="row" style={{ cursor: "pointer", gap: 4 }} title="Active">
+              <input
+                type="checkbox"
+                checked={section.isActive}
+                onChange={(e) => update({ isActive: e.target.checked })}
+                aria-label="Active"
+              />
+              <span className="small muted">Active</span>
+            </label>
+            <button
+              type="button"
+              className="btn btn-sm btn-quiet btn-icon btn-icon-danger"
+              title="Delete section"
+              aria-label="Delete section"
+              onClick={removeSection}
+            >
+              <TrashIcon />
+            </button>
+          </span>
         )}
       </div>
 
       {open && (
         <div style={{ marginTop: 8 }}>
-          <label className="row" style={{ cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={section.isActive}
-              onChange={(e) => update({ isActive: e.target.checked })}
-            />
-            <span className="small">Active</span>
-          </label>
-
-          <div className="field" style={{ marginTop: 8 }}>
-            <span className="field-label">Section trigger</span>
+          <div className="field-inline">
+            <span className="field-label">Trigger</span>
             <select
-              className="select select-inline"
+              className="select field-control"
               value={section.triggerType}
               onChange={(e) => update({ triggerType: e.target.value })}
             >
@@ -1077,6 +1153,8 @@ function SectionEditor({
                 </option>
               ))}
             </select>
+          </div>
+          <div>
             {section.triggerType === "recurring" && (
               <RecurrenceRuleField
                 value={cfg.recurrenceRule ?? ""}
@@ -1100,14 +1178,27 @@ function SectionEditor({
             )}
           </div>
 
-          <div className="field">
+          <RuleFields
+            hideUntilRule={section.hideUntilRule}
+            dueBy={section.dueBy}
+            onHideUntilRule={(hideUntilRule) =>
+              update({ hideUntilRule: hideUntilRule || null })
+            }
+            onDueBy={(dueBy) => update({ dueBy: dueBy ?? null })}
+          />
+
+          <div className="field-inline">
             <span className="field-label">Location</span>
-            <LocationPicker
-              locations={locations}
-              value={section.location?.id ?? ""}
-              onChange={(next) => setLocation(next || undefined)}
-              placeholder="Search locations…"
-            />
+            <div className="field-control">
+              <LocationPicker
+                locations={locations}
+                value={section.location?.id ?? ""}
+                onChange={(next) => setLocation(next || undefined)}
+                placeholder="Search locations…"
+              />
+            </div>
+          </div>
+          <div>
             {section.location && (
               <div style={{ marginTop: 6 }}>
                 <span className="small muted">
@@ -1182,15 +1273,6 @@ function SectionEditor({
               </button>
             </div>
           )}
-
-          <RuleFields
-            hideUntilRule={section.hideUntilRule}
-            dueBy={section.dueBy}
-            onHideUntilRule={(hideUntilRule) =>
-              update({ hideUntilRule: hideUntilRule || null })
-            }
-            onDueBy={(dueBy) => update({ dueBy: dueBy ?? null })}
-          />
 
           <div className="section-title" style={{ marginTop: 10 }}>
             Items
@@ -1328,9 +1410,9 @@ function RuleFields({
   const kind = dueBy?.kind ?? "";
   return (
     <>
-      <div className="field">
-        <span className="field-label">Hide until — optional</span>
-        <div className="row">
+      <div className="field-inline">
+        <span className="field-label">Hide until</span>
+        <div className="row field-control">
           <DraftInput
             type="time"
             className="input select-inline"
@@ -1349,9 +1431,9 @@ function RuleFields({
           )}
         </div>
       </div>
-      <div className="field">
-        <span className="field-label">Due by — optional</span>
-        <div className="row">
+      <div className="field-inline">
+        <span className="field-label">Due by</span>
+        <div className="row field-control">
           <select
             className="select select-inline"
             value={kind}
@@ -1364,7 +1446,7 @@ function RuleFields({
           >
             <option value="">No due time</option>
             <option value="time">At a time of day</option>
-            <option value="offset">Within minutes of creation</option>
+            <option value="offset">Within X minutes</option>
           </select>
           {dueBy?.kind === "time" && (
             <DraftInput
@@ -1557,9 +1639,9 @@ function StateCheckConfigFields({
 
   return (
     <div>
-      <div className="row">
-        <span className="small muted">
-          {finalStateOnly ? "Expected final state" : "Expected state"}
+      <div className="field-inline" style={{ marginBottom: 0 }}>
+        <span className="field-label">
+          {finalStateOnly ? "Final state" : "Expected"}
         </span>
         <select
           className="select select-inline"
@@ -1579,22 +1661,19 @@ function StateCheckConfigFields({
           checked={finalStateOnly}
           onChange={(e) => setConfig({ finalStateOnly: e.target.checked })}
         />
-        <span className="small">
-          No initial expected state — only ask how this {spec.noun} was left, and
-          don't raise an incident over how it was found
-        </span>
+        <span className="small">No initial expected state</span>
       </label>
-      <div className="field" style={{ marginTop: 8, marginBottom: 0 }}>
-        <span className="field-label">
-          Location this {spec.noun} belongs to — required
-        </span>
-        <LocationPicker
-          locations={locations}
-          value={locationId}
-          onChange={(next) => setConfig({ locationId: next || undefined })}
-          placeholder="Search locations…"
-          allowNone={false}
-        />
+      <div className="field-inline" style={{ marginTop: 8, marginBottom: 0 }}>
+        <span className="field-label">Location</span>
+        <div className="field-control">
+          <LocationPicker
+            locations={locations}
+            value={locationId}
+            onChange={(next) => setConfig({ locationId: next || undefined })}
+            placeholder="Search locations…"
+            allowNone={false}
+          />
+        </div>
         {!locationId && (
           <div className="badge badge-warn" style={{ display: "block", marginTop: 6 }}>
             Set a location — without one, an incident raised for this {spec.noun}{" "}

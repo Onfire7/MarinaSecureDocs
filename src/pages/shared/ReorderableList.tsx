@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 /**
@@ -83,6 +83,25 @@ export function ReorderableList<T extends { id: string }>({
     setDragOrder(null);
     setDraggingId(null);
   };
+
+  // Releasing outside the viewport used to leave the row stuck mid-drag —
+  // still dimmed, still following the pointer — until it was grabbed and
+  // dropped a second time. The handle's own onPointerUp can't be relied on:
+  // reordering moves the dragged node in the DOM, which drops the pointer
+  // capture, and a release over nothing then has no element to fire at.
+  // The window always hears it.
+  const finish = useRef(onPointerUp);
+  finish.current = onPointerUp;
+  useEffect(() => {
+    if (!draggingId) return;
+    const onRelease = () => finish.current();
+    window.addEventListener("pointerup", onRelease);
+    window.addEventListener("pointercancel", onRelease);
+    return () => {
+      window.removeEventListener("pointerup", onRelease);
+      window.removeEventListener("pointercancel", onRelease);
+    };
+  }, [draggingId]);
 
   const nudge = (rowId: string, delta: -1 | 1) => {
     const order = ordered.map((it) => it.id);

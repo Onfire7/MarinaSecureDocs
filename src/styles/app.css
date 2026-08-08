@@ -223,6 +223,57 @@ h3 {
 .spread.row-nowrap {
   flex-wrap: nowrap;
 }
+/* Label before its control instead of above it. Halves the vertical cost of
+   a form whose labels are mostly one word. The label keeps a common width so
+   the controls line up into a column rather than stepping in and out. */
+.field-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.field-inline > .field-label {
+  margin-bottom: 0;
+  flex: none;
+  width: 88px;
+}
+.field-inline > .field-control {
+  flex: 1;
+  min-width: 0;
+}
+/* Narrow rows can't afford the label column; the control takes the next line
+   rather than being squeezed to nothing. */
+@media (max-width: 420px) {
+  .field-inline {
+    flex-wrap: wrap;
+  }
+  .field-inline > .field-label {
+    width: auto;
+  }
+}
+/* A select whose closed state shows its choices as bubbles. */
+.chip-select {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.picker-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.picker-check:hover {
+  background: var(--fill);
+}
 /* Text that acts as a control — the collapsed name of a section or item,
    which opens the editor when tapped. */
 .btn-bare {

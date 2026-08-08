@@ -148,7 +148,10 @@ export function LocationPicker({
             }
           }}
         />
-        {selected && (
+        {/* Nothing to clear to when a location is required — the field can't
+            legally be empty, so offering the button only invites an invalid
+            state and a warning to go with it. */}
+        {selected && allowNone && (
           <button
             type="button"
             className="btn btn-sm btn-quiet"
