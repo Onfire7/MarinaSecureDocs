@@ -273,6 +273,26 @@ function write(what: string, tx: Parameters<typeof db.transact>[0]) {
 }
 
 /**
+ * The settings block read back as one sentence. Five fields describing what
+ * is usually a single fact ("Clock In, due within an hour") cost most of the
+ * editor's height before you reached the sections, which are what you came
+ * for — so they fold up into this and open on a tap.
+ */
+function templateSummary(template: TemplateRow) {
+  const parts = [
+    template.assignedRole?.name ?? "no role",
+    TRIGGERS.find((t) => t.value === template.triggerType)?.label ??
+      template.triggerType,
+  ];
+  if (template.hideUntilRule) parts.push(`from ${template.hideUntilRule}`);
+  if (template.dueBy?.kind === "time") parts.push(`due ${template.dueBy.time}`);
+  if (template.dueBy?.kind === "offset")
+    parts.push(`due within ${template.dueBy.minutes}m`);
+  if (template.assignedToUser) parts.push("self-assigned");
+  return parts.join(" · ");
+}
+
+/**
  * Roles chosen from a dropdown, checkbox per row, shown closed as the same
  * bubbles a role wears everywhere else in the app. Reads as one line at rest
  * however many are picked, where a checkbox list cost a row per role
@@ -526,6 +546,9 @@ function TemplateCard({
 }) {
   const [addingViewerRoles, setAddingViewerRoles] = useState(false);
   const [addingSection, setAddingSection] = useState(false);
+  // Closed to start: a template's role and trigger are set once, while its
+  // sections are edited over and over.
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const update = (fields: Record<string, unknown>) =>
     void db.transact(db.tx.checklistTemplates[template.id].update(fields));
@@ -710,6 +733,40 @@ function TemplateCard({
         <div style={{ marginTop: 12 }}>
           <div className="grid-2">
             <div>
+              <div className="spread row-nowrap" style={{ marginBottom: 6 }}>
+                <span
+                  className="row row-nowrap"
+                  style={{ minWidth: 0, flex: 1, gap: 6 }}
+                >
+                  <DisclosureToggle
+                    open={settingsOpen}
+                    label={settingsOpen ? "Collapse settings" : "Expand settings"}
+                    onToggle={() => setSettingsOpen(!settingsOpen)}
+                  />
+                  <button
+                    type="button"
+                    className="btn-bare row row-nowrap"
+                    style={{ minWidth: 0, flex: 1, gap: 6 }}
+                    onClick={() => setSettingsOpen(!settingsOpen)}
+                  >
+                    <span className="muted small" style={ELLIPSIS}>
+                      {templateSummary(template)}
+                    </span>
+                    {(template.viewerRoles ?? []).length > 0 && (
+                      <span className="badge-marquee">
+                        {(template.viewerRoles ?? []).map((r) => (
+                          <span key={r.id} className="badge">
+                            {r.name}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                  </button>
+                </span>
+              </div>
+
+              {settingsOpen && (
+              <>
               <div className="field-inline">
                 <span className="field-label">Role</span>
                 <select
@@ -813,6 +870,8 @@ function TemplateCard({
                 }
                 onDueBy={(dueBy) => update({ dueBy: dueBy ?? null })}
               />
+              </>
+              )}
             </div>
 
             <div>
