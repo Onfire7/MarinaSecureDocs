@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import {
+  hideUntilWarning,
   ITEM_TYPE_LABEL,
   QUESTION_ANSWER_LABEL,
   STATE_CHECK_KINDS,
@@ -948,6 +949,8 @@ function TemplateCard({
                   update({ hideUntilRule: hideUntilRule || null })
                 }
                 onDueBy={(dueBy) => update({ dueBy: dueBy ?? null })}
+                level="template"
+                triggerType={template.triggerType}
               />
               </>
               )}
@@ -1380,6 +1383,8 @@ function SectionEditor({
               update({ hideUntilRule: hideUntilRule || null })
             }
             onDueBy={(dueBy) => update({ dueBy: dueBy ?? null })}
+            level="section"
+            triggerType={section.triggerType}
           />
 
           <div className="field-inline">
@@ -1604,13 +1609,23 @@ function RuleFields({
   dueBy,
   onHideUntilRule,
   onDueBy,
+  level,
+  triggerType,
 }: {
   hideUntilRule: string | undefined;
   dueBy: DueByRule | undefined;
   onHideUntilRule: (rule: string) => void;
   onDueBy: (rule: DueByRule | undefined) => void;
+  /** Which row this is — the same trigger name means different things. */
+  level: "template" | "section";
+  /** What creates this row, which decides whether a hide-until is safe. */
+  triggerType: string;
 }) {
   const kind = dueBy?.kind ?? "";
+  // Only worth saying once the rule exists — an empty field hides nothing.
+  const hideWarning = hideUntilRule
+    ? hideUntilWarning(level, triggerType)
+    : undefined;
   return (
     <>
       <div className="field-inline">
@@ -1634,6 +1649,14 @@ function RuleFields({
           )}
         </div>
       </div>
+      {hideWarning && (
+        <div
+          className="badge badge-warn"
+          style={{ display: "block", marginBottom: 6, padding: "6px 10px" }}
+        >
+          {hideWarning}
+        </div>
+      )}
       <div className="field-inline">
         <span className="field-label">Due by</span>
         <div className="row field-control">

@@ -438,29 +438,67 @@ function nextOccurrenceOf(time: string, from: Date): Date | null {
 }
 
 /**
- * Past this horizon, a hide-until time is read as already-passed rather than
- * upcoming. "Hide until 21:00" on an instance created at 22:00 means 9pm
- * already came and went — not "hide for 23 hours" — while "hide until 02:00"
- * created at 23:00 genuinely means 2am tonight. 20h splits the two readings:
- * an instance lives one shift cycle, so a reveal that far out can only be a
- * time that was meant for earlier today.
- */
-const HIDE_RULE_HORIZON_MS = 20 * 60 * 60_000;
-
-/**
  * Resolve an authored hideUntilRule ("HH:MM") to a concrete timestamp at
  * instantiation, or null for visible-immediately. Malformed rules resolve to
  * visible — an admin typo must never hide assigned work.
+ *
+ * The rule is simply the next occurrence of that clock time: a checklist is
+ * assumed to be created before any hide-until inside it. That assumption is
+ * what makes a clock time mean anything at all here — the alternative is
+ * asking whether "19:00" meant tonight's or yesterday's, which cannot be
+ * answered from the creation time, and can't be answered from the shift
+ * either, since plenty of people who run checklists never clock into one.
+ *
+ * A guess used to live here: reveals more than 20 hours out were read as
+ * "that time already passed today". It was wrong in both directions — five
+ * hours ahead is a genuine reveal for a day shift and a stale one for a night
+ * shift that began at 4am — and no threshold can tell those apart. Where the
+ * assumption doesn't hold, the template builder says so at authoring time
+ * (see HIDE_UNTIL_TRIGGER_WARNING), which is the only place the question can
+ * actually be settled.
  */
 export function resolveHideUntil(
   rule: string | null | undefined,
   createdAt: Date = new Date(),
 ): number | null {
   if (!rule?.trim()) return null;
-  const next = nextOccurrenceOf(rule, createdAt);
-  if (!next) return null;
-  if (next.getTime() - createdAt.getTime() > HIDE_RULE_HORIZON_MS) return null;
-  return next.getTime();
+  return nextOccurrenceOf(rule, createdAt)?.getTime() ?? null;
+}
+
+/**
+ * Warns where "created before its own hide-until" can quietly stop being
+ * true. The author is warned rather than blocked: a late start is unusual,
+ * not impossible, and the rule is still what they meant on every ordinary
+ * day.
+ *
+ * The same trigger name means different things at the two levels, so they
+ * can't share one list. A *section* triggered "manual" is created with its
+ * checklist, and inherits whatever the template's trigger decided — nothing
+ * arbitrary about it. A *template* triggered "manual" is created the moment
+ * somebody taps Start, which is as arbitrary as it gets.
+ */
+export function hideUntilWarning(
+  level: "template" | "section",
+  triggerType: string,
+): string | undefined {
+  if (level === "template") {
+    if (triggerType === "manual")
+      return "Manual checklists start whenever someone taps Start, so one begun after this time hides the row until the same time tomorrow.";
+    if (triggerType === "checkpoint")
+      return "Checkpoint scans happen at any hour, so a scan after this time hides the row until the same time tomorrow.";
+    if (triggerType === "clock_out")
+      return "Clock-out checklists are created as someone leaves, so anything hidden until later the same day won't be seen on that shift at all.";
+    return undefined;
+  }
+  // Sections created lazily onto an already-open checklist, whenever the
+  // place they belong to is actually visited.
+  if (triggerType === "checkpoint")
+    return "Checkpoint sections appear when the checkpoint is scanned, which can be any hour — a scan after this time hides the section until the same time tomorrow.";
+  if (triggerType === "location")
+    return "Location sections appear when the location is visited, which can be any hour — a visit after this time hides the section until the same time tomorrow.";
+  if (triggerType === "asset")
+    return "Asset sections appear when the asset is scanned, which can be any hour — a scan after this time hides the section until the same time tomorrow.";
+  return undefined;
 }
 
 /**
