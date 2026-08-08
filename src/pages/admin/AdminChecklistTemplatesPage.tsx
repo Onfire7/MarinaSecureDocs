@@ -2089,7 +2089,7 @@ function QuestionConfigFields({
 
       {answerType === "repeatable_line" && (
         <p className="muted small" style={{ marginTop: 6, marginBottom: 0 }}>
-          The guard gets one box and an "Add another line" button, so entries
+          The user gets one box and an "Add another line" button, so entries
           can be added through the shift without disturbing earlier ones.
         </p>
       )}
