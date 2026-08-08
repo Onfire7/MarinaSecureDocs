@@ -1124,6 +1124,13 @@ h3 {
   font-weight: 650;
 }
 
+/* Finished checklists, ruled off below the working part of the page. */
+.completed-divider {
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
 /* ---------- Multi-select dialog ---------- */
 
 .multiselect-scroll {

@@ -6,7 +6,6 @@ import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import {
-  ITEM_TYPE_LABEL,
   isStateCheck,
   isVisibleNow,
   normalizeItemType,
@@ -101,6 +100,8 @@ export function ChecklistItemsPanel({
   // follows its own completion, so a section folds itself away as the last
   // item in it is answered and the next one is the one in front of you.
   const [sectionOverride, setSectionOverride] = useState<Record<string, boolean>>({});
+  // Arms the second tap that submits with work outstanding.
+  const [confirmingPartial, setConfirmingPartial] = useState(false);
 
   const { data } = db.useQuery({
     checklistInstances: {
@@ -604,6 +605,14 @@ export function ChecklistItemsPanel({
         </p>
       )}
 
+      {confirmingPartial && !allDone && (
+        <div className="badge badge-warn" style={{ display: "block", marginTop: 12 }}>
+          {remainingAll} item{remainingAll === 1 ? "" : "s"} still unanswered.
+          Submitting now records the checklist as it stands, and those items
+          stay unanswered on the record.
+        </div>
+      )}
+
       {submitError && (
         <div className="badge badge-bad" style={{ display: "block", marginTop: 12 }}>
           {submitError}
@@ -626,28 +635,44 @@ export function ChecklistItemsPanel({
               </button>
             ) : null
           ) : (
+            <>
             <button
               type="button"
-              className="btn btn-primary"
-              disabled={!allDone || submitting}
-              onClick={() => void submit()}
+              className={"btn " + (allDone ? "btn-primary" : "btn-danger")}
+              disabled={submitting}
+              onClick={() => {
+                // Unfinished work is submittable — a round cut short by a
+                // callout is still worth recording — but never by the same
+                // tap that submits a finished one.
+                if (!allDone && !confirmingPartial) {
+                  setConfirmingPartial(true);
+                  return;
+                }
+                void submit();
+              }}
             >
               {submitting
                 ? "Submitting…"
                 : allDone
                   ? "Submit Checklist"
-                  : `Submit Checklist — ${remainingAll} item${remainingAll === 1 ? "" : "s"} remaining`}
+                  : confirmingPartial
+                    ? `Submit anyway — ${remainingAll} unanswered`
+                    : `Submit Checklist — ${remainingAll} item${remainingAll === 1 ? "" : "s"} remaining`}
             </button>
+            {confirmingPartial && !allDone && !submitting && (
+              <button
+                type="button"
+                className="btn btn-quiet"
+                onClick={() => setConfirmingPartial(false)}
+              >
+                Keep working
+              </button>
+            )}
+            </>
           )}
         </div>
       )}
 
-      {!compact && (
-        <p className="muted small" style={{ marginTop: 10 }}>
-          Every item type here — {Object.values(ITEM_TYPE_LABEL).join(", ")} — writes locally
-          first and syncs automatically; leaving and resuming later preserves exact progress.
-        </p>
-      )}
     </div>
   );
 }

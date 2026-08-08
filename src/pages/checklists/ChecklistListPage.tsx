@@ -356,36 +356,6 @@ export function ChecklistListPage() {
               </div>
             )}
 
-            {completed.length > 0 && (
-              <details className="section-collapse" style={{ marginTop: 14 }}>
-                <summary>
-                  <span className="section-title" style={{ marginBottom: 0 }}>
-                    Completed · {completed.length}
-                    {checklists.filter((c) => c.status === "complete").length >
-                      RECENT_COMPLETED && " most recent"}
-                  </span>
-                </summary>
-                <div className="stack" style={{ gap: 4, marginTop: 8 }}>
-                  {completed.map((c) => (
-                    <Link
-                      key={c.id}
-                      to={`/checklists/${c.id}`}
-                      className="spread muted"
-                      style={{ textDecoration: "none", padding: "4px 0" }}
-                    >
-                      <span className="small" style={{ minWidth: 0 }}>
-                        {c.template?.name ?? "Checklist"}
-                        <span className="muted"> · {triggerLabel(c)}</span>
-                      </span>
-                      <span className="small muted">{when(c.completedAt) ?? "✓"}</span>
-                    </Link>
-                  ))}
-                </div>
-                <p className="muted small" style={{ marginTop: 8, marginBottom: 0 }}>
-                  Full history is in each checklist and in Reports.
-                </p>
-              </details>
-            )}
         </div>
 
         {isSecurity && (
@@ -394,6 +364,37 @@ export function ChecklistListPage() {
           </div>
         )}
       </div>
+
+      {/* Below everything, behind a rule: finished work is worth confirming
+          at a glance and worth nothing above the work still to do. */}
+      {completed.length > 0 && (
+        <div className="completed-divider">
+          <div className="section-title">
+            Completed · {completed.length}
+            {checklists.filter((c) => c.status === "complete").length >
+              RECENT_COMPLETED && " most recent"}
+          </div>
+          <div className="stack" style={{ gap: 4 }}>
+            {completed.map((c) => (
+              <Link
+                key={c.id}
+                to={`/checklists/${c.id}`}
+                className="spread muted"
+                style={{ textDecoration: "none", padding: "4px 0" }}
+              >
+                <span className="small" style={{ minWidth: 0 }}>
+                  {c.template?.name ?? "Checklist"}
+                  <span className="muted"> · {triggerLabel(c)}</span>
+                </span>
+                <span className="small muted">{when(c.completedAt) ?? "✓"}</span>
+              </Link>
+            ))}
+          </div>
+          <p className="muted small" style={{ marginTop: 8, marginBottom: 0 }}>
+            Full history is in each checklist and in Reports.
+          </p>
+        </div>
+      )}
 
       {showManualCheckin && (
         <ManualCheckinDialog onClose={() => setShowManualCheckin(false)} />
