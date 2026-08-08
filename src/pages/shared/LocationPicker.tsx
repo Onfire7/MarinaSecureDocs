@@ -55,6 +55,11 @@ export function LocationPicker({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
+  // Taking the cursor shouldn't also drop the whole list over whatever sits
+  // below the field — in a dialog that's the rest of the form. The first
+  // focus is the one this component gave itself; typing opens the menu, as
+  // does focusing it by hand afterwards.
+  const suppressOpenOnFocus = useRef(autoFocus);
 
   const byId = useMemo(
     () => new Map(locations.map((l) => [l.id, l])),
@@ -143,7 +148,13 @@ export function LocationPicker({
             setQuery(e.target.value);
             setOpen(true);
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => {
+            if (suppressOpenOnFocus.current) {
+              suppressOpenOnFocus.current = false;
+              return;
+            }
+            setOpen(true);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Escape") setOpen(false);
             if (e.key === "Enter" && open && results.length > 0) {

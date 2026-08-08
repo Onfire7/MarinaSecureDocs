@@ -1481,35 +1481,60 @@ function SectionEditor({
               />
             )}
           />
-          {items.length === 0 && <span className="muted small">No items yet.</span>}
-          <div className="row" style={{ marginTop: 8, gap: 6 }}>
-            <select
-              className="select select-inline"
-              value=""
-              onChange={(e) => {
-                if (e.target.value) addItem(e.target.value as ItemType);
-              }}
-            >
-              <option value="">Add an item…</option>
-              {(Object.keys(ITEM_TYPE_LABEL) as ItemType[]).map((t) => (
-                <option key={t} value={t}>
-                  {ITEM_TYPE_LABEL[t]}
-                </option>
-              ))}
-            </select>
-            {/* Items come in runs — four door checks for four doors — and the
-                menu resets after every use, so the second one cost the same
-                three taps as the first. */}
-            {lastAddedType && (
-              <button
-                type="button"
-                className="btn btn-sm"
-                onClick={() => addItem(lastAddedType)}
+          {/* An empty section is the one place the type menu is pure friction:
+              there's no list to keep tidy, and every type is one tap away if
+              you just show them. Once there's something in the section the
+              menu comes back, because six buttons under a list of items would
+              compete with the items. */}
+          {items.length === 0 ? (
+            <div className="placeholder" style={{ padding: "16px 12px" }}>
+              <div style={{ marginBottom: 10 }}>No items yet, let's add one!</div>
+              <div
+                className="row"
+                style={{ flexWrap: "wrap", justifyContent: "center", gap: 6 }}
               >
-                + another {ITEM_TYPE_LABEL[lastAddedType]}
-              </button>
-            )}
-          </div>
+                {(Object.keys(ITEM_TYPE_LABEL) as ItemType[]).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => addItem(t)}
+                  >
+                    {ITEM_TYPE_LABEL[t]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="row" style={{ marginTop: 8, gap: 6 }}>
+              <select
+                className="select select-inline"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) addItem(e.target.value as ItemType);
+                }}
+              >
+                <option value="">Add an item…</option>
+                {(Object.keys(ITEM_TYPE_LABEL) as ItemType[]).map((t) => (
+                  <option key={t} value={t}>
+                    {ITEM_TYPE_LABEL[t]}
+                  </option>
+                ))}
+              </select>
+              {/* Items come in runs — four door checks for four doors — and
+                  the menu resets after every use, so the second one cost the
+                  same three taps as the first. */}
+              {lastAddedType && (
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => addItem(lastAddedType)}
+                >
+                  + another {ITEM_TYPE_LABEL[lastAddedType]}
+                </button>
+              )}
+            </div>
+          )}
           {items.length > 1 && (
             <p className="muted small" style={{ marginTop: 4 }}>
               Drag ⠿ to reorder.
