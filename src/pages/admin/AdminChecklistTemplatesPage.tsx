@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import {
@@ -31,6 +31,16 @@ export function AdminChecklistTemplatesPage() {
   const current = useCurrent();
   const canManage = current.can("manage_checklists");
   const [editing, setEditing] = useState<string | null>(null);
+  const [writeError, setWriteError] = useState<string | null>(null);
+
+  // A rejected write rolls its optimistic change back, so without this the
+  // only evidence is a row quietly reverting under the editor's hands.
+  useEffect(() => {
+    reportWriteError = setWriteError;
+    return () => {
+      reportWriteError = null;
+    };
+  }, []);
 
   const { data } = db.useQuery({
     checklistTemplates: {
@@ -115,6 +125,23 @@ export function AdminChecklistTemplatesPage() {
           + New template
         </button>
       </AdminHeader>
+
+      {writeError && (
+        <div
+          className="badge badge-bad"
+          style={{ display: "block", marginBottom: 8, padding: "8px 10px" }}
+          role="alert"
+        >
+          {writeError}{" "}
+          <button
+            type="button"
+            className="btn btn-sm btn-quiet"
+            onClick={() => setWriteError(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <div className="stack" style={{ gap: 8 }}>
         {templates.map((t) => (
@@ -203,6 +230,119 @@ const ELLIPSIS = {
 } as const;
 
 /**
+ * Runs a write and says so when it fails.
+ *
+ * Every mutation here used to be `void db.transact(...)`, which throws the
+ * promise away. Instant applies writes optimistically, so a rejected one
+ * rolls back — the row you just edited silently reverts or vanishes, with
+ * nothing in the UI and only an anonymous unhandled rejection in the
+ * console. Copy-on-edit makes that worse: the failing transaction both
+ * creates the new row and unlinks the old, so a partial refusal reads as
+ * "my item disappeared". Failures are announced now, with the operation
+ * that caused them.
+ */
+let reportWriteError: ((message: string) => void) | null = null;
+
+function write(what: string, tx: Parameters<typeof db.transact>[0]) {
+  void db.transact(tx).catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`checklist templates — ${what} failed:`, err);
+    reportWriteError?.(`Couldn't ${what}: ${message}`);
+  });
+}
+
+/**
+ * Asked before a section exists, because a section is almost always "the
+ * round you do at a place" — and when it is, its name is that place's name.
+ * Picking the location fills the name in, so the common case is one choice
+ * rather than a choice plus retyping what you just chose. Either field alone
+ * is enough: somewhere to be, or something to call it.
+ */
+function NewSectionDialog({
+  locations,
+  onCreate,
+  onClose,
+}: {
+  locations: { id: string; name: string; parent?: { id: string } | null }[];
+  onCreate: (name: string, locationId?: string) => void;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [locationId, setLocationId] = useState("");
+  // Once the name has been typed in by hand it stops tracking the location —
+  // silently overwriting someone's wording would be worse than not helping.
+  const [nameEdited, setNameEdited] = useState(false);
+
+  const pickLocation = (next: string) => {
+    setLocationId(next);
+    if (!nameEdited) setName(locations.find((l) => l.id === next)?.name ?? "");
+  };
+
+  const trimmed = name.trim();
+
+  return (
+    <div className="dialog-backdrop" onClick={onClose}>
+      <div
+        className="dialog-card"
+        style={{ maxWidth: 460 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="card-title" style={{ marginBottom: 10 }}>
+          New section
+        </div>
+
+        <div className="field">
+          <span className="field-label">Location — optional</span>
+          <LocationPicker
+            locations={locations}
+            value={locationId}
+            onChange={pickLocation}
+            placeholder="Search locations…"
+          />
+        </div>
+
+        <div className="field">
+          <span className="field-label">Name</span>
+          <input
+            className="input"
+            value={name}
+            autoFocus
+            placeholder="Section name"
+            onChange={(e) => {
+              setName(e.target.value);
+              setNameEdited(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && trimmed) {
+                onCreate(trimmed, locationId || undefined);
+                onClose();
+              }
+            }}
+          />
+        </div>
+
+        <div className="row">
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!trimmed}
+            onClick={() => {
+              onCreate(trimmed, locationId || undefined);
+              onClose();
+            }}
+          >
+            Add section
+          </button>
+          <button type="button" className="btn btn-quiet" onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * The caret that opens a section or an item — the row's only expand control.
  * One chevron that rotates rather than two swapped glyphs: the turn is what
  * tells you which way the row just went.
@@ -282,6 +422,7 @@ function TemplateCard({
   onDuplicated: (templateId: string) => void;
 }) {
   const [addingViewerRoles, setAddingViewerRoles] = useState(false);
+  const [addingSection, setAddingSection] = useState(false);
 
   const update = (fields: Record<string, unknown>) =>
     void db.transact(db.tx.checklistTemplates[template.id].update(fields));
@@ -304,16 +445,22 @@ function TemplateCard({
     (r) => r.id !== template.assignedRole?.id && !viewerRoleIds.has(r.id),
   );
 
-  const addSection = () =>
-    void db.transact(
+  // Named — and usually placed — before it exists, so no section is ever
+  // called "New section". See NewSectionDialog.
+  const addSection = (name: string, locationId?: string) =>
+    write(
+      "add that section",
       db.tx.checklistTemplateSections[id()]
         .update({
-          name: "New section",
+          name,
           order: sections.length,
           isActive: true,
           triggerType: "manual",
         })
-        .link({ template: template.id }),
+        .link({
+          template: template.id,
+          ...(locationId ? { location: locationId } : {}),
+        }),
     );
 
   const duplicate = async () => {
@@ -596,7 +743,11 @@ function TemplateCard({
                 </span>
               )}
               <div style={{ marginTop: 8 }}>
-                <button type="button" className="btn btn-sm" onClick={addSection}>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => setAddingSection(true)}
+                >
                   + Add section
                 </button>
               </div>
@@ -608,6 +759,14 @@ function TemplateCard({
             </div>
           </div>
         </div>
+      )}
+
+      {addingSection && (
+        <NewSectionDialog
+          locations={locations}
+          onCreate={addSection}
+          onClose={() => setAddingSection(false)}
+        />
       )}
 
       {addingViewerRoles && (
@@ -705,7 +864,7 @@ function SectionEditor({
     patch: { label?: string; config?: Record<string, unknown> },
   ) => {
     const newId = id();
-    void db.transact([
+    write("save this item's change", [
       db.tx.checklistTemplateItems[newId]
         .update({
           type: item.type,
@@ -730,7 +889,7 @@ function SectionEditor({
   // A door or lock needs a Location, and the section's own location is
   // almost always the right one — so default it.
   const addItem = (type: ItemType) =>
-    void db.transact(
+    write("add that item", 
       db.tx.checklistTemplateItems[id()]
         .update({
           type,
@@ -746,7 +905,7 @@ function SectionEditor({
     );
 
   const duplicateItem = (item: TemplateItemRow) =>
-    void db.transact(
+    write("duplicate that item", 
       db.tx.checklistTemplateItems[id()]
         .update({
           type: item.type,
@@ -761,7 +920,8 @@ function SectionEditor({
   // Removal unlinks rather than deletes: instance items on already-generated
   // checklists render through this row forever.
   const removeItem = (itemId: string) =>
-    void db.transact(
+    write(
+      "remove that item",
       db.tx.checklistTemplateItems[itemId].unlink({ section: section.id }),
     );
 
@@ -772,7 +932,7 @@ function SectionEditor({
       )
     )
       return;
-    void db.transact(db.tx.checklistTemplateSections[section.id].delete());
+    write("delete that section", db.tx.checklistTemplateSections[section.id].delete());
   };
 
   return (

@@ -412,22 +412,22 @@ h3 {
      compounding into more chrome than content. Everything here is a
      container's own spacing; type and controls keep their sizes. */
   .main {
-    padding: 8px 8px calc(var(--tabbar-h) + 16px);
+    padding: 6px 6px calc(var(--tabbar-h) + 16px);
   }
   .card {
-    padding: 8px 8px;
+    padding: 6px 6px;
   }
   .stack {
-    gap: 8px;
+    gap: 6px;
   }
   .grid-2 {
-    gap: 10px;
+    gap: 8px;
   }
   .field {
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
   .page-head {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
   }
   .section-title {
     margin-bottom: 6px;
