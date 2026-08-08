@@ -3,19 +3,23 @@ import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import {
   ITEM_TYPE_LABEL,
+  QUESTION_ANSWER_LABEL,
   STATE_CHECK_KINDS,
+  YES_NO_DETAILS_LABEL,
   isStateCheck,
   itemTypeLabel,
   normalizeItemType,
   type DueByRule,
   type ItemType,
+  type QuestionAnswerType,
   type StateCheckType,
+  type YesNoDetailsOn,
 } from "../../lib/checklists";
 import { LocationPicker } from "../shared/LocationPicker";
 import { MultiSelectDialog } from "../shared/MultiSelectDialog";
 import { ReorderableList } from "../shared/ReorderableList";
 import { AdminHeader } from "./AdminHomePage";
-import { DraftInput } from "../shared/DraftInput";
+import { DraftInput, DraftNumberInput } from "../shared/DraftInput";
 
 // Admin — Checklist Templates (see docs/pages/admin-checklist-templates.html).
 // Authoring for the sectioned checklist model: a template belongs to one
@@ -1817,6 +1821,9 @@ function ItemRow({
             <LocationCheckConfig cfg={cfg} setConfig={setConfig} />
           )}
           {item.type === "meter_reading" && <MeterConfig cfg={cfg} setConfig={setConfig} />}
+          {item.type === "question" && (
+            <QuestionConfigFields cfg={cfg} setConfig={setConfig} />
+          )}
         </div>
       )}
     </div>
@@ -2016,6 +2023,80 @@ function LocationCheckConfig({
   );
 }
 
+/**
+ * A question's whole configuration is the shape of its answer — the question
+ * itself is the item's name. Yes/No adds one more choice, because the answer
+ * that needs explaining is usually only one of the two.
+ */
+function QuestionConfigFields({
+  cfg,
+  setConfig,
+}: {
+  cfg: Record<string, unknown>;
+  setConfig: (patch: Record<string, unknown>) => void;
+}) {
+  const answerType = ((cfg.answerType as QuestionAnswerType) ??
+    "single_line") as QuestionAnswerType;
+  const detailsOn = ((cfg.detailsOn as YesNoDetailsOn) ?? "none") as YesNoDetailsOn;
+  const step = (cfg.step as number) ?? 1;
+
+  return (
+    <div>
+      <div className="field-inline" style={{ marginBottom: 0 }}>
+        <span className="field-label">Answer</span>
+        <select
+          className="select field-control"
+          value={answerType}
+          onChange={(e) => setConfig({ answerType: e.target.value })}
+        >
+          {(Object.keys(QUESTION_ANSWER_LABEL) as QuestionAnswerType[]).map((t) => (
+            <option key={t} value={t}>
+              {QUESTION_ANSWER_LABEL[t]}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {answerType === "yes_no" && (
+        <div className="field-inline" style={{ marginTop: 8, marginBottom: 0 }}>
+          <span className="field-label">Ask why</span>
+          <select
+            className="select field-control"
+            value={detailsOn}
+            onChange={(e) => setConfig({ detailsOn: e.target.value })}
+          >
+            {(Object.keys(YES_NO_DETAILS_LABEL) as YesNoDetailsOn[]).map((t) => (
+              <option key={t} value={t}>
+                {YES_NO_DETAILS_LABEL[t]}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {answerType === "number" && (
+        <div className="field-inline" style={{ marginTop: 8, marginBottom: 0 }}>
+          <span className="field-label">Step</span>
+          <DraftNumberInput
+            className="input select-inline"
+            style={{ width: 90 }}
+            aria-label="Step"
+            value={step}
+            onCommit={(next) => setConfig({ step: next && next > 0 ? next : undefined })}
+          />
+        </div>
+      )}
+
+      {answerType === "repeatable_line" && (
+        <p className="muted small" style={{ marginTop: 6, marginBottom: 0 }}>
+          The guard gets one box and an "Add another line" button, so entries
+          can be added through the shift without disturbing earlier ones.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function MeterConfig({
   cfg,
   setConfig,
@@ -2031,7 +2112,7 @@ function MeterConfig({
         value={(cfg.assetId as string) ?? ""}
         onChange={(e) => setConfig({ assetId: e.target.value || undefined })}
       >
-        <option value="">Guard picks the asset at completion time</option>
+        <option value="">Selected at completion</option>
         {(data?.assets ?? []).map((a) => (
           <option key={a.id} value={a.id}>
             {a.name}

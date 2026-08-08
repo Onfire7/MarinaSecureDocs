@@ -186,6 +186,16 @@ h3 {
 .btn-icon-danger:hover {
   background: var(--bad-bg);
 }
+/* The minus and plus either side of a counter. Deliberately large: it gets
+   used one-handed, on the move, by someone counting things. Two classes deep
+   because the layout primitives set `min-width: 0` on every flex child, and
+   that rule sits further down the file. */
+.btn.btn-step {
+  min-width: 56px;
+  font-size: 1.4rem;
+  line-height: 1;
+  padding: 8px 12px;
+}
 /* A button that is only a glyph. Nested editor rows are barely 200px wide on
    a phone, where .btn-sm's side padding costs more than the icon does. */
 .btn-icon {

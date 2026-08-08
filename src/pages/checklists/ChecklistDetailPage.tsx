@@ -4,6 +4,7 @@ import { db } from "../../lib/db";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import {
   doorCheckSummary,
+  questionAnswerSummary,
   itemTypeLabel,
   sectionCompletionTime,
   type ItemResult,
@@ -270,6 +271,12 @@ function ResultSummary({ type, result }: { type: string; result: ItemResult | un
       const r = result as Extract<ItemResult, { type: "meter_reading" }>;
       return <span>Recorded {r.value}</span>;
     }
+    case "question":
+      return (
+        <span>
+          {questionAnswerSummary(result as Extract<ItemResult, { type: "question" }>)}
+        </span>
+      );
     default:
       return <span className="muted">—</span>;
   }

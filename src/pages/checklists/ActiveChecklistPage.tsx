@@ -23,6 +23,7 @@ import {
   LockCheckItem,
   LocationCheckItem,
   MeterReadingItem,
+  QuestionItem,
   SimpleCheckItem,
   VerifyTaskItem,
   type ItemProps,
@@ -331,6 +332,8 @@ export function ChecklistItemsPanel({
         return LocationCheckItem;
       case "meter_reading":
         return MeterReadingItem;
+      case "question":
+        return QuestionItem;
       default:
         return () => <div className="card">Unknown item type: {type}</div>;
     }

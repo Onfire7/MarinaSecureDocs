@@ -12,7 +12,24 @@ export type ItemType =
   | "door_check"
   | "lock_check"
   | "location_check"
-  | "meter_reading";
+  | "meter_reading"
+  | "question";
+
+/** One-line reading of a recorded answer, for lists and reports. */
+export function questionAnswerSummary(r: QuestionResult): string {
+  switch (r.answerType) {
+    case "yes_no":
+      return (r.yes ? "Yes" : "No") + (r.details ? ` — ${r.details}` : "");
+    case "number":
+      return r.value == null ? "—" : String(r.value);
+    case "repeatable_line": {
+      const lines = (r.lines ?? []).filter((l) => l.trim());
+      return lines.length ? lines.join("; ") : "—";
+    }
+    default:
+      return r.text?.trim() ? r.text.trim() : "—";
+  }
+}
 
 /**
  * Item types that record a physical thing's state as found and as left.
@@ -113,6 +130,18 @@ export interface DoorCheckConfig {
 export interface LocationCheckConfig {
   locationId: string;
   templateId: string;
+}
+export interface QuestionConfig {
+  /** Absent reads as a single line — the plainest answer a question can take. */
+  answerType?: QuestionAnswerType;
+  /**
+   * Yes/No only: which answer opens a details box. A question where only one
+   * of the answers needs explaining ("Anything to report?") shouldn't ask
+   * twice, so this is per-answer rather than a single "ask for details" flag.
+   */
+  detailsOn?: YesNoDetailsOn;
+  /** Number only: how much the minus and plus buttons move the value. */
+  step?: number;
 }
 export interface MeterReadingConfig {
   /** Fixed by the template; absent means the guard selects an asset at runtime. */
@@ -226,12 +255,30 @@ export interface MeterReadingResult {
   pendingReading?: PendingMeterReading;
 }
 
+export interface QuestionResult {
+  type: "question";
+  /** Copied from the config at answer time, so a later edit to the template
+      can't change how a recorded answer is read back. */
+  answerType: QuestionAnswerType;
+  /** single_line and multi_line. */
+  text?: string;
+  /** repeatable_line — one entry per box, in the order they were added. */
+  lines?: string[];
+  /** number */
+  value?: number;
+  /** yes_no */
+  yes?: boolean;
+  /** yes_no, when that answer was configured to ask. */
+  details?: string;
+}
+
 export type ItemResult =
   | SimpleCheckResult
   | VerifyTaskResult
   | DoorCheckResult
   | LocationCheckResult
-  | MeterReadingResult;
+  | MeterReadingResult
+  | QuestionResult;
 
 // ---- Template trigger types ----
 
@@ -311,6 +358,36 @@ export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   lock_check: "Lock Check",
   location_check: "Location-Based Check",
   meter_reading: "Meter Reading",
+  question: "Question",
+};
+
+/**
+ * How a Question takes its answer. The shape of the answer is the whole
+ * configuration of the type — everything else about a question is its label.
+ */
+export type QuestionAnswerType =
+  | "single_line"
+  | "repeatable_line"
+  | "multi_line"
+  | "number"
+  | "yes_no";
+
+export const QUESTION_ANSWER_LABEL: Record<QuestionAnswerType, string> = {
+  single_line: "Single line",
+  repeatable_line: "Repeatable lines",
+  multi_line: "Multi-line",
+  number: "Number",
+  yes_no: "Yes / No",
+};
+
+/** Which Yes/No answers ask for details as well. */
+export type YesNoDetailsOn = "none" | "yes" | "no" | "both";
+
+export const YES_NO_DETAILS_LABEL: Record<YesNoDetailsOn, string> = {
+  none: "Never",
+  yes: "On Yes",
+  no: "On No",
+  both: "On either",
 };
 
 // ---- Section trigger types ----

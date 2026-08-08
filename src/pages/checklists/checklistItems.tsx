@@ -4,13 +4,21 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { deterministicId } from "../../lib/detId";
-import { doorCheckSummary, doorStateLabel, STATE_CHECK_KINDS } from "../../lib/checklists";
+import {
+  doorCheckSummary,
+  doorStateLabel,
+  questionAnswerSummary,
+  STATE_CHECK_KINDS,
+} from "../../lib/checklists";
 import {
   buildInstanceTx,
   TEMPLATE_INSTANTIATION_QUERY,
 } from "../../lib/checklistInstantiation";
 import type {
   DoorCheckConfig,
+  QuestionAnswerType,
+  QuestionConfig,
+  QuestionResult,
   DoorCheckResult,
   DoorState,
   StateCheckType,
@@ -975,6 +983,215 @@ export function MeterReadingItem({
           onClick={() => void record()}
         >
           Record reading
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Question
+
+/**
+ * A free-form question, answered in whichever shape the template asked for.
+ *
+ * The answer type is copied onto the result at answer time: a template edited
+ * later must not change how an answer already given is read back.
+ */
+export function QuestionItem({
+  item,
+  existing,
+  onSaved,
+  editable = true,
+}: ItemProps) {
+  const current = useCurrent();
+  const cfg = (item.config ?? {}) as unknown as QuestionConfig;
+  const answerType: QuestionAnswerType = cfg.answerType ?? "single_line";
+  const detailsOn = cfg.detailsOn ?? "none";
+  const step = cfg.step && cfg.step > 0 ? cfg.step : 1;
+  const previous = existing.result as QuestionResult | undefined;
+
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(previous?.text ?? "");
+  // Always one empty box to type into, and never fewer boxes than answers.
+  const [lines, setLines] = useState<string[]>(
+    previous?.lines?.length ? previous.lines : [""],
+  );
+  const [value, setValue] = useState<string>(
+    previous?.value != null ? String(previous.value) : "0",
+  );
+  const [yes, setYes] = useState<boolean | null>(previous?.yes ?? null);
+  const [details, setDetails] = useState(previous?.details ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const done = previous != null && !editing;
+  const detailsWanted =
+    yes === null
+      ? false
+      : detailsOn === "both" || (yes ? detailsOn === "yes" : detailsOn === "no");
+
+  const save = async (over?: Partial<QuestionResult>) => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const base: QuestionResult = { type: "question", answerType };
+      if (answerType === "single_line" || answerType === "multi_line")
+        base.text = text.trim();
+      if (answerType === "repeatable_line")
+        base.lines = lines.map((l) => l.trim()).filter(Boolean);
+      if (answerType === "number") base.value = Number(value);
+      if (answerType === "yes_no") {
+        base.yes = yes ?? false;
+        if (detailsWanted && details.trim()) base.details = details.trim();
+      }
+      const result: ItemResult = { ...base, ...over };
+      await saveResult(existing, result, current.user?.id);
+      setEditing(false);
+      onSaved(result);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (done) {
+    return (
+      <DoneCard
+        title={item.label}
+        summary={questionAnswerSummary(previous)}
+        tone="done"
+        onEdit={editable ? () => setEditing(true) : undefined}
+      />
+    );
+  }
+
+  const nudge = (by: number) => {
+    const n = Number(value);
+    setValue(String((Number.isFinite(n) ? n : 0) + by));
+  };
+
+  return (
+    <div className="card">
+      <div className="card-title">{item.label}</div>
+
+      {answerType === "single_line" && (
+        <input
+          className="input"
+          style={{ marginTop: 10 }}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+      )}
+
+      {answerType === "multi_line" && (
+        <textarea
+          className="textarea"
+          style={{ marginTop: 10 }}
+          rows={4}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+      )}
+
+      {/* One box per answer, each independent: a new line appears beneath
+          rather than anywhere near what's already been written, so adding to
+          the list later can't disturb an earlier entry. */}
+      {answerType === "repeatable_line" && (
+        <div className="stack" style={{ gap: 6, marginTop: 10 }}>
+          {lines.map((line, i) => (
+            <input
+              key={i}
+              className="input"
+              value={line}
+              aria-label={`Line ${i + 1}`}
+              onChange={(e) =>
+                setLines((prev) => prev.map((l, j) => (j === i ? e.target.value : l)))
+              }
+            />
+          ))}
+          <div>
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setLines((prev) => [...prev, ""])}
+            >
+              + Add another line
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Big targets either side of a small field: this is for counting
+          things on the move, where the number moves by one far more often
+          than it gets typed. */}
+      {answerType === "number" && (
+        <div className="row" style={{ marginTop: 10, gap: 10 }}>
+          <button
+            type="button"
+            className="btn btn-step"
+            aria-label={`Down ${step}`}
+            onClick={() => nudge(-step)}
+          >
+            −
+          </button>
+          <input
+            className="input"
+            style={{ width: 90, textAlign: "center" }}
+            inputMode="numeric"
+            value={value}
+            aria-label="Value"
+            onChange={(e) => {
+              // Digits and one leading minus only — a numeric field that
+              // accepts "12e4" is a numeric field that reports nonsense.
+              const next = e.target.value.replace(/(?!^-)[^0-9]/g, "");
+              setValue(next);
+            }}
+          />
+          <button
+            type="button"
+            className="btn btn-step"
+            aria-label={`Up ${step}`}
+            onClick={() => nudge(step)}
+          >
+            +
+          </button>
+        </div>
+      )}
+
+      {answerType === "yes_no" && (
+        <>
+          <div className="row" style={{ marginTop: 10, gap: 8 }}>
+            {[true, false].map((v) => (
+              <button
+                key={String(v)}
+                type="button"
+                className={"btn" + (yes === v ? " btn-primary" : "")}
+                onClick={() => setYes(v)}
+              >
+                {v ? "Yes" : "No"}
+              </button>
+            ))}
+          </div>
+          {detailsWanted && (
+            <div className="field" style={{ marginTop: 10, marginBottom: 0 }}>
+              <span className="field-label">Details</span>
+              <textarea
+                className="textarea"
+                rows={2}
+                value={details}
+                onChange={(e) => setDetails(e.target.value)}
+              />
+            </div>
+          )}
+        </>
+      )}
+
+      <div className="row" style={{ marginTop: 10 }}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={saving || (answerType === "yes_no" && yes === null)}
+          onClick={() => void save()}
+        >
+          Save answer
         </button>
       </div>
     </div>
