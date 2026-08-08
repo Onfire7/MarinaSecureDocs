@@ -70,8 +70,23 @@ export interface VerifyTaskConfig {
   requireAttemptBeforeReject?: boolean;
 }
 export interface DoorCheckConfig {
-  /** The expected state — of the final/left state only when finalStateOnly is set. */
-  expectedState: DoorState;
+  /**
+   * The state it should be FOUND in. Absent means there is no found-state
+   * expectation — the guard is never asked how they found it and no
+   * found-state incident can arise. That's the right answer for anything
+   * with no single legitimate resting state (a door unlocked by day and
+   * locked overnight), and it's what every item carried into this shape has,
+   * since the old config couldn't express a found state distinct from a
+   * left state.
+   */
+  expectedState?: DoorState;
+  /**
+   * The state it should be LEFT in. Required going forward; absent only on
+   * rows written before the two states were separated, where `expectedState`
+   * held the single value that served as both — see the legacy fallback in
+   * checklistItems.tsx, which is what keeps those rows behaving as authored.
+   */
+  finalState?: DoorState;
   /**
    * The Location this door or pump belongs to — required, and what a mismatch
    * incident attaches to. A door isn't an entity of its own (it's a labelled
@@ -82,11 +97,9 @@ export interface DoorCheckConfig {
    */
   locationId?: string;
   /**
-   * Some doors/locks have no legitimate "should already be" state — e.g. one
-   * that's meant to be unlocked during the day and locked overnight has no
-   * single expected state a guard could be checking it against on arrival.
-   * When set, the guard is only asked what state they're leaving it in; there
-   * is no "found" question and therefore no found-state incident.
+   * @deprecated Superseded by an absent `expectedState`, which says the same
+   * thing without a second field that can disagree with the first. Still read
+   * on rows written before the split.
    */
   finalStateOnly?: boolean;
 }

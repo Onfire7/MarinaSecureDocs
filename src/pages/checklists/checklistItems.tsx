@@ -330,14 +330,27 @@ function StateCheckItem({
   // An item whose config was never opened in the template builder persists as
   // `{}`; fall back to the same default the builder displays rather than
   // crashing on an undefined state.
-  const expectedState: DoorState = cfg.expectedState ?? spec.defaultState;
-  // Some doors/locks have no legitimate "should already be" state (e.g. one
-  // that's meant to be unlocked by day, locked overnight). These skip the
-  // found question entirely and never raise a found-state incident.
-  const finalOnly = cfg.finalStateOnly === true;
+  // Two states now: the one it should be found in, and the one it should be
+  // left in. Rows written before they were separated carry a single value
+  // plus a flag, and are read back as the pair that stood for — so an
+  // unmigrated item behaves exactly as it was authored.
+  const legacy = cfg.finalState == null;
+  const finalTarget: DoorState =
+    cfg.finalState ?? cfg.expectedState ?? spec.defaultState;
+  const expectedState: DoorState | undefined = legacy
+    ? cfg.finalStateOnly === true
+      ? undefined
+      : (cfg.expectedState ?? spec.defaultState)
+    : cfg.expectedState;
+  // No found expectation means no found question, and so no found-state
+  // incident — only the left state matters.
+  const finalOnly = expectedState == null;
   const existingResult = existing.result as DoorCheckResult | undefined;
 
   const [initialState, setInitialState] = useState<DoorState | null>(null);
+  // Found in the expected state, now being asked what it's being left in —
+  // no incident, because nothing was wrong when they arrived.
+  const [foundState, setFoundState] = useState<DoorState | null>(null);
   const [pendingFinal, setPendingFinal] = useState<DoorState | null>(null);
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
@@ -362,7 +375,7 @@ function StateCheckItem({
     openedAtRef.current ??= Date.now();
     setTitle(`${item.label} found ${stateLabel(found).toLowerCase()}`);
     setDetails(
-      `Expected ${stateLabel(expectedState).toLowerCase()}, ` +
+      `Expected ${stateLabel(expectedState ?? finalTarget).toLowerCase()}, ` +
         `found ${stateLabel(found).toLowerCase()}.`,
     );
   };
@@ -372,8 +385,16 @@ function StateCheckItem({
       beginMismatch(found);
       return;
     }
-    // Found as expected: nothing to correct, so the final state is the same
-    // state and the guard is never asked a second question.
+    // Found as expected, but not necessarily meant to stay that way — a door
+    // expected unlocked on arrival and locked on departure is found right and
+    // still has to be answered for. Only skip the second question when the
+    // two states agree, which is every item that existed before they could
+    // differ.
+    if (found !== finalTarget) {
+      setFoundState(found);
+      openedAtRef.current ??= Date.now();
+      return;
+    }
     const result: ItemResult = {
       type: kind,
       expected: expectedState,
@@ -402,10 +423,10 @@ function StateCheckItem({
       const summary =
         `${item.label}: found ${stateLabel(initialState).toLowerCase()}, ` +
         `left ${stateLabel(finalState).toLowerCase()} ` +
-        `(expected ${stateLabel(expectedState).toLowerCase()})`;
+        `(expected ${stateLabel(expectedState ?? finalTarget).toLowerCase()})`;
       const result: ItemResult = {
         type: kind,
-        expected: expectedState,
+        expected: expectedState ?? finalTarget,
         initialState,
         finalState,
         ...(details.trim() ? { note: details.trim() } : {}),
@@ -449,7 +470,7 @@ function StateCheckItem({
   };
 
   const chooseFinal = (finalState: DoorState) => {
-    if (finalState === expectedState) {
+    if (finalState === finalTarget) {
       // Put right — no ticket to offer, so don't ask.
       void commitMismatch(finalState, false);
       return;
@@ -469,11 +490,12 @@ function StateCheckItem({
         : undefined;
       const summary =
         `${item.label}: left ${stateLabel(finalState).toLowerCase()} ` +
-        `(expected ${stateLabel(expectedState).toLowerCase()})`;
+        `(expected ${stateLabel(finalTarget).toLowerCase()})`;
       const result: ItemResult = {
         type: kind,
-        expected: expectedState,
+        expected: finalTarget,
         finalState,
+        ...(foundState ? { initialState: foundState } : {}),
         ...(ticketId
           ? {
               pendingTicket: {
@@ -490,6 +512,7 @@ function StateCheckItem({
       await saveResult(existing, result, current.user?.id);
       setEditing(false);
       setPendingFinal(null);
+      setFoundState(null);
       onSaved(result, ticketId);
     } finally {
       setSaving(false);
@@ -497,7 +520,7 @@ function StateCheckItem({
   };
 
   const chooseFinalOnly = (finalState: DoorState) => {
-    if (finalState === expectedState) {
+    if (finalState === finalTarget) {
       void commitFinalOnly(finalState, false);
       return;
     }
@@ -520,6 +543,7 @@ function StateCheckItem({
                 const prev = existingResult.pendingIncident;
                 openedAtRef.current = prev?.openedAt ?? null;
                 setInitialState(s.initial ?? null);
+                setFoundState(null);
                 setTitle(prev?.title ?? "");
                 setDetails(prev?.details ?? existingResult.note ?? "");
                 setPendingFinal(null);
@@ -538,7 +562,8 @@ function StateCheckItem({
         <div className="card-title">{item.label}</div>
         <div className="badge badge-bad" style={{ margin: "8px 0", display: "block" }}>
           Found {stateLabel(initialState).toLowerCase()} — expected{" "}
-          {stateLabel(expectedState).toLowerCase()}. This is logged as an incident
+          {stateLabel(expectedState ?? finalTarget).toLowerCase()}. This is logged
+          as an incident
           {boundLocation ? ` on ${boundLocation.name}` : ""}.
         </div>
 
@@ -579,11 +604,47 @@ function StateCheckItem({
           ))}
         </div>
 
-        {pendingFinal && pendingFinal !== expectedState && (
+        {pendingFinal && pendingFinal !== finalTarget && (
           <TicketOfferPrompt
             state={pendingFinal}
             saving={saving}
             onConfirm={(raiseTicket) => void commitMismatch(pendingFinal, raiseTicket)}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // Found right, now being asked what it's being left in. Same question as
+  // the final-only flow and the same commit — the only difference is that the
+  // found state is known and gets recorded with it.
+  if (foundState) {
+    return (
+      <div className="card">
+        <div className="card-title">{item.label}</div>
+        <div className="field-label" style={{ marginTop: 10 }}>
+          Found {stateLabel(foundState).toLowerCase()}, as expected. Leave it{" "}
+          {stateLabel(finalTarget).toLowerCase()} — what state are you leaving
+          it in?
+        </div>
+        <div className="row" style={{ flexWrap: "wrap", marginTop: 8 }}>
+          {spec.states.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={"btn btn-sm" + (pendingFinal === s ? " btn-primary" : "")}
+              disabled={saving}
+              onClick={() => chooseFinalOnly(s)}
+            >
+              {stateLabel(s)}
+            </button>
+          ))}
+        </div>
+        {pendingFinal && pendingFinal !== finalTarget && (
+          <TicketOfferPrompt
+            state={pendingFinal}
+            saving={saving}
+            onConfirm={(raiseTicket) => void commitFinalOnly(pendingFinal, raiseTicket)}
           />
         )}
       </div>
@@ -595,7 +656,7 @@ function StateCheckItem({
       <div className="card">
         <div className="card-title">{item.label}</div>
         <div className="field-label" style={{ marginTop: 10 }}>
-          Expected when left: {stateLabel(expectedState)} · what state are you
+          Expected when left: {stateLabel(finalTarget)} · what state are you
           leaving it in?
         </div>
         <div className="row" style={{ flexWrap: "wrap", marginTop: 8 }}>
@@ -611,7 +672,7 @@ function StateCheckItem({
             </button>
           ))}
         </div>
-        {pendingFinal && pendingFinal !== expectedState && (
+        {pendingFinal && pendingFinal !== finalTarget && (
           <TicketOfferPrompt
             state={pendingFinal}
             saving={saving}
@@ -626,7 +687,8 @@ function StateCheckItem({
     <div className="card">
       <div className="card-title">{item.label}</div>
       <div className="field-label" style={{ marginTop: 10 }}>
-        Expected: {stateLabel(expectedState)} · how did you find it?
+        Expected: {stateLabel(expectedState ?? finalTarget)} · how did you find
+        it?
       </div>
       <div className="row" style={{ flexWrap: "wrap", marginTop: 8 }}>
         {spec.states.map((s) => (

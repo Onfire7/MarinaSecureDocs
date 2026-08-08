@@ -1704,7 +1704,11 @@ function ItemRow({
             </button>
           )}
         </span>
-        <span className="row row-nowrap" style={{ gap: 2, flex: "none" }}>
+        <span className="row row-nowrap" style={{ gap: 4, flex: "none" }}>
+          {/* Between the name and the controls: it qualifies the name, and
+              inside the config panel it only said what the fields under it
+              already implied. */}
+          <span className="badge">{itemTypeLabel(item.type)}</span>
           <button
             type="button"
             className="btn btn-sm btn-quiet btn-icon"
@@ -1728,9 +1732,6 @@ function ItemRow({
 
       {open && (
         <div style={{ marginTop: 8 }}>
-          <div style={{ marginBottom: 8 }}>
-            <span className="badge">{itemTypeLabel(item.type)}</span>
-          </div>
           {isStateCheck(item.type) && (
             <StateCheckConfigFields
               kind={normalizeItemType(item.type) as StateCheckType}
@@ -1784,35 +1785,22 @@ function StateCheckConfigFields({
   );
   const locationId = (cfg.locationId as string) ?? "";
 
-  const finalStateOnly = Boolean(cfg.finalStateOnly);
+  // Legacy rows carry one state and a flag; read them as the pair they were
+  // standing in for so an unmigrated item shows what it actually does.
+  const legacy = cfg.finalState == null;
+  const finalState =
+    (cfg.finalState as string) ?? (cfg.expectedState as string) ?? spec.defaultState;
+  const expectedState = legacy
+    ? cfg.finalStateOnly === true
+      ? ""
+      : ((cfg.expectedState as string) ?? spec.defaultState)
+    : ((cfg.expectedState as string) ?? "");
 
+  // The fields run in the order the guard meets them: which {noun} is it,
+  // what should it be when you get there, what should it be when you leave.
   return (
     <div>
       <div className="field-inline" style={{ marginBottom: 0 }}>
-        <span className="field-label">
-          {finalStateOnly ? "Final state" : "Expected"}
-        </span>
-        <select
-          className="select select-inline"
-          value={(cfg.expectedState as string) ?? spec.defaultState}
-          onChange={(e) => setConfig({ expectedState: e.target.value })}
-        >
-          {spec.states.map((st) => (
-            <option key={st} value={st}>
-              {st.charAt(0).toUpperCase() + st.slice(1)}
-            </option>
-          ))}
-        </select>
-      </div>
-      <label className="row" style={{ cursor: "pointer", marginTop: 8 }}>
-        <input
-          type="checkbox"
-          checked={finalStateOnly}
-          onChange={(e) => setConfig({ finalStateOnly: e.target.checked })}
-        />
-        <span className="small">No initial expected state</span>
-      </label>
-      <div className="field-inline" style={{ marginTop: 8, marginBottom: 0 }}>
         <span className="field-label">Location</span>
         <div className="field-control">
           <LocationPicker
@@ -1823,12 +1811,56 @@ function StateCheckConfigFields({
             allowNone={false}
           />
         </div>
-        {!locationId && (
-          <div className="badge badge-warn" style={{ display: "block", marginTop: 6 }}>
-            Set a location — without one, an incident raised for this {spec.noun}{" "}
-            has nothing to attach to.
-          </div>
-        )}
+      </div>
+      {!locationId && (
+        <div className="badge badge-warn" style={{ display: "block", marginTop: 6 }}>
+          Set a location — without one, an incident raised for this {spec.noun}{" "}
+          has nothing to attach to.
+        </div>
+      )}
+      <div className="field-inline" style={{ marginTop: 8, marginBottom: 0 }}>
+        <span className="field-label">Expected State</span>
+        <select
+          className="select select-inline"
+          value={expectedState}
+          onChange={(e) =>
+            // None is the absence of the key, not a value of its own — one
+            // way to say "no found expectation" instead of two that can
+            // contradict each other.
+            setConfig({
+              expectedState: e.target.value || undefined,
+              finalState,
+              finalStateOnly: undefined,
+            })
+          }
+        >
+          <option value="">None</option>
+          {spec.states.map((st) => (
+            <option key={st} value={st}>
+              {st.charAt(0).toUpperCase() + st.slice(1)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="field-inline" style={{ marginTop: 8, marginBottom: 0 }}>
+        <span className="field-label">Final State</span>
+        <select
+          className="select select-inline"
+          value={finalState}
+          onChange={(e) =>
+            setConfig({
+              finalState: e.target.value,
+              expectedState: expectedState || undefined,
+              finalStateOnly: undefined,
+            })
+          }
+        >
+          {spec.states.map((st) => (
+            <option key={st} value={st}>
+              {st.charAt(0).toUpperCase() + st.slice(1)}
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );
