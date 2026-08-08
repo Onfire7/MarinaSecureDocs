@@ -16,7 +16,6 @@ import { MultiSelectDialog } from "../shared/MultiSelectDialog";
 import { ReorderableList } from "../shared/ReorderableList";
 import { AdminHeader } from "./AdminHomePage";
 import { DraftInput } from "../shared/DraftInput";
-import { locationPathResolver } from "../../lib/checkpoints";
 
 // Admin — Checklist Templates (see docs/pages/admin-checklist-templates.html).
 // Authoring for the sectioned checklist model: a template belongs to one
@@ -64,10 +63,6 @@ export function AdminChecklistTemplatesPage() {
   );
 
   const roles = data?.roles ?? [];
-  const pathOf = useMemo(
-    () => locationPathResolver(data?.locations ?? []),
-    [data],
-  );
   const locations = useMemo(
     () =>
       [...(data?.locations ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
@@ -152,7 +147,6 @@ export function AdminChecklistTemplatesPage() {
             locations={locations}
             allCheckpoints={allCheckpoints}
             allAssets={allAssets}
-            pathOf={pathOf}
             expanded={editing === t.id}
             onToggle={() => setEditing(editing === t.id ? null : t.id)}
             onDuplicated={setEditing}
@@ -272,6 +266,20 @@ function write(what: string, tx: Parameters<typeof db.transact>[0]) {
   });
 }
 
+/** A section's settings read back as one line — see templateSummary. */
+function sectionSummary(
+  section: SectionRow,
+  triggerLabel: string,
+) {
+  const parts = [triggerLabel];
+  if (section.location) parts.push(section.location.name);
+  if (section.hideUntilRule) parts.push(`from ${section.hideUntilRule}`);
+  if (section.dueBy?.kind === "time") parts.push(`due ${section.dueBy.time}`);
+  if (section.dueBy?.kind === "offset")
+    parts.push(`due within ${section.dueBy.minutes}m`);
+  return parts.join(" · ");
+}
+
 /**
  * The settings block read back as one sentence. Five fields describing what
  * is usually a single fact ("Clock In, due within an hour") cost most of the
@@ -293,21 +301,30 @@ function templateSummary(template: TemplateRow) {
 }
 
 /**
- * Roles chosen from a dropdown, checkbox per row, shown closed as the same
- * bubbles a role wears everywhere else in the app. Reads as one line at rest
- * however many are picked, where a checkbox list cost a row per role
- * whether or not it was one of them.
+ * A combobox that picks several things: a checkbox per row while open, and
+ * the chosen ones as bubbles inside the closed field — the same bubbles they
+ * wear everywhere else. Reads as one line at rest however many are picked,
+ * where a checkbox list cost a row per option whether or not it was one of
+ * the answers.
+ *
+ * Shaped after LocationPicker so the two read as the same control; the
+ * difference is that this one keeps the menu open between ticks, because
+ * picking several is the whole point.
  */
-function RoleSelect({
-  roles,
+function ChipMultiSelect({
+  options,
   selectedIds,
   onToggle,
   placeholder,
+  emptyMessage,
+  disabled = false,
 }: {
-  roles: { id: string; name: string }[];
+  options: { id: string; name: string }[];
   selectedIds: Set<string>;
-  onToggle: (roleId: string, on: boolean) => void;
+  onToggle: (optionId: string, on: boolean) => void;
   placeholder: string;
+  emptyMessage: string;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -320,7 +337,7 @@ function RoleSelect({
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  const selected = roles.filter((r) => selectedIds.has(r.id));
+  const selected = options.filter((o) => selectedIds.has(o.id));
 
   return (
     <div className="picker field-control" ref={boxRef}>
@@ -328,32 +345,33 @@ function RoleSelect({
         type="button"
         className="input chip-select"
         aria-expanded={open}
+        disabled={disabled}
         onClick={() => setOpen(!open)}
       >
         {selected.length > 0 ? (
-          selected.map((r) => (
-            <span key={r.id} className="badge">
-              {r.name}
+          selected.map((o) => (
+            <span key={o.id} className="badge">
+              {o.name}
             </span>
           ))
         ) : (
           <span className="muted">{placeholder}</span>
         )}
       </button>
-      {open && (
+      {open && !disabled && (
         <div className="picker-menu">
-          {roles.map((r) => (
-            <label key={r.id} className="picker-check">
+          {options.map((o) => (
+            <label key={o.id} className="picker-check">
               <input
                 type="checkbox"
-                checked={selectedIds.has(r.id)}
-                onChange={(e) => onToggle(r.id, e.target.checked)}
+                checked={selectedIds.has(o.id)}
+                onChange={(e) => onToggle(o.id, e.target.checked)}
               />
-              <span>{r.name}</span>
+              <span>{o.name}</span>
             </label>
           ))}
-          {roles.length === 0 && (
-            <div className="picker-option muted small">No other roles exist.</div>
+          {options.length === 0 && (
+            <div className="picker-option muted small">{emptyMessage}</div>
           )}
         </div>
       )}
@@ -368,10 +386,10 @@ function RoleSelect({
  * Types with no noun of their own, and sections with no location, keep the
  * type's name: a guess nobody wants is worse than no guess.
  */
-function defaultItemLabel(type: ItemType, locationName?: string) {
-  if (!locationName || !isStateCheck(type)) return ITEM_TYPE_LABEL[type];
+function defaultItemLabel(type: ItemType, placeName?: string) {
+  if (!placeName || !isStateCheck(type)) return ITEM_TYPE_LABEL[type];
   const { noun } = STATE_CHECK_KINDS[normalizeItemType(type) as StateCheckType];
-  return `${locationName} ${noun.charAt(0).toUpperCase()}${noun.slice(1)}`;
+  return `${placeName} ${noun.charAt(0).toUpperCase()}${noun.slice(1)}`;
 }
 
 /**
@@ -576,7 +594,6 @@ function TemplateCard({
   locations,
   allCheckpoints,
   allAssets,
-  pathOf,
   expanded,
   onToggle,
   onDuplicated,
@@ -586,7 +603,6 @@ function TemplateCard({
   locations: { id: string; name: string; parent?: { id: string } | null }[];
   allCheckpoints: { id: string; name: string; location?: { id: string; name: string } | null }[];
   allAssets: { id: string; name: string }[];
-  pathOf: (locationId: string) => string;
   expanded: boolean;
   onToggle: () => void;
   onDuplicated: (templateId: string) => void;
@@ -866,10 +882,11 @@ function TemplateCard({
 
               <div className="field-inline">
                 <span className="field-label">Read only</span>
-                <RoleSelect
-                  roles={roles.filter((r) => r.id !== template.assignedRole?.id)}
+                <ChipMultiSelect
+                  options={roles.filter((r) => r.id !== template.assignedRole?.id)}
                   selectedIds={viewerRoleIds}
                   placeholder="Nobody else"
+                  emptyMessage="No other roles exist."
                   onToggle={(roleId, on) =>
                     void db.transact(
                       on
@@ -957,7 +974,6 @@ function TemplateCard({
                     locations={locations}
                     allCheckpoints={allCheckpoints}
                     allAssets={allAssets}
-                    pathOf={pathOf}
                   />
                 )}
               />
@@ -1021,7 +1037,6 @@ function SectionEditor({
   locations,
   allCheckpoints,
   allAssets,
-  pathOf,
 }: {
   section: SectionRow & { items: TemplateItemRow[] };
   /** Just created — mount expanded rather than making you open it again. */
@@ -1029,10 +1044,11 @@ function SectionEditor({
   locations: { id: string; name: string; parent?: { id: string } | null }[];
   allCheckpoints: { id: string; name: string; location?: { id: string; name: string } | null }[];
   allAssets: { id: string; name: string }[];
-  pathOf: (locationId: string) => string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  const [addingCheckpoints, setAddingCheckpoints] = useState(false);
+  // Open on a section you just created — you're still describing it. Closed
+  // otherwise, where the items are what you came back for.
+  const [settingsOpen, setSettingsOpen] = useState(defaultOpen);
   const [addingAssets, setAddingAssets] = useState(false);
   // Which item rows have their config open. Held here rather than inside the
   // row because copy-on-edit gives an edited item a *new* id — the row that
@@ -1278,6 +1294,43 @@ function SectionEditor({
 
       {open && (
         <div style={{ marginTop: 8 }}>
+          {/* Same fold as the template's settings, for the same reason: the
+              items are what you opened the section for. */}
+          <div className="spread row-nowrap" style={{ marginBottom: 6 }}>
+            <span className="row row-nowrap" style={{ minWidth: 0, flex: 1, gap: 6 }}>
+              <DisclosureToggle
+                open={settingsOpen}
+                label={settingsOpen ? "Collapse section settings" : "Expand section settings"}
+                onToggle={() => setSettingsOpen(!settingsOpen)}
+              />
+              <button
+                type="button"
+                className="btn-bare row row-nowrap"
+                style={{ minWidth: 0, flex: 1, gap: 6 }}
+                onClick={() => setSettingsOpen(!settingsOpen)}
+              >
+                <span className="muted small" style={ELLIPSIS}>
+                  {sectionSummary(
+                    section,
+                    SECTION_TRIGGERS.find((t) => t.value === section.triggerType)
+                      ?.label ?? section.triggerType,
+                  )}
+                </span>
+                {(section.checkpoints ?? []).length > 0 && (
+                  <span className="badge-marquee">
+                    {(section.checkpoints ?? []).map((c) => (
+                      <span key={c.id} className="badge">
+                        {c.name}
+                      </span>
+                    ))}
+                  </span>
+                )}
+              </button>
+            </span>
+          </div>
+
+          {settingsOpen && (
+          <>
           <div className="field-inline">
             <span className="field-label">Trigger</span>
             <select
@@ -1336,44 +1389,27 @@ function SectionEditor({
               />
             </div>
           </div>
-          <div>
-            {section.location && (
-              <div style={{ marginTop: 6 }}>
-                <span className="small muted">Checkpoints</span>
-                <div className="stack" style={{ gap: 2, marginTop: 4 }}>
-                  {(section.checkpoints ?? []).map((c) => (
-                    <div key={c.id} className="row spread">
-                      <span className="small">{c.name}</span>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-quiet"
-                        onClick={() =>
-                          void db.transact(
-                            db.tx.checklistTemplateSections[section.id].unlink({
-                              checkpoints: c.id,
-                            }),
-                          )
-                        }
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  style={{ marginTop: 4 }}
-                  disabled={
-                    checkpointChoices.filter((c) => !attachedCheckpointIds.has(c.id))
-                      .length === 0
-                  }
-                  onClick={() => setAddingCheckpoints(true)}
-                >
-                  + Add checkpoints
-                </button>
-              </div>
-            )}
+          <div className="field-inline">
+            <span className="field-label">Checkpoints</span>
+            <ChipMultiSelect
+              options={checkpointChoices}
+              selectedIds={attachedCheckpointIds}
+              placeholder={section.location ? "None" : "Pick a location first"}
+              emptyMessage={`No checkpoints in ${section.location?.name ?? "this location"}.`}
+              disabled={!section.location}
+              onToggle={(checkpointId, on) =>
+                write(
+                  on ? "attach that checkpoint" : "remove that checkpoint",
+                  on
+                    ? db.tx.checklistTemplateSections[section.id].link({
+                        checkpoints: checkpointId,
+                      })
+                    : db.tx.checklistTemplateSections[section.id].unlink({
+                        checkpoints: checkpointId,
+                      }),
+                )
+              }
+            />
           </div>
 
           {(section.triggerType === "asset" || (section.assets ?? []).length > 0) && (
@@ -1410,6 +1446,9 @@ function SectionEditor({
             </div>
           )}
 
+          </>
+          )}
+
           <div className="section-title" style={{ marginTop: 10 }}>
             Items
           </div>
@@ -1425,6 +1464,10 @@ function SectionEditor({
             renderItem={(item) => (
               <ItemRow
                 item={item}
+                defaultLabel={defaultItemLabel(
+                  item.type as ItemType,
+                  section.location?.name,
+                )}
                 open={openItemIds.has(item.id)}
                 onToggle={() => toggleItem(item.id)}
                 autoSelectName={namingItemId === item.id}
@@ -1472,27 +1515,6 @@ function SectionEditor({
         </div>
       )}
 
-      {addingCheckpoints && (
-        <MultiSelectDialog
-          title={`Attach checkpoints to ${section.name}`}
-          options={checkpointChoices
-            .filter((c) => !attachedCheckpointIds.has(c.id))
-            .map((c) => ({
-              id: c.id,
-              name: c.name,
-              group: c.location ? pathOf(c.location.id) : "No location",
-            }))}
-          onConfirm={(ids) => {
-            if (ids.length > 0)
-              void db.transact(
-                db.tx.checklistTemplateSections[section.id].link({ checkpoints: ids }),
-              );
-          }}
-          onClose={() => setAddingCheckpoints(false)}
-          confirmLabel="Attach"
-          emptyMessage="Every checkpoint in this location is already attached."
-        />
-      )}
       {addingAssets && (
         <MultiSelectDialog
           title={`Attach assets to ${section.name}`}
@@ -1630,6 +1652,7 @@ function RuleFields({
 
 function ItemRow({
   item,
+  defaultLabel,
   open,
   onToggle,
   autoSelectName = false,
@@ -1639,6 +1662,8 @@ function ItemRow({
   onRemove,
 }: {
   item: TemplateItemRow;
+  /** What this item would be called if nobody had renamed it. */
+  defaultLabel: string;
   /** Owned by the section — see `openItemIds` there. */
   open: boolean;
   onToggle: () => void;
@@ -1654,8 +1679,13 @@ function ItemRow({
 }) {
   const cfg = (item.config ?? {}) as Record<string, unknown>;
 
-  const setConfig = (patch: Record<string, unknown>) =>
-    onEdit(item, { config: { ...cfg, ...patch } });
+  // A label can ride along with a config change so the pair lands as one
+  // version rather than two — see the asset picker in StateCheckConfigFields.
+  const setConfig = (patch: Record<string, unknown>, label?: string) =>
+    onEdit(item, {
+      config: { ...cfg, ...patch },
+      ...(label ? { label } : {}),
+    });
 
   // The field has the cursor by now (child effects run first), so release
   // the flag — reopening this row later shouldn't grab focus again.
@@ -1737,6 +1767,8 @@ function ItemRow({
               kind={normalizeItemType(item.type) as StateCheckType}
               cfg={cfg}
               setConfig={setConfig}
+              label={item.label}
+              defaultLabel={defaultLabel}
             />
           )}
           {item.type === "verify_task" && (
@@ -1772,18 +1804,45 @@ function StateCheckConfigFields({
   kind,
   cfg,
   setConfig,
+  label,
+  defaultLabel,
 }: {
   kind: StateCheckType;
   cfg: Record<string, unknown>;
-  setConfig: (patch: Record<string, unknown>) => void;
+  setConfig: (patch: Record<string, unknown>, label?: string) => void;
+  label: string;
+  defaultLabel: string;
 }) {
   const spec = STATE_CHECK_KINDS[kind];
-  const { data } = db.useQuery({ locations: { parent: {}, type: {} } });
+  const { data } = db.useQuery({
+    locations: { parent: {}, type: {} },
+    assets: {},
+  });
   const locations = useMemo(
     () => [...(data?.locations ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
     [data],
   );
+  const assets = useMemo(
+    () => [...(data?.assets ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
+    [data],
+  );
   const locationId = (cfg.locationId as string) ?? "";
+  const assetId = (cfg.assetId as string) ?? "";
+  // A lock is often a thing the marina already tracks — a gate padlock, a
+  // shed hasp — so it can hang off the asset instead of, or as well as, a
+  // place. Doors are part of a building, not assets of their own.
+  const supportsAsset = kind === "lock_check";
+
+  const pickAsset = (nextId: string) => {
+    const asset = assets.find((a) => a.id === nextId);
+    // Only rename while the name is still the one we generated: once it's
+    // been written by hand it's the author's, not ours to overwrite.
+    const rename =
+      asset && label === defaultLabel
+        ? `${asset.name} ${spec.noun.charAt(0).toUpperCase()}${spec.noun.slice(1)}`
+        : undefined;
+    setConfig({ assetId: nextId || undefined }, rename);
+  };
 
   // Legacy rows carry one state and a flag; read them as the pair they were
   // standing in for so an unmigrated item shows what it actually does.
@@ -1808,14 +1867,31 @@ function StateCheckConfigFields({
             value={locationId}
             onChange={(next) => setConfig({ locationId: next || undefined })}
             placeholder="Search locations…"
-            allowNone={false}
+            allowNone={supportsAsset}
           />
         </div>
       </div>
-      {!locationId && (
+      {supportsAsset && (
+        <div className="field-inline" style={{ marginTop: 8, marginBottom: 0 }}>
+          <span className="field-label">Asset</span>
+          <select
+            className="select field-control"
+            value={assetId}
+            onChange={(e) => pickAsset(e.target.value)}
+          >
+            <option value="">None</option>
+            {assets.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {!locationId && !(supportsAsset && assetId) && (
         <div className="badge badge-warn" style={{ display: "block", marginTop: 6 }}>
-          Set a location — without one, an incident raised for this {spec.noun}{" "}
-          has nothing to attach to.
+          Set a {supportsAsset ? "location or an asset" : "location"} — without
+          one, an incident raised for this {spec.noun} has nothing to attach to.
         </div>
       )}
       <div className="field-inline" style={{ marginTop: 8, marginBottom: 0 }}>

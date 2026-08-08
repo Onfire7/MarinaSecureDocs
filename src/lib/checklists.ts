@@ -97,6 +97,13 @@ export interface DoorCheckConfig {
    */
   locationId?: string;
   /**
+   * The Asset this check belongs to, where the thing being checked is one —
+   * a padlocked gate or a shed hasp that the marina already tracks. Either
+   * this or `locationId` is enough to give an incident something to attach
+   * to; both is fine, and neither is what the builder warns about.
+   */
+  assetId?: string;
+  /**
    * @deprecated Superseded by an absent `expectedState`, which says the same
    * thing without a second field that can disagree with the first. Still read
    * on rows written before the split.
