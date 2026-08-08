@@ -1063,6 +1063,23 @@ h3 {
 .picker {
   position: relative;
 }
+/* The clear button sits over the field's right edge rather than beside it,
+   so the input keeps its full width for the ancestor path — which is the
+   part that tells two "Slip 14"s apart. */
+.picker-field {
+  position: relative;
+  display: flex;
+}
+.picker-field > .input {
+  padding-right: 34px;
+}
+.picker-clear {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  padding: 2px 6px;
+}
 .picker-menu {
   position: absolute;
   z-index: 40;

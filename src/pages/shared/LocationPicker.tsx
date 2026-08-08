@@ -35,9 +35,10 @@ export function LocationPicker({
   onChange,
   placeholder = "Search locations…",
   allowNone = true,
-  noneLabel = "None — a root location",
+  noneLabel = "None",
   excludeId,
   maxResults = 60,
+  autoFocus = false,
 }: {
   locations: PickerLocation[];
   value: string;
@@ -45,6 +46,8 @@ export function LocationPicker({
   placeholder?: string;
   allowNone?: boolean;
   noneLabel?: string;
+  /** Take the cursor on mount — for dialogs that open onto this field. */
+  autoFocus?: boolean;
   /** Omit this location and its descendants — a location can't parent itself. */
   excludeId?: string;
   maxResults?: number;
@@ -130,9 +133,10 @@ export function LocationPicker({
 
   return (
     <div className="picker" ref={boxRef}>
-      <div className="row">
+      <div className="picker-field">
         <input
           className="input"
+          autoFocus={autoFocus}
           value={open ? query : selectedPath}
           placeholder={selected ? selectedPath : placeholder}
           onChange={(e) => {
@@ -148,15 +152,18 @@ export function LocationPicker({
             }
           }}
         />
-        {/* Nothing to clear to when a location is required — the field can't
-            legally be empty, so offering the button only invites an invalid
-            state and a warning to go with it. */}
+        {/* Inside the field against its right edge, where a combobox's own
+            clear lives — outside it read as a separate control and cost the
+            field width it needed for the path.
+            Nothing to clear to when a location is required, so the button
+            only exists where empty is a legal value. */}
         {selected && allowNone && (
           <button
             type="button"
-            className="btn btn-sm btn-quiet"
+            className="btn btn-sm btn-quiet picker-clear"
             onClick={() => onChange("")}
             title="Clear"
+            aria-label="Clear location"
           >
             ✕
           </button>

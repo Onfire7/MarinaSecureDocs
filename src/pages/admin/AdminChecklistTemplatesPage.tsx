@@ -383,15 +383,22 @@ function defaultItemLabel(type: ItemType, locationName?: string) {
  */
 function NewSectionDialog({
   locations,
+  allCheckpoints,
   onCreate,
   onClose,
 }: {
   locations: { id: string; name: string; parent?: { id: string } | null }[];
-  onCreate: (name: string, locationId?: string) => void;
+  allCheckpoints: {
+    id: string;
+    name: string;
+    location?: { id: string; name: string } | null;
+  }[];
+  onCreate: (name: string, locationId?: string, checkpointIds?: string[]) => void;
   onClose: () => void;
 }) {
   const [name, setName] = useState("");
   const [locationId, setLocationId] = useState("");
+  const [checkpointIds, setCheckpointIds] = useState<Set<string>>(new Set());
   // Once the name has been typed in by hand it stops tracking the location —
   // silently overwriting someone's wording would be worse than not helping.
   const [nameEdited, setNameEdited] = useState(false);
@@ -399,9 +406,22 @@ function NewSectionDialog({
   const pickLocation = (next: string) => {
     setLocationId(next);
     if (!nameEdited) setName(locations.find((l) => l.id === next)?.name ?? "");
+    // A checkpoint belongs to exactly one location, so anything already
+    // ticked stops being a legal choice the moment the location changes.
+    setCheckpointIds(new Set());
   };
 
+  // A section's checkpoints have to sit in its location, so there is nothing
+  // to offer until there's a location to offer from.
+  const checkpointChoices = locationId
+    ? allCheckpoints.filter((c) => c.location?.id === locationId)
+    : [];
+
   const trimmed = name.trim();
+  const submit = () => {
+    onCreate(trimmed, locationId || undefined, [...checkpointIds]);
+    onClose();
+  };
 
   return (
     <div className="dialog-backdrop" onClick={onClose}>
@@ -414,6 +434,8 @@ function NewSectionDialog({
           New section
         </div>
 
+        {/* The cursor starts here, not in Name: the location is the choice
+            that answers both fields, since picking it writes the name too. */}
         <div className="field">
           <span className="field-label">Location</span>
           <LocationPicker
@@ -421,6 +443,7 @@ function NewSectionDialog({
             value={locationId}
             onChange={pickLocation}
             placeholder="Search locations…"
+            autoFocus
           />
         </div>
 
@@ -429,19 +452,46 @@ function NewSectionDialog({
           <input
             className="input"
             value={name}
-            autoFocus
             placeholder="Section name"
             onChange={(e) => {
               setName(e.target.value);
               setNameEdited(true);
             }}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && trimmed) {
-                onCreate(trimmed, locationId || undefined);
-                onClose();
-              }
+              if (e.key === "Enter" && trimmed) submit();
             }}
           />
+        </div>
+
+        <div className="field">
+          <span className="field-label">Checkpoints</span>
+          {!locationId ? (
+            <span className="muted small">Pick a location first.</span>
+          ) : checkpointChoices.length === 0 ? (
+            <span className="muted small">
+              No checkpoints in {locations.find((l) => l.id === locationId)?.name}.
+            </span>
+          ) : (
+            <div className="stack" style={{ gap: 2 }}>
+              {checkpointChoices.map((c) => (
+                <label key={c.id} className="row" style={{ cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={checkpointIds.has(c.id)}
+                    onChange={(e) =>
+                      setCheckpointIds((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(c.id);
+                        else next.delete(c.id);
+                        return next;
+                      })
+                    }
+                  />
+                  <span className="small">{c.name}</span>
+                </label>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="row">
@@ -449,10 +499,7 @@ function NewSectionDialog({
             type="button"
             className="btn btn-primary"
             disabled={!trimmed}
-            onClick={() => {
-              onCreate(trimmed, locationId || undefined);
-              onClose();
-            }}
+            onClick={submit}
           >
             Add section
           </button>
@@ -549,6 +596,8 @@ function TemplateCard({
   // Closed to start: a template's role and trigger are set once, while its
   // sections are edited over and over.
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // The section just created, so it can mount already open.
+  const [openedSectionId, setOpenedSectionId] = useState<string | null>(null);
 
   const update = (fields: Record<string, unknown>) =>
     void db.transact(db.tx.checklistTemplates[template.id].update(fields));
@@ -572,11 +621,17 @@ function TemplateCard({
   );
 
   // Named — and usually placed — before it exists, so no section is ever
-  // called "New section". See NewSectionDialog.
-  const addSection = (name: string, locationId?: string) =>
+  // called "New section". See NewSectionDialog. It arrives expanded: you just
+  // described it, and the next thing you want is to put items in it.
+  const addSection = (
+    name: string,
+    locationId?: string,
+    checkpointIds?: string[],
+  ) => {
+    const newId = id();
     write(
       "add that section",
-      db.tx.checklistTemplateSections[id()]
+      db.tx.checklistTemplateSections[newId]
         .update({
           name,
           order: sections.length,
@@ -586,8 +641,11 @@ function TemplateCard({
         .link({
           template: template.id,
           ...(locationId ? { location: locationId } : {}),
+          ...(checkpointIds?.length ? { checkpoints: checkpointIds } : {}),
         }),
     );
+    setOpenedSectionId(newId);
+  };
 
   const duplicate = async () => {
     const copyId = id();
@@ -895,6 +953,7 @@ function TemplateCard({
                 renderItem={(section) => (
                   <SectionEditor
                     section={section}
+                    defaultOpen={section.id === openedSectionId}
                     locations={locations}
                     allCheckpoints={allCheckpoints}
                     allAssets={allAssets}
@@ -929,6 +988,7 @@ function TemplateCard({
       {addingSection && (
         <NewSectionDialog
           locations={locations}
+          allCheckpoints={allCheckpoints}
           onCreate={addSection}
           onClose={() => setAddingSection(false)}
         />
@@ -957,18 +1017,21 @@ function TemplateCard({
 
 function SectionEditor({
   section,
+  defaultOpen = false,
   locations,
   allCheckpoints,
   allAssets,
   pathOf,
 }: {
   section: SectionRow & { items: TemplateItemRow[] };
+  /** Just created — mount expanded rather than making you open it again. */
+  defaultOpen?: boolean;
   locations: { id: string; name: string; parent?: { id: string } | null }[];
   allCheckpoints: { id: string; name: string; location?: { id: string; name: string } | null }[];
   allAssets: { id: string; name: string }[];
   pathOf: (locationId: string) => string;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [addingCheckpoints, setAddingCheckpoints] = useState(false);
   const [addingAssets, setAddingAssets] = useState(false);
   // Which item rows have their config open. Held here rather than inside the
@@ -1276,9 +1339,7 @@ function SectionEditor({
           <div>
             {section.location && (
               <div style={{ marginTop: 6 }}>
-                <span className="small muted">
-                  Checkpoints — in {section.location.name} only
-                </span>
+                <span className="small muted">Checkpoints</span>
                 <div className="stack" style={{ gap: 2, marginTop: 4 }}>
                   {(section.checkpoints ?? []).map((c) => (
                     <div key={c.id} className="row spread">
