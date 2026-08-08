@@ -1100,14 +1100,19 @@ h3 {
 .reorder-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 .reorder-dragging {
   opacity: 0.6;
 }
 .reorder-handle {
   flex: none;
-  padding: 4px 6px;
+  /* Tall and narrow. The glyph is 12px of ink, and side padding here is
+     charged twice over to a nested row — an item sits inside a section's
+     list inside the template's — which is width a 390px phone can't spare.
+     The vertical padding buys the drag target back on the axis the gesture
+     actually runs along. */
+  padding: 7px 2px;
   font-size: 1rem;
   line-height: 1;
   color: var(--mute);
