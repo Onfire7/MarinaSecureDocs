@@ -243,12 +243,46 @@ const ELLIPSIS = {
  */
 let reportWriteError: ((message: string) => void) | null = null;
 
+/**
+ * Whether any instance item still reads through this template row — the one
+ * thing that decides whether a superseded or removed row has to be kept.
+ *
+ * Asked per edit rather than joined into the page query: `items: { instances:
+ * {} }` there would drag every instance row ever generated from every
+ * template into the editor. On any doubt this answers "yes" — orphaning a
+ * draft row is untidy, deleting one a checklist still renders through is a
+ * broken checklist.
+ */
+async function hasInstances(itemId: string) {
+  try {
+    const { data } = await db.queryOnce({
+      checklistTemplateItems: { $: { where: { id: itemId } }, instances: {} },
+    });
+    return (data.checklistTemplateItems[0]?.instances ?? []).length > 0;
+  } catch {
+    return true;
+  }
+}
+
 function write(what: string, tx: Parameters<typeof db.transact>[0]) {
   void db.transact(tx).catch((err: unknown) => {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`checklist templates — ${what} failed:`, err);
     reportWriteError?.(`Couldn't ${what}: ${message}`);
   });
+}
+
+/**
+ * The name a new item arrives with. A door check in a section that is a
+ * place is "Main Office Door" far more often than it is anything else, so
+ * that is what it gets — pre-selected, to be typed over when it isn't.
+ * Types with no noun of their own, and sections with no location, keep the
+ * type's name: a guess nobody wants is worse than no guess.
+ */
+function defaultItemLabel(type: ItemType, locationName?: string) {
+  if (!locationName || !isStateCheck(type)) return ITEM_TYPE_LABEL[type];
+  const { noun } = STATE_CHECK_KINDS[normalizeItemType(type) as StateCheckType];
+  return `${locationName} ${noun.charAt(0).toUpperCase()}${noun.slice(1)}`;
 }
 
 /**
@@ -813,6 +847,9 @@ function SectionEditor({
   const [openItemIds, setOpenItemIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
+  // The item whose name should be focused and selected — set when a row is
+  // added, cleared once the field has taken the cursor.
+  const [namingItemId, setNamingItemId] = useState<string | null>(null);
   const toggleItem = (itemId: string) =>
     setOpenItemIds((prev) => {
       const next = new Set(prev);
@@ -859,11 +896,27 @@ function SectionEditor({
   // new row and repoints this section's link, so instances created before
   // the edit keep the row they were created from. Order is presentation, not
   // meaning — reorders write in place.
-  const versionItem = (
+  const versionItem = async (
     item: TemplateItemRow,
     patch: { label?: string; config?: Record<string, unknown> },
   ) => {
     const newId = id();
+    // Hand the open panel to the replacement before anything awaits, so the
+    // row doesn't blink shut while the check below runs.
+    setOpenItemIds((prev) => {
+      if (!prev.has(item.id)) return prev;
+      const next = new Set(prev);
+      next.delete(item.id);
+      next.add(newId);
+      return next;
+    });
+
+    // Only a row some instance points at has to survive being edited — that
+    // reference is the whole reason copy-on-edit exists. A template still
+    // being written has none, and keeping every superseded draft would leave
+    // the namespace full of rows no query can reach.
+    const referenced = await hasInstances(item.id);
+
     write("save this item's change", [
       db.tx.checklistTemplateItems[newId]
         .update({
@@ -873,27 +926,31 @@ function SectionEditor({
           version: (item.version ?? 1) + 1,
           config: patch.config ?? item.config ?? {},
         })
-        .link({ section: section.id, previousVersion: item.id }),
-      db.tx.checklistTemplateItems[item.id].unlink({ section: section.id }),
+        // No previousVersion when the old row is going away — the link would
+        // only point at a hole.
+        .link({
+          section: section.id,
+          ...(referenced ? { previousVersion: item.id } : {}),
+        }),
+      referenced
+        ? db.tx.checklistTemplateItems[item.id].unlink({ section: section.id })
+        : db.tx.checklistTemplateItems[item.id].delete(),
     ]);
-    setOpenItemIds((prev) => {
-      if (!prev.has(item.id)) return prev;
-      const next = new Set(prev);
-      next.delete(item.id);
-      next.add(newId);
-      return next;
-    });
   };
 
-  // The label starts as the type's own name and is edited inline on the row.
   // A door or lock needs a Location, and the section's own location is
   // almost always the right one — so default it.
-  const addItem = (type: ItemType) =>
-    write("add that item", 
-      db.tx.checklistTemplateItems[id()]
+  // Arrives open with its name selected: picking a type from the menu is an
+  // intention to describe the thing, and the next thing you want is the
+  // cursor in the field, not a second tap to get there.
+  const addItem = (type: ItemType) => {
+    const newId = id();
+    write(
+      "add that item",
+      db.tx.checklistTemplateItems[newId]
         .update({
           type,
-          label: ITEM_TYPE_LABEL[type],
+          label: defaultItemLabel(type, section.location?.name),
           order: items.length,
           version: 1,
           config:
@@ -903,6 +960,9 @@ function SectionEditor({
         })
         .link({ section: section.id }),
     );
+    setOpenItemIds((prev) => new Set(prev).add(newId));
+    setNamingItemId(newId);
+  };
 
   const duplicateItem = (item: TemplateItemRow) =>
     write("duplicate that item", 
@@ -919,11 +979,17 @@ function SectionEditor({
 
   // Removal unlinks rather than deletes: instance items on already-generated
   // checklists render through this row forever.
-  const removeItem = (itemId: string) =>
+  // Same rule as an edit: a row no instance reads through is the editor's
+  // own scratch work, and unlinking it would leave exactly the orphan that
+  // deleting the superseded version was meant to stop.
+  const removeItem = async (itemId: string) => {
     write(
       "remove that item",
-      db.tx.checklistTemplateItems[itemId].unlink({ section: section.id }),
+      (await hasInstances(itemId))
+        ? db.tx.checklistTemplateItems[itemId].unlink({ section: section.id })
+        : db.tx.checklistTemplateItems[itemId].delete(),
     );
+  };
 
   const removeSection = () => {
     if (
@@ -1143,6 +1209,8 @@ function SectionEditor({
                 item={item}
                 open={openItemIds.has(item.id)}
                 onToggle={() => toggleItem(item.id)}
+                autoSelectName={namingItemId === item.id}
+                onNamed={() => setNamingItemId(null)}
                 onEdit={versionItem}
                 onDuplicate={duplicateItem}
                 onRemove={removeItem}
@@ -1333,6 +1401,8 @@ function ItemRow({
   item,
   open,
   onToggle,
+  autoSelectName = false,
+  onNamed,
   onEdit,
   onDuplicate,
   onRemove,
@@ -1341,6 +1411,9 @@ function ItemRow({
   /** Owned by the section — see `openItemIds` there. */
   open: boolean;
   onToggle: () => void;
+  /** Just added: take the cursor and select the generated name. */
+  autoSelectName?: boolean;
+  onNamed: () => void;
   onEdit: (
     item: TemplateItemRow,
     patch: { label?: string; config?: Record<string, unknown> },
@@ -1352,6 +1425,12 @@ function ItemRow({
 
   const setConfig = (patch: Record<string, unknown>) =>
     onEdit(item, { config: { ...cfg, ...patch } });
+
+  // The field has the cursor by now (child effects run first), so release
+  // the flag — reopening this row later shouldn't grab focus again.
+  useEffect(() => {
+    if (autoSelectName) onNamed();
+  }, [autoSelectName, onNamed]);
 
   return (
     <div className="card">
@@ -1375,6 +1454,7 @@ function ItemRow({
               // debounced write mid-word would drop focus and close the
               // phone keyboard on every keystroke. Write on blur instead.
               commitOnBlurOnly
+              autoSelect={autoSelectName}
               onCommit={(label) => {
                 if (label !== item.label) onEdit(item, { label });
               }}

@@ -118,6 +118,11 @@ type DraftInputProps = Omit<
   blurOnEnter?: boolean;
   /** See `useDraft` — for commits that replace the row being edited. */
   commitOnBlurOnly?: boolean;
+  /**
+   * Focus and select the whole value on mount, so a generated default name
+   * can be typed straight over without clearing it first.
+   */
+  autoSelect?: boolean;
 };
 
 export function DraftInput({
@@ -126,11 +131,22 @@ export function DraftInput({
   debounceMs,
   blurOnEnter = false,
   commitOnBlurOnly = false,
+  autoSelect = false,
   ...rest
 }: DraftInputProps) {
   const d = useDraft(value, onCommit, debounceMs, commitOnBlurOnly);
+  const ref = useRef<HTMLInputElement>(null);
+
+  // Mount only: re-selecting on later renders would fight the caret.
+  useEffect(() => {
+    if (!autoSelect) return;
+    ref.current?.focus();
+    ref.current?.select();
+  }, [autoSelect]);
+
   return (
     <input
+      ref={ref}
       {...rest}
       value={d.value}
       onChange={(e) => d.onChange(e.target.value)}
