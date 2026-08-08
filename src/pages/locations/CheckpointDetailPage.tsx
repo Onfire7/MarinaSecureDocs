@@ -111,7 +111,7 @@ export function CheckpointDetailPage() {
             ))}
             {(checkpoint.checklistTemplateSections ?? []).length === 0 && (
               <span className="muted small">
-                None configured — a guard can still check in and add a note or incident.
+                None configured — a user can still check in and add a note or incident.
               </span>
             )}
           </div>

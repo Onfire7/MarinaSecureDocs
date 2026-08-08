@@ -1172,7 +1172,7 @@ export function QuestionItem({
           </div>
           {detailsWanted && (
             <div className="field" style={{ marginTop: 10, marginBottom: 0 }}>
-              <span className="field-label">Details</span>
+              <span className="field-label">Provide Details</span>
               <textarea
                 className="textarea"
                 rows={2}

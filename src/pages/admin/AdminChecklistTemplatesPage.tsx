@@ -159,7 +159,7 @@ export function AdminChecklistTemplatesPage() {
         {templates.length === 0 && (
           <div className="placeholder">
             <div className="big">No templates yet</div>
-            Templates generate the real checklists guards work through.
+            Templates generate the real checklists users work through.
           </div>
         )}
       </div>
@@ -1813,7 +1813,7 @@ function ItemRow({
                 }
               />
               <span className="small">
-                Prompt the guard to attempt it themselves before rejecting
+                Prompt the user to attempt it themselves before rejecting
               </span>
             </label>
           )}
@@ -2059,7 +2059,7 @@ function QuestionConfigFields({
 
       {answerType === "yes_no" && (
         <div className="field-inline" style={{ marginTop: 8, marginBottom: 0 }}>
-          <span className="field-label">Ask why</span>
+          <span className="field-label">Require details</span>
           <select
             className="select field-control"
             value={detailsOn}
