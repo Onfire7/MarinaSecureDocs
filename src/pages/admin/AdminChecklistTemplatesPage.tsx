@@ -202,7 +202,11 @@ const ELLIPSIS = {
   whiteSpace: "nowrap",
 } as const;
 
-/** The ▸/▾ that opens a section or an item — the row's only expand control. */
+/**
+ * The caret that opens a section or an item — the row's only expand control.
+ * One chevron that rotates rather than two swapped glyphs: the turn is what
+ * tells you which way the row just went.
+ */
 function DisclosureToggle({
   open,
   label,
@@ -221,7 +225,22 @@ function DisclosureToggle({
       title={label}
       onClick={onToggle}
     >
-      {open ? "▾" : "▸"}
+      <svg
+        className="disclosure-caret"
+        viewBox="0 0 20 20"
+        width="18"
+        height="18"
+        aria-hidden="true"
+      >
+        <path
+          d="M5 7.5 10 12.5 15 7.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
     </button>
   );
 }
@@ -262,6 +281,8 @@ function TemplateCard({
   onToggle: () => void;
   onDuplicated: (templateId: string) => void;
 }) {
+  const [addingViewerRoles, setAddingViewerRoles] = useState(false);
+
   const update = (fields: Record<string, unknown>) =>
     void db.transact(db.tx.checklistTemplates[template.id].update(fields));
 
@@ -277,6 +298,11 @@ function TemplateCard({
   );
   const itemCount = sections.reduce((n, s) => n + s.items.length, 0);
   const viewerRoleIds = new Set((template.viewerRoles ?? []).map((r) => r.id));
+  // The assigned role already has full access, so offering it here would only
+  // let someone grant a weaker version of what it holds.
+  const viewerRoleChoices = roles.filter(
+    (r) => r.id !== template.assignedRole?.id && !viewerRoleIds.has(r.id),
+  );
 
   const addSection = () =>
     void db.transact(
@@ -451,37 +477,45 @@ function TemplateCard({
                 </label>
               </div>
 
+              {/* Picked through the same multi-select the checkpoint and
+                  asset attachments use, rather than a checkbox per role: the
+                  list is only ever read to answer "which roles are on here",
+                  and every unchecked box was paying rent to say "not this
+                  one". */}
               <div className="field">
-                <span className="field-label">
-                  Viewer roles — read-only monitoring
-                </span>
+                <span className="field-label">Read Only Roles</span>
                 <div className="stack" style={{ gap: 2 }}>
-                  {roles
-                    .filter((r) => r.id !== template.assignedRole?.id)
-                    .map((r) => (
-                      <label key={r.id} className="row" style={{ cursor: "pointer" }}>
-                        <input
-                          type="checkbox"
-                          checked={viewerRoleIds.has(r.id)}
-                          onChange={(e) =>
-                            void db.transact(
-                              e.target.checked
-                                ? db.tx.checklistTemplates[template.id].link({
-                                    viewerRoles: r.id,
-                                  })
-                                : db.tx.checklistTemplates[template.id].unlink({
-                                    viewerRoles: r.id,
-                                  }),
-                            )
-                          }
-                        />
-                        <span className="small">{r.name}</span>
-                      </label>
-                    ))}
-                  {roles.length <= 1 && (
-                    <span className="muted small">No other roles exist.</span>
+                  {(template.viewerRoles ?? []).map((r) => (
+                    <div key={r.id} className="row spread">
+                      <span className="small">{r.name}</span>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-quiet"
+                        onClick={() =>
+                          void db.transact(
+                            db.tx.checklistTemplates[template.id].unlink({
+                              viewerRoles: r.id,
+                            }),
+                          )
+                        }
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  {(template.viewerRoles ?? []).length === 0 && (
+                    <span className="muted small">None — nobody else sees these.</span>
                   )}
                 </div>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  style={{ marginTop: 4 }}
+                  disabled={viewerRoleChoices.length === 0}
+                  onClick={() => setAddingViewerRoles(true)}
+                >
+                  + Add read only roles
+                </button>
               </div>
 
               <div className="field">
@@ -574,6 +608,22 @@ function TemplateCard({
             </div>
           </div>
         </div>
+      )}
+
+      {addingViewerRoles && (
+        <MultiSelectDialog
+          title={`Read only roles for ${template.name}`}
+          options={viewerRoleChoices.map((r) => ({ id: r.id, name: r.name }))}
+          onConfirm={(ids) => {
+            if (ids.length > 0)
+              void db.transact(
+                db.tx.checklistTemplates[template.id].link({ viewerRoles: ids }),
+              );
+          }}
+          onClose={() => setAddingViewerRoles(false)}
+          confirmLabel="Add"
+          emptyMessage="Every other role can already see this."
+        />
       )}
     </div>
   );

@@ -191,12 +191,27 @@ h3 {
 .btn-icon {
   padding: 5px 6px;
 }
-/* Disclosure triangles read as one tap target with the name beside them, so
-   they get the glyph's own width and none of the button padding. */
+/* Disclosure carets read as one tap target with the name beside them, so they
+   get little side padding — but the icon itself is full size and inked at
+   text colour, because a row's only expand control has to be findable. */
 .disclosure-toggle {
-  padding: 4px 2px;
+  padding: 3px 4px;
   flex: none;
-  color: var(--mute);
+  color: var(--ink);
+}
+.disclosure-caret {
+  display: block;
+  transition: transform 160ms ease;
+}
+/* Down when closed, up when open — driven off the same attribute screen
+   readers get, so the two can never disagree. */
+.disclosure-toggle[aria-expanded="true"] .disclosure-caret {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .disclosure-caret {
+    transition: none;
+  }
 }
 /* Opts a row out of the narrow-screen wrap below. A header of triangle +
    name + one or two icons fits at 375px on its own, because the name is the
@@ -392,8 +407,33 @@ h3 {
   .sidenav {
     display: none;
   }
+  /* Roughly half the desktop gutters. Admin nests cards three deep — a
+     template holds sections which hold items — and at 390px the padding was
+     compounding into more chrome than content. Everything here is a
+     container's own spacing; type and controls keep their sizes. */
   .main {
-    padding: 14px 14px calc(var(--tabbar-h) + 24px);
+    padding: 8px 8px calc(var(--tabbar-h) + 16px);
+  }
+  .card {
+    padding: 8px 8px;
+  }
+  .stack {
+    gap: 8px;
+  }
+  .grid-2 {
+    gap: 10px;
+  }
+  .field {
+    margin-bottom: 8px;
+  }
+  .page-head {
+    margin-bottom: 10px;
+  }
+  .section-title {
+    margin-bottom: 6px;
+  }
+  .placeholder {
+    padding: 20px 12px;
   }
   /* A card header pairing a name field with three or four buttons cannot fit
      on one line at 375px. Wrapping is the only honest answer — the
@@ -411,7 +451,7 @@ h3 {
     justify-content: space-between;
     background: var(--panel);
     border-bottom: 1px solid var(--line-lt);
-    padding: 12px 16px;
+    padding: 8px 10px;
     font-weight: 700;
   }
   .tabbar {
