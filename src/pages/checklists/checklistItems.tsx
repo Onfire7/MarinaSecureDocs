@@ -89,23 +89,41 @@ async function clearResult(row: InstanceItemRow) {
  * offered before the checklist is submitted — afterwards the item is part of
  * a completed record, and its incidents and tickets actually exist.
  */
+/** "12:27 am" — the only time format a completed row needs. */
+export function timeOfDay(ts: number | string | null | undefined) {
+  if (ts == null) return null;
+  return new Date(ts)
+    .toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    .toLowerCase();
+}
+
 function DoneCard({
   title,
   summary,
   tone = "done",
+  at,
   onEdit,
 }: {
   title: string;
   summary?: ReactNode;
   tone?: "done" | "plain";
+  /** When it was answered — appended to the summary. */
+  at?: number | string | null;
   onEdit?: () => void;
 }) {
+  const time = timeOfDay(at);
   return (
     <div className={"card" + (tone === "done" ? " card-done" : "")}>
       <div className="spread" style={{ alignItems: "flex-start" }}>
         <div>
           <div className="card-title">{title}</div>
-          {summary && <div className="card-meta">{summary}</div>}
+          {(summary || time) && (
+            <div className="card-meta">
+              {summary}
+              {summary && time ? " · " : ""}
+              {time}
+            </div>
+          )}
         </div>
         {onEdit && (
           <button type="button" className="btn btn-sm btn-quiet" onClick={onEdit}>
@@ -138,6 +156,7 @@ export function SimpleCheckItem({
       <DoneCard
         title={item.label}
         summary="✓ Complete"
+        at={existing.completedAt}
         // "Complete" is this item's only state, so editing it can only mean
         // undoing it — there's no form to reopen.
         onEdit={editable ? () => void clearResult(existing) : undefined}
@@ -214,6 +233,7 @@ export function VerifyTaskItem({
       <DoneCard
         title={item.label}
         summary={verifyOutcomeLabel(existingResult)}
+        at={existing.completedAt}
         onEdit={
           editable
             ? () => {
@@ -543,6 +563,7 @@ function StateCheckItem({
         title={item.label}
         summary={doneSummaryText(s)}
         tone={s.leftAsExpected ? "done" : "plain"}
+        at={existing.completedAt}
         onEdit={
           editable
             ? () => {
@@ -595,29 +616,47 @@ function StateCheckItem({
           </div>
         )}
 
-        <div className="field-label" style={{ marginTop: 4 }}>
-          What state did you leave it in?
-        </div>
-        <div className="row" style={{ flexWrap: "wrap" }}>
-          {spec.states.map((s) => (
+        {/* Nothing to ask when it's already sitting in the state it's meant
+            to be left in — the incident above records that it was found
+            wrong, and there is no second answer to give. */}
+        {initialState === finalTarget ? (
+          <div className="row" style={{ marginTop: 8 }}>
             <button
-              key={s}
               type="button"
-              className={"btn btn-sm" + (pendingFinal === s ? " btn-primary" : "")}
+              className="btn btn-primary"
               disabled={saving}
-              onClick={() => chooseFinal(s)}
+              onClick={() => void commitMismatch(initialState, false)}
             >
-              {stateLabel(s)}
+              Record
             </button>
-          ))}
-        </div>
+          </div>
+        ) : (
+          <>
+            <div className="field-label" style={{ marginTop: 4 }}>
+              How did you leave it?
+            </div>
+            <div className="row" style={{ flexWrap: "wrap" }}>
+              {spec.states.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={"btn btn-sm" + (pendingFinal === s ? " btn-primary" : "")}
+                  disabled={saving}
+                  onClick={() => chooseFinal(s)}
+                >
+                  {stateLabel(s)}
+                </button>
+              ))}
+            </div>
 
-        {pendingFinal && pendingFinal !== finalTarget && (
-          <TicketOfferPrompt
-            state={pendingFinal}
-            saving={saving}
-            onConfirm={(raiseTicket) => void commitMismatch(pendingFinal, raiseTicket)}
-          />
+            {pendingFinal && pendingFinal !== finalTarget && (
+              <TicketOfferPrompt
+                state={pendingFinal}
+                saving={saving}
+                onConfirm={(raiseTicket) => void commitMismatch(pendingFinal, raiseTicket)}
+              />
+            )}
+          </>
         )}
       </div>
     );
@@ -631,9 +670,7 @@ function StateCheckItem({
       <div className="card">
         <div className="card-title">{item.label}</div>
         <div className="field-label" style={{ marginTop: 10 }}>
-          Found {stateLabel(foundState).toLowerCase()}, as expected. Leave it{" "}
-          {stateLabel(finalTarget).toLowerCase()} — what state are you leaving
-          it in?
+          How did you leave it?
         </div>
         <div className="row" style={{ flexWrap: "wrap", marginTop: 8 }}>
           {spec.states.map((s) => (
@@ -664,8 +701,7 @@ function StateCheckItem({
       <div className="card">
         <div className="card-title">{item.label}</div>
         <div className="field-label" style={{ marginTop: 10 }}>
-          Expected when left: {stateLabel(finalTarget)} · what state are you
-          leaving it in?
+          How did you leave it?
         </div>
         <div className="row" style={{ flexWrap: "wrap", marginTop: 8 }}>
           {spec.states.map((s) => (
@@ -695,8 +731,7 @@ function StateCheckItem({
     <div className="card">
       <div className="card-title">{item.label}</div>
       <div className="field-label" style={{ marginTop: 10 }}>
-        Expected: {stateLabel(expectedState ?? finalTarget)} · how did you find
-        it?
+        How did you find it?
       </div>
       <div className="row" style={{ flexWrap: "wrap", marginTop: 8 }}>
         {spec.states.map((s) => (
@@ -918,7 +953,9 @@ export function MeterReadingItem({
     return (
       <DoneCard
         title={item.label}
-        summary={`Recorded ${existingResult.value}`}
+        summary={`Recorded ${existingResult.value}${
+          timeOfDay(existing.completedAt) ? ` at ${timeOfDay(existing.completedAt)}` : ""
+        }`}
         onEdit={
           editable
             ? () => {
@@ -1058,6 +1095,7 @@ export function QuestionItem({
         title={item.label}
         summary={questionAnswerSummary(previous)}
         tone="done"
+        at={existing.completedAt}
         onEdit={editable ? () => setEditing(true) : undefined}
       />
     );

@@ -97,6 +97,10 @@ export function ChecklistItemsPanel({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [reorderingSection, setReorderingSection] = useState<string | null>(null);
+  // Only the sections someone has opened or shut by hand. Everything else
+  // follows its own completion, so a section folds itself away as the last
+  // item in it is answered and the next one is the one in front of you.
+  const [sectionOverride, setSectionOverride] = useState<Record<string, boolean>>({});
 
   const { data } = db.useQuery({
     checklistInstances: {
@@ -413,6 +417,14 @@ export function ChecklistItemsPanel({
 
           for (const section of visibleSections) {
             const reordering = reorderingSection === section.id;
+            const left = section.items.filter((i) => !isDone(i)).length;
+            const sectionDone = section.items.length > 0 && left === 0;
+            // Collapsing only means anything when there's more than one
+            // section and a heading to click; a reorder in progress needs its
+            // rows on screen whatever the section's state.
+            const collapsible = showSectionHeadings && !reordering;
+            const collapsed =
+              collapsible && (sectionOverride[section.id] ?? sectionDone);
             // The heading row also carries the Reorder control, which a
             // single-section checklist still needs — so it renders (label
             // suppressed, since it would just repeat the page title) even
@@ -427,11 +439,52 @@ export function ChecklistItemsPanel({
                   className="group-heading spread"
                   style={spansColumns ? { gridColumn: "1 / -1" } : undefined}
                 >
-                  <span>
-                    {showSectionHeadings ? section.label : ""}
-                    {showSectionHeadings && section.dueBy && (
-                      <span className="muted small"> · due {dueText(section.dueBy)}</span>
+                  <span className="row" style={{ minWidth: 0, gap: 6 }}>
+                    {collapsible && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-quiet disclosure-toggle"
+                        aria-expanded={!collapsed}
+                        aria-label={collapsed ? "Expand section" : "Collapse section"}
+                        onClick={() =>
+                          setSectionOverride((prev) => ({
+                            ...prev,
+                            [section.id]: !collapsed ? true : false,
+                          }))
+                        }
+                      >
+                        <svg
+                          className="disclosure-caret"
+                          viewBox="0 0 20 20"
+                          width="18"
+                          height="18"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M5 7.5 10 12.5 15 7.5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
                     )}
+                    <span style={{ minWidth: 0 }}>
+                      {showSectionHeadings ? section.label : ""}
+                      {showSectionHeadings && section.dueBy && (
+                        <span className="muted small"> · due {dueText(section.dueBy)}</span>
+                      )}
+                      {collapsed && (
+                        <span className="muted small">
+                          {" "}
+                          · {sectionDone
+                            ? `all ${section.items.length} done`
+                            : `${left} left`}
+                        </span>
+                      )}
+                    </span>
                   </span>
                   {showReorder && (
                     <button
@@ -447,6 +500,8 @@ export function ChecklistItemsPanel({
                 </div>,
               );
             }
+
+            if (collapsed) continue;
 
             if (reordering) {
               // Compact reorder rows instead of full item cards — moving
