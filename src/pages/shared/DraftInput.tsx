@@ -24,6 +24,13 @@ export function useDraft(
   canonical: string,
   commit: (next: string) => void,
   debounceMs = 500,
+  /**
+   * Skip the mid-typing debounce and only write on blur, Enter, or unmount.
+   * For fields whose commit *replaces the row being edited* — copy-on-edit
+   * template items — where a write mid-word remounts the input under the
+   * user, closing the mobile keyboard on every keystroke.
+   */
+  commitOnBlurOnly = false,
 ) {
   const [draft, setDraft] = useState(canonical);
   const focused = useRef(false);
@@ -70,7 +77,7 @@ export function useDraft(
     setDraft(next);
     pending.current = next;
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(flush, debounceMs);
+    if (!commitOnBlurOnly) timer.current = setTimeout(flush, debounceMs);
   };
 
   return {
@@ -109,6 +116,8 @@ type DraftInputProps = Omit<
   debounceMs?: number;
   /** Enter also blurs — right for single-line names, wrong for a form field. */
   blurOnEnter?: boolean;
+  /** See `useDraft` — for commits that replace the row being edited. */
+  commitOnBlurOnly?: boolean;
 };
 
 export function DraftInput({
@@ -116,9 +125,10 @@ export function DraftInput({
   onCommit,
   debounceMs,
   blurOnEnter = false,
+  commitOnBlurOnly = false,
   ...rest
 }: DraftInputProps) {
-  const d = useDraft(value, onCommit, debounceMs);
+  const d = useDraft(value, onCommit, debounceMs, commitOnBlurOnly);
   return (
     <input
       {...rest}

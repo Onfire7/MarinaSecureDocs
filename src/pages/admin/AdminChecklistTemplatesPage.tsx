@@ -196,6 +196,51 @@ const SECTION_TRIGGERS = [
   { value: "asset", label: "Asset" },
 ];
 
+const ELLIPSIS = {
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+} as const;
+
+/** The ▸/▾ that opens a section or an item — the row's only expand control. */
+function DisclosureToggle({
+  open,
+  label,
+  onToggle,
+}: {
+  open: boolean;
+  label: string;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="btn btn-sm btn-quiet disclosure-toggle"
+      aria-expanded={open}
+      aria-label={label}
+      title={label}
+      onClick={onToggle}
+    >
+      {open ? "▾" : "▸"}
+    </button>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true">
+      <path
+        d="M4 5.5h12M8.5 3.5h3M6 5.5l.7 10.2a1 1 0 0 0 1 .8h4.6a1 1 0 0 0 1-.8L14 5.5M8.6 8.5v5M11.4 8.5v5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function TemplateCard({
   template,
   roles,
@@ -402,10 +447,7 @@ function TemplateCard({
                     checked={template.assignedToUser ?? false}
                     onChange={(e) => update({ assignedToUser: e.target.checked })}
                   />
-                  <span className="small">
-                    Assign each checklist to whoever triggers it — otherwise it
-                    stays unclaimed for anyone holding the role
-                  </span>
+                  <span className="small">Assign to triggering user.</span>
                 </label>
               </div>
 
@@ -483,12 +525,18 @@ function TemplateCard({
                   update({ hideUntilRule: hideUntilRule || null })
                 }
                 onDueBy={(dueBy) => update({ dueBy: dueBy ?? null })}
-                nounPhrase="checklist"
               />
             </div>
 
             <div>
               <div className="section-title">Sections</div>
+              {/* The per-section item count used to sit in each section's own
+                  header; one total above the list says the same thing without
+                  competing with the section name for room. */}
+              <div className="muted small" style={{ marginBottom: 6 }}>
+                {sections.length} section{sections.length === 1 ? "" : "s"} ·{" "}
+                {itemCount} item{itemCount === 1 ? "" : "s"}
+              </div>
               <ReorderableList
                 items={sections}
                 onReorder={(orderedIds) =>
@@ -549,6 +597,19 @@ function SectionEditor({
   const [open, setOpen] = useState(false);
   const [addingCheckpoints, setAddingCheckpoints] = useState(false);
   const [addingAssets, setAddingAssets] = useState(false);
+  // Which item rows have their config open. Held here rather than inside the
+  // row because copy-on-edit gives an edited item a *new* id — the row that
+  // was open unmounts, and only this map can hand the openness to its
+  // replacement.
+  const [openItemIds, setOpenItemIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const toggleItem = (itemId: string) =>
+    setOpenItemIds((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(itemId)) next.add(itemId);
+      return next;
+    });
 
   const update = (fields: Record<string, unknown>) =>
     void db.transact(db.tx.checklistTemplateSections[section.id].update(fields));
@@ -606,6 +667,13 @@ function SectionEditor({
         .link({ section: section.id, previousVersion: item.id }),
       db.tx.checklistTemplateItems[item.id].unlink({ section: section.id }),
     ]);
+    setOpenItemIds((prev) => {
+      if (!prev.has(item.id)) return prev;
+      const next = new Set(prev);
+      next.delete(item.id);
+      next.add(newId);
+      return next;
+    });
   };
 
   // The label starts as the type's own name and is edited inline on the row.
@@ -659,32 +727,54 @@ function SectionEditor({
 
   return (
     <div className="card">
-      <div className="spread" style={{ flexWrap: "wrap" }}>
-        <span className="row" style={{ minWidth: 0 }}>
-          <DraftInput
-            className="input select-inline"
-            style={{ minWidth: 0 }}
-            value={section.name}
-            aria-label="Section name"
-            onCommit={(name) => update({ name })}
+      <div className="spread row-nowrap">
+        <span className="row row-nowrap" style={{ minWidth: 0, flex: 1, gap: 6 }}>
+          <DisclosureToggle
+            open={open}
+            label={open ? "Collapse section" : "Expand section"}
+            onToggle={() => setOpen(!open)}
           />
-          {!section.isActive && <span className="badge">Inactive</span>}
+          {/* Closed, the name is a label with its item count; open, it's the
+              field you edit. An input reading as editable only while the rest
+              of the editor is on screen is the point. */}
+          {open ? (
+            <DraftInput
+              className="input select-inline"
+              style={{ minWidth: 0, flex: 1 }}
+              value={section.name}
+              aria-label="Section name"
+              onCommit={(name) => update({ name })}
+            />
+          ) : (
+            <button
+              type="button"
+              className="btn-bare row row-nowrap"
+              style={{ minWidth: 0, flex: 1, gap: 6 }}
+              onClick={() => setOpen(true)}
+            >
+              <span style={ELLIPSIS}>{section.name}</span>
+              <span className="muted small" style={{ flex: "none" }}>
+                | {items.length} item{items.length === 1 ? "" : "s"}
+              </span>
+            </button>
+          )}
+          {!section.isActive && (
+            <span className="badge" style={{ flex: "none" }}>
+              Inactive
+            </span>
+          )}
         </span>
-        <span className="row" style={{ gap: 2 }}>
-          <span className="muted small">
-            {items.length} item{items.length === 1 ? "" : "s"}
-          </span>
+        {open && (
           <button
             type="button"
-            className="btn btn-sm btn-quiet"
-            onClick={() => setOpen(!open)}
+            className="btn btn-sm btn-quiet btn-icon btn-icon-danger"
+            title="Delete section"
+            aria-label="Delete section"
+            onClick={removeSection}
           >
-            {open ? "Close" : "Open"}
+            <TrashIcon />
           </button>
-          <button type="button" className="btn btn-sm btn-quiet" onClick={removeSection}>
-            ✕
-          </button>
-        </span>
+        )}
       </div>
 
       {open && (
@@ -695,9 +785,7 @@ function SectionEditor({
               checked={section.isActive}
               onChange={(e) => update({ isActive: e.target.checked })}
             />
-            <span className="small">
-              Active — inactive sections are never added to new checklists
-            </span>
+            <span className="small">Active</span>
           </label>
 
           <div className="field" style={{ marginTop: 8 }}>
@@ -826,7 +914,6 @@ function SectionEditor({
               update({ hideUntilRule: hideUntilRule || null })
             }
             onDueBy={(dueBy) => update({ dueBy: dueBy ?? null })}
-            nounPhrase="section"
           />
 
           <div className="section-title" style={{ marginTop: 10 }}>
@@ -844,6 +931,8 @@ function SectionEditor({
             renderItem={(item) => (
               <ItemRow
                 item={item}
+                open={openItemIds.has(item.id)}
+                onToggle={() => toggleItem(item.id)}
                 onEdit={versionItem}
                 onDuplicate={duplicateItem}
                 onRemove={removeItem}
@@ -952,13 +1041,11 @@ function RuleFields({
   dueBy,
   onHideUntilRule,
   onDueBy,
-  nounPhrase,
 }: {
   hideUntilRule: string | undefined;
   dueBy: DueByRule | undefined;
   onHideUntilRule: (rule: string) => void;
   onDueBy: (rule: DueByRule | undefined) => void;
-  nounPhrase: string;
 }) {
   const kind = dueBy?.kind ?? "";
   return (
@@ -983,10 +1070,6 @@ function RuleFields({
             </button>
           )}
         </div>
-        <p className="muted small" style={{ marginTop: 4 }}>
-          The {nounPhrase} exists from creation but stays hidden until this
-          time of day — and once shown, never re-hides.
-        </p>
       </div>
       <div className="field">
         <span className="field-label">Due by — optional</span>
@@ -1038,11 +1121,16 @@ function RuleFields({
 
 function ItemRow({
   item,
+  open,
+  onToggle,
   onEdit,
   onDuplicate,
   onRemove,
 }: {
   item: TemplateItemRow;
+  /** Owned by the section — see `openItemIds` there. */
+  open: boolean;
+  onToggle: () => void;
   onEdit: (
     item: TemplateItemRow,
     patch: { label?: string; config?: Record<string, unknown> },
@@ -1050,7 +1138,6 @@ function ItemRow({
   onDuplicate: (item: TemplateItemRow) => void;
   onRemove: (itemId: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const cfg = (item.config ?? {}) as Record<string, unknown>;
 
   const setConfig = (patch: Record<string, unknown>) =>
@@ -1058,49 +1145,71 @@ function ItemRow({
 
   return (
     <div className="card">
-      <div className="spread">
-        <span className="row" style={{ minWidth: 0 }}>
-          <span className="badge">{itemTypeLabel(item.type)}</span>
-          <DraftInput
-            className="input select-inline"
-            style={{ minWidth: 0 }}
-            value={item.label}
-            aria-label="Item label"
-            onCommit={(label) => {
-              if (label !== item.label) onEdit(item, { label });
-            }}
+      <div className="spread row-nowrap">
+        <span className="row row-nowrap" style={{ minWidth: 0, flex: 1, gap: 6 }}>
+          {/* Every type opens, including the ones with no config fields:
+              the label is only editable while open, and simple checks have
+              a label to edit like everything else. */}
+          <DisclosureToggle
+            open={open}
+            label={open ? "Collapse item" : "Expand item"}
+            onToggle={onToggle}
           />
-        </span>
-        <span className="row" style={{ gap: 2 }}>
-          {item.type !== "simple_check" && (
+          {open ? (
+            <DraftInput
+              className="input select-inline"
+              style={{ minWidth: 0, flex: 1 }}
+              value={item.label}
+              aria-label="Item label"
+              // Copy-on-edit replaces this row, remounting the input — so a
+              // debounced write mid-word would drop focus and close the
+              // phone keyboard on every keystroke. Write on blur instead.
+              commitOnBlurOnly
+              onCommit={(label) => {
+                if (label !== item.label) onEdit(item, { label });
+              }}
+            />
+          ) : (
             <button
               type="button"
-              className="btn btn-sm btn-quiet"
-              onClick={() => setOpen(!open)}
+              className="btn-bare"
+              // Wraps rather than ellipsizing: three levels of card padding
+              // leave this row under 200px on a phone, and half a label is
+              // no use in a list you collapsed in order to scan it.
+              style={{ minWidth: 0, flex: 1 }}
+              onClick={onToggle}
             >
-              Config
+              {item.label}
             </button>
           )}
+        </span>
+        <span className="row row-nowrap" style={{ gap: 2, flex: "none" }}>
           <button
             type="button"
-            className="btn btn-sm btn-quiet"
+            className="btn btn-sm btn-quiet btn-icon"
             title="Duplicate this item"
+            aria-label="Duplicate this item"
             onClick={() => onDuplicate(item)}
           >
             ⧉
           </button>
           <button
             type="button"
-            className="btn btn-sm btn-quiet"
+            className="btn btn-sm btn-quiet btn-icon btn-icon-danger"
+            title="Remove this item"
+            aria-label="Remove this item"
             onClick={() => onRemove(item.id)}
           >
-            ✕
+            <TrashIcon />
           </button>
         </span>
       </div>
 
       {open && (
         <div style={{ marginTop: 8 }}>
+          <div style={{ marginBottom: 8 }}>
+            <span className="badge">{itemTypeLabel(item.type)}</span>
+          </div>
           {isStateCheck(item.type) && (
             <StateCheckConfigFields
               kind={normalizeItemType(item.type) as StateCheckType}

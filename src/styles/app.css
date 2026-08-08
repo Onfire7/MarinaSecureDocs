@@ -177,6 +177,48 @@ h3 {
 .btn-block {
   width: 100%;
 }
+/* A destructive icon button: red at rest and on hover, where .btn-quiet
+   would otherwise pull it back to ink. */
+.btn-icon-danger,
+.btn-icon-danger:hover {
+  color: var(--bad);
+}
+.btn-icon-danger:hover {
+  background: var(--bad-bg);
+}
+/* A button that is only a glyph. Nested editor rows are barely 200px wide on
+   a phone, where .btn-sm's side padding costs more than the icon does. */
+.btn-icon {
+  padding: 5px 6px;
+}
+/* Disclosure triangles read as one tap target with the name beside them, so
+   they get the glyph's own width and none of the button padding. */
+.disclosure-toggle {
+  padding: 4px 2px;
+  flex: none;
+  color: var(--mute);
+}
+/* Opts a row out of the narrow-screen wrap below. A header of triangle +
+   name + one or two icons fits at 375px on its own, because the name is the
+   flexible part and ellipsizes; wrapping it would only strand the trailing
+   text on a second line. Two classes deep so it outranks the narrow-screen
+   wrap rule further down, which is equally specific and would otherwise win
+   on order. */
+.row.row-nowrap,
+.spread.row-nowrap {
+  flex-wrap: nowrap;
+}
+/* Text that acts as a control — the collapsed name of a section or item,
+   which opens the editor when tapped. */
+.btn-bare {
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
 
 /* ---------- Cards ---------- */
 
