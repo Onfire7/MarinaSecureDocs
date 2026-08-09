@@ -177,6 +177,19 @@ h3 {
 .btn-block {
   width: 100%;
 }
+/* The one control that says "there is a newer app than the one you're
+   looking at". Green because it's the only affirmative thing in the bar,
+   and it only exists when there's something to press. */
+.btn-update {
+  background: var(--good);
+  border-color: var(--good);
+  color: #fff;
+}
+.btn-update:hover {
+  background: var(--good);
+  filter: brightness(1.08);
+}
+
 /* A destructive icon button: red at rest and on hover, where .btn-quiet
    would otherwise pull it back to ink. */
 .btn-icon-danger,

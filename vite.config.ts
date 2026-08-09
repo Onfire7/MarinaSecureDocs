@@ -34,7 +34,17 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt', not 'autoUpdate': autoUpdate swaps the worker on the next
+      // launch with nothing on screen to say so, which makes a stale build
+      // indistinguishable from a bug — a dropdown that was replaced days ago
+      // still looked like a dropdown. The new worker now waits until someone
+      // presses Update (see UpdateButton), which is also the only way the
+      // app can tell you there's something to press.
+      registerType: 'prompt',
+      // Registration is UpdateButton's job — the injected script would
+      // register a second time and the hook would never see the waiting
+      // worker.
+      injectRegister: null,
       // App-shell caching. The build has no code-splitting (one JS bundle),
       // so precaching it — which globPatterns below does — already includes
       // the InstantDB and Clerk SDK code itself: the app still boots and

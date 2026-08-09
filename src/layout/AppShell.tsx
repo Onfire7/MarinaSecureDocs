@@ -10,6 +10,7 @@ import { CheckpointScanModal } from "../pages/checklists/CheckpointScanModal";
 import { ThemeToggle } from "./ThemeToggle";
 import { ADMIN_SECTIONS } from "../pages/admin/adminSections";
 import { InstallAppButton } from "./InstallAppButton";
+import { UpdateButton } from "./UpdateButton";
 import { NfcScanToggle } from "./NfcScanToggle";
 
 // Responsive shell: persistent left sidenav on desktop, app bar + bottom tab
@@ -93,6 +94,7 @@ export function AppShell() {
               Switch user
             </button>
             <InstallAppButton />
+            <UpdateButton />
             <NfcScanToggle onScan={setScannedGuid} />
             <button
               type="button"
@@ -108,7 +110,10 @@ export function AppShell() {
       <div style={{ flex: 1, minWidth: 0 }}>
         <header className="appbar">
           <span>{activeSection?.label ?? "MarinaSecure"}</span>
-          <NfcScanToggle onScan={setScannedGuid} />
+          <span className="row" style={{ gap: 6 }}>
+            <UpdateButton />
+            <NfcScanToggle onScan={setScannedGuid} />
+          </span>
         </header>
         <main className="main">
           <Outlet />
