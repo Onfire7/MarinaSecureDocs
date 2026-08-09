@@ -178,16 +178,16 @@ h3 {
   width: 100%;
 }
 /* The one control that says "there is a newer app than the one you're
-   looking at". Green because it's the only affirmative thing in the bar,
-   and it only exists when there's something to press. */
+   looking at". Outlined in green, the same shape .btn-danger uses in red —
+   a bar full of quiet buttons shouldn't have one solid block in it, and the
+   colour alone carries the meaning. */
 .btn-update {
-  background: var(--good);
+  color: var(--good);
   border-color: var(--good);
-  color: #fff;
+  background: var(--panel);
 }
 .btn-update:hover {
-  background: var(--good);
-  filter: brightness(1.08);
+  background: var(--good-bg);
 }
 
 /* A destructive icon button: red at rest and on hover, where .btn-quiet
