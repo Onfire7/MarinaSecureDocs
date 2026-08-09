@@ -13,6 +13,7 @@ import {
   type ItemType,
 } from "../../lib/checklists";
 import { activityTx } from "../../lib/activityLog";
+import { ReorderableList } from "../shared/ReorderableList";
 import {
   buildPendingEffectTxns,
   collectPendingEffects,
@@ -95,7 +96,6 @@ export function ChecklistItemsPanel({
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [reorderingSection, setReorderingSection] = useState<string | null>(null);
   // Only the sections someone has opened or shut by hand. Everything else
   // follows its own completion, so a section folds itself away as the last
   // item in it is answered and the next one is the one in front of you.
@@ -346,15 +346,14 @@ export function ChecklistItemsPanel({
 
   // Reordering swaps the two rows' order values — the row order is the
   // guard's own working order from then on (it started as the template's).
-  const move = (section: (typeof visibleSections)[number], index: number, dir: -1 | 1) => {
-    const a = section.items[index];
-    const b = section.items[index + dir];
-    if (!a || !b) return;
-    void db.transact([
-      db.tx.checklistInstanceItems[a.id].update({ order: b.order }),
-      db.tx.checklistInstanceItems[b.id].update({ order: a.order }),
-    ]);
-  };
+  // One write per drop, and the row order becomes the user's own working
+  // order from then on — it started as the template's.
+  const reorderItems = (orderedIds: string[]) =>
+    void db.transact(
+      orderedIds.map((itemId, i) =>
+        db.tx.checklistInstanceItems[itemId].update({ order: i }),
+      ),
+    );
 
   const title = checklist.template?.name ?? "Checklist";
   const sectionLabel = sectionId
@@ -416,24 +415,42 @@ export function ChecklistItemsPanel({
           // the only group of cards. A section embed already has its header.
           const showSectionHeadings = !sectionId && visibleSections.length > 1;
 
-          for (const section of visibleSections) {
-            const reordering = reorderingSection === section.id;
+          // Finished sections sink. What's left to do is the whole point of
+          // this screen, and a section you've completed shouldn't sit between
+          // two you haven't.
+          const isSectionDone = (sec: (typeof visibleSections)[number]) =>
+            sec.items.length > 0 && sec.items.every((i) => isDone(i));
+          const ordered = [
+            ...visibleSections.filter((sec) => !isSectionDone(sec)),
+            ...visibleSections.filter(isSectionDone),
+          ];
+          const firstDoneId = showSectionHeadings
+            ? ordered.find(isSectionDone)?.id
+            : undefined;
+
+          for (const section of ordered) {
+            if (section.id === firstDoneId) {
+              nodes.push(
+                <div
+                  key="completed-separator"
+                  className="group-heading completed-divider"
+                  style={spansColumns ? { gridColumn: "1 / -1" } : undefined}
+                >
+                  <span className="section-title" style={{ marginBottom: 0 }}>
+                    Completed
+                  </span>
+                </div>,
+              );
+            }
             const left = section.items.filter((i) => !isDone(i)).length;
             const sectionDone = section.items.length > 0 && left === 0;
             // Collapsing only means anything when there's more than one
             // section and a heading to click; a reorder in progress needs its
             // rows on screen whatever the section's state.
-            const collapsible = showSectionHeadings && !reordering;
+            const collapsible = showSectionHeadings;
             const collapsed =
               collapsible && (sectionOverride[section.id] ?? sectionDone);
-            // The heading row also carries the Reorder control, which a
-            // single-section checklist still needs — so it renders (label
-            // suppressed, since it would just repeat the page title) even
-            // when there's only one section, as long as there's something
-            // to reorder. Compact embeds skip it: reordering is the full
-            // page's affair.
-            const showReorder = !compact && canAct && section.items.length > 1;
-            if (showSectionHeadings || showReorder) {
+            if (showSectionHeadings) {
               nodes.push(
                 <div
                   key={`section-${section.id}`}
@@ -487,60 +504,11 @@ export function ChecklistItemsPanel({
                       )}
                     </span>
                   </span>
-                  {showReorder && (
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-quiet"
-                      onClick={() =>
-                        setReorderingSection(reordering ? null : section.id)
-                      }
-                    >
-                      {reordering ? "Done" : "Reorder"}
-                    </button>
-                  )}
                 </div>,
               );
             }
 
             if (collapsed) continue;
-
-            if (reordering) {
-              // Compact reorder rows instead of full item cards — moving
-              // things shouldn't require scrolling past every open form.
-              section.items.forEach((item, i) => {
-                nodes.push(
-                  <div
-                    key={item.id}
-                    className="card spread"
-                    style={spansColumns ? { gridColumn: "1 / -1" } : undefined}
-                  >
-                    <span className="small" style={{ minWidth: 0 }}>
-                      {isDone(item) ? "✓ " : ""}
-                      {item.template?.label ?? "Item"}
-                    </span>
-                    <span className="row" style={{ gap: 4 }}>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-quiet"
-                        disabled={i === 0}
-                        onClick={() => move(section, i, -1)}
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-quiet"
-                        disabled={i === section.items.length - 1}
-                        onClick={() => move(section, i, 1)}
-                      >
-                        ↓
-                      </button>
-                    </span>
-                  </div>,
-                );
-              });
-              continue;
-            }
 
             // A header appears once per run of consecutive items at the same
             // off-site location — not once per card, and not again immediately
@@ -548,6 +516,9 @@ export function ChecklistItemsPanel({
             // different location. Reset per section so a run can't straddle a
             // section boundary.
             let previousLocationId = section.location?.id;
+            // A location heading breaks the flow, so items are collected into
+            // runs between headings — dragging is only meaningful within one.
+            const runs: { items: typeof section.items }[] = [{ items: [] }];
             for (const item of section.items) {
               if (!item.template) continue;
               const locationId = itemLocationId(item) ?? section.location?.id;
@@ -563,20 +534,41 @@ export function ChecklistItemsPanel({
                       <span>{name}</span>
                     </div>,
                   );
+                  runs.push({ items: [] });
                 }
               }
               previousLocationId = locationId;
-
-              const Component = componentFor(item.template.type);
+              runs[runs.length - 1].items.push(item);
+            }
+            // Each run of items renders as its own draggable list, so a
+            // grabber sits beside every card instead of a mode you enter and
+            // leave. Runs span both columns: a two-up grid can't carry a
+            // drag order that reads top to bottom.
+            for (const run of runs) {
+              if (run.items.length === 0) continue;
               nodes.push(
-                <Component
-                  key={item.id}
-                  item={item.template}
-                  existing={item}
-                  checklistId={checklist.id}
-                  onSaved={() => {}}
-                  editable={canAct}
-                />,
+                <div
+                  key={`run-${run.items[0].id}`}
+                  style={spansColumns ? { gridColumn: "1 / -1" } : undefined}
+                >
+                  <ReorderableList
+                    items={run.items}
+                    enabled={canAct && !compact && section.items.length > 1}
+                    onReorder={reorderItems}
+                    renderItem={(item: (typeof run.items)[number]) => {
+                      const Component = componentFor(item.template!.type);
+                      return (
+                        <Component
+                          item={item.template!}
+                          existing={item}
+                          checklistId={checklist.id}
+                          onSaved={() => {}}
+                          editable={canAct}
+                        />
+                      );
+                    }}
+                  />
+                </div>,
               );
             }
           }
