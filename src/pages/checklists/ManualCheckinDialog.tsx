@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { db } from "../../lib/db";
 import { distanceMeters } from "../../lib/geo";
-import { groupByLocation } from "../../lib/checkpoints";
 import { useCheckpointVisit } from "./useCheckpointVisit";
+import { SearchPicker } from "../shared/SearchPicker";
 
 // Checklists & Tours — Manual Check-In Dialog (see pages/manual-checkin-dialog.html).
 // Fallback when a checkpoint's NFC tag/QR is unreadable. Reason is the one
@@ -55,6 +55,20 @@ export function ManualCheckinDialog({
       .map(({ cp, d }) => ({ ...cp, distance: d }));
   }, [data, here]);
 
+  const options = useMemo(
+    () =>
+      checkpoints.map((cp) => {
+        const d = (cp as { distance?: number }).distance;
+        const near =
+          d != null && Number.isFinite(d)
+            ? `${d < 1000 ? `${Math.round(d)} m` : `${(d / 1000).toFixed(1)} km`} away`
+            : "";
+        const hint = [cp.location?.name, near].filter(Boolean).join(" · ");
+        return { id: cp.id, name: cp.name, hint: hint || undefined };
+      }),
+    [checkpoints],
+  );
+
   const visit = useCheckpointVisit(
     submitted ? checkpointId : undefined,
     "manual",
@@ -78,44 +92,19 @@ export function ManualCheckinDialog({
           <>
             <div className="field">
               <span className="field-label">Checkpoint</span>
-              <select
-                className="select"
+              {/* Ordering is the picker's caller's business: nearest-first
+                  when the device says where it is, alphabetical otherwise.
+                  The location and distance ride along as the second line,
+                  which is also what the filter matches against — "back dock
+                  c" finds Back Door on Dock C. */}
+              <SearchPicker
+                options={options}
                 value={checkpointId}
-                onChange={(e) => setCheckpointId(e.target.value)}
-              >
-                <option value="">
-                  {here ? "Select — nearest first…" : "Select…"}
-                </option>
-                {/* With GPS the useful order is by distance, which grouping
-                    would destroy — so the location rides along on each row.
-                    Without GPS there's no meaningful order to preserve, so
-                    the list groups under its location instead and each
-                    option carries only the checkpoint's own name. */}
-                {here
-                  ? checkpoints.map((cp) => {
-                      const d = (cp as { distance?: number }).distance;
-                      const near =
-                        d != null && Number.isFinite(d)
-                          ? ` · ${d < 1000 ? `${Math.round(d)} m` : `${(d / 1000).toFixed(1)} km`} away`
-                          : "";
-                      return (
-                        <option key={cp.id} value={cp.id}>
-                          {cp.name}
-                          {cp.location?.name ? ` — ${cp.location.name}` : ""}
-                          {near}
-                        </option>
-                      );
-                    })
-                  : groupByLocation(checkpoints).map((g) => (
-                      <optgroup key={g.locationId || "none"} label={g.label}>
-                        {g.items.map((cp) => (
-                          <option key={cp.id} value={cp.id}>
-                            {cp.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-              </select>
+                onChange={setCheckpointId}
+                placeholder={here ? "Search — nearest first…" : "Search checkpoints…"}
+                emptyMessage="No checkpoints exist yet."
+                autoFocus
+              />
             </div>
             <div className="field">
               <span className="field-label">Reason — required</span>

@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
+import { ManualCheckinDialog } from "../checklists/ManualCheckinDialog";
 
 // Locations — Checkpoint Detail (see pages/checkpoint-detail.html).
 // Read-oriented reference/audit view: identity, GUID URL, GPS validation
@@ -9,6 +11,7 @@ import { useCurrent } from "../../lib/auth/CurrentUserContext";
 export function CheckpointDetailPage() {
   const { id: checkpointId } = useParams();
   const current = useCurrent();
+  const [checkingIn, setCheckingIn] = useState(false);
 
   const { data } = db.useQuery(
     checkpointId
@@ -65,12 +68,31 @@ export function CheckpointDetailPage() {
             </div>
           )}
         </div>
-        {current.can("manage_locations") && (
-          <Link to="/admin" className="btn btn-sm btn-quiet">
-            Edit in Admin
-          </Link>
-        )}
+        <div className="row">
+          {/* The page you land on from anywhere that lists a checkpoint —
+              a tour on the Checklists screen, a location, a search. Standing
+              at one whose tag won't read, this is where you already are. */}
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setCheckingIn(true)}
+          >
+            Check in manually
+          </button>
+          {current.can("manage_locations") && (
+            <Link to="/admin" className="btn btn-sm btn-quiet">
+              Edit in Admin
+            </Link>
+          )}
+        </div>
       </div>
+
+      {checkingIn && (
+        <ManualCheckinDialog
+          initialCheckpointId={checkpoint.id}
+          onClose={() => setCheckingIn(false)}
+        />
+      )}
 
       <div className="grid-2">
         <div>
