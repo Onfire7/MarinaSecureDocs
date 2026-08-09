@@ -13,6 +13,7 @@ import {
   eligibleToday,
   resolveDueBy,
   resolveHideUntil,
+  sectionEnabledByStatus,
   type DueByRule,
   type TemplateItemLike,
 } from "./checklists";
@@ -26,7 +27,8 @@ export interface InstantiableSection {
   triggerConfig?: Record<string, unknown> | null;
   hideUntilRule?: string | null;
   dueBy?: DueByRule | null;
-  location?: { id: string } | null;
+  /** Status comes along for "location_status" gating; see checklists.ts. */
+  location?: { id: string; status?: string | null } | null;
   checkpoints?: { id: string }[];
   assets?: { id: string }[];
   items?: TemplateItemLike[];
@@ -49,19 +51,50 @@ export function sectionInstanceId(instanceId: string, templateSectionId: string)
 
 /**
  * Section rows created with the instance: active, and either always-on
- * (manual) or recurring with today matching. Event-anchored types
- * (checkpoint / location / asset) wait for their event.
+ * (manual), recurring with today matching, or gated on the current status of
+ * the place they belong to. Event-anchored types (checkpoint / location /
+ * asset) wait for their event.
  */
 export function sectionsEligibleAtCreation(
   sections: InstantiableSection[] | undefined,
   now: Date,
 ): InstantiableSection[] {
-  return (sections ?? []).filter(
-    (s) =>
-      s.isActive &&
+  return (sections ?? []).filter((s) => {
+    if (!s.isActive) return false;
+    if (s.triggerType === "location_status") {
+      // No location, nothing to read a status from, so nothing to switch it
+      // on — the builder warns about this while the template is written.
+      return sectionEnabledByStatus(
+        (s.triggerConfig ?? {}).statuses,
+        s.location?.status,
+      );
+    }
+    return (
       (s.triggerType === "manual" || s.triggerType === "recurring") &&
-      eligibleToday(s, now),
-  );
+      eligibleToday(s, now)
+    );
+  });
+}
+
+/**
+ * Whether generating this template right now would produce any work.
+ *
+ * A checklist with nothing in it is noise on someone's list, and with
+ * status-gated sections that's a normal outcome rather than a misconfigured
+ * one — a dock round for occupied slips has nothing to do on a night when
+ * they're all empty. Callers that generate a checklist *ahead* of the work
+ * (clock in/out, manual, recurring) check this first.
+ *
+ * Deliberately not folded into buildInstanceTx: a checkpoint scan creates an
+ * instance and the section that brought it into being in the same
+ * transaction, so "no eligible sections at creation" is the wrong question
+ * there.
+ */
+export function hasWorkAtCreation(
+  template: InstantiableTemplate,
+  now: Date = new Date(),
+): boolean {
+  return sectionsEligibleAtCreation(template.sections, now).length > 0;
 }
 
 /**

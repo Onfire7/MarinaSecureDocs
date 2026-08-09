@@ -7,6 +7,7 @@ import { deterministicId } from "../../lib/detId";
 import { eligibleToday, isVisibleNow, triggerTypeLabel } from "../../lib/checklists";
 import {
   buildInstanceTx,
+  hasWorkAtCreation,
   TEMPLATE_INSTANTIATION_QUERY,
 } from "../../lib/checklistInstantiation";
 import { ManualCheckinDialog } from "./ManualCheckinDialog";
@@ -41,6 +42,7 @@ export function ChecklistListPage() {
   const isSecurity = current.roleNames.includes("Security");
   const [showManualCheckin, setShowManualCheckin] = useState(false);
   const [starting, setStarting] = useState<string | null>(null);
+  const [nothingToStart, setNothingToStart] = useState<string | null>(null);
   const [manualTemplateId, setManualTemplateId] = useState("");
 
   const roleIds = (current.user?.roles ?? []).map((r) => r.id);
@@ -60,6 +62,13 @@ export function ChecklistListPage() {
 
   const startChecklist = async (template: (typeof manualTemplates)[number]) => {
     if (!userId || starting) return;
+    // Silently doing nothing after someone taps Start is worse than the
+    // empty checklist would have been.
+    if (!hasWorkAtCreation(template)) {
+      setNothingToStart(template.name);
+      return;
+    }
+    setNothingToStart(null);
     setStarting(template.id);
     const instanceId = id();
     await db.transact([
@@ -89,7 +98,7 @@ export function ChecklistListPage() {
     ).padStart(2, "0")}`;
   });
   const dueToday = myTemplates.filter(
-    (t) => t.triggerType === "recurring" && eligibleToday(t),
+    (t) => t.triggerType === "recurring" && eligibleToday(t) && hasWorkAtCreation(t),
   );
   const expectedRecurringIds = dueToday.map((t) =>
     deterministicId(`recurring:${t.id}:${today}`),
@@ -283,6 +292,14 @@ export function ChecklistListPage() {
           </button>
         </div>
       </div>
+
+      {nothingToStart && (
+        <div className="badge badge-warn" style={{ display: "block", marginBottom: 10 }}>
+          Nothing to do in "{nothingToStart}" right now — none of its sections
+          are switched on. A section gated on a location's status only runs
+          when that location is in one of the statuses it names.
+        </div>
+      )}
 
       <div className={isSecurity ? "grid-2" : undefined}>
         <div>

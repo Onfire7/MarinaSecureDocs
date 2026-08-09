@@ -17,6 +17,7 @@ import {
   type YesNoDetailsOn,
 } from "../../lib/checklists";
 import { LocationPicker } from "../shared/LocationPicker";
+import { STANDARD_STATUSES, statusLabel } from "../../lib/locations";
 import { MultiSelectDialog } from "../shared/MultiSelectDialog";
 import { ReorderableList } from "../shared/ReorderableList";
 import { AdminHeader } from "./AdminHomePage";
@@ -220,6 +221,7 @@ const SECTION_TRIGGERS = [
   { value: "checkpoint", label: "Checkpoint scan" },
   { value: "location", label: "Location visit" },
   { value: "asset", label: "Asset" },
+  { value: "location_status", label: "Location status" },
 ];
 
 const ELLIPSIS = {
@@ -410,7 +412,12 @@ function NewSectionDialog({
   onCreate,
   onClose,
 }: {
-  locations: { id: string; name: string; parent?: { id: string } | null }[];
+  locations: {
+    id: string;
+    name: string;
+    status?: string | null;
+    parent?: { id: string } | null;
+  }[];
   allCheckpoints: {
     id: string;
     name: string;
@@ -605,7 +612,12 @@ function TemplateCard({
 }: {
   template: TemplateRow;
   roles: { id: string; name: string }[];
-  locations: { id: string; name: string; parent?: { id: string } | null }[];
+  locations: {
+    id: string;
+    name: string;
+    status?: string | null;
+    parent?: { id: string } | null;
+  }[];
   allCheckpoints: { id: string; name: string; location?: { id: string; name: string } | null }[];
   allAssets: { id: string; name: string }[];
   expanded: boolean;
@@ -1048,7 +1060,12 @@ function SectionEditor({
   section: SectionRow & { items: TemplateItemRow[] };
   /** Just created — mount expanded rather than making you open it again. */
   defaultOpen?: boolean;
-  locations: { id: string; name: string; parent?: { id: string } | null }[];
+  locations: {
+    id: string;
+    name: string;
+    status?: string | null;
+    parent?: { id: string } | null;
+  }[];
   allCheckpoints: { id: string; name: string; location?: { id: string; name: string } | null }[];
   allAssets: { id: string; name: string }[];
 }) {
@@ -1079,7 +1096,20 @@ function SectionEditor({
     void db.transact(db.tx.checklistTemplateSections[section.id].update(fields));
 
   const items = section.items;
-  const cfg = (section.triggerConfig ?? {}) as { recurrenceRule?: string };
+  const cfg = (section.triggerConfig ?? {}) as {
+    recurrenceRule?: string;
+    statuses?: string[];
+  };
+  const selectedStatuses = new Set(cfg.statuses ?? []);
+  // The standard set plus any status a location is actually sitting in, so
+  // an admin-invented one is selectable without being typed twice.
+  const statusOptions = useMemo(() => {
+    const seen = new Set<string>(STANDARD_STATUSES);
+    for (const l of locations) if (l.status) seen.add(l.status);
+    for (const st of selectedStatuses) seen.add(st);
+    return [...seen].map((st) => ({ id: st, name: statusLabel(st) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locations, cfg.statuses]);
 
   // A section belongs to exactly one location, and its checkpoints must be
   // in it — so changing the location also drops any checkpoint that isn't.
@@ -1360,6 +1390,48 @@ function SectionEditor({
                   update({ triggerConfig: recurrenceRule ? { recurrenceRule } : {} })
                 }
               />
+            )}
+            {section.triggerType === "location_status" && (
+              <div style={{ marginTop: 6 }}>
+                <div className="field-inline" style={{ marginBottom: 0 }}>
+                  <span className="field-label">Runs when</span>
+                  <ChipMultiSelect
+                    options={statusOptions}
+                    selectedIds={selectedStatuses}
+                    placeholder="No statuses — never runs"
+                    emptyMessage="No statuses defined."
+                    onToggle={(status, on) => {
+                      const next = new Set(selectedStatuses);
+                      if (on) next.add(status);
+                      else next.delete(status);
+                      update({
+                        triggerConfig: { ...cfg, statuses: [...next] },
+                      });
+                    }}
+                  />
+                </div>
+                {!section.location && (
+                  <div
+                    className="badge badge-warn"
+                    style={{ display: "block", marginTop: 6 }}
+                  >
+                    Set a location below — without one there's no status to
+                    read, so this section never runs.
+                  </div>
+                )}
+                {section.location && selectedStatuses.size === 0 && (
+                  <div
+                    className="badge badge-warn"
+                    style={{ display: "block", marginTop: 6 }}
+                  >
+                    Pick at least one status — a gate naming none never opens.
+                  </div>
+                )}
+                <p className="muted small" style={{ marginTop: 6, marginBottom: 0 }}>
+                  Read once, when the checklist is generated. A checklist whose
+                  sections are all switched off isn't created at all.
+                </p>
+              </div>
             )}
             {(section.triggerType === "checkpoint" ||
               section.triggerType === "location") && (

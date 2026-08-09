@@ -7,6 +7,7 @@ import type { CurrentUser } from "../../lib/auth/useCurrentUser";
 import { activityTx } from "../../lib/activityLog";
 import {
   buildInstanceTx,
+  hasWorkAtCreation,
   TEMPLATE_INSTANTIATION_QUERY,
 } from "../../lib/checklistInstantiation";
 
@@ -154,8 +155,15 @@ function ShiftCard() {
   const clockTemplates = (data?.checklistTemplates ?? []).filter(
     (t) => t.assignedRole && roleIds.includes(t.assignedRole.id),
   );
-  const clockInTemplate = clockTemplates.find((t) => t.triggerType === "clock_in");
-  const clockOutTemplate = clockTemplates.find((t) => t.triggerType === "clock_out");
+  // A template with nothing switched on right now generates nothing — see
+  // hasWorkAtCreation. Empty checklists are noise, and with status-gated
+  // sections an empty one is an ordinary outcome, not a mistake.
+  const clockInTemplate = clockTemplates.find(
+    (t) => t.triggerType === "clock_in" && hasWorkAtCreation(t),
+  );
+  const clockOutTemplate = clockTemplates.find(
+    (t) => t.triggerType === "clock_out" && hasWorkAtCreation(t),
+  );
 
   // Re-render each minute so elapsed time stays fresh.
   const [, tick] = useState(0);

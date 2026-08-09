@@ -401,9 +401,31 @@ export type SectionTriggerType =
   | "recurring"
   | "checkpoint"
   | "location"
-  | "asset";
+  | "asset"
+  | "location_status";
+
+/**
+ * Statuses that switch a "location_status" section on. Read at creation and
+ * not after: an instance is materialized rows, and a slip changing hands at
+ * 3am shouldn't make work appear or vanish underneath whoever is holding the
+ * checklist. What was true when the round was assigned is what the round is.
+ */
+export function sectionEnabledByStatus(
+  statuses: unknown,
+  locationStatus: string | null | undefined,
+): boolean {
+  if (!Array.isArray(statuses) || statuses.length === 0) return false;
+  if (!locationStatus) return false;
+  return statuses.includes(locationStatus);
+}
 
 export interface TriggerConfig {
+  /**
+   * For "location_status" sections: the location statuses that switch the
+   * section on. Empty or absent means it never runs — an unconfigured gate
+   * shouldn't quietly become an open one.
+   */
+  statuses?: string[];
   /**
    * For "recurring" (sections and templates alike): an RFC 5545 RRULE naming
    * which *days* apply — e.g. "FREQ=WEEKLY;BYDAY=TU" for Tuesdays. Purely a
