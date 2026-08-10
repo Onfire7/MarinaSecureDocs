@@ -272,7 +272,7 @@ export function LocationDetailPage() {
                       : " · open-ended"}
                   </span>
                 </div>
-              ) : current.can("manage_lease") ? (
+              ) : current.can("manage_lease") && location.leaseEnabled ? (
                 <div className="field-value">
                   <button
                     type="button"

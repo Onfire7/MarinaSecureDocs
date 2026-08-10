@@ -72,6 +72,10 @@ const _schema = i.schema({
       // occupancy specifically: `status` is an open set, so a type might
       // track "out of service" and never be occupied by anything.
       tracksStatus: i.boolean().optional(),
+      // The lease half of the same two-level pattern as allowsReservations:
+      // whether Locations of this type can be leased at all. Optional so
+      // rows predating the flag stay valid; absent = false.
+      allowsLeases: i.boolean().optional(),
     }),
     locations: i.entity({
       name: i.string(),
@@ -81,6 +85,13 @@ const _schema = i.schema({
       reservationEnabled: i.boolean(),
       reservationVisibility: i.string().optional(), // public / internal
       postReservationStatus: i.string().optional(),
+      // Per-location lease switch, mirroring reservationEnabled: on one dock
+      // the front slips may be reservable and the back ones leasable, and a
+      // few of each are both. Optional rather than required because rows
+      // predating it have no value; absent reads as false everywhere except
+      // the backfill, which turns it on for locations that already hold a
+      // lease (scripts/migrate-leasable-flags.mjs).
+      leaseEnabled: i.boolean().optional(),
       gpsLat: i.number().optional(),
       gpsLng: i.number().optional(),
     }),

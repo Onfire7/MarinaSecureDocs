@@ -238,8 +238,11 @@ function CreateLease({
   const [lesseeIds, setLesseeIds] = useState<string[]>([]);
   const [variances, setVariances] = useState("");
 
-  const { data } = db.useQuery({ locations: {}, contacts: {} });
-  const locations = data?.locations ?? [];
+  const { data } = db.useQuery({ locations: { type: {} }, contacts: {} });
+  // Only somewhere that's actually leasable — the picker used to offer every
+  // location, root properties and grouping docks included, so the first
+  // guard against leasing "the marina" was whoever was reading the list.
+  const locations = (data?.locations ?? []).filter((l) => l.leaseEnabled);
   const contacts = (data?.contacts ?? []).filter((c) => c.name);
   const location = locations.find((l) => l.id === selectedLocation);
 
@@ -297,6 +300,12 @@ function CreateLease({
               </option>
             ))}
         </select>
+        {locations.length === 0 && (
+          <p className="muted small" style={{ marginTop: 4 }}>
+            Nothing is marked leasable yet — switch it on for a location in
+            Admin → Location Types &amp; Locations.
+          </p>
+        )}
         {location?.reservationEnabled && (
           <p className="muted small" style={{ marginTop: 4 }}>
             Note: this location currently accepts reservations.

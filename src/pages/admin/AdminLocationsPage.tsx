@@ -272,6 +272,34 @@ function BulkEditTab() {
           </div>
 
           <div className="field-inline" style={{ marginBottom: 8 }}>
+            <span className="field-label">Leases</span>
+            <span className="row" style={{ gap: 6 }}>
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() =>
+                  apply("Leases enabled", (l) =>
+                    l.type?.allowsLeases ? { leaseEnabled: true } : null,
+                  )
+                }
+              >
+                Enable
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() =>
+                  apply("Leases disabled", (l) =>
+                    l.type?.allowsLeases ? { leaseEnabled: false } : null,
+                  )
+                }
+              >
+                Disable
+              </button>
+            </span>
+          </div>
+
+          <div className="field-inline" style={{ marginBottom: 8 }}>
             <span className="field-label">Status</span>
             <span className="row" style={{ gap: 6 }}>
               <select
@@ -363,14 +391,18 @@ function BulkEditTab() {
                 {l.type?.tracksStatus && ` · ${statusLabel(l.status)}`}
               </span>
             </span>
-            {l.type?.allowsReservations && (
-              <span
-                className={l.reservationEnabled ? "badge badge-good" : "badge"}
-                style={{ flex: "none" }}
-              >
-                {l.reservationEnabled ? "Reservable" : "Not reservable"}
-              </span>
-            )}
+            <span className="row" style={{ gap: 4, flex: "none" }}>
+              {l.type?.allowsReservations && (
+                <span className={l.reservationEnabled ? "badge badge-good" : "badge"}>
+                  {l.reservationEnabled ? "Reservable" : "Not reservable"}
+                </span>
+              )}
+              {l.type?.allowsLeases && (
+                <span className={l.leaseEnabled ? "badge badge-good" : "badge"}>
+                  {l.leaseEnabled ? "Leasable" : "Not leasable"}
+                </span>
+              )}
+            </span>
           </label>
         ))}
         {shown.length === 0 && (
@@ -467,6 +499,7 @@ function TypesTab() {
                   [
                     ["tracksStatus", "Track Status"],
                     ["allowsReservations", "Reservable"],
+                    ["allowsLeases", "Leasable"],
                     ["hasBoat", "Holds a boat"],
                     ["hasVehicle", "Holds a vehicle"],
                   ] as const
@@ -732,6 +765,7 @@ type LocationRowType = {
   name: string;
   status?: string;
   reservationEnabled: boolean;
+  leaseEnabled?: boolean;
   reservationVisibility?: string | null;
   postReservationStatus?: string | null;
   gpsLat?: number;
@@ -740,6 +774,7 @@ type LocationRowType = {
     id: string;
     name: string;
     allowsReservations?: boolean;
+    allowsLeases?: boolean;
     tracksStatus?: boolean;
   } | null;
   parent?: { id: string; name: string } | null;
@@ -763,6 +798,7 @@ function LocationRow({
     id: string;
     name: string;
     allowsReservations?: boolean;
+    allowsLeases?: boolean;
     tracksStatus?: boolean;
   }[];
   allLocations: PickerLocation[];
@@ -779,6 +815,7 @@ function LocationRow({
 
   const locationType = types.find((t) => t.id === location.type?.id);
   const typeAllowsReservations = locationType?.allowsReservations;
+  const typeAllowsLeases = locationType?.allowsLeases;
   const tracksStatus = Boolean(locationType?.tracksStatus ?? location.type?.tracksStatus);
 
   // Named after its location and renamed inline on the row below if that's
@@ -899,6 +936,20 @@ function LocationRow({
                   />
                 </div>
               </div>
+
+              {typeAllowsLeases && (
+                <div className="field">
+                  <span className="field-label">Leases</span>
+                  <label className="row" style={{ cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(location.leaseEnabled)}
+                      onChange={(e) => update({ leaseEnabled: e.target.checked })}
+                    />
+                    <span className="small">Can be leased</span>
+                  </label>
+                </div>
+              )}
 
               {typeAllowsReservations && (
                 <div className="field">
