@@ -47,8 +47,8 @@
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Name</td><td>LocationType.name</td><td>e.g. "Dock," "Slip," "Cabin," "Building," "RV Site" — not a fixed list.</td></tr>
       <tr><td>Valid parent types</td><td>LocationType.valid_parent_types</td><td>Which type(s) this type may nest under; a type may allow more than one.</td></tr>
-      <tr><td>Allows reservations</td><td>LocationType.allows_reservations</td><td>The type-level capability flag — whether Locations of this type <em>can</em> be made reservation-enabled at all, per <a href="../data-model.html">Data Model</a>.</td></tr>
-      <tr><td>Tracks status</td><td>LocationType.tracks_status</td><td>Whether Locations of this type carry an occupancy status. Off for organizational containers (a root property, a dock that only groups slips) so they never display or offer a meaningless "Vacant."</td></tr>
+      <tr><td>Reservable</td><td>LocationType.allows_reservations</td><td>The type-level capability flag — whether Locations of this type <em>can</em> be made reservation-enabled at all, per <a href="../data-model.html">Data Model</a>.</td></tr>
+      <tr><td>Track Status</td><td>LocationType.tracks_status</td><td>Whether Locations of this type carry a status at all — not occupancy specifically, since the set is open and a type might only ever be Out of Service. Off for organizational containers (a root property, a dock that only groups slips) so they never display or offer a meaningless "Vacant."</td></tr>
     </table>
 
     <h2>Locations</h2>
