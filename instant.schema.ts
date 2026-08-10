@@ -66,9 +66,11 @@ const _schema = i.schema({
       // stay valid; absent = false.
       hasBoat: i.boolean().optional(),
       hasVehicle: i.boolean().optional(),
-      // Whether Locations of this type carry an occupancy status at all —
-      // off for organizational containers (a root property, a dock that only
-      // groups slips), which would otherwise read a meaningless "Vacant".
+      // Whether Locations of this type carry a status at all — off for
+      // organizational containers (a root property, a dock that only groups
+      // slips), which would otherwise read a meaningless "Vacant". Not
+      // occupancy specifically: `status` is an open set, so a type might
+      // track "out of service" and never be occupied by anything.
       tracksStatus: i.boolean().optional(),
     }),
     locations: i.entity({

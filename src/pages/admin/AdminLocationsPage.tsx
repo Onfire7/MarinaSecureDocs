@@ -465,8 +465,8 @@ function TypesTab() {
               <div className="row" style={{ flexWrap: "wrap", marginTop: 8 }}>
                 {(
                   [
-                    ["tracksStatus", "Tracks occupancy status"],
-                    ["allowsReservations", "Can accept reservations"],
+                    ["tracksStatus", "Track Status"],
+                    ["allowsReservations", "Reservable"],
                     ["hasBoat", "Holds a boat"],
                     ["hasVehicle", "Holds a vehicle"],
                   ] as const
