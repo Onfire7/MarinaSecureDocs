@@ -15,6 +15,7 @@ import { NfcWriteDialog } from "../shared/NfcWriteDialog";
 import { NameGeneratorDialog } from "./NameGeneratorDialog";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
+import { locationPathResolver } from "../../lib/checkpoints";
 import {
   DraftInput,
   DraftNumberInput,
@@ -58,7 +59,7 @@ export function AdminLocationsPage() {
   );
 }
 
-type Tab = "types" | "locations" | "maps";
+type Tab = "types" | "locations" | "bulk" | "maps";
 
 function LocationsAdmin() {
   const [tab, setTab] = useState<Tab>("locations");
@@ -68,21 +69,314 @@ function LocationsAdmin() {
       <AdminHeader title="Location Types & Locations" />
 
       <div className="chip-row">
-        {(["types", "locations", "maps"] as Tab[]).map((t) => (
+        {(["types", "locations", "bulk", "maps"] as Tab[]).map((t) => (
           <button
             key={t}
             type="button"
             className={"chip" + (tab === t ? " active" : "")}
             onClick={() => setTab(t)}
           >
-            {t === "types" ? "Location types" : t === "locations" ? "Locations & checkpoints" : "Maps & plotting"}
+            {t === "types"
+              ? "Location types"
+              : t === "locations"
+                ? "Locations & checkpoints"
+                : t === "bulk"
+                  ? "Bulk edit"
+                  : "Maps & plotting"}
           </button>
         ))}
       </div>
 
       {tab === "types" && <TypesTab />}
       {tab === "locations" && <LocationsTab />}
+      {tab === "bulk" && <BulkEditTab />}
       {tab === "maps" && <MapsTab />}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Bulk edit
+
+/**
+ * Change one setting across many locations at once.
+ *
+ * The tree next door is right for finding a location and right for editing
+ * one; it is hopeless for "make every slip on every dock reservable", which
+ * otherwise means opening two hundred rows and ticking the same box in each.
+ * So this is a flat list with a filter, a type filter, and one setting
+ * applied to whatever is ticked.
+ *
+ * Every action here is a single field on a single namespace, applied in one
+ * transaction. Nothing that changes a location's shape — its type, its
+ * parent — belongs in a bulk tool: those need to be seen one at a time.
+ */
+function BulkEditTab() {
+  const [filter, setFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [status, setStatus] = useState("");
+  const [postStatus, setPostStatus] = useState("");
+  const [result, setResult] = useState<string | null>(null);
+
+  const { data } = db.useQuery({
+    locations: { type: {}, parent: {}, leases: {} },
+    locationTypes: {},
+  });
+  const locations = useMemo(
+    () => [...(data?.locations ?? [])].sort((a, b) => compareNames(a.name, b.name)),
+    [data],
+  );
+  const types = data?.locationTypes ?? [];
+  const pathOf = useMemo(() => locationPathResolver(locations), [locations]);
+
+  const shown = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    return locations.filter((l) => {
+      if (typeFilter && l.type?.id !== typeFilter) return false;
+      if (!q) return true;
+      return (l.name + " " + pathOf(l.id)).toLowerCase().includes(q);
+    });
+  }, [locations, filter, typeFilter, pathOf]);
+
+  const shownIds = shown.map((l) => l.id);
+  const allShownSelected =
+    shownIds.length > 0 && shownIds.every((id) => selected.has(id));
+  const chosen = locations.filter((l) => selected.has(l.id));
+
+  const toggle = (locationId: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(locationId)) next.add(locationId);
+      return next;
+    });
+
+  const apply = (
+    what: string,
+    build: (l: (typeof locations)[number]) => Record<string, unknown> | null,
+  ) => {
+    const txns = [];
+    let skipped = 0;
+    for (const l of chosen) {
+      const fields = build(l);
+      if (!fields) {
+        skipped++;
+        continue;
+      }
+      txns.push(db.tx.locations[l.id].update(fields));
+    }
+    if (txns.length === 0) {
+      setResult(`Nothing to do — ${what} applies to none of the ${chosen.length} selected.`);
+      return;
+    }
+    void db.transact(txns);
+    setResult(
+      `${what} on ${txns.length} location${txns.length === 1 ? "" : "s"}` +
+        (skipped > 0 ? ` · ${skipped} skipped — their type doesn't allow it` : ""),
+    );
+  };
+
+  // Enabling reservations where a lease is already running is legal but odd,
+  // and worth saying out loud rather than asking two hundred times.
+  const now = Date.now();
+  const leasedAndChosen = chosen.filter((l) =>
+    (l.leases ?? []).some(
+      (x) =>
+        (!x.startDate || new Date(x.startDate).getTime() <= now) &&
+        (!x.endDate || new Date(x.endDate).getTime() >= now),
+    ),
+  ).length;
+
+  return (
+    <div>
+      <div className="row" style={{ marginBottom: 10, flexWrap: "wrap" }}>
+        <input
+          className="input select-inline"
+          style={{ minWidth: 180 }}
+          placeholder="Filter by name or path…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+        <select
+          className="select select-inline"
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+        >
+          <option value="">Every type</option>
+          {types.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={() =>
+            setSelected((prev) => {
+              const next = new Set(prev);
+              if (allShownSelected) for (const id of shownIds) next.delete(id);
+              else for (const id of shownIds) next.add(id);
+              return next;
+            })
+          }
+        >
+          {allShownSelected ? "Deselect" : "Select"} {shown.length} shown
+        </button>
+        {selected.size > 0 && (
+          <button
+            type="button"
+            className="btn btn-sm btn-quiet"
+            onClick={() => setSelected(new Set())}
+          >
+            Clear selection
+          </button>
+        )}
+        <span className="muted small">{selected.size} selected</span>
+      </div>
+
+      {selected.size > 0 && (
+        <div className="card" style={{ marginBottom: 10 }}>
+          <div className="field-inline" style={{ marginBottom: 8 }}>
+            <span className="field-label">Reservations</span>
+            <span className="row" style={{ gap: 6 }}>
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() =>
+                  apply("Reservations enabled", (l) =>
+                    l.type?.allowsReservations
+                      ? {
+                          reservationEnabled: true,
+                          ...(l.postReservationStatus
+                            ? {}
+                            : { postReservationStatus: DEFAULT_POST_RESERVATION_STATUS }),
+                        }
+                      : null,
+                  )
+                }
+              >
+                Enable
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() =>
+                  apply("Reservations disabled", (l) =>
+                    l.type?.allowsReservations ? { reservationEnabled: false } : null,
+                  )
+                }
+              >
+                Disable
+              </button>
+            </span>
+          </div>
+
+          <div className="field-inline" style={{ marginBottom: 8 }}>
+            <span className="field-label">Status</span>
+            <span className="row" style={{ gap: 6 }}>
+              <select
+                className="select select-inline"
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              >
+                <option value="">Pick a status…</option>
+                {STANDARD_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {statusLabel(s)}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={!status}
+                onClick={() =>
+                  apply(`Status set to ${statusLabel(status)}`, (l) =>
+                    l.type?.tracksStatus ? { status } : null,
+                  )
+                }
+              >
+                Apply
+              </button>
+            </span>
+          </div>
+
+          <div className="field-inline" style={{ marginBottom: 0 }}>
+            <span className="field-label">After check-out</span>
+            <span className="row" style={{ gap: 6 }}>
+              <select
+                className="select select-inline"
+                value={postStatus}
+                onChange={(e) => setPostStatus(e.target.value)}
+              >
+                <option value="">Pick a status…</option>
+                {STANDARD_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {statusLabel(s)}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={!postStatus}
+                onClick={() =>
+                  apply(`Post-checkout status set to ${statusLabel(postStatus)}`, (l) =>
+                    l.type?.allowsReservations
+                      ? { postReservationStatus: postStatus }
+                      : null,
+                  )
+                }
+              >
+                Apply
+              </button>
+            </span>
+          </div>
+
+          {leasedAndChosen > 0 && (
+            <div className="badge badge-warn" style={{ display: "block", marginTop: 8 }}>
+              {leasedAndChosen} of the selected {leasedAndChosen === 1 ? "has" : "have"} a
+              running lease. Reservations alongside a lease are allowed, just unusual.
+            </div>
+          )}
+        </div>
+      )}
+
+      {result && (
+        <div className="badge badge-good" style={{ display: "block", marginBottom: 10 }}>
+          {result}
+        </div>
+      )}
+
+      <div className="stack" style={{ gap: 2 }}>
+        {shown.map((l) => (
+          <label key={l.id} className="card row" style={{ cursor: "pointer", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={selected.has(l.id)}
+              onChange={() => toggle(l.id)}
+            />
+            <span style={{ minWidth: 0, flex: 1 }}>
+              <span className="card-title">{l.name}</span>
+              <span className="card-meta" style={{ display: "block" }}>
+                {pathOf(l.id)} · {l.type?.name ?? "no type"}
+                {l.type?.tracksStatus && ` · ${statusLabel(l.status)}`}
+              </span>
+            </span>
+            {l.type?.allowsReservations && (
+              <span
+                className={l.reservationEnabled ? "badge badge-good" : "badge"}
+                style={{ flex: "none" }}
+              >
+                {l.reservationEnabled ? "Reservable" : "Not reservable"}
+              </span>
+            )}
+          </label>
+        ))}
+        {shown.length === 0 && (
+          <span className="muted small">Nothing matches that filter.</span>
+        )}
+      </div>
     </div>
   );
 }

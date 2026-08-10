@@ -9,7 +9,6 @@ import { ManualCheckinDialog } from "../checklists/ManualCheckinDialog";
 import { activityTx } from "../../lib/activityLog";
 import type { AttachmentTarget } from "../../lib/attachments";
 import {
-  DEFAULT_POST_RESERVATION_STATUS,
   STANDARD_STATUSES,
   breadcrumb,
   compareNames,
@@ -107,31 +106,6 @@ export function LocationDetailPage() {
     ]);
   };
 
-  const toggleReservations = () => {
-    const enabling = !location.reservationEnabled;
-    if (enabling && activeLease) {
-      const ok = window.confirm(
-        "This location has an active lease. Enabling reservations alongside a lease is allowed but unusual — continue?",
-      );
-      if (!ok) return;
-    }
-    void db.transact(
-      db.tx.locations[location.id].update({
-        reservationEnabled: enabling,
-        // First enable establishes the post-checkout default.
-        ...(enabling && !location.postReservationStatus
-          ? { postReservationStatus: DEFAULT_POST_RESERVATION_STATUS }
-          : {}),
-      }),
-    );
-  };
-
-  const setPostReservationStatus = (status: string) => {
-    void db.transact(
-      db.tx.locations[location.id].update({ postReservationStatus: status }),
-    );
-  };
-
   const children = [...(location.children ?? [])].sort((a, b) =>
     compareNames(a.name, b.name),
   );
@@ -224,44 +198,11 @@ export function LocationDetailPage() {
           </div>
           )}
 
-          {location.type?.allowsReservations && canManage && (
-            <div className="field">
-              <span className="field-label">Reservations</span>
-              <label className="row" style={{ cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={location.reservationEnabled}
-                  onChange={toggleReservations}
-                />
-                <span className="small">
-                  {location.reservationEnabled ? "Enabled" : "Disabled"} for this location
-                </span>
-              </label>
-              {location.reservationEnabled && (
-                <div className="row" style={{ marginTop: 6 }}>
-                  <span className="small muted">After check-out becomes</span>
-                  <select
-                    className="select select-inline"
-                    value={
-                      location.postReservationStatus ?? DEFAULT_POST_RESERVATION_STATUS
-                    }
-                    onChange={(e) => setPostReservationStatus(e.target.value)}
-                  >
-                    {[
-                      ...new Set([
-                        ...STANDARD_STATUSES,
-                        location.postReservationStatus ?? DEFAULT_POST_RESERVATION_STATUS,
-                      ]),
-                    ].map((s) => (
-                      <option key={s} value={s}>
-                        {statusLabel(s)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-          )}
+          {/* Whether a location takes reservations, and what it becomes after
+              one, is configuration — it belongs with the rest of a
+              location's setup in Admin, not on the page a guard opens to see
+              what's in front of them. Status stays: marking a slip
+              needs_cleaning is the work, not a setting. */}
 
           {carriesBoat && (
             <div className="field">
