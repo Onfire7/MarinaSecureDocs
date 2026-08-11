@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { db } from "../../lib/db";
 import { distanceMeters } from "../../lib/geo";
 import { useCheckpointVisit } from "./useCheckpointVisit";
+import { CheckpointCheckinView } from "./CheckpointCheckinPage";
+import { NoteDialog } from "../shared/NoteDialog";
+import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { SearchPicker } from "../shared/SearchPicker";
 
 // Checklists & Tours — Manual Check-In Dialog (see pages/manual-checkin-dialog.html).
@@ -19,9 +22,11 @@ export function ManualCheckinDialog({
   onClose: () => void;
 }) {
   const navigate = useNavigate();
+  const current = useCurrent();
   const [checkpointId, setCheckpointId] = useState(initialCheckpointId ?? "");
   const [reason, setReason] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [showNote, setShowNote] = useState(false);
 
   const { data } = db.useQuery({ checkpoints: { location: {} } });
 
@@ -69,6 +74,8 @@ export function ManualCheckinDialog({
     [checkpoints],
   );
 
+  const checkpoint = checkpoints.find((cp) => cp.id === checkpointId);
+
   const visit = useCheckpointVisit(
     submitted ? checkpointId : undefined,
     "manual",
@@ -76,17 +83,20 @@ export function ManualCheckinDialog({
     undefined,
   );
 
-  const open = (instanceId: string) => {
-    onClose();
-    navigate(`/checklists/${instanceId}`);
-  };
-
   return (
     <div className="dialog-backdrop" onClick={onClose}>
-      <div className="dialog-card" onClick={(e) => e.stopPropagation()}>
-        <div className="card-title" style={{ marginBottom: 10 }}>
-          Manual Check-In
-        </div>
+      {/* Wider once the form is behind us: what follows is checklist items
+          to actually work, not two fields to fill in. */}
+      <div
+        className="dialog-card"
+        style={submitted ? { maxWidth: 640 } : undefined}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {!submitted && (
+          <div className="card-title" style={{ marginBottom: 10 }}>
+            Manual Check-In
+          </div>
+        )}
 
         {!submitted ? (
           <>
@@ -130,35 +140,36 @@ export function ManualCheckinDialog({
               </button>
             </div>
           </>
-        ) : visit.loading || !visit.checkInId ? (
+        ) : visit.loading || !visit.checkInId || !checkpoint ? (
           <div className="muted">Logging check-in…</div>
-        ) : visit.applicableSections.length === 0 ? (
-          <>
-            <p className="muted small">Check-in logged. Nothing currently applies here.</p>
-            <button type="button" className="btn" onClick={onClose}>
-              Done
-            </button>
-          </>
         ) : (
-          <>
-            <p className="muted small">Check-in logged.</p>
-            <div className="stack">
-              {visit.applicableSections.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  className="btn btn-block"
-                  onClick={() => open(s.instanceId)}
-                >
-                  {s.checklistName}
-                  {s.label !== s.checklistName ? ` — ${s.label}` : ""}
-                  {s.itemsTotal > 0 ? ` (${s.itemsDone}/${s.itemsTotal})` : ""}
-                </button>
-              ))}
-            </div>
-          </>
+          /* The same view a scanned tag opens. Linking to the checklist
+             instead dropped you at the top of a fifty-item round to scroll
+             for the section you were standing in front of — while the work
+             itself fits right here, which is the whole point of checking in
+             at a checkpoint. */
+          <CheckpointCheckinView
+            checkpoint={checkpoint}
+            visit={visit}
+            canCreateIncidents={current.can("create_incidents")}
+            onNote={() => setShowNote(true)}
+            onIncident={() =>
+              navigate("/incidents/new", {
+                state: {
+                  target: { type: "checkpoint", id: checkpoint.id, label: checkpoint.name },
+                },
+              })
+            }
+          />
         )}
       </div>
+
+      {showNote && checkpoint && (
+        <NoteDialog
+          target={{ type: "checkpoint", id: checkpoint.id, label: checkpoint.name }}
+          onClose={() => setShowNote(false)}
+        />
+      )}
     </div>
   );
 }
