@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -40,7 +40,7 @@
     <p class="lede">Log a maintenance issue — available to every role by default, with no permission gate.</p>
 
     <h2>Purpose</h2>
-    <p>Reached from <a href="ticket-queue.html">Ticket queue</a>, an <a href="incident-detail.html">Incident detail</a> page ("raise a ticket"), a failed checklist item (Verify Task rejection or Door Check double-mismatch), or any attachment target's detail page. Per <a href="../permissions.html">Permissions</a>, ticket creation is deliberately unrestricted — every role can create one, including Office logging an issue an owner called in.</p>
+    <p>Reached from <a href="ticket-queue.html">Ticket queue</a>, an <a href="incident-detail.html">Incident detail</a> page ("raise a ticket"), a failed checklist item (Verify Task rejection or Door Check double-mismatch), or any attachment target's detail page. Per <a href="../permissions.md">Permissions</a>, ticket creation is deliberately unrestricted — every role can create one, including Office logging an issue an owner called in.</p>
 
     <h2>Data shown / form fields</h2>
     <table>
@@ -61,7 +61,7 @@
 
     <h2>States &amp; edge cases</h2>
     <ul>
-      <li><strong>Opened with no attachment context</strong> — the attachment target is required before submitting; there's no such thing as an unattached ticket, per <a href="../data-model.html">Data Model</a>.</li>
+      <li><strong>Opened with no attachment context</strong> — the attachment target is required before submitting; there's no such thing as an unattached ticket, per <a href="../data-model.md">Data Model</a>.</li>
       <li><strong>Opened from a checklist item's failure</strong> — title/description/attachment target are pre-filled from that context (e.g. the checkpoint's Location, a note about which Door Check failed), still editable before submitting.</li>
       <li><strong>Assignment isn't offered here</strong> — a new ticket is always created unassigned; taking or assigning happens afterward from <a href="ticket-queue.html">Ticket queue</a> or <a href="ticket-detail.html">Ticket detail</a>, gated normally by <code>assign_ticket_to_self</code>/<code>assign_ticket_to_others</code>.</li>
     </ul>

@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -40,13 +40,13 @@
     <p class="lede">A freeform log entry attached to exactly one Location, Checkpoint, Boat, Contact, or Asset — no status, no priority, no workflow.</p>
 
     <h2>Purpose</h2>
-    <p>Reached from nearly every detail page in the app (pre-attached to that record) or, less often, opened generically and completed via the <a href="attachment-target-picker.html">Attachment-target picker</a>. Unrestricted to create, per <a href="../permissions.html">Permissions</a> — Notes carry no permission gate of their own, only their attachment target's own visibility gating applies when the note is later viewed.</p>
+    <p>Reached from nearly every detail page in the app (pre-attached to that record) or, less often, opened generically and completed via the <a href="attachment-target-picker.html">Attachment-target picker</a>. Unrestricted to create, per <a href="../permissions.md">Permissions</a> — Notes carry no permission gate of their own, only their attachment target's own visibility gating applies when the note is later viewed.</p>
 
     <h2>Data shown / form fields</h2>
     <table>
       <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
       <tr><td>Body</td><td>Text, required</td><td>Freeform — no markdown/rich-text editor, unlike Incident details or Ticket descriptions.</td></tr>
-      <tr><td>Attachment target</td><td>Location / Checkpoint / Boat / Contact / Asset</td><td>Pre-filled when opened from a specific record; otherwise resolved via <a href="attachment-target-picker.html">Attachment-target picker</a>. Required — there's no such thing as an unattached Note, per <a href="../data-model.html">Data Model</a>.</td></tr>
+      <tr><td>Attachment target</td><td>Location / Checkpoint / Boat / Contact / Asset</td><td>Pre-filled when opened from a specific record; otherwise resolved via <a href="attachment-target-picker.html">Attachment-target picker</a>. Required — there's no such thing as an unattached Note, per <a href="../data-model.md">Data Model</a>.</td></tr>
     </table>
 
     <h2>Actions</h2>

@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -40,7 +40,7 @@
     <p class="lede">Appears automatically whenever a call is ringing or in progress — a right-side panel on desktop, a pop-up on mobile — surfacing everything useful about the caller before anyone has to ask.</p>
 
     <h2>Purpose</h2>
-    <p>Per <a href="../workflows.html">Role Workflows — Handling calls</a>, the goal is that whoever answers already has context: who's calling, what they might be calling about, and what's already been discussed with them. The panel itself always appears when a call rings to this user's device — that's a routing/device fact, not a permission — but the enrichment inside it (matched contact, notes, recording) requires <code>view_calls</code>; <code>place_calls</code> is a separate gate covering only ending/controlling the call.</p>
+    <p>Per <a href="../workflows.md">Role Workflows — Handling calls</a>, the goal is that whoever answers already has context: who's calling, what they might be calling about, and what's already been discussed with them. The panel itself always appears when a call rings to this user's device — that's a routing/device fact, not a permission — but the enrichment inside it (matched contact, notes, recording) requires <code>view_calls</code>; <code>place_calls</code> is a separate gate covering only ending/controlling the call.</p>
 
     <h2>Data shown</h2>
     <table>
@@ -57,21 +57,21 @@
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
       <tr><td>Add a note</td><td><code>view_calls</code></td><td>Creates a <code>CallNote</code> live, during or after the call — gated the same as the rest of the call's context, since a note without visibility into that context doesn't make sense.</td></tr>
-      <tr><td>End the call</td><td><code>place_calls</code></td><td>Hangs up via the Twilio Function; the Function updates <code>Call.status</code>/<code>duration</code> on the resulting webhook, per the Twilio-source-of-truth rule in <a href="../architecture.html">Architecture</a>.</td></tr>
+      <tr><td>End the call</td><td><code>place_calls</code></td><td>Hangs up via the Twilio Function; the Function updates <code>Call.status</code>/<code>duration</code> on the resulting webhook, per the Twilio-source-of-truth rule in <a href="../architecture.md">Architecture</a>.</td></tr>
       <tr><td>Dismiss the panel</td><td>None</td><td>Closes the panel without ending the call (e.g. a call already handled by someone else).</td></tr>
     </table>
 
     <h2>States &amp; edge cases</h2>
     <ul>
       <li><strong>Call rings to a user without <code>view_calls</code></strong> — the panel still appears (it's their device ringing), but shows only the bare call state; no contact, notes, reservation, or recording. They can still end the call if they hold <code>place_calls</code>.</li>
-      <li><strong>Nameless contact</strong> — no match found for the incoming number; for a user with <code>view_calls</code>, the panel shows a prompt to enter a name, then surfaces similar existing Contacts for a merge, per <a href="../workflows.html">Role Workflows</a> and <a href="nameless-contact-merge.html">Nameless-contact merge</a>.</li>
+      <li><strong>Nameless contact</strong> — no match found for the incoming number; for a user with <code>view_calls</code>, the panel shows a prompt to enter a name, then surfaces similar existing Contacts for a merge, per <a href="../workflows.md">Role Workflows</a> and <a href="nameless-contact-merge.html">Nameless-contact merge</a>.</li>
       <li><strong>Recording/transcription disabled for the marina</strong> — that section is omitted entirely, not shown empty.</li>
       <li><strong>No active reservation or slip/boat info</strong> — those sections are omitted rather than shown as empty placeholders.</li>
       <li><strong>Call ends</strong> — the panel stays open briefly for a final note before collapsing, rather than disappearing the instant the call drops.</li>
     </ul>
 
     <h2>Mobile vs. desktop</h2>
-    <p>Desktop: a persistent right-side panel, so the rest of the app stays usable underneath it. Mobile: a pop-up (bottom sheet or modal) since there's no room for a persistent sidebar — matches the exact split described in <a href="../workflows.html">Role Workflows</a>.</p>
+    <p>Desktop: a persistent right-side panel, so the rest of the app stays usable underneath it. Mobile: a pop-up (bottom sheet or modal) since there's no room for a persistent sidebar — matches the exact split described in <a href="../workflows.md">Role Workflows</a>.</p>
 
     <div class="page-foot">
       <a href="comms-home.html">← Comms Home</a>

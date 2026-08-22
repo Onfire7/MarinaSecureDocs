@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -47,7 +47,7 @@
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Name</td><td>LocationType.name</td><td>e.g. "Dock," "Slip," "Cabin," "Building," "RV Site" — not a fixed list.</td></tr>
       <tr><td>Valid parent types</td><td>LocationType.valid_parent_types</td><td>Which type(s) this type may nest under; a type may allow more than one.</td></tr>
-      <tr><td>Reservable</td><td>LocationType.allows_reservations</td><td>The type-level capability flag — whether Locations of this type <em>can</em> be made reservation-enabled at all, per <a href="../data-model.html">Data Model</a>.</td></tr>
+      <tr><td>Reservable</td><td>LocationType.allows_reservations</td><td>The type-level capability flag — whether Locations of this type <em>can</em> be made reservation-enabled at all, per <a href="../data-model.md">Data Model</a>.</td></tr>
       <tr><td>Track Status</td><td>LocationType.tracks_status</td><td>Whether Locations of this type carry a status at all — not occupancy specifically, since the set is open and a type might only ever be Out of Service. Off for organizational containers (a root property, a dock that only groups slips) so they never display or offer a meaningless "Vacant."</td></tr>
     </table>
 
@@ -55,14 +55,14 @@
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Name, type, parent</td><td>Location fields</td><td>Parent must match one of the type's valid_parent_types.</td></tr>
-      <tr><td>Reservation toggle</td><td>Location.reservation_enabled + reservation_visibility</td><td>The per-location toggle that makes mixed-use possible — set independently per Slip, per <a href="../data-model.html">Data Model — Location</a>. Only offered when the type's <code>allows_reservations</code> is on. Turning it on for a Location with an active <a href="lease-detail.html">Lease</a> shows a warning, not a block.</td></tr>
+      <tr><td>Reservation toggle</td><td>Location.reservation_enabled + reservation_visibility</td><td>The per-location toggle that makes mixed-use possible — set independently per Slip, per <a href="../data-model.md">Data Model — Location</a>. Only offered when the type's <code>allows_reservations</code> is on. Turning it on for a Location with an active <a href="lease-detail.html">Lease</a> shows a warning, not a block.</td></tr>
       <tr><td>Post-reservation status</td><td>Location.post_reservation_status</td><td>Only relevant when reservation-enabled.</td></tr>
       <tr><td>GPS coordinates</td><td>Location.gps_coordinates</td><td>Real-world lat/lng, used for the geographic pin map and as the default for any Checkpoint here.</td></tr>
       <tr><td>Checkpoints</td><td>Checkpoint.location = this Location</td><td>Each checkpoint's GUID URL (auto-generated), GPS radius override, and applicable checklist templates.</td></tr>
     </table>
 
     <h2>Map upload &amp; plotting</h2>
-    <p>Per the note carried since Reservations, backed by <code>MarinaMap</code> and <code>LocationMapPlacement</code> in <a href="../data-model.html">Data Model</a>. Every map is scoped to a Location — there's no unscoped "master map." A marina's overview map is scoped to a <strong>root Location</strong> (a Location with no parent) representing the property itself; a marina must create at least one such root Location before it can upload its first map. Multiple root Locations are supported, for a marina that manages more than one physical property as one instance — each gets its own overview map rather than forcing everything onto a single image.</p>
+    <p>Per the note carried since Reservations, backed by <code>MarinaMap</code> and <code>LocationMapPlacement</code> in <a href="../data-model.md">Data Model</a>. Every map is scoped to a Location — there's no unscoped "master map." A marina's overview map is scoped to a <strong>root Location</strong> (a Location with no parent) representing the property itself; a marina must create at least one such root Location before it can upload its first map. Multiple root Locations are supported, for a marina that manages more than one physical property as one instance — each gets its own overview map rather than forcing everything onto a single image.</p>
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Map name &amp; image</td><td>MarinaMap.name / image</td><td>Uploaded layout/diagram — a schematic, not a real-world map.</td></tr>

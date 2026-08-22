@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -40,14 +40,14 @@
     <p class="lede">Every tracked piece of equipment — vehicles, jump packs, anything with a maintenance cycle or a checkout log.</p>
 
     <h2>Purpose</h2>
-    <p>Reached from the Assets top-level nav item. Viewing has no dedicated permission — same pattern as Tickets, Reservations, and Boats — only creating/editing requires <code>manage_assets</code>, per <a href="../permissions.html">Permissions</a>. Static infrastructure with no maintenance cycle and no checkout (a fixed gate, a pedestal) is deliberately not modeled as an Asset at all, per <a href="../../CONTEXT.md">Terminology</a>, so this list is shorter than "everything physical at the marina."</p>
+    <p>Reached from the Assets top-level nav item. Viewing has no dedicated permission — same pattern as Tickets, Reservations, and Boats — only creating/editing requires <code>manage_assets</code>, per <a href="../permissions.md">Permissions</a>. Static infrastructure with no maintenance cycle and no checkout (a fixed gate, a pedestal) is deliberately not modeled as an Asset at all, per <a href="../../CONTEXT.md">Terminology</a>, so this list is shorter than "everything physical at the marina."</p>
 
     <h2>Data shown</h2>
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Name, category</td><td>Asset.name / category</td><td>Category is an admin-defined grouping.</td></tr>
       <tr><td>Current status</td><td>Asset.current_status</td><td>Denormalized latest value from AssetStatusLog.</td></tr>
-      <tr><td>Meter / hours</td><td>Asset.meter_reading (if has_meter) or accumulated hours</td><td>A meterless asset accrues hours automatically over time rather than showing a reading, per <a href="../data-model.html">Data Model</a>.</td></tr>
+      <tr><td>Meter / hours</td><td>Asset.meter_reading (if has_meter) or accumulated hours</td><td>A meterless asset accrues hours automatically over time rather than showing a reading, per <a href="../data-model.md">Data Model</a>.</td></tr>
       <tr><td>Checked out?</td><td>Open AssetCheckout (time_in null)</td><td>Only shown for <code>checkoutable</code> assets.</td></tr>
       <tr><td>Reservable?</td><td>Asset.reservation_enabled</td><td>Small indicator; links into <a href="reservation-list.html">Reservation calendar/list</a> filtered to this asset when applicable.</td></tr>
     </table>

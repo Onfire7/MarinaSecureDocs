@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -43,7 +43,7 @@
     <p>The landing point for the Locations top-level nav item. A list/map toggle over the same underlying set of <code>Location</code> records, filtered by <code>LocationType</code> and <code>status</code>. This screen is for finding and navigating to a location, not for defining the location hierarchy itself — creating location types and locations happens in <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>, gated by <code>manage_locations</code>, which is also where the schematic map's upload/plotting lives.</p>
 
     <div class="note">
-      <strong>Two different maps.</strong> <em>Geographic map</em> mode plots each Location's real-world <code>gps_coordinates</code> as pins on a live map — the same coordinates used for checkpoint GPS validation. <em>Schematic map</em> mode instead renders an admin-uploaded <code>MarinaMap</code> image with each Location plotted as a color-coded rectangle (<code>LocationMapPlacement</code>) — the same underlying capability the Reservation calendar/list uses for its own map view, just with an occupancy/type overlay here instead of a reservation-status one. See <a href="../data-model.html">Data Model</a>.
+      <strong>Two different maps.</strong> <em>Geographic map</em> mode plots each Location's real-world <code>gps_coordinates</code> as pins on a live map — the same coordinates used for checkpoint GPS validation. <em>Schematic map</em> mode instead renders an admin-uploaded <code>MarinaMap</code> image with each Location plotted as a color-coded rectangle (<code>LocationMapPlacement</code>) — the same underlying capability the Reservation calendar/list uses for its own map view, just with an occupancy/type overlay here instead of a reservation-status one. See <a href="../data-model.md">Data Model</a>.
     </div>
 
     <h2>Data shown</h2>
@@ -66,7 +66,7 @@
       <tr><td>Switch between root-level maps</td><td>None</td><td>Only shown when the marina has more than one root Location with a map attached (multi-property setups) — a top-level chooser before drilling into either one's overview. With exactly one root map, schematic mode opens straight to it.</td></tr>
       <tr><td>Filter by type / status</td><td>None</td><td>Client-side filter over the subscribed query.</td></tr>
       <tr><td>Open a location</td><td>None</td><td>Navigates to <a href="location-detail.html">Location detail</a>, from a list row, a map pin, or a schematic rectangle.</td></tr>
-      <tr><td>Change a location's status</td><td><code>manage_locations</code></td><td>Inline quick-edit from the list (e.g. marking a slip Out of Service) — reuses the same permission as full location editing rather than introducing a separate status-change permission, per <a href="../permissions.html">Permissions</a>.</td></tr>
+      <tr><td>Change a location's status</td><td><code>manage_locations</code></td><td>Inline quick-edit from the list (e.g. marking a slip Out of Service) — reuses the same permission as full location editing rather than introducing a separate status-change permission, per <a href="../permissions.md">Permissions</a>.</td></tr>
       <tr><td>Add a location</td><td><code>manage_locations</code></td><td>Shortcut into <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>, where creation actually happens.</td></tr>
     </table>
 
@@ -78,7 +78,7 @@
       <li><strong>No <code>MarinaMap</code> exists yet</strong> — schematic mode has nothing to render; falls back to list mode, or is simply omitted from the view toggle until an admin uploads at least one root-level overview map, per <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>.</li>
       <li><strong>Multiple root Locations with maps (multi-property marina)</strong> — schematic mode opens to a top-level chooser between them rather than guessing which one to show; a single-root marina never sees this extra step.</li>
       <li><strong>Deep hierarchy</strong> — nesting depth isn't fixed (a type's <code>valid_parent_types</code> can chain arbitrarily); the list view supports drilling down (parent → children) rather than assuming a flat two-level dock/slip structure.</li>
-      <li><strong>Current boat changes</strong> — reflects live; when a boat moves slips (see <a href="../data-model.html">Data Model — Boat</a>), this list updates immediately via InstantDB subscription, with the move itself preserved in the Activity Log rather than a location history table.</li>
+      <li><strong>Current boat changes</strong> — reflects live; when a boat moves slips (see <a href="../data-model.md">Data Model — Boat</a>), this list updates immediately via InstantDB subscription, with the move itself preserved in the Activity Log rather than a location history table.</li>
     </ul>
 
     <h2>Mobile vs. desktop</h2>

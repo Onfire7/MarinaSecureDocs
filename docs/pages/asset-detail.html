@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -50,14 +50,14 @@
       <tr><td>Meter</td><td>Asset.meter_reading / meter_type, or accumulated hours if meterless</td><td>Recent AssetMeterReading history shown alongside, with each entry's source (Manual / Checklist item).</td></tr>
       <tr><td>Maintenance rules</td><td>Asset.maintenance_rules</td><td>e.g. "every 3,000 miles," "every 90 days since last completed"; edited in <a href="admin-assets.html">Admin</a>, shown read-only here.</td></tr>
       <tr><td>Checkout log</td><td>AssetCheckout, most recent first</td><td>Only shown for <code>checkoutable</code> assets; current open checkout (if any) highlighted at the top.</td></tr>
-      <tr><td>Reservation config</td><td>Asset.reservation_enabled / reservation_visibility / post_return_status</td><td>Read-only summary here; upcoming reservations shown alongside status per <a href="../data-model.html">Data Model — Reservation</a>.</td></tr>
+      <tr><td>Reservation config</td><td>Asset.reservation_enabled / reservation_visibility / post_return_status</td><td>Read-only summary here; upcoming reservations shown alongside status per <a href="../data-model.md">Data Model — Reservation</a>.</td></tr>
     </table>
 
     <h2>Actions</h2>
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
       <tr><td>Log a status update</td><td><code>manage_assets</code></td><td>Creates a new AssetStatusLog entry; updates <code>Asset.current_status</code>.</td></tr>
-      <tr><td>Check out / return</td><td><code>manage_assets</code></td><td>Opens <a href="asset-checkout-dialog.html">Checkout / return dialog</a> — checkout records are explicitly part of this permission's scope in <a href="../permissions.html">Permissions</a>, so "any role can check an asset in or out if permitted" (per <a href="../workflows.html">Role Workflows</a>) means "if they hold <code>manage_assets</code>," not a separate gate.</td></tr>
+      <tr><td>Check out / return</td><td><code>manage_assets</code></td><td>Opens <a href="asset-checkout-dialog.html">Checkout / return dialog</a> — checkout records are explicitly part of this permission's scope in <a href="../permissions.md">Permissions</a>, so "any role can check an asset in or out if permitted" (per <a href="../workflows.md">Role Workflows</a>) means "if they hold <code>manage_assets</code>," not a separate gate.</td></tr>
       <tr><td>Update the meter</td><td><code>manage_assets</code></td><td>Opens <a href="meter-update-dialog.html">Meter update dialog</a>. Distinct from a Meter Reading checklist item, which is unrestricted as part of normal checklist completion (see <a href="active-checklist.html">Active checklist</a>) — this is the direct, outside-of-a-checklist edit path.</td></tr>
       <tr><td>Add a note</td><td>Unrestricted</td><td>Opens <a href="new-note-dialog.html">New note dialog</a>, pre-attached.</td></tr>
       <tr><td>Log an incident</td><td><code>create_incidents</code></td><td>Opens <a href="new-incident-form.html">New incident form</a>, pre-attached.</td></tr>

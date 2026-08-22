@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -45,7 +45,7 @@
     <h2>Data shown</h2>
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
-      <tr><td>Name</td><td>Contact.name</td><td>Requires <code>view_owner</code>; nameless contacts (name = null) show a "needs a name" indicator instead. Gating extended here from its literal "slip/boat owner" wording in <a href="../permissions.html">Permissions</a> to cover Contacts generally, for consistency with how the same two permissions gate Contact info everywhere else it appears (Boat, Location, Active Call Panel, etc.).</td></tr>
+      <tr><td>Name</td><td>Contact.name</td><td>Requires <code>view_owner</code>; nameless contacts (name = null) show a "needs a name" indicator instead. Gating extended here from its literal "slip/boat owner" wording in <a href="../permissions.md">Permissions</a> to cover Contacts generally, for consistency with how the same two permissions gate Contact info everywhere else it appears (Boat, Location, Active Call Panel, etc.).</td></tr>
       <tr><td>Phone / email</td><td>Contact.phone / email</td><td>Requires <code>view_contact</code>, additionally to <code>view_owner</code>.</td></tr>
       <tr><td>Linked boats</td><td>Boat.owners / authorized_users containing this Contact</td><td>Shown as a short tag/count, not full detail.</td></tr>
     </table>
@@ -61,7 +61,7 @@
     <h2>States &amp; edge cases</h2>
     <ul>
       <li><strong>No <code>view_owner</code></strong> — the list and the Owners &amp; Contacts nav item are effectively unreachable in any useful form.</li>
-      <li><strong>Merged contact</strong> (<code>merged_into</code> set) — excluded from this list entirely; only the canonical target record appears, per <a href="../data-model.html">Data Model — Contact</a>.</li>
+      <li><strong>Merged contact</strong> (<code>merged_into</code> set) — excluded from this list entirely; only the canonical target record appears, per <a href="../data-model.md">Data Model — Contact</a>.</li>
       <li><strong>Nameless contact</strong> — included in the list with a distinct visual treatment, so staff can spot ones that still need a name/merge decision.</li>
     </ul>
 
