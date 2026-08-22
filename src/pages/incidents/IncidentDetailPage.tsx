@@ -10,6 +10,7 @@ import {
 } from "../../lib/attachments";
 import type { NewTicketState } from "../tickets/NewTicketPage";
 import { incidentStatusBadgeClass } from "../../lib/workItems";
+import { activityTx } from "../../lib/activityLog";
 
 // Incidents — Incident Detail (see pages/incident-detail.html).
 // Two distinct edit windows: the original content locks to its author at the
@@ -74,20 +75,43 @@ export function IncidentDetailPage() {
   const canEditOriginal =
     isAuthor && (authorShifts.length === 0 || containingShiftOpen);
 
+  const logIncident = (eventType: string, summary: string) =>
+    activityTx({
+      eventType,
+      summary,
+      subjectType: "incidents",
+      subjectId: incident.id,
+      actorId: current.user?.id,
+    });
+
   const setStatus = (status: string) => {
-    void db.transact(db.tx.incidents[incident.id].update({ status }));
+    void db.transact([
+      db.tx.incidents[incident.id].update({ status }),
+      logIncident(
+        "incident.status_changed",
+        `"${incident.title}" set to ${statusLabel(status)}`,
+      ),
+    ]);
   };
   const assign = (userId: string) => {
     if (!userId) return;
-    void db.transact(db.tx.incidents[incident.id].link({ assignedTo: userId }));
+    const assignee = users.find((u) => u.id === userId);
+    void db.transact([
+      db.tx.incidents[incident.id].link({ assignedTo: userId }),
+      logIncident(
+        "incident.assigned",
+        `"${incident.title}" assigned to ${assignee?.name ?? "someone"}`,
+      ),
+    ]);
   };
   const addComment = async () => {
     if (!comment.trim() || !current.user) return;
-    await db.transact(
+    await db.transact([
       db.tx.incidentComments[id()]
         .update({ body: comment.trim(), createdAt: Date.now() })
         .link({ incident: incident.id, author: current.user.id }),
-    );
+      logIncident("incident.commented", `Addendum added to "${incident.title}"`),
+    ]);
     setComment("");
   };
 
@@ -287,16 +311,24 @@ function EditOriginal({
   initialDetails: string;
   onDone: () => void;
 }) {
+  const current = useCurrent();
   const [title, setTitle] = useState(initialTitle);
   const [details, setDetails] = useState(initialDetails);
 
   const save = async () => {
-    await db.transact(
+    await db.transact([
       db.tx.incidents[incidentId].update({
         title: title.trim(),
         details: details.trim() || undefined,
       }),
-    );
+      activityTx({
+        eventType: "incident.edited",
+        summary: `"${title.trim()}" edited by its author`,
+        subjectType: "incidents",
+        subjectId: incidentId,
+        actorId: current.user?.id,
+      }),
+    ]);
     onDone();
   };
 

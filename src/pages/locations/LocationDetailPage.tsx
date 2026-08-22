@@ -5,6 +5,8 @@ import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { NoteDialog } from "../shared/NoteDialog";
+import { ManualCheckinDialog } from "../checklists/ManualCheckinDialog";
+import { activityTx } from "../../lib/activityLog";
 import type { AttachmentTarget } from "../../lib/attachments";
 import {
   STANDARD_STATUSES,
@@ -25,6 +27,7 @@ export function LocationDetailPage() {
   const isMobile = useIsMobile();
   const canManage = current.can("manage_locations");
   const [showNoteDialog, setShowNoteDialog] = useState(false);
+  const [showCheckin, setShowCheckin] = useState(false);
 
   const { data } = db.useQuery(
     locationId
@@ -91,20 +94,16 @@ export function LocationDetailPage() {
     )[0];
 
   const setStatus = (status: string) => {
-    void db.transact(db.tx.locations[location.id].update({ status }));
-  };
-
-  const toggleReservations = () => {
-    const enabling = !location.reservationEnabled;
-    if (enabling && activeLease) {
-      const ok = window.confirm(
-        "This location has an active lease. Enabling reservations alongside a lease is allowed but unusual — continue?",
-      );
-      if (!ok) return;
-    }
-    void db.transact(
-      db.tx.locations[location.id].update({ reservationEnabled: enabling }),
-    );
+    void db.transact([
+      db.tx.locations[location.id].update({ status }),
+      activityTx({
+        eventType: "location.status_changed",
+        summary: `${location.name} set to ${statusLabel(status)}`,
+        subjectType: "locations",
+        subjectId: location.id,
+        actorId: current.user?.id,
+      }),
+    ]);
   };
 
   const children = [...(location.children ?? [])].sort((a, b) =>
@@ -149,21 +148,33 @@ export function LocationDetailPage() {
           >
             + Ticket
           </button>
+          {(location.checkpoints ?? []).length > 0 && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setShowCheckin(true)}
+            >
+              Check in manually
+            </button>
+          )}
         </div>
       </div>
 
       <div className={isMobile ? undefined : "grid-2"}>
         <div>
+          {location.type?.tracksStatus && (
           <div className="field">
             <span className="field-label">Status</span>
             <div className="field-value row">
               {canManage ? (
                 <select
                   className="select select-inline"
-                  value={location.status}
+                  value={location.status ?? "vacant"}
                   onChange={(e) => setStatus(e.target.value)}
                 >
-                  {[...new Set([...STANDARD_STATUSES, location.status])].map((s) => (
+                  {[
+                    ...new Set([...STANDARD_STATUSES, location.status ?? "vacant"]),
+                  ].map((s) => (
                     <option key={s} value={s}>
                       {statusLabel(s)}
                     </option>
@@ -185,29 +196,22 @@ export function LocationDetailPage() {
               )}
             </div>
           </div>
-
-          {location.type?.allowsReservations && canManage && (
-            <div className="field">
-              <span className="field-label">Reservations</span>
-              <label className="row" style={{ cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={location.reservationEnabled}
-                  onChange={toggleReservations}
-                />
-                <span className="small">
-                  {location.reservationEnabled ? "Enabled" : "Disabled"} for this location
-                </span>
-              </label>
-            </div>
           )}
+
+          {/* Whether a location takes reservations, and what it becomes after
+              one, is configuration — it belongs with the rest of a
+              location's setup in Admin, not on the page a guard opens to see
+              what's in front of them. Status stays: marking a slip
+              needs_cleaning is the work, not a setting. */}
 
           {carriesBoat && (
             <div className="field">
               <span className="field-label">Current boat</span>
               <div className="field-value">
                 {location.currentBoat ? (
-                  <Link to="/boats">{location.currentBoat.name}</Link>
+                  <Link to={`/boats/${location.currentBoat.id}`}>
+                    {location.currentBoat.name}
+                  </Link>
                 ) : (
                   <span className="muted">Vacant — no boat</span>
                 )}
@@ -220,7 +224,7 @@ export function LocationDetailPage() {
               <span className="field-label">Current vehicle</span>
               <div className="field-value">
                 {location.currentVehicle ? (
-                  <Link to="/boats">
+                  <Link to={`/vehicles/${location.currentVehicle.id}`}>
                     {location.currentVehicle.description}
                     {location.currentVehicle.plateNumber
                       ? ` · ${location.currentVehicle.plateNumber}`
@@ -239,7 +243,7 @@ export function LocationDetailPage() {
               <div className="field-value">
                 {owners.map((o) => (
                   <div key={o.id}>
-                    {o.name ?? "Unnamed contact"}
+                    <Link to={`/contacts/${o.id}`}>{o.name ?? "Unnamed contact"}</Link>
                     {current.can("view_contact") && (
                       <span className="muted small">
                         {o.phone ? ` · ${o.phone}` : ""}
@@ -252,18 +256,39 @@ export function LocationDetailPage() {
             </div>
           )}
 
-          {current.can("view_lease") && activeLease && (
+          {current.can("view_lease") && (
             <div className="field">
               <span className="field-label">Lease</span>
-              <div className="field-value">
-                {(activeLease.lessees ?? []).map((c) => c.name ?? "Unnamed").join(", ") ||
-                  "Lease on file"}
-                <span className="muted small">
-                  {activeLease.endDate
-                    ? ` · through ${new Date(activeLease.endDate).toLocaleDateString()}`
-                    : " · open-ended"}
-                </span>
-              </div>
+              {activeLease ? (
+                <div className="field-value">
+                  <Link to={`/contacts/leases/${activeLease.id}`}>
+                    {(activeLease.lessees ?? [])
+                      .map((c) => c.name ?? "Unnamed")
+                      .join(", ") || "Lease on file"}
+                  </Link>
+                  <span className="muted small">
+                    {activeLease.endDate
+                      ? ` · through ${new Date(activeLease.endDate).toLocaleDateString()}`
+                      : " · open-ended"}
+                  </span>
+                </div>
+              ) : current.can("manage_lease") && location.leaseEnabled ? (
+                <div className="field-value">
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() =>
+                      navigate("/contacts/leases/new", {
+                        state: { locationId: location.id },
+                      })
+                    }
+                  >
+                    + Add a lease
+                  </button>
+                </div>
+              ) : (
+                <div className="field-value muted">None</div>
+              )}
             </div>
           )}
         </div>
@@ -293,7 +318,11 @@ export function LocationDetailPage() {
               {children.map((c) => (
                 <Link key={c.id} to={`/locations/${c.id}`} className="card spread" style={{ textDecoration: "none", color: "inherit" }}>
                   <span className="card-title">{c.name}</span>
-                  <span className={statusBadgeClass(c.status)}>{statusLabel(c.status)}</span>
+                  {c.type?.tracksStatus && (
+                    <span className={statusBadgeClass(c.status)}>
+                      {statusLabel(c.status)}
+                    </span>
+                  )}
                 </Link>
               ))}
             </Section>
@@ -359,6 +388,13 @@ export function LocationDetailPage() {
 
       {showNoteDialog && (
         <NoteDialog target={selfTarget} onClose={() => setShowNoteDialog(false)} />
+      )}
+
+      {showCheckin && (
+        <ManualCheckinDialog
+          initialCheckpointId={(location.checkpoints ?? [])[0]?.id}
+          onClose={() => setShowCheckin(false)}
+        />
       )}
     </div>
   );

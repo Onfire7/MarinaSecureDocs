@@ -1,26 +1,34 @@
-import { useEffect, useRef } from "react";
-import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useAuth } from "@clerk/clerk-react";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { db } from "../../lib/db";
+import { useCurrent } from "../../lib/auth/CurrentUserContext";
+import type { AttachmentTarget } from "../../lib/attachments";
+import { NoteDialog } from "../shared/NoteDialog";
 import { useCheckpointVisit } from "./useCheckpointVisit";
+import { ChecklistItemsPanel } from "./ActiveChecklistPage";
 
 const IDLE_TIMEOUT_MS = 10 * 60_000;
 
 // Checklists & Tours — Checkpoint Check-In (see pages/checkpoint-checkin.html).
-// What a checkpoint's NFC/QR guid_url opens. Sits outside the normal
-// authenticated route tree since it's a public deep link — an unauthenticated
-// visit detours through Sign In / User Switch and resumes here afterward.
+// What a checkpoint's NFC/QR guid_url opens. CheckinRoute in App.tsx has
+// already established the Clerk session and the current-user context by the
+// time this renders — an unauthenticated scan detours through Sign In there
+// and resumes here afterward.
+//
+// A checkpoint scanned by NfcScanToggle while the app is already open takes
+// a different path entirely (CheckpointScanModal, a chrome-less overlay) —
+// this page is specifically what a *fresh* scan-launched tab lands on, which
+// is why window-close/idle-timeout behavior below only makes sense here.
 export function CheckpointCheckinPage() {
   const { guidUrl } = useParams();
-  const { isLoaded, isSignedIn } = useAuth();
   const navigate = useNavigate();
+  const current = useCurrent();
   const [searchParams] = useSearchParams();
   const resumeCheckInId = searchParams.get("checkin") ?? undefined;
+  const [showNoteDialog, setShowNoteDialog] = useState(false);
 
   const { data, isLoading: cpLoading } = db.useQuery(
-    guidUrl && isSignedIn
-      ? { checkpoints: { $: { where: { guidUrl } }, location: {} } }
-      : null,
+    guidUrl ? { checkpoints: { $: { where: { guidUrl } }, location: {} } } : null,
   );
   const checkpoint = data?.checkpoints?.[0];
 
@@ -42,15 +50,6 @@ export function CheckpointCheckinPage() {
 
   const done = visit.allTriggeredComplete || visit.hasNoApplicable;
   useCloseWhenDone(done);
-
-  if (!isLoaded) return null;
-
-  if (!isSignedIn) {
-    const returnTo = `${window.location.pathname}${window.location.search}`;
-    return <Navigate to={`/sign-in?returnTo=${encodeURIComponent(returnTo)}`} replace />;
-  }
-
-  if (!guidUrl) return null;
 
   if (cpLoading) {
     return (
@@ -74,8 +73,50 @@ export function CheckpointCheckinPage() {
     );
   }
 
+  const target: AttachmentTarget = {
+    type: "checkpoint",
+    id: checkpoint.id,
+    label: checkpoint.name,
+  };
+
   return (
     <div>
+      <CheckpointCheckinView
+        checkpoint={checkpoint}
+        visit={visit}
+        canCreateIncidents={current.can("create_incidents")}
+        onNote={() => setShowNoteDialog(true)}
+        onIncident={() => navigate("/incidents/new", { state: { target } })}
+      />
+
+      {showNoteDialog && (
+        <NoteDialog target={target} onClose={() => setShowNoteDialog(false)} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * The checkpoint-visit UI itself, with no opinion on how it's framed — used
+ * both by the full page above (fresh scan-launched tab) and by
+ * CheckpointScanModal (a tag scanned while the app's already open). Pure
+ * presentation: all data comes in as props, all actions go out as callbacks.
+ */
+export function CheckpointCheckinView({
+  checkpoint,
+  visit,
+  canCreateIncidents,
+  onNote,
+  onIncident,
+}: {
+  checkpoint: { id: string; name: string; location?: { name: string } | null };
+  visit: ReturnType<typeof useCheckpointVisit>;
+  canCreateIncidents: boolean;
+  onNote: () => void;
+  onIncident: () => void;
+}) {
+  return (
+    <>
       <div className="page-head">
         <h1 className="page-title">{checkpoint.name}</h1>
         <GpsPill status={visit.gpsStatus} />
@@ -85,33 +126,39 @@ export function CheckpointCheckinPage() {
       <div className="section-title" style={{ marginTop: 16 }}>
         Applicable now
       </div>
-      {visit.applicableChecklists.length === 0 ? (
+      {visit.applicableSections.length === 0 ? (
         <div className="placeholder">
           <div className="big">Nothing triggers right now</div>
-          No checklist currently applies at this checkpoint.
+          No checklist section currently applies at this checkpoint.
         </div>
       ) : (
-        <div className="stack">
-          {visit.applicableChecklists.map((c) => (
-            <div key={c.id} className="card">
-              <div className="card-title">{c.templateName}</div>
-              <div className="card-meta">
-                {c.status === "complete"
-                  ? "Complete"
-                  : c.status === "in_progress"
-                    ? "In Progress"
-                    : "Not Started"}
-              </div>
-              <div className="row" style={{ marginTop: 8 }}>
-                <Link to={`/checklists/${c.id}`} className="btn btn-primary btn-sm">
-                  {c.status === "not_started" ? "Begin Checklist" : "Resume Checklist"}
-                </Link>
-              </div>
+        <div className="stack" style={{ gap: 14 }}>
+          {/* Each applicable section of each open checklist, headed by its
+              parent checklist's name and ready to work right here rather
+              than behind an extra "Begin Checklist" tap. */}
+          {visit.applicableSections.map((s) => (
+            <div key={s.id} className="card">
+              <ChecklistItemsPanel
+                checklistId={s.instanceId}
+                sectionId={s.id}
+                compact
+              />
             </div>
           ))}
         </div>
       )}
-    </div>
+
+      <div className="row" style={{ marginTop: 16 }}>
+        <button type="button" className="btn btn-sm" onClick={onNote}>
+          + Note
+        </button>
+        {canCreateIncidents && (
+          <button type="button" className="btn btn-sm" onClick={onIncident}>
+            + Incident
+          </button>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -122,10 +169,15 @@ function GpsPill({ status }: { status: "pending" | "clear" | "outside_radius" | 
   return <span className="badge">Location unavailable</span>;
 }
 
-// Closes this tab once nothing is left unfinished — or, if the app isn't
-// installed and the browser refuses to close a tab it didn't itself open,
-// falls back to redirecting to the Dashboard and keeps retrying the close on
-// every subsequent focus (see spec: "Tab pileup").
+// Closes this tab once nothing is left unfinished. window.close() only
+// works on a tab the script itself opened, which a scan-launched tab
+// usually isn't — that failure is silent (no return value, no event), so
+// the immediate attempt below must NOT also redirect: the guard needs the
+// chance to actually see this screen (and use the note/incident actions on
+// it) before anything whisks them away. Redirecting to the Dashboard is
+// reserved for the "never revisited" fallback — the idle timeout — so a tab
+// left open in the background at least shows something current rather than
+// a dead checkpoint screen (see spec: "Tab pileup").
 function useCloseWhenDone(done: boolean) {
   const navigate = useNavigate();
   const doneRef = useRef(done);
@@ -136,8 +188,7 @@ function useCloseWhenDone(done: boolean) {
     if (!done || attempted.current) return;
     attempted.current = true;
     window.close();
-    navigate("/", { replace: true });
-  }, [done, navigate]);
+  }, [done]);
 
   useEffect(() => {
     const retry = () => {
@@ -146,12 +197,15 @@ function useCloseWhenDone(done: boolean) {
     document.addEventListener("visibilitychange", retry);
     window.addEventListener("focus", retry);
     const idle = setTimeout(() => {
-      if (doneRef.current) window.close();
+      if (doneRef.current) {
+        window.close();
+        navigate("/", { replace: true });
+      }
     }, IDLE_TIMEOUT_MS);
     return () => {
       document.removeEventListener("visibilitychange", retry);
       window.removeEventListener("focus", retry);
       clearTimeout(idle);
     };
-  }, []);
+  }, [navigate]);
 }

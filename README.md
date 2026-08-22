@@ -48,8 +48,18 @@ src/
     locations/           Location list/maps, Location detail, Checkpoint detail
     tickets/             Ticket queue, Ticket detail, New ticket form
     incidents/           Incident list, Incident detail, New incident form
-    shared/              placeholders, More menu, config screen,
-                         attachment-target picker, note dialog
+    reservations/        Reservation list/calendar/map, detail (+ check-in/out
+                         dialog), New reservation form
+    boats/               Boat & Vehicle lists/details, owners-succession editor
+    contacts/            Contact list/detail, nameless-contact merge, leases
+    assets/              Asset list/detail, checkout/return, meter update
+    activity/            permission-scoped Activity Log feed
+    reports/             Reports home (aggregates), Shift report
+    admin/               all 10 configuration screens, each independently gated
+    comms/               Comms home, chat rooms, SMS threads, call dialogs,
+                         active-call panel, missed-comms badge
+    shared/              More menu, config screen, attachment-target picker,
+                         note dialog, schematic map, target activity sections
   styles/app.css         design tokens + component styles
 ```
 
@@ -71,9 +81,68 @@ src/
 - ✅ Incidents group: permission-gated list, Incident detail (author-locked
   original + permanent addendum thread, linked tickets), New incident form
   (inline type creation, optional raise-linked-ticket)
-- ⬜ Everything else renders a placeholder — see the docs' page-spec list for
-  the remaining groups (Comms, Reservations, Boats & Vehicles, Owners &
-  Contacts, Assets, Activity Log, Reports, Admin), plus InstantDB permission
-  rules, Netlify Functions (shift report + scheduled jobs — including
-  scheduled-trigger Checklist generation and time-based maintenance rules),
-  and Twilio Functions (telephony bridge).
+- ✅ Reservations group: list/calendar/schematic-map views, Reservation
+  detail with check-in/check-out dialog (target status side effects,
+  early/late tracking), New reservation form (reservable-targets-only
+  picker, overlap guard per MarinaSettings)
+- ✅ Boats & Vehicles group: tabbed lists with search, Boat detail
+  (owners-in-succession editor, slip reassignment, lease), Vehicle detail
+  (optional plate/owners, location reassignment)
+- ✅ Owners & Contacts group: contact list/detail with merge resolution,
+  nameless-contact name prompt & merge dialog, Lease detail (doubles as the
+  creation form, document upload, comment thread)
+- ✅ Assets group: asset list/detail with status + meter history, checkout /
+  return dialog (post-return status applied on return), meter update dialog
+  (absolute reading or accrued hours, correction reason, inline
+  maintenance-rule tickets)
+- ✅ Activity Log: entries generated at write time across every implemented
+  write path, feed scoped per entry by its subject's own permission,
+  Protected flag under `manage_marina_settings`
+- ✅ Reports: Reports home (aggregate-only sections + shift list, gated by
+  `view_reports`), Shift report compiled live by timestamp window
+- ✅ Admin: home tile picker plus Users, Roles & Permissions (trinary
+  matrix), Checklist Templates (builder with per-item config), Location
+  Types & Locations (hierarchy, checkpoints, map upload and drag-plotting),
+  Tours, Incident Types, Asset Categories & Maintenance Rules, SMS
+  Templates, and Marina Settings — each independently permission-gated
+- ✅ Comms: chat rooms (fully working — ordinary InstantDB data, so offline
+  too) with participant computation and the join overlay; Comms home's three
+  independently gated sections; SMS threads with template picker; call/SMS
+  dialogs; active-call panel; floating missed-comms badge
+
+**Every screen in the page-spec list now exists.** What remains is the
+backend, without which some actions can't complete:
+
+- ⬜ **Twilio Functions** (telephony bridge) — calls and SMS *read* fine, but
+  nothing creates that data and sending/placing fails with an explicit
+  error until the bridge is deployed.
+- ⬜ **Netlify Functions** — shift-report send, plus the scheduled jobs:
+  checklist-trigger generation, time-based maintenance rules, and the
+  Activity Log retention purge.
+- 🟡 **InstantDB permission rules** — `instant.perms.ts` blocks anonymous
+  access (every namespace requires a signed-in Clerk identity), runtime
+  attribute creation is off, `$users` is read-only, and Activity Log entries
+  can't be deleted from the client. Two stronger tiers are written in that
+  file but deliberately inactive, each with its blocker documented inline:
+  requiring an *active marina User* (blocked until the app actually creates
+  the `userAuth` link on sign-in), and gating `roles`/`users` writes on the
+  `canManageRoles`/`canManageUsers` cache (blocked until that cache is
+  backfilled — enforcing first deadlocks all admin access; it happened).
+  Per-permission enforcement for everything else (`view_incidents`,
+  `manage_locations`, …) is client-side only.
+- ⬜ **Clerk invitation emails** from Admin → Users need a server-side call;
+  provisioning + email-matched first sign-in works today.
+
+## Deployment
+
+The app deploys to Netlify from this repo's root (`netlify.toml`); `docs/`
+stays on GitHub Pages. Branch deploys of `beta` are the working preview.
+Two per-environment settings live outside the repo:
+
+- **Netlify env vars**: `VITE_CLERK_PUBLISHABLE_KEY` and
+  `VITE_INSTANT_APP_ID` (both public-by-design; never `CLERK_SECRET_KEY`).
+- **Instant allowed origins**: every origin that serves the app (the
+  Netlify URL, `http://localhost:5173`, a LAN IP for phone testing) must be
+  added in the Instant dashboard → Auth, or the Clerk → Instant token
+  exchange fails with "Unauthorized origin" and the app shows "Can't reach
+  the marina database" after sign-in.

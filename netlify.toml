@@ -1,3 +1,32 @@
+# Netlify build config for the MarinaSecure app (see README — Deployment).
+#
+# The site builds from the repo root; docs/ stays on GitHub Pages. Branch
+# deploys of `beta` give a stable preview origin, which matters because
+# Instant validates the browser origin — an unknown origin fails the
+# Clerk → Instant token exchange with "Unauthorized origin" (surfaced by
+# the in-app "Can't reach the marina database" screen). Any origin serving
+# this app must be added to the Instant dashboard's allowed origins.
+#
+# Required environment variables (Netlify UI → Site settings → Environment):
+#   VITE_CLERK_PUBLISHABLE_KEY  — public by design (pk_...)
+#   VITE_INSTANT_APP_ID         — public by design
+# Never add CLERK_SECRET_KEY here; the frontend build must not see it.
+
 [build]
   command = "npm run build"
   publish = "dist"
+
+[build.environment]
+  # Vite 8 requires Node 20.19+ / 22.12+.
+  NODE_VERSION = "22"
+  # Both VITE_ values are compiled into the public bundle on purpose
+  # (publishable key + public app id); without this, Netlify's secrets
+  # scanner sees env values in the output and fails the build.
+  SECRETS_SCAN_OMIT_KEYS = "VITE_CLERK_PUBLISHABLE_KEY,VITE_INSTANT_APP_ID"
+
+# Single-page app: react-router owns all paths (including /checkin/:guidUrl
+# deep links from NFC tags/QR codes), so every URL serves index.html.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

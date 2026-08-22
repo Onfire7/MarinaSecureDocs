@@ -15,7 +15,7 @@
     <nav>
       <h3>Overview</h3>
       <a href="../index.html">Introduction</a>
-      <a href="../terminology.html">Terminology</a>
+      <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
       <a href="../architecture.html">Stack &amp; Architecture</a>
@@ -36,18 +36,19 @@
 
   <main class="content">
     <span class="eyebrow">Checklists &amp; Tours · Page Specification</span>
-    <h1>Tour Progress View</h1>
-    <p class="lede">Security-only view of where a guard stands within their current Tour — presentation differs by tour mode, since Randomized mode must not reveal the full remaining route.</p>
+    <h1>Tour Progress</h1>
+    <p class="lede">Security-only view of where a guard stands within a Tour — rendered as an inline section of <a href="checklist-list.html">Checklist list</a>, not a separate page. Presentation differs by tour mode, since Randomized mode must not reveal the full remaining route.</p>
 
     <h2>Purpose</h2>
-    <p>Reached from the Tours tab on <a href="checklist-list.html">Checklist list</a>. Read-only progress tracker — actual check-ins happen through <a href="checkpoint-checkin.html">Checkpoint check-in</a> or the <a href="manual-checkin-dialog.html">manual dialog</a>, not here.</p>
+    <p>One section per tour, directly below the open checklists on <a href="checklist-list.html">Checklist list</a>, under a small heading carrying the tour's name, mode, remaining count, and progress bar. A guard typically has exactly one active tour, so a dedicated page put its steps two navigations from where every round starts; <code>/checklists/tours/:tourId</code> now redirects to the Checklist list so old links and bookmarks still land. Read-only progress tracker — actual check-ins happen through <a href="checkpoint-checkin.html">Checkpoint check-in</a> or the <a href="manual-checkin-dialog.html">manual dialog</a>, not here.</p>
+    <p><strong>Ordering principle: work leads, done recedes — expressed per mode.</strong> Linear and Randomized keep visited stops out of their sequence view entirely, collapsing them into a "Visited this shift · N" disclosure; Freeform shows everything but lets color do the backgrounding, since its location containers stay glanceable either way. A header badge ("4 of 6 left" / "Complete ✓") and a progress bar answer the state question before any list is read.</p>
 
     <h2>Data shown, by mode</h2>
     <table>
       <tr><th>Mode</th><th>Display</th></tr>
-      <tr><td>Linear</td><td>The full ordered checkpoint list from <code>Tour.checkpoints</code>, with completed checkpoints marked and the next one highlighted.</td></tr>
-      <tr><td>Freeform</td><td>The full checkpoint set, marked visited/remaining, in no particular order — all must be visited before shift end but order is the guard's choice.</td></tr>
-      <tr><td>Randomized</td><td>Only the currently-available next checkpoint(s) are shown, plus a remaining count. The rest of the set is deliberately withheld so patrol patterns stay unpredictable, per <a href="../workflows.html">Role Workflows</a>.</td></tr>
+      <tr><td>Linear</td><td>The next stop as a hero card ("NEXT — STOP 3 OF 6", name, location), then the rest of the route in order under "Then". Sequence numbers are positions in the full route, so they stay stable as stops are completed. Visited stops appear only in the collapsed section.</td></tr>
+      <tr><td>Freeform</td><td>One container per parent location — the unit a guard works a round in: finish this dock, move on — holding that location's checkpoints as buttons <strong>color-coded by this-shift status</strong>: visited green with a ✓, remaining neutral. Color carries the done/left split without hiding either, so freeform has no separate visited disclosure; each container shows its own n/m count, fully-visited containers sink to the bottom and dim, and every button links to its checkpoint. All must be visited before shift end but order is the guard's choice.</td></tr>
+      <tr><td>Randomized</td><td>Only the currently-available next checkpoint is shown, plus a remaining count. The rest of the set is deliberately withheld so patrol patterns stay unpredictable, per <a href="../workflows.html">Role Workflows</a>. The collapsed visited section is shown as in the other modes — it reveals nothing about what remains.</td></tr>
     </table>
 
     <h2>Actions</h2>
@@ -65,7 +66,7 @@
     </ul>
 
     <h2>Mobile vs. desktop</h2>
-    <p>Mobile is the primary surface — used in the field mid-round. A desktop rendering is useful for a manager watching a guard's progress live from the office; same data, read-only either way, with desktop showing a larger map alongside the list.</p>
+    <p>Mobile is the primary surface — used in the field mid-round. The inline section renders identically on desktop; a manager watching a guard's progress does so through <a href="reports-home.html">Reports</a> rather than this guard-scoped view, whose progress is always the signed-in user's own check-ins.</p>
 
     <div class="page-foot">
       <a href="manual-checkin-dialog.html">← Manual Check-In Dialog</a>

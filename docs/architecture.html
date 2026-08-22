@@ -15,7 +15,7 @@
     <nav>
       <h3>Overview</h3>
       <a href="index.html">Introduction</a>
-      <a href="terminology.html">Terminology</a>
+      <a href="../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
       <a href="architecture.html" class="current">Stack &amp; Architecture</a>
@@ -96,7 +96,7 @@
       <li>Write call/SMS metadata, recordings, and transcriptions (where enabled) into InstantDB as they occur, so the frontend simply reads live data rather than polling Twilio directly.</li>
       <li>Accept outbound call/SMS initiation requests from the frontend and relay them to Twilio.</li>
       <li>Send the shift-report email via Twilio SendGrid on behalf of the shift-report Netlify Function (see "Shift report delivery" below).</li>
-      <li>Perform contact matching (incoming number → existing Contact, or create a new one) as described in <a href="terminology.html">Terminology</a> and detailed further in <a href="data-model.html">Data Model</a>.</li>
+      <li>Perform contact matching (incoming number → existing Contact, or create a new one) as described in <a href="../CONTEXT.md">Terminology</a> and detailed further in <a href="data-model.html">Data Model</a>.</li>
     </ul>
     <p>Twilio Functions are the <strong>single gateway to Twilio</strong> — every caller that needs Twilio to do something routes through them rather than talking to Twilio directly: Twilio itself (inbound webhooks), the frontend (initiating a call/SMS), and Netlify Functions (sending the shift-report email). No other part of the system holds a Twilio credential.</p>
     <p>Functions write to InstantDB using its server-side/admin API, authenticated with a per-marina admin token stored as an encrypted Twilio Function environment variable — never exposed to the frontend. Full request/response shape is covered in <a href="api-structure.html">API Structure</a>. These Functions are intentionally thin: no business logic beyond bridging Twilio events into InstantDB records; everything else (call UI, notes, missed-call badges) is frontend behavior reacting to that data.</p>
@@ -161,7 +161,7 @@ Shift-report email
     </div>
 
     <h2>Activity Log generation</h2>
-    <p>The Activity Log (see <a href="terminology.html">Terminology</a>) is generated at write time, immutably, by the same code paths that make the underlying change — not reconstructed later from other tables. As a rule of thumb: any user-initiated change to persisted data should produce a corresponding entry, with two categories of exception:</p>
+    <p>The Activity Log (see <a href="../CONTEXT.md">Terminology</a>) is generated at write time, immutably, by the same code paths that make the underlying change — not reconstructed later from other tables. As a rule of thumb: any user-initiated change to persisted data should produce a corresponding entry, with two categories of exception:</p>
     <ul>
       <li>Changes to the Activity Log itself (it doesn't log its own writes).</li>
       <li>High-frequency, low-value changes where logging would create noise without benefit (exact boundaries to be defined per entity in <a href="data-model.html">Data Model</a>).</li>
@@ -169,9 +169,18 @@ Shift-report email
     <p>Each marina configures a retention period for Activity Log entries; individual entries can be flagged <strong>Protected</strong> to survive any retention purge, for legal or evidentiary reasons.</p>
 
     <div class="page-foot">
-      <a href="terminology.html">← Terminology</a>
+      <a href="../CONTEXT.md">← Terminology</a>
       <a href="data-model.html">Data Model →</a>
     </div>
+  
+    <h2>Inline editing and the local-first echo</h2>
+    <p>Admin edits fields in place rather than through save-buttoned forms. The naive implementation — write to InstantDB on every <code>onChange</code> and read <code>value</code> straight back from <code>useQuery</code> — is broken, and was: the round-trip is asynchronous, so React re-renders mid-word with the previous stored value. The caret jumps to the end, and on mobile the IME, which composes against the DOM value it last observed, reinserts what it believes is still pending and duplicates text after the caret. Deleting is worst, because the echo restores the character just removed.</p>
+    <p>Every inline field therefore goes through the shared draft components in <code>pages/shared/DraftInput.tsx</code>. The rule they enforce: <strong>while a field has focus, the local draft is the single source of truth and incoming values are ignored.</strong> External edits are adopted on blur, so a co-admin's change still lands, just never underneath someone's cursor. Writes are debounced while typing and flushed on blur and on unmount, so collapsing a card or navigating away cannot lose the last keystrokes. A number variant keeps the raw string locally — so a half-typed value stays editable — and reports <code>undefined</code> when cleared, which is how the schema spells "fall back to the default".</p>
+    <p>This is a general consequence of a local-first store, not a quirk of one screen: any controlled input bound directly to synced state has the same defect.</p>
+
+    <h2>Mobile layout constraints</h2>
+    <p>The shell is a desktop sidenav and a mobile tab bar over the same pages, so every layout primitive has to survive a 375px viewport. Two rules in <code>styles/app.css</code> carry most of that weight, because flex and grid children default to <code>min-width: auto</code> and so refuse to shrink below their content — a long location path or a wide inline control pushes out of its card instead of compressing. <code>.row</code>, <code>.spread</code>, <code>.grid-2</code> and <code>.stack</code> children are therefore given <code>min-width: 0</code>, <code>.select-inline</code> is capped at <code>max-width: 100%</code>, and below 900px <code>.row</code> and <code>.spread</code> wrap, since a card header pairing a name field with three or four buttons genuinely cannot fit on one line. Content that is legitimately wider than a phone — the permission matrix, long scan URLs — scrolls or breaks inside its own container rather than widening the page.</p>
+
   </main>
 </div>
 </body>

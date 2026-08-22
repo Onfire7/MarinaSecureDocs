@@ -5,6 +5,10 @@ import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import {
+  SchematicMapView,
+  type MarinaMapRecord,
+} from "../shared/SchematicMapView";
+import {
   STANDARD_STATUSES,
   compareNames,
   statusBadgeClass,
@@ -21,11 +25,11 @@ type ViewMode = "list" | "pins" | "schematic";
 type LocationRow = {
   id: string;
   name: string;
-  status: string;
+  status?: string;
   reservationEnabled: boolean;
   gpsLat?: number;
   gpsLng?: number;
-  type?: { id: string; name: string } | null;
+  type?: { id: string; name: string; tracksStatus?: boolean } | null;
   parent?: { id: string } | null;
   currentBoat?: { id: string; name: string } | null;
   currentVehicle?: { id: string; description: string } | null;
@@ -54,7 +58,7 @@ export function LocationListPage() {
 
   const statuses = useMemo(() => {
     const set = new Set<string>(STANDARD_STATUSES);
-    for (const l of locations) set.add(l.status);
+    for (const l of locations) if (l.status) set.add(l.status);
     return [...set];
   }, [locations]);
 
@@ -148,6 +152,7 @@ function ListView({
   canManage: boolean;
 }) {
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   // Mobile drills level by level; desktop shows the whole indented tree.
   const [drillStack, setDrillStack] = useState<LocationRow[]>([]);
 
@@ -205,8 +210,12 @@ function ListView({
                 location={l}
                 canManage={canManage}
                 childCount={kids.length}
+                // A location with no children is a drill-in dead end — tapping
+                // it opens its details instead, rather than doing nothing.
                 onDrill={
-                  kids.length > 0 ? () => setDrillStack([...drillStack, l]) : undefined
+                  kids.length > 0
+                    ? () => setDrillStack([...drillStack, l])
+                    : () => navigate(`/locations/${l.id}`)
                 }
               />
             );
@@ -258,14 +267,16 @@ function LocationCard({
         </div>
       </div>
       <div className="row">
-        {canManage ? (
+        {!location.type?.tracksStatus ? null : canManage ? (
           <select
             className="select select-inline"
-            value={location.status}
+            value={location.status ?? "vacant"}
             onClick={(e) => e.stopPropagation()}
             onChange={(e) => setStatus(e.target.value)}
           >
-            {[...new Set([...STANDARD_STATUSES, location.status])].map((s) => (
+            {[
+              ...new Set([...STANDARD_STATUSES, location.status ?? "vacant"]),
+            ].map((s) => (
               <option key={s} value={s}>
                 {statusLabel(s)}
               </option>
@@ -347,120 +358,17 @@ function PinMap({ locations }: { locations: LocationRow[] }) {
 
 // ---------------------------------------------------------------- Schematic
 
-type MapRecord = {
-  id: string;
-  name: string;
-  scope?: { id: string; name: string; parent?: { id: string } | null } | null;
-  image?: { url: string } | null;
-  placements?: {
-    id: string;
-    // Center + dimensions as percentages (0–100) of the map image,
-    // rotation in degrees clockwise (see data-model — LocationMapPlacement).
-    placement: {
-      cx: number;
-      cy: number;
-      width: number;
-      height: number;
-      rotation: number;
-    };
-    location?: { id: string; name: string; status: string } | null;
-  }[];
-};
-
-function SchematicMap({ maps }: { maps: MapRecord[] }) {
+function SchematicMap({ maps }: { maps: MarinaMapRecord[] }) {
   const navigate = useNavigate();
-  const [mapStack, setMapStack] = useState<MapRecord[]>([]);
-
-  const rootMaps = maps.filter((m) => !m.scope?.parent);
-  const mapForLocation = (locationId: string) =>
-    maps.find((m) => m.scope?.id === locationId);
-
-  const active =
-    mapStack.at(-1) ?? (rootMaps.length === 1 ? rootMaps[0] : undefined);
-
-  // Multi-property marina: choose which root overview map to open first.
-  if (!active) {
-    return (
-      <div className="stack">
-        <div className="section-title">Choose a property</div>
-        {rootMaps.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            className="card spread"
-            style={{ cursor: "pointer", textAlign: "left", font: "inherit" }}
-            onClick={() => setMapStack([m])}
-          >
-            <span className="card-title">{m.scope?.name ?? m.name}</span>
-            <span className="muted small">{m.placements?.length ?? 0} plotted</span>
-          </button>
-        ))}
-        {rootMaps.length === 0 && (
-          <div className="placeholder">
-            <div className="big">No overview map uploaded yet</div>
-            Maps are uploaded and plotted in Admin → Locations.
-          </div>
-        )}
-      </div>
-    );
-  }
+  const { data } = db.useQuery({ locations: {} });
+  const statusById = new Map((data?.locations ?? []).map((l) => [l.id, l.status]));
 
   return (
-    <div>
-      <div className="row" style={{ marginBottom: 10 }}>
-        {(mapStack.length > 1 || (mapStack.length === 1 && rootMaps.length > 1)) && (
-          <button
-            type="button"
-            className="btn btn-sm btn-quiet"
-            onClick={() => setMapStack(mapStack.slice(0, -1))}
-          >
-            ← Back
-          </button>
-        )}
-        <span className="section-title" style={{ marginBottom: 0 }}>
-          {active.scope?.name ?? active.name}
-        </span>
-      </div>
-
-      <div className="map-canvas map-schematic">
-        {active.image?.url && (
-          <img src={active.image.url} alt={active.name} className="map-image" />
-        )}
-        {(active.placements ?? []).map((p) => {
-          if (!p.location) return null;
-          const colors = statusMapColors(p.location.status);
-          const childMap = mapForLocation(p.location.id);
-          return (
-            <button
-              key={p.id}
-              type="button"
-              className="map-rect"
-              style={{
-                left: `${p.placement.cx}%`,
-                top: `${p.placement.cy}%`,
-                width: `${p.placement.width}%`,
-                height: `${p.placement.height}%`,
-                transform: `translate(-50%, -50%) rotate(${p.placement.rotation ?? 0}deg)`,
-                background: colors.background,
-                borderColor: colors.border,
-              }}
-              title={`${p.location.name} — ${statusLabel(p.location.status)}`}
-              onClick={() =>
-                childMap
-                  ? setMapStack([...mapStack, childMap])
-                  : navigate(`/locations/${p.location!.id}`)
-              }
-            >
-              {p.location.name}
-              {childMap && " ▸"}
-            </button>
-          );
-        })}
-      </div>
-      <p className="muted small" style={{ marginTop: 8 }}>
-        Rectangles are color-coded by status. A ▸ marker drills into that
-        location's own detail map; anything else opens the location.
-      </p>
-    </div>
+    <SchematicMapView
+      maps={maps}
+      colorFor={(locationId) => statusMapColors(statusById.get(locationId) ?? "")}
+      onOpen={(locationId) => navigate(`/locations/${locationId}`)}
+      footnote="Rectangles are color-coded by status. A ▸ marker drills into that location's own detail map; anything else opens the location."
+    />
   );
 }

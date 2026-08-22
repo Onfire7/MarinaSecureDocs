@@ -40,12 +40,13 @@ export function targetPath(target: AttachmentTarget): string {
     case "checkpoint":
       return `/locations/checkpoints/${target.id}`;
     case "boat":
+      return `/boats/${target.id}`;
     case "vehicle":
-      return "/boats";
+      return `/vehicles/${target.id}`;
     case "contact":
-      return "/contacts";
+      return `/contacts/${target.id}`;
     case "asset":
-      return "/assets";
+      return `/assets/${target.id}`;
   }
 }
 

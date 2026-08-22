@@ -32,11 +32,30 @@ const _schema = i.schema({
       active: i.boolean(),
       // Ordered [{ card, visible }] pairs; null = derive from current roles.
       dashboardLayout: i.json<{ card: string; visible: boolean }[]>().optional(),
+      // Denormalized copies of two effective permissions (allow minus deny
+      // across every currently-held role — see lib/permissions.ts),
+      // rewritten by Admin Roles/Users whenever a role's grants or this
+      // user's role links change. Plain booleans rather than a permission
+      // array: instant.perms.ts rules can only reach these via a single-hop
+      // auth.ref() to a scalar attribute (the same pattern already proven
+      // with `active`) — whether auth.ref() flattens a JSON array attribute
+      // or returns a list-of-lists is undocumented, so the rules never read
+      // one. Only these two are cached because they're the only permissions
+      // enforced server-side today; see instant.perms.ts.
+      canManageRoles: i.boolean().optional(),
+      canManageUsers: i.boolean().optional(),
     }),
     roles: i.entity({
       name: i.string(),
-      // Map of permission key → "allow" | "deny"; absent key = undefined (no opinion).
-      permissions: i.json<Record<string, "allow" | "deny">>(),
+      // Permission keys this role grants / explicitly denies. Was a single
+      // map<Permission, "allow"|"deny">; split into two plain string arrays
+      // because InstantDB's CEL permission rules can test list membership
+      // ("x" in data.ref(...)) but can't index into a JSON map — a rule
+      // needs "is this key present in this list", not "what's the value at
+      // this key". Absent from both = undefined (no opinion), matching the
+      // trinary model exactly.
+      allow: i.json<string[]>().optional(),
+      deny: i.json<string[]>().optional(),
     }),
 
     // ---- locations & checkpoints ----
@@ -47,13 +66,32 @@ const _schema = i.schema({
       // stay valid; absent = false.
       hasBoat: i.boolean().optional(),
       hasVehicle: i.boolean().optional(),
+      // Whether Locations of this type carry a status at all — off for
+      // organizational containers (a root property, a dock that only groups
+      // slips), which would otherwise read a meaningless "Vacant". Not
+      // occupancy specifically: `status` is an open set, so a type might
+      // track "out of service" and never be occupied by anything.
+      tracksStatus: i.boolean().optional(),
+      // The lease half of the same two-level pattern as allowsReservations:
+      // whether Locations of this type can be leased at all. Optional so
+      // rows predating the flag stay valid; absent = false.
+      allowsLeases: i.boolean().optional(),
     }),
     locations: i.entity({
       name: i.string(),
-      status: i.string(), // occupied / vacant / reserved / out_of_service / admin-defined
+      // occupied / vacant / reserved / out_of_service / needs_cleaning /
+      // admin-defined. Absent entirely when the type doesn't track status.
+      status: i.string().optional(),
       reservationEnabled: i.boolean(),
       reservationVisibility: i.string().optional(), // public / internal
       postReservationStatus: i.string().optional(),
+      // Per-location lease switch, mirroring reservationEnabled: on one dock
+      // the front slips may be reservable and the back ones leasable, and a
+      // few of each are both. Optional rather than required because rows
+      // predating it have no value; absent reads as false everywhere except
+      // the backfill, which turns it on for locations that already hold a
+      // lease (scripts/migrate-leasable-flags.mjs).
+      leaseEnabled: i.boolean().optional(),
       gpsLat: i.number().optional(),
       gpsLng: i.number().optional(),
     }),
@@ -61,15 +99,23 @@ const _schema = i.schema({
       name: i.string(),
     }),
     locationMapPlacements: i.entity({
-      // Center point + dimensions as percentages (0–100) of the map image,
-      // rotation in degrees clockwise — a plotted slip can sit at whatever
-      // angle the dock actually runs.
+      // Center point as percentages (0–100) of the map image — genuinely
+      // relative, so this is the one part of the shape percent still suits.
+      // Everything else about the rectangle's size is intrinsic to its
+      // label text (font size + padding around it) rather than an absolute
+      // percent extent, so rotation just rotates a normally-sized box
+      // instead of stretching two independent axes. Old rows may still
+      // carry the retired width/height percent fields; they're ignored,
+      // not migrated (harmless leftover keys in an opaque JSON blob).
+      // fontSize/paddingX/paddingY are optional so old rows fall back to
+      // sane defaults (see lib/locations.ts — DEFAULT_PLACEMENT_STYLE).
       placement: i.json<{
         cx: number;
         cy: number;
-        width: number;
-        height: number;
         rotation: number;
+        fontSize?: number;
+        paddingX?: number;
+        paddingY?: number;
       }>(),
     }),
     checkpoints: i.entity({
@@ -94,29 +140,70 @@ const _schema = i.schema({
     }),
 
     // ---- checklists ----
+    // Templates are authored per role and instantiated as fully materialized
+    // copies: every section and item of an instance exists as a row from the
+    // moment it's assigned, so display logic only ever renders rows. Trigger
+    // rules decide IF a row gets created; hideUntil decides WHEN it becomes
+    // visible — and once visible, nothing ever re-hides.
     checklistTemplates: i.entity({
       name: i.string(),
-      visibility: i.string(), // global / role_restricted / personal
-      triggerType: i.string().indexed(), // clock_in / clock_out / scheduled / checkpoint / incident_type / manual
-      triggerConfig: i.json<Record<string, unknown>>().optional(),
-      assignmentMode: i.string(), // triggering_user / role
+      triggerType: i.string().indexed(), // manual / clock_in / clock_out / checkpoint / recurring
+      triggerConfig: i.json<Record<string, unknown>>().optional(), // recurring: { recurrenceRule: RRULE }
+      // true: the instance is assigned to whoever triggered it; false/absent:
+      // left unclaimed for any holder of assignedRole to pick up. Optional
+      // because templates authored before the restructure have no value —
+      // a required constraint can't land over them.
+      assignedToUser: i.boolean().optional(),
+      hideUntilRule: i.string().optional(), // "HH:MM" → resolved to instance.hideUntil at creation
+      dueBy: i
+        .json<{ kind: "time"; time: string } | { kind: "offset"; minutes: number }>()
+        .optional(), // resolved to instance.dueBy at creation
+    }),
+    checklistTemplateSections: i.entity({
+      name: i.string(),
+      order: i.number(),
+      isActive: i.boolean(), // authoring switch: inactive sections are never instantiated
+      // manual and recurring sections are created with the instance
+      // (recurring only when the rule matches that day); checkpoint /
+      // location / asset sections are created lazily when that thing is
+      // actually visited, onto an already-open instance.
+      triggerType: i.string(),
+      triggerConfig: i.json<Record<string, unknown>>().optional(), // recurring: { recurrenceRule: RRULE }
+      hideUntilRule: i.string().optional(), // "HH:MM" — same semantics as the template's
+      dueBy: i
+        .json<{ kind: "time"; time: string } | { kind: "offset"; minutes: number }>()
+        .optional(),
     }),
     checklistTemplateItems: i.entity({
-      type: i.string(), // simple_check / verify_task / door_check / location_check / meter_reading
+      type: i.string(), // simple_check / verify_task / door_check / gas_pump_check / location_check / meter_reading
       label: i.string(),
       config: i.json<Record<string, unknown>>().optional(),
       order: i.number(),
+      // Copy-on-edit: committing an edit writes a NEW row (version+1,
+      // previousVersion link) and repoints the section's items link, so
+      // instance items forever reference the exact row they were created
+      // from without snapshotting config per instance. Optional because
+      // pre-restructure rows carry none; absent reads as version 1.
+      version: i.number().optional(),
     }),
-    checklists: i.entity({
+    checklistInstances: i.entity({
       status: i.string().indexed(), // not_started / in_progress / complete
-      triggeredBy: i.json<Record<string, unknown>>().optional(),
       startedAt: i.date().indexed().optional(),
       completedAt: i.date().indexed().optional(),
+      hideUntil: i.date().optional(), // absent or past = visible
+      dueBy: i.date().indexed().optional(),
     }),
-    checklistItemResults: i.entity({
+    checklistInstanceSections: i.entity({
+      label: i.string(), // copied from the template section's name at creation
+      order: i.number(),
+      hideUntil: i.date().optional(),
+      dueBy: i.date().optional(),
+    }),
+    checklistInstanceItems: i.entity({
+      order: i.number(), // copied from the template item; user-reorderable afterward
+      completedAt: i.date().optional(), // per-item completion time; unset = open
       result: i.json<Record<string, unknown>>().optional(),
       note: i.string().optional(),
-      completedAt: i.date().optional(),
     }),
 
     // ---- incidents, tickets & notes ----
@@ -183,11 +270,15 @@ const _schema = i.schema({
     // ---- reservations ----
     reservations: i.entity({
       status: i.string().indexed(), // requested / confirmed / checked_in / checked_out / cancelled
+      // billable / non_billable — chosen per booking; defaults from the
+      // target's reservationVisibility. Absent (legacy rows) falls back to
+      // that target default too.
+      billingType: i.string().optional(),
       expectedCheckin: i.date().indexed().optional(),
       expectedCheckout: i.date().indexed().optional(),
       actualCheckin: i.date().optional(),
       actualCheckout: i.date().optional(),
-      // Hidden/ignored when the target's reservationVisibility is internal:
+      // Hidden/ignored when this reservation is non_billable:
       earlyCheckin: i.date().optional(),
       lateCheckout: i.date().optional(),
       rate: i.number().optional(),
@@ -294,6 +385,9 @@ const _schema = i.schema({
         .json<{ number: string; label: string; routing?: Record<string, unknown> }[]>()
         .optional(),
       allowOverlappingReservations: i.boolean(),
+      // ask / customer — whether hauling a boat out prompts for who did it.
+      // A marina haul-out raises a Ticket; a customer one doesn't.
+      haulOutMode: i.string().optional(),
     }),
   },
 
@@ -356,10 +450,6 @@ const _schema = i.schema({
       forward: { on: "checkpoints", has: "one", label: "location" },
       reverse: { on: "locations", has: "many", label: "checkpoints" },
     },
-    checkpointTemplates: {
-      forward: { on: "checkpoints", has: "many", label: "checklistTemplates" },
-      reverse: { on: "checklistTemplates", has: "many", label: "checkpoints" },
-    },
     checkpointTours: {
       forward: { on: "checkpoints", has: "many", label: "tours" },
       reverse: { on: "tours", has: "many", label: "checkpoints" },
@@ -374,7 +464,7 @@ const _schema = i.schema({
     },
     checkInGeneratedChecklist: {
       forward: { on: "checkIns", has: "one", label: "generatedChecklist" },
-      reverse: { on: "checklists", has: "one", label: "sourceCheckIn" },
+      reverse: { on: "checklistInstances", has: "one", label: "sourceCheckIn" },
     },
 
     // checklists
@@ -382,34 +472,105 @@ const _schema = i.schema({
       forward: { on: "checklistTemplates", has: "one", label: "creator" },
       reverse: { on: "users", has: "many", label: "createdChecklistTemplates" },
     },
-    templateRole: {
-      // Role restriction (visibility) and/or role assignment target.
-      forward: { on: "checklistTemplates", has: "one", label: "role" },
+    templateAssignedRole: {
+      // Every template belongs to exactly one role (admin UI enforces it) —
+      // that role's members see and work its instances. There is no global
+      // or personal visibility anymore.
+      forward: { on: "checklistTemplates", has: "one", label: "assignedRole" },
       reverse: { on: "roles", has: "many", label: "checklistTemplates" },
     },
-    templateItems: {
-      forward: { on: "checklistTemplateItems", has: "one", label: "template" },
-      reverse: { on: "checklistTemplates", has: "many", label: "items" },
+    templateViewerRoles: {
+      // Read-only cross-role monitoring: e.g. office watches maintenance's
+      // progress without holding the role. Client-side only until the
+      // permissions overhaul.
+      forward: { on: "checklistTemplates", has: "many", label: "viewerRoles" },
+      reverse: { on: "roles", has: "many", label: "viewableChecklistTemplates" },
     },
-    checklistTemplate: {
-      forward: { on: "checklists", has: "one", label: "template" },
+    templateSections: {
+      forward: { on: "checklistTemplateSections", has: "one", label: "template" },
+      reverse: { on: "checklistTemplates", has: "many", label: "sections" },
+    },
+    sectionLocation: {
+      // A section sits in at most one location; its checkpoints must belong
+      // to that location (admin UI enforces — checkpoints can't move between
+      // locations, so this can't drift after authoring).
+      forward: { on: "checklistTemplateSections", has: "one", label: "location" },
+      reverse: { on: "locations", has: "many", label: "checklistTemplateSections" },
+    },
+    sectionCheckpointAttachments: {
+      forward: { on: "checklistTemplateSections", has: "many", label: "checkpoints" },
+      reverse: { on: "checkpoints", has: "many", label: "checklistTemplateSections" },
+    },
+    sectionAssetAttachments: {
+      forward: { on: "checklistTemplateSections", has: "many", label: "assets" },
+      reverse: { on: "assets", has: "many", label: "checklistTemplateSections" },
+    },
+    sectionItems: {
+      forward: { on: "checklistTemplateItems", has: "one", label: "section" },
+      reverse: { on: "checklistTemplateSections", has: "many", label: "items" },
+    },
+    itemPreviousVersion: {
+      // Copy-on-edit trail. No forward "current" pointer: the live version
+      // is whichever row the section's items link points at; older rows are
+      // orphaned from the section but keep their instance references.
+      forward: { on: "checklistTemplateItems", has: "one", label: "previousVersion" },
+      reverse: { on: "checklistTemplateItems", has: "many", label: "laterVersions" },
+    },
+    instanceTemplate: {
+      forward: { on: "checklistInstances", has: "one", label: "template" },
       reverse: { on: "checklistTemplates", has: "many", label: "instances" },
     },
-    checklistAssignee: {
-      forward: { on: "checklists", has: "one", label: "assignedTo" },
-      reverse: { on: "users", has: "many", label: "checklists" },
+    instanceAssignee: {
+      forward: { on: "checklistInstances", has: "one", label: "assignedTo" },
+      reverse: { on: "users", has: "many", label: "checklistInstances" },
     },
-    itemResultChecklist: {
-      forward: { on: "checklistItemResults", has: "one", label: "checklist" },
-      reverse: { on: "checklists", has: "many", label: "itemResults" },
+    instanceSections: {
+      forward: { on: "checklistInstanceSections", has: "one", label: "instance" },
+      reverse: { on: "checklistInstances", has: "many", label: "sections" },
     },
-    itemResultTemplateItem: {
-      forward: { on: "checklistItemResults", has: "one", label: "templateItem" },
-      reverse: { on: "checklistTemplateItems", has: "many", label: "results" },
+    instanceSectionTemplate: {
+      forward: { on: "checklistInstanceSections", has: "one", label: "template" },
+      reverse: { on: "checklistTemplateSections", has: "many", label: "instances" },
     },
-    itemResultTicket: {
-      forward: { on: "checklistItemResults", has: "one", label: "linkedTicket" },
+    // Location/checkpoint/asset context is copied from the template section
+    // at instantiation — the same snapshot idea as item versioning, without
+    // needing to version sections.
+    instanceSectionLocation: {
+      forward: { on: "checklistInstanceSections", has: "one", label: "location" },
+      reverse: { on: "locations", has: "many", label: "checklistInstanceSections" },
+    },
+    instanceSectionCheckpoints: {
+      forward: { on: "checklistInstanceSections", has: "many", label: "checkpoints" },
+      reverse: { on: "checkpoints", has: "many", label: "checklistInstanceSections" },
+    },
+    instanceSectionAssets: {
+      forward: { on: "checklistInstanceSections", has: "many", label: "assets" },
+      reverse: { on: "assets", has: "many", label: "checklistInstanceSections" },
+    },
+    instanceItemSection: {
+      forward: { on: "checklistInstanceItems", has: "one", label: "section" },
+      reverse: { on: "checklistInstanceSections", has: "many", label: "items" },
+    },
+    instanceItemTemplate: {
+      // Pins the exact item version this row was created from; label, type,
+      // and config are always read through here, never copied.
+      forward: { on: "checklistInstanceItems", has: "one", label: "template" },
+      reverse: { on: "checklistTemplateItems", has: "many", label: "instances" },
+    },
+    instanceItemCompletedBy: {
+      forward: { on: "checklistInstanceItems", has: "one", label: "completedBy" },
+      reverse: { on: "users", has: "many", label: "completedChecklistItems" },
+    },
+    instanceItemTicket: {
+      forward: { on: "checklistInstanceItems", has: "one", label: "linkedTicket" },
       reverse: { on: "tickets", has: "one", label: "sourceChecklistItem" },
+    },
+    instanceParentItem: {
+      // Set only on nested instances spawned by a location_check item.
+      // Replaces the old triggeredBy json marker: the checklist list shows
+      // instances where this is absent, so sub-checklists don't double-list.
+      forward: { on: "checklistInstances", has: "one", label: "parentItem" },
+      reverse: { on: "checklistInstanceItems", has: "one", label: "nestedInstance" },
     },
 
     // notes (attachment target: exactly one of five, app-enforced)
@@ -555,6 +716,12 @@ const _schema = i.schema({
       forward: { on: "assetMeterReadings", has: "one", label: "loggedBy" },
       reverse: { on: "users", has: "many", label: "meterReadings" },
     },
+    assetLocation: {
+      // Unlike currentBoat/currentVehicle, this isn't exclusive occupancy —
+      // a location can hold many assets at once.
+      forward: { on: "assets", has: "one", label: "location" },
+      reverse: { on: "locations", has: "many", label: "assets" },
+    },
 
     // reservations (target: exactly one of location | asset, app-enforced)
     reservationContact: {
@@ -615,7 +782,7 @@ const _schema = i.schema({
     },
     shiftEndChecklist: {
       forward: { on: "shifts", has: "one", label: "endOfShiftChecklist" },
-      reverse: { on: "checklists", has: "one", label: "endedShift" },
+      reverse: { on: "checklistInstances", has: "one", label: "endedShift" },
     },
     activityActor: {
       forward: { on: "activityLogEntries", has: "one", label: "actor" },

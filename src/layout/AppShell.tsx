@@ -1,8 +1,17 @@
+import { useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useClerk } from "@clerk/clerk-react";
 import { useCurrent } from "../lib/auth/CurrentUserContext";
 import { db } from "../lib/db";
 import { visibleSections, MOBILE_TAB_COUNT } from "../routes/nav";
+import { ActiveCallPanel } from "../pages/comms/ActiveCallPanel";
+import { MissedCommsBadge } from "../pages/comms/MissedCommsBadge";
+import { CheckpointScanModal } from "../pages/checklists/CheckpointScanModal";
+import { ThemeToggle } from "./ThemeToggle";
+import { ADMIN_SECTIONS } from "../pages/admin/adminSections";
+import { InstallAppButton } from "./InstallAppButton";
+import { UpdateButton } from "./UpdateButton";
+import { NfcScanToggle } from "./NfcScanToggle";
 
 // Responsive shell: persistent left sidenav on desktop, app bar + bottom tab
 // bar on mobile (see wireframes — Dashboard frames for both breakpoints).
@@ -11,6 +20,9 @@ export function AppShell() {
   const { signOut } = useClerk();
   const navigate = useNavigate();
   const location = useLocation();
+  // Set by whichever NfcScanToggle instance (sidenav or appbar) is armed —
+  // opens CheckpointScanModal without touching the route underneath.
+  const [scannedGuid, setScannedGuid] = useState<string | null>(null);
 
   const sections = visibleSections(current);
   const tabs = sections.slice(0, MOBILE_TAB_COUNT);
@@ -24,6 +36,14 @@ export function AppShell() {
   const inOverflow =
     activeSection !== undefined && !tabs.includes(activeSection);
 
+  // Derived from the route rather than its own toggle state — being on any
+  // /admin/* page (including having just clicked "Admin" itself) is what
+  // expands the sub-list, and leaving collapses it again. That satisfies
+  // "clicking Admin still navigates" for free, since expansion is just a
+  // side effect of where the click already lands.
+  const adminExpanded = location.pathname.startsWith("/admin");
+  const adminSubSections = ADMIN_SECTIONS.filter((s) => current.can(s.requires));
+
   return (
     <div className="shell">
       <aside className="sidenav">
@@ -31,22 +51,41 @@ export function AppShell() {
         <div className="sidenav-marina">{marinaName}</div>
         <nav>
           {sections.map((s) => (
-            <NavLink
-              key={s.path}
-              to={s.path}
-              end={s.path === "/"}
-              className={({ isActive }) =>
-                "sidenav-item" + (isActive ? " active" : "")
-              }
-            >
-              {s.label}
-            </NavLink>
+            <div key={s.path}>
+              <NavLink
+                to={s.path}
+                end={s.path === "/"}
+                className={({ isActive }) =>
+                  "sidenav-item" + (isActive ? " active" : "")
+                }
+              >
+                {s.label}
+              </NavLink>
+              {s.path === "/admin" && adminExpanded && (
+                <div className="sidenav-subnav">
+                  {adminSubSections.map((a) => (
+                    <NavLink
+                      key={a.path}
+                      to={a.path}
+                      className={({ isActive }) =>
+                        "sidenav-subitem" + (isActive ? " active" : "")
+                      }
+                    >
+                      {a.label}
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </nav>
         <div className="sidenav-footer">
           <div className="sidenav-user">{current.user?.name}</div>
           <div className="sidenav-roles">{current.roleNames.join(" · ")}</div>
-          <div className="row">
+          <div style={{ marginBottom: 10 }}>
+            <ThemeToggle />
+          </div>
+          <div className="row" style={{ flexWrap: "wrap" }}>
             <button
               type="button"
               className="btn btn-sm"
@@ -54,6 +93,9 @@ export function AppShell() {
             >
               Switch user
             </button>
+            <InstallAppButton />
+            <UpdateButton />
+            <NfcScanToggle onScan={setScannedGuid} />
             <button
               type="button"
               className="btn btn-sm btn-quiet"
@@ -68,11 +110,24 @@ export function AppShell() {
       <div style={{ flex: 1, minWidth: 0 }}>
         <header className="appbar">
           <span>{activeSection?.label ?? "MarinaSecure"}</span>
+          <span className="row" style={{ gap: 6 }}>
+            <UpdateButton />
+            <NfcScanToggle onScan={setScannedGuid} />
+          </span>
         </header>
         <main className="main">
           <Outlet />
         </main>
       </div>
+
+      {/* App-wide: the call panel surfaces whenever a call is live, the
+          missed-comms badge floats over everything, and a scanned checkpoint
+          opens full-screen without disturbing whatever route is underneath. */}
+      <ActiveCallPanel />
+      <MissedCommsBadge />
+      {scannedGuid && (
+        <CheckpointScanModal guidUrl={scannedGuid} onClose={() => setScannedGuid(null)} />
+      )}
 
       <nav className="tabbar">
         {tabs.map((s) => (

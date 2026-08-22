@@ -22,7 +22,7 @@ export const NAV_SECTIONS: NavSection[] = [
     visible: (c) => c.can("view_incidents") || c.can("create_incidents"),
   },
   { path: "/reservations", label: "Reservations", icon: "📅" },
-  { path: "/boats", label: "Boats", icon: "⛵" },
+  { path: "/boats", label: "Boats & Vehicles", icon: "⛵" },
   { path: "/contacts", label: "Owners & Contacts", icon: "👤" },
   { path: "/assets", label: "Assets", icon: "🧰" },
   { path: "/activity", label: "Activity Log", icon: "≡" },

@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { templateAppliesNow } from "../../lib/checklists";
+import { ManualCheckinDialog } from "../checklists/ManualCheckinDialog";
 
 // Locations — Checkpoint Detail (see pages/checkpoint-detail.html).
 // Read-oriented reference/audit view: identity, GUID URL, GPS validation
@@ -10,6 +11,7 @@ import { templateAppliesNow } from "../../lib/checklists";
 export function CheckpointDetailPage() {
   const { id: checkpointId } = useParams();
   const current = useCurrent();
+  const [checkingIn, setCheckingIn] = useState(false);
 
   const { data } = db.useQuery(
     checkpointId
@@ -17,7 +19,7 @@ export function CheckpointDetailPage() {
           checkpoints: {
             $: { where: { id: checkpointId } },
             location: {},
-            checklistTemplates: {},
+            checklistTemplateSections: { template: {} },
             tours: {},
           },
           marinaSettings: {},
@@ -66,57 +68,72 @@ export function CheckpointDetailPage() {
             </div>
           )}
         </div>
-        {current.can("manage_locations") && (
-          <Link to="/admin" className="btn btn-sm btn-quiet">
-            Edit in Admin
-          </Link>
-        )}
+        <div className="row">
+          {/* The page you land on from anywhere that lists a checkpoint —
+              a tour on the Checklists screen, a location, a search. Standing
+              at one whose tag won't read, this is where you already are. */}
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setCheckingIn(true)}
+          >
+            Check in manually
+          </button>
+          {current.can("manage_locations") && (
+            <Link to="/admin" className="btn btn-sm btn-quiet">
+              Edit in Admin
+            </Link>
+          )}
+        </div>
       </div>
+
+      {checkingIn && (
+        <ManualCheckinDialog
+          initialCheckpointId={checkpoint.id}
+          onClose={() => setCheckingIn(false)}
+        />
+      )}
 
       <div className="grid-2">
         <div>
-          <div className="field">
-            <span className="field-label">GPS validation radius</span>
-            <div className="field-value">
-              {radius != null ? `${radius} m` : "—"}{" "}
-              <span className={overridden ? "badge badge-accent" : "badge"}>
-                {overridden ? "Overrides marina default" : "Marina default"}
-              </span>
+          {current.can("manage_locations") && (
+            <div className="field">
+              <span className="field-label">GPS validation radius</span>
+              <div className="field-value">
+                {radius != null ? `${radius} m` : "—"}{" "}
+                <span className={overridden ? "badge badge-accent" : "badge"}>
+                  {overridden ? "Overrides marina default" : "Marina default"}
+                </span>
+              </div>
+              {checkpoint.gpsLat != null && checkpoint.gpsLng != null ? (
+                <p className="muted small" style={{ marginTop: 4 }}>
+                  Anchored at {checkpoint.gpsLat.toFixed(5)}, {checkpoint.gpsLng.toFixed(5)}
+                </p>
+              ) : (
+                <p className="muted small" style={{ marginTop: 4 }}>
+                  No coordinates set — check-ins here are never radius-flagged.
+                </p>
+              )}
             </div>
-            {checkpoint.gpsLat != null && checkpoint.gpsLng != null ? (
-              <p className="muted small" style={{ marginTop: 4 }}>
-                Anchored at {checkpoint.gpsLat.toFixed(5)}, {checkpoint.gpsLng.toFixed(5)}
-              </p>
-            ) : (
-              <p className="muted small" style={{ marginTop: 4 }}>
-                No coordinates set — check-ins here are never radius-flagged.
-              </p>
-            )}
-          </div>
+          )}
 
-          <div className="section-title">Applicable checklist templates</div>
+          <div className="section-title">Checklist sections here</div>
           <div className="stack" style={{ gap: 8, marginBottom: 16 }}>
-            {(checkpoint.checklistTemplates ?? []).map((t) => {
-              const cfg = (t.triggerConfig ?? {}) as { timeStart?: string; timeEnd?: string };
-              return (
-                <div key={t.id} className="card spread">
-                  <div>
-                    <div className="card-title">{t.name}</div>
-                    <div className="card-meta">
-                      {cfg.timeStart && cfg.timeEnd
-                        ? `${cfg.timeStart} – ${cfg.timeEnd}`
-                        : "Any time"}
-                    </div>
+            {(checkpoint.checklistTemplateSections ?? []).map((s) => (
+              <div key={s.id} className="card spread">
+                <div>
+                  <div className="card-title">{s.template?.name ?? "Checklist"}</div>
+                  <div className="card-meta">
+                    {s.name}
+                    {s.hideUntilRule ? ` · shows at ${s.hideUntilRule}` : ""}
                   </div>
-                  {templateAppliesNow(t) && (
-                    <span className="badge badge-good">Applies now</span>
-                  )}
                 </div>
-              );
-            })}
-            {(checkpoint.checklistTemplates ?? []).length === 0 && (
+                {!s.isActive && <span className="badge">Inactive</span>}
+              </div>
+            ))}
+            {(checkpoint.checklistTemplateSections ?? []).length === 0 && (
               <span className="muted small">
-                None configured — a guard can still check in and add a note or incident.
+                None configured — a user can still check in and add a note or incident.
               </span>
             )}
           </div>
@@ -126,7 +143,7 @@ export function CheckpointDetailPage() {
             {(checkpoint.tours ?? []).map((t) => (
               <Link
                 key={t.id}
-                to={`/checklists/tours/${t.id}`}
+                to="/checklists"
                 className="card spread"
                 style={{ textDecoration: "none", color: "inherit" }}
               >
@@ -145,7 +162,7 @@ export function CheckpointDetailPage() {
         <div>
           <div className="section-title spread">
             <span>Recent check-ins</span>
-            <Link to="/activity" className="small">
+            <Link to="/activity?subjectType=checkIns" className="small">
               Full history →
             </Link>
           </div>

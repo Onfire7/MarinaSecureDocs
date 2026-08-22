@@ -10,6 +10,7 @@ import {
 } from "../../lib/attachments";
 import { NoteDialog } from "../shared/NoteDialog";
 import { PRIORITY_ORDER, priorityBadgeClass } from "../../lib/workItems";
+import { activityTx } from "../../lib/activityLog";
 
 // Tickets — Ticket Detail (see pages/ticket-detail.html).
 // Status/priority edits are unrestricted; only assignment is gated. A ticket
@@ -49,21 +50,47 @@ export function TicketDetailPage() {
 
   const target = attachmentOf(ticket);
 
+  const logTicket = (eventType: string, summary: string) =>
+    activityTx({
+      eventType,
+      summary,
+      subjectType: "tickets",
+      subjectId: ticket.id,
+      actorId: current.user?.id,
+    });
+
   const setStatus = (status: string) => {
     // resolvedAt tracks the terminal status; cleared if the ticket reopens.
-    void db.transact(
+    void db.transact([
       db.tx.tickets[ticket.id].update({
         status,
         resolvedAt: status === "complete" ? Date.now() : null,
       }),
-    );
+      logTicket(
+        "ticket.status_changed",
+        `"${ticket.title}" set to ${statusLabel(status)}`,
+      ),
+    ]);
   };
   const setPriority = (priority: string) => {
-    void db.transact(db.tx.tickets[ticket.id].update({ priority }));
+    void db.transact([
+      db.tx.tickets[ticket.id].update({ priority }),
+      logTicket(
+        "ticket.priority_changed",
+        `"${ticket.title}" priority set to ${statusLabel(priority)}`,
+      ),
+    ]);
   };
   const assign = (userId: string) => {
     if (!userId) return;
-    void db.transact(db.tx.tickets[ticket.id].link({ assignedTo: userId }));
+    const assignee = users.find((u) => u.id === userId);
+    void db.transact([
+      db.tx.tickets[ticket.id].link({ assignedTo: userId }),
+      logTicket(
+        "ticket.assigned",
+        `"${ticket.title}" assigned to ${assignee?.name ?? "someone"}`,
+      ),
+    ]);
   };
 
   return (

@@ -4,6 +4,12 @@ import type { ComponentType } from "react";
 import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import type { CurrentUser } from "../../lib/auth/useCurrentUser";
+import { activityTx } from "../../lib/activityLog";
+import {
+  buildInstanceTx,
+  hasWorkAtCreation,
+  TEMPLATE_INSTANTIATION_QUERY,
+} from "../../lib/checklistInstantiation";
 
 // Dashboard cards (see pages/dashboard.html — Available cards).
 // A card's availability gate is exactly the permission that governs the data
@@ -136,17 +142,27 @@ function ShiftCard() {
           },
           checklistTemplates: {
             $: { where: { triggerType: { $in: ["clock_in", "clock_out"] } } },
+            ...TEMPLATE_INSTANTIATION_QUERY,
           },
         }
       : null,
   );
 
   const activeShift = data?.shifts?.[0];
-  const clockInTemplate = data?.checklistTemplates?.find(
-    (t) => t.triggerType === "clock_in",
+  // Clock templates are role-scoped like everything else — a maintenance
+  // clock-in checklist shouldn't fire for a security guard.
+  const roleIds = (current.user?.roles ?? []).map((r) => r.id);
+  const clockTemplates = (data?.checklistTemplates ?? []).filter(
+    (t) => t.assignedRole && roleIds.includes(t.assignedRole.id),
   );
-  const clockOutTemplate = data?.checklistTemplates?.find(
-    (t) => t.triggerType === "clock_out",
+  // A template with nothing switched on right now generates nothing — see
+  // hasWorkAtCreation. Empty checklists are noise, and with status-gated
+  // sections an empty one is an ordinary outcome, not a mistake.
+  const clockInTemplate = clockTemplates.find(
+    (t) => t.triggerType === "clock_in" && hasWorkAtCreation(t),
+  );
+  const clockOutTemplate = clockTemplates.find(
+    (t) => t.triggerType === "clock_out" && hasWorkAtCreation(t),
   );
 
   // Re-render each minute so elapsed time stays fresh.
@@ -159,30 +175,51 @@ function ShiftCard() {
   const startShift = async () => {
     if (!userId) return;
     const shiftId = id();
+    const checklistId = clockInTemplate ? id() : null;
     // Clock In may itself be a checklist trigger — the checklist opens immediately.
     await db.transact([
       db.tx.shifts[shiftId]
         .update({ startedAt: Date.now() })
         .link({ guard: userId }),
-      ...(clockInTemplate
+      activityTx({
+        eventType: "shift.started",
+        summary: `Shift started by ${current.user?.name ?? "a guard"}`,
+        subjectType: "shifts",
+        subjectId: shiftId,
+        actorId: userId,
+      }),
+      ...(clockInTemplate && checklistId
         ? [
-            db.tx.checklists[id()]
-              .update({
-                status: "not_started",
-                triggeredBy: { type: "clock_in", shiftId },
-              })
-              .link({ template: clockInTemplate.id, assignedTo: userId }),
+            ...buildInstanceTx({
+              template: clockInTemplate,
+              instanceId: checklistId,
+              userId,
+            }),
+            activityTx({
+              eventType: "checklist.created",
+              summary: `${clockInTemplate.name} created by clock-in`,
+              subjectType: "checklistInstances",
+              subjectId: checklistId,
+              actorId: userId,
+            }),
           ]
         : []),
     ]);
-    if (clockInTemplate) navigate("/checklists");
+    if (checklistId) navigate(`/checklists/${checklistId}`);
   };
 
   const endShiftManually = async () => {
     if (!activeShift) return;
-    await db.transact(
+    await db.transact([
       db.tx.shifts[activeShift.id].update({ endedAt: Date.now() }),
-    );
+      activityTx({
+        eventType: "shift.ended",
+        summary: `Shift ended manually by ${current.user?.name ?? "a guard"}`,
+        subjectType: "shifts",
+        subjectId: activeShift.id,
+        actorId: userId,
+      }),
+    ]);
     // TODO: call the shift-report Netlify Function on-demand once the
     // functions layer exists; the scheduled backstop sweep covers it meanwhile.
   };
@@ -190,16 +227,22 @@ function ShiftCard() {
   const startEndOfShiftChecklist = async () => {
     if (!activeShift || !clockOutTemplate || !userId) return;
     const checklistId = id();
-    await db.transact(
-      db.tx.checklists[checklistId]
-        .update({
-          status: "not_started",
-          triggeredBy: { type: "clock_out", shiftId: activeShift.id },
-        })
-        .link({ template: clockOutTemplate.id, assignedTo: userId })
-        .link({ endedShift: activeShift.id }),
-    );
-    navigate("/checklists");
+    await db.transact([
+      ...buildInstanceTx({
+        template: clockOutTemplate,
+        instanceId: checklistId,
+        userId,
+      }),
+      db.tx.checklistInstances[checklistId].link({ endedShift: activeShift.id }),
+      activityTx({
+        eventType: "checklist.created",
+        summary: `${clockOutTemplate.name} created by clock-out`,
+        subjectType: "checklistInstances",
+        subjectId: checklistId,
+        actorId: userId,
+      }),
+    ]);
+    navigate(`/checklists/${checklistId}`);
   };
 
   if (!activeShift) {
