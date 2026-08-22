@@ -36,9 +36,12 @@ Verify each task against the deployment before moving on.
       `dependencies`.
 - [x] `netlify.toml`, `README.md`, `CLAUDE.md` and the migration script
       comment updated to pnpm.
-- [ ] **Verify against a `beta` deploy.** Local trio passes; Netlify has to
-      resolve pnpm through Corepack from the `packageManager` pin, and that
-      only gets proven by a real build.
+- [x] **Verified against the `beta` deploy.** Netlify resolved pnpm through
+      Corepack and built; bundle hash moved `DaXTkhpc` → `CCjnSRel`. A real
+      signed-in session renders the dashboard with live data, the service
+      worker registers and is active (the `workbox-window` path that strict
+      resolution broke), and Checklists / Tickets / Locations all navigate
+      with no console errors, page errors, or ≥400 responses.
 
 ## Phase 1 — Cross-cutting docs ✅
 

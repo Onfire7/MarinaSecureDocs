@@ -73,6 +73,11 @@ Screenshots or it didn't happen.
   deployment, saves Playwright state to `/tmp/pw-test/state.json` and
   screenshots to `/tmp/pw-test/screenshots/`. Reuse the state:
   `browser.newContext({ storageState: '/tmp/pw-test/state.json' })`.
+- **Ad-hoc Playwright scripts must live in the repo root**, not in
+  `/tmp/pw-test/`. ESM resolves `playwright` from the script's own directory,
+  so a script under `/tmp` dies with `ERR_MODULE_NOT_FOUND` before it opens a
+  browser. Write it to the repo root, run it, delete it. Keep the *state* and
+  *screenshots* in `/tmp/pw-test/`.
 - **Direct DB access**: `node scripts/instant-admin.mjs query '<json>'`.
   Add `--as <email>` or `--guest` to route through the permission rules —
   this is the honest way to test them.
