@@ -23,7 +23,7 @@
 // before anything can write them (instant.perms.ts denies attribute creation
 // at runtime), so:
 //
-//   npx instant-cli@latest push schema
+//   pnpm dlx instant-cli@latest push schema
 //   node scripts/migrate-leasable-flags.mjs          # dry run
 //   node scripts/migrate-leasable-flags.mjs --apply  # write
 //

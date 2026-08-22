@@ -13,7 +13,10 @@
 # Never add CLERK_SECRET_KEY here; the frontend build must not see it.
 
 [build]
-  command = "npm run build"
+  # pnpm is detected from pnpm-lock.yaml; the exact version comes from
+  # package.json's "packageManager" field via Corepack (which rejects semver
+  # ranges there, so it must stay pinned exactly).
+  command = "pnpm run build"
   publish = "dist"
 
 [build.environment]

@@ -24,6 +24,22 @@ Verify each task against the deployment before moving on.
 - [x] Delete `docs/terminology.html`, repoint its 76 references.
 - [x] Merge `beta` → `main` (push pending, above).
 
+## Phase 2 — pnpm migration ✅
+
+- [x] `pnpm import` → `pnpm-lock.yaml`; `package-lock.json` deleted;
+      `packageManager` pinned to an exact version (Corepack rejects ranges).
+- [x] Declare `workbox-window`. Strict resolution surfaced it immediately:
+      `vite-plugin-pwa` lists it as both a dependency *and* a peer
+      dependency, the generated `virtual:pwa-register` module imports it, and
+      the npm build only worked because a flat `node_modules` hoisted it into
+      resolution range. It ships in the client bundle, so it belongs in
+      `dependencies`.
+- [x] `netlify.toml`, `README.md`, `CLAUDE.md` and the migration script
+      comment updated to pnpm.
+- [ ] **Verify against a `beta` deploy.** Local trio passes; Netlify has to
+      resolve pnpm through Corepack from the `packageManager` pin, and that
+      only gets proven by a real build.
+
 ## Phase 1 — Cross-cutting docs ✅
 
 - [x] Convert all six remaining cross-cutting docs to Markdown:
@@ -55,5 +71,6 @@ Verify each task against the deployment before moving on.
 items to promote into this file. Don't start them unprompted — propose, then
 wait.
 
-Next up there: **Phase 2, the pnpm migration** — which lands alone, verified
-against a `beta` deploy, because it touches the deploy path.
+Next up there: **Phase 3, the testing foundation** — vitest, a self-hosted
+InstantDB instance, and unit tests for `src/lib/` as the harness's proving
+ground.

@@ -10,23 +10,11 @@ items to promote into it.
 
 ## Planned phases
 
-Sequenced by dependency. Phase 0 (knowledge architecture) and Phase 1
-(cross-cutting docs) are tracked in `docs/TODO.md`.
-
-### Phase 2 — pnpm migration
-
-Convert the lockfile with `pnpm import`, delete `package-lock.json`, add an
-exact `packageManager` pin (Corepack rejects semver ranges), and update the
-three places that name npm commands: `README.md`, `CLAUDE.md`, and
-`netlify.toml`. Adopt strict resolution — hoisting-dependent breakage is the
-point of the exercise, not a reason to avoid it.
-
-**Lands alone, verified against a `beta` deploy.** It touches the deploy
-path, and this project's history says that's where confusing failures live.
+Sequenced by dependency. Phases 0–2 are done; what remains starts at Phase 3.
 
 ### Phase 3 — Testing foundation
 
-Depends on Phase 2, so tooling scripts are written once.
+Next up. Phase 2 (pnpm) is done, so tooling scripts get written once.
 
 - `vitest` + `@vitest/coverage-v8`
 - Self-hosted InstantDB via Docker as the test target

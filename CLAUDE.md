@@ -54,8 +54,14 @@ spec-approval time and expensive afterward.
 
 ## Verification
 
-Before any commit: `npx tsc -b` · `npx oxlint` · `npm run build` then
-`rm -rf dist` (dist is gitignored; never commit it).
+Before any commit: `pnpm exec tsc -b` · `pnpm exec oxlint` · `pnpm run build`
+then `rm -rf dist` (dist is gitignored; never commit it).
+
+This repo uses **pnpm**, pinned exactly in `package.json`'s `packageManager`
+field. Its strict `node_modules` means a transitive dependency is not
+importable unless it's declared — if a build fails to resolve a module you
+never imported directly, declare it rather than reaching for
+`--shamefully-hoist`.
 
 Nothing is verified until a real signed-in session has exercised it.
 Screenshots or it didn't happen.

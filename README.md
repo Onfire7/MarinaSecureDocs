@@ -20,11 +20,11 @@ permissions, page specs, and wireframes this implements, and
 
 ## Setup
 
-1. `npm install`
+1. `pnpm install`
 2. Copy `.env.example` to `.env.local` and fill in this marina's
    InstantDB app id and Clerk publishable key.
-3. Push the schema to the InstantDB app: `npx instant-cli@latest push schema`
-4. `npm run dev`
+3. Push the schema to the InstantDB app: `pnpm dlx instant-cli@latest push schema`
+4. `pnpm dev`
 
 Without env configuration the app renders a setup screen instead of crashing.
 
