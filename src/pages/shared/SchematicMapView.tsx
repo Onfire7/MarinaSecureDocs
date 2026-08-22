@@ -3,7 +3,7 @@ import { placementStyle, type PlacementShape } from "../../lib/locations";
 
 // Shared schematic-map renderer: MarinaMap image + LocationMapPlacement
 // rectangles, with root-map chooser and drill-down into scoped detail maps.
-// One shared capability, two overlays (see docs: data-model.html —
+// One shared capability, two overlays (see docs/data-model.md —
 // LocationMapPlacement): Location list colors by occupancy/type, the
 // Reservations map colors by reservation status — callers supply colorFor
 // and which locations to include.

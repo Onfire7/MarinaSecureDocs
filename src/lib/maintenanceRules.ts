@@ -1,8 +1,12 @@
 // Asset maintenance rules — meter-based rules fire inline on the InstantDB
 // write that records a new AssetMeterReading, since that's the only moment
-// the value changes (see docs: api-structure.html — Scheduled jobs. Time-based
-// rules are instead swept daily by a Netlify Scheduled Function, not modeled
-// here).
+// the value changes.
+//
+// Time-based rules ("every 90 days since last completed") are not modeled
+// here yet. They are specified to run client-side on the same
+// deterministic-id pattern as recurring checklists rather than as a scheduled
+// function — see docs/adr/0004-client-first-execution.md and
+// docs/ROADMAP.md. Nothing generates them today.
 import type { InstaQLEntity } from "@instantdb/react";
 import type { AppSchema } from "./db";
 

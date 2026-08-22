@@ -1,8 +1,8 @@
 // Shift report compilation (see docs: pages/shift-report.html,
-// architecture.html — Shift report delivery).
+// docs/architecture.md — Shift report delivery).
 //
 // Records aren't linked to a Shift by reference; association is computed from
-// timestamps falling inside the shift's start/end window (per data-model.html
+// timestamps falling inside the shift's start/end window (per docs/data-model.md
 // — Shift). An open shift's window runs to "now", so viewing mid-shift shows
 // progress so far. This is the same compilation the send path performs, which
 // is why viewing always reflects current data rather than an email snapshot.

@@ -1,4 +1,4 @@
-// Activity Log — write-time generation (see docs: architecture.html —
+// Activity Log — write-time generation (see docs/architecture.md —
 // Activity Log generation, pages/activity-log.html).
 //
 // Entries are generated immutably by the same code paths that make the

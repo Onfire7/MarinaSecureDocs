@@ -1,4 +1,4 @@
-// The attachable-entities pattern (see docs: data-model.html — every Note,
+// The attachable-entities pattern (see docs/data-model.md — every Note,
 // Incident, and Ticket attaches to exactly one target). The schema models
 // this as six optional links; these helpers pick the one that's set and
 // build the .link() payload when creating.

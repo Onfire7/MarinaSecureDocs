@@ -2,7 +2,7 @@
 //
 // Telephony is the one online-only surface in the app: calls and SMS are
 // placed by Twilio Functions, which are also the only writers of
-// Twilio-sourced data (see architecture.html). Chat, by contrast, is
+// Twilio-sourced data (see docs/architecture.md). Chat, by contrast, is
 // ordinary InstantDB data and works fully offline.
 
 export interface ChatRoomLike {

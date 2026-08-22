@@ -69,7 +69,7 @@ export function ActivityLogPage() {
   });
 
   const toggleProtected = (entryId: string, next: boolean) => {
-    // The Activity Log never logs its own writes (see architecture.html).
+    // The Activity Log never logs its own writes (see docs/architecture.md).
     void db.transact(db.tx.activityLogEntries[entryId].update({ protected: next }));
   };
 

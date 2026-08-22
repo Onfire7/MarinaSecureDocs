@@ -11,7 +11,7 @@ export const STANDARD_STATUSES = [
 ] as const;
 
 // The status a reservation-enabled Location takes on check-out when no
-// per-location override is set (see docs: data-model.html — Location).
+// per-location override is set (see docs/data-model.md — Location).
 export const DEFAULT_POST_RESERVATION_STATUS = "needs_cleaning";
 
 // Status is absent entirely for types that don't track it (containers, roots).

@@ -1,4 +1,5 @@
-// Trinary role-based permissions (see docs: permissions.html).
+// Trinary role-based permissions (see docs/permissions.md — including
+// Enforcement, which records that all of this is client-side only).
 // Each role maps permission → "allow" | "deny" | (absent = undefined).
 // Effective value per permission: default Deny; any Allow grants; any explicit
 // Deny cancels every Allow. Deny always wins.
