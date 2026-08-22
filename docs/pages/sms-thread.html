@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -40,7 +40,7 @@
     <p class="lede">A single conversation with a Contact — full message history, plus a template picker for common replies.</p>
 
     <h2>Purpose</h2>
-    <p>Reached from <a href="comms-home.html">Comms Home</a> or <a href="missed-comms-detail.html">Missed Comms Detail</a>, both of which already gate the link by <code>view_sms</code> — this screen is unreachable without it. One thread per Contact-per-line, per <a href="../data-model.html">Data Model — SMSThread</a>; opening it marks it read. Sending is a separate gate, <code>place_calls</code>, so a user can have one without the other.</p>
+    <p>Reached from <a href="comms-home.html">Comms Home</a> or <a href="missed-comms-detail.html">Missed Comms Detail</a>, both of which already gate the link by <code>view_sms</code> — this screen is unreachable without it. One thread per Contact-per-line, per <a href="../data-model.md">Data Model — SMSThread</a>; opening it marks it read. Sending is a separate gate, <code>place_calls</code>, so a user can have one without the other.</p>
 
     <h2>Data shown</h2>
     <table>
@@ -60,7 +60,7 @@
 
     <h2>States &amp; edge cases</h2>
     <ul>
-      <li><strong>Offline</strong> — history already synced to InstantDB is fully viewable (given <code>view_sms</code>); sending is unavailable, since SMS is a Twilio (online-only) action — the composer reflects this honestly rather than silently queuing, per <a href="../architecture.html">Architecture</a>.</li>
+      <li><strong>Offline</strong> — history already synced to InstantDB is fully viewable (given <code>view_sms</code>); sending is unavailable, since SMS is a Twilio (online-only) action — the composer reflects this honestly rather than silently queuing, per <a href="../architecture.md">Architecture</a>.</li>
       <li><strong><code>view_sms</code> without <code>place_calls</code></strong> — thread history is fully viewable; only the composer/send action is hidden, matching <a href="comms-home.html">Comms Home</a>'s view-vs-initiate split.</li>
       <li><strong><code>place_calls</code> without <code>view_sms</code></strong> — this user can send a first message via <a href="new-sms-dialog.html">New SMS dialog</a>, but can't subsequently open the resulting thread to see the reply; an unusual combination, but a legal one under the trinary permission model.</li>
       <li><strong>No templates configured</strong> — the picker is simply empty; typing a message from scratch is unaffected.</li>

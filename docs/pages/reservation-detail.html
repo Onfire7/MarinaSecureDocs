@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -40,7 +40,7 @@
     <p class="lede">Full record of one reservation — contact, target, dates, and (for Billable reservations only) the billing fields.</p>
 
     <h2>Purpose</h2>
-    <p>Reached from <a href="reservation-list.html">Reservation calendar/list</a>, or from the target Location/Asset's own detail page (an upcoming reservation shown alongside current status, per <a href="../data-model.html">Data Model</a>).</p>
+    <p>Reached from <a href="reservation-list.html">Reservation calendar/list</a>, or from the target Location/Asset's own detail page (an upcoming reservation shown alongside current status, per <a href="../data-model.md">Data Model</a>).</p>
 
     <h2>Data shown</h2>
     <table>
@@ -58,7 +58,7 @@
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
       <tr><td>Edit reservation details</td><td><code>manage_reservations</code></td><td>Covers contact, dates, rate/deposit/balance (where applicable) — anything short of actually checking in/out.</td></tr>
-      <tr><td>Override status/dates</td><td><code>manage_reservations</code></td><td>Manually setting status or dates outside the normal check-in/out flow (e.g. correcting a mistake) — explicitly called out in <a href="../permissions.html">Permissions</a> as part of this permission's scope.</td></tr>
+      <tr><td>Override status/dates</td><td><code>manage_reservations</code></td><td>Manually setting status or dates outside the normal check-in/out flow (e.g. correcting a mistake) — explicitly called out in <a href="../permissions.md">Permissions</a> as part of this permission's scope.</td></tr>
       <tr><td>Check in / check out</td><td><code>manage_reservations</code></td><td>Opens <a href="reservation-checkin-checkout.html">Reservation Check-In / Check-Out Dialog</a> rather than editing <code>actual_checkin</code>/<code>actual_checkout</code> inline, since that action also has to update the target's status.</td></tr>
       <tr><td>Cancel</td><td><code>manage_reservations</code></td><td>Sets status to Cancelled; does not delete the record.</td></tr>
     </table>

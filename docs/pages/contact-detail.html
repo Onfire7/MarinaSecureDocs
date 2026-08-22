@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -51,7 +51,7 @@
       <tr><td>Boats authorized on</td><td>Boat.authorized_users containing this Contact</td><td></td></tr>
       <tr><td>Leases</td><td>Lease.lessees containing this Contact</td><td>Requires <code>view_lease</code>; omitted entirely without it.</td></tr>
       <tr><td>Notes, incidents, tickets</td><td>attached_to = this Contact</td><td>Standard gating (incidents require <code>view_incidents</code>; notes and tickets unrestricted).</td></tr>
-      <tr><td>Call / SMS history</td><td>Call.contact / SMSThread.contact = this Contact</td><td>Requires <code>view_calls</code> / <code>view_sms</code> respectively, per <a href="../permissions.html">Permissions</a>.</td></tr>
+      <tr><td>Call / SMS history</td><td>Call.contact / SMSThread.contact = this Contact</td><td>Requires <code>view_calls</code> / <code>view_sms</code> respectively, per <a href="../permissions.md">Permissions</a>.</td></tr>
     </table>
 
     <h2>Actions</h2>

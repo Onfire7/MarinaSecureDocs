@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -48,7 +48,7 @@
       <tr><th>Mode</th><th>Display</th></tr>
       <tr><td>Linear</td><td>The next stop as a hero card ("NEXT — STOP 3 OF 6", name, location), then the rest of the route in order under "Then". Sequence numbers are positions in the full route, so they stay stable as stops are completed. Visited stops appear only in the collapsed section.</td></tr>
       <tr><td>Freeform</td><td>One container per parent location — the unit a guard works a round in: finish this dock, move on — holding that location's checkpoints as buttons <strong>color-coded by this-shift status</strong>: visited green with a ✓, remaining neutral. Color carries the done/left split without hiding either, so freeform has no separate visited disclosure; each container shows its own n/m count, fully-visited containers sink to the bottom and dim, and every button links to its checkpoint. All must be visited before shift end but order is the guard's choice.</td></tr>
-      <tr><td>Randomized</td><td>Only the currently-available next checkpoint is shown, plus a remaining count. The rest of the set is deliberately withheld so patrol patterns stay unpredictable, per <a href="../workflows.html">Role Workflows</a>. The collapsed visited section is shown as in the other modes — it reveals nothing about what remains.</td></tr>
+      <tr><td>Randomized</td><td>Only the currently-available next checkpoint is shown, plus a remaining count. The rest of the set is deliberately withheld so patrol patterns stay unpredictable, per <a href="../workflows.md">Role Workflows</a>. The collapsed visited section is shown as in the other modes — it reveals nothing about what remains.</td></tr>
     </table>
 
     <h2>Actions</h2>
@@ -61,7 +61,7 @@
     <h2>States &amp; edge cases</h2>
     <ul>
       <li><strong>No active tour</strong> — empty state directing the guard back to Checklist list or Dashboard.</li>
-      <li><strong>Tour scope resets per shift</strong> — progress is derived from check-ins whose timestamps fall within the current <code>Shift</code> window (association by timestamp, not a direct reference, per <a href="../data-model.html">Data Model — Shift</a>), so a new shift starts every tour fresh.</li>
+      <li><strong>Tour scope resets per shift</strong> — progress is derived from check-ins whose timestamps fall within the current <code>Shift</code> window (association by timestamp, not a direct reference, per <a href="../data-model.md">Data Model — Shift</a>), so a new shift starts every tour fresh.</li>
       <li><strong>Read access for managers</strong> — a manager reviewing a guard's live progress (e.g. via Reports) sees the same data read-only; not permission-gated in the fixed list, so treat as covered by general <code>view_reports</code> access.</li>
     </ul>
 

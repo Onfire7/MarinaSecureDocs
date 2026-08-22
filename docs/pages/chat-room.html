@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -40,14 +40,14 @@
     <p class="lede">One internal, topic-based conversation — entirely separate from calls and SMS, with no database relationship linking the two.</p>
 
     <h2>Purpose</h2>
-    <p>Reached from <a href="comms-home.html">Comms Home</a>. Per <a href="../workflows.html">Role Workflows — Comms: chat rooms</a>, any user can start a room and invite specific users and/or roles into it; this page is where that room's conversation actually happens. Two distinct permissions govern access beyond actual participation: <code>view_all_chats</code> (read any room, participant or not) and <code>manage_chats</code> (add yourself or someone else as an actual participant to any room) — see <a href="../permissions.html">Permissions</a>.</p>
+    <p>Reached from <a href="comms-home.html">Comms Home</a>. Per <a href="../workflows.md">Role Workflows — Comms: chat rooms</a>, any user can start a room and invite specific users and/or roles into it; this page is where that room's conversation actually happens. Two distinct permissions govern access beyond actual participation: <code>view_all_chats</code> (read any room, participant or not) and <code>manage_chats</code> (add yourself or someone else as an actual participant to any room) — see <a href="../permissions.md">Permissions</a>.</p>
 
     <h2>Data shown</h2>
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Title / topic</td><td>ChatRoom.title / topic</td><td></td></tr>
       <tr><td>Messages</td><td>ChatMessage, ordered by timestamp</td><td>Author, body, attachments, timestamp.</td></tr>
-      <tr><td>Entity preview cards</td><td>ChatMessage.body, parsed for Location/Asset/Contact/etc. URLs</td><td>Rendered inline for display only — pasting a URL is link parsing, not a stored relationship, per <a href="../data-model.html">Data Model</a>.</td></tr>
+      <tr><td>Entity preview cards</td><td>ChatMessage.body, parsed for Location/Asset/Contact/etc. URLs</td><td>Rendered inline for display only — pasting a URL is link parsing, not a stored relationship, per <a href="../data-model.md">Data Model</a>.</td></tr>
       <tr><td>Invited users / roles</td><td>ChatRoom.invited_users / invited_roles</td><td><code>invited_roles</code> is a live reference to Role, not a snapshot — a user granted that role after the room was created gains access to it immediately, without being re-invited.</td></tr>
       <tr><td>Participant status</td><td>Derived: is the viewing user in <code>invited_users</code>, a member of an <code>invited_roles</code> role, or <code>created_by</code>?</td><td>Not a stored field — computed on load to decide whether the composer is enabled. Drives the disabled-input/join-overlay state below.</td></tr>
     </table>

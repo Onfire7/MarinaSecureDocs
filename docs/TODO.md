@@ -7,55 +7,45 @@ Verify each task against the deployment before moving on.
 
 ---
 
-## Phase 0 — Knowledge architecture
+## Awaiting user action
 
-- [x] Split the old `TODO.md` into `CLAUDE.md` (conventions, learnings,
-      workflow), this file (open tasks), and `docs/ROADMAP.md` (deferred
-      work with reasons).
+- [ ] **Push `main`.** `beta` has been merged in cleanly (no conflicts; the
+      trees are identical). The merge commit is local and unpushed —
+      `git push origin main` moves the repo's default branch.
+- [ ] **Turn off GitHub Pages.** Repo settings. The docs are Markdown now;
+      Pages would serve them as raw files.
+
+## Phase 0 — Knowledge architecture ✅
+
+- [x] Split the old `TODO.md` into `CLAUDE.md`, this file, and
+      `docs/ROADMAP.md`.
 - [x] Write `CONTEXT.md` — the domain glossary, corrected against the data
-      model. Fixes the stale "global / role-restricted / personal" template
-      visibility and the obsolete trigger list.
-- [x] Delete `docs/terminology.html` and repoint the 76 nav links across
-      `docs/` at `CONTEXT.md`.
-- [ ] Merge `beta` → `main`. `main`'s three commits are pure merge bubbles
-      with no unique content, so this is clean. **Needs the user to
-      authorize the push.**
-- [ ] Turn off GitHub Pages. The docs are for agents now; Pages has been
-      serving month-stale content from `main` and nobody noticed, which is
-      itself the argument. **User action in repo settings.**
+      model.
+- [x] Delete `docs/terminology.html`, repoint its 76 references.
+- [x] Merge `beta` → `main` (push pending, above).
 
-## Phase 1 — Cross-cutting docs
+## Phase 1 — Cross-cutting docs ✅
 
-Convert the seven top-level docs from HTML to Markdown, correcting content
-in the same pass. They hold every contradiction found in the audit; the
-page specs do not, so those convert incrementally instead (Phase 7).
-
-- [ ] `architecture.html` → Markdown
-- [ ] `api-structure.html` → Markdown. Remove the `checklist-triggers`
-      scheduled function — checklist recurrence is client-side, created by
-      the first role-holder to open the app on a matching day. Remove the
-      claim that Instant's rules check each acting user's effective
-      permission; only `active`, `canManageRoles` and `canManageUsers` are
-      enforced server-side.
-- [ ] `data-model.html` → Markdown
-- [ ] `permissions.html` → Markdown
-- [ ] `workflows.html` → Markdown
-- [ ] `index.html` → Markdown
-- [ ] Document the client-vs-server criterion: server-side only if it needs
-      a credential that can't reach the browser, authority the rules deny
-      every client, or execution with no client present.
-- [ ] Document the migration lifecycle: expand → dual-write → sweep →
-      contract, with the deprecation schedule and the pipeline ordering.
-- [ ] Fix `README.md`: it says the strict permission tiers are "deliberately
-      inactive." They are live — `instant.perms.ts` has been the current
-      tier for some time.
-- [ ] Fix the stale header comment in `instant.perms.ts` claiming per-field
-      rules don't exist. They do, and Phase 4 uses them.
-- [ ] Fix the schema header comment saying attachment targets are five
-      links. There are six — `vehicle` was added.
-- [ ] Write the four ADRs in `docs/adr/`: live migration design;
-      client-side-only permission enforcement with the accepted residual;
-      docs-for-agents with co-located specs; the client-first criterion.
+- [x] Convert all six remaining cross-cutting docs to Markdown:
+      `architecture`, `api-structure`, `data-model`, `permissions`,
+      `workflows`, and `index` → `docs/README.md`. All 540 references from
+      the page specs and wireframes repointed; zero broken links.
+- [x] Remove the `checklist-triggers` scheduled function from
+      `api-structure.md` and record why it isn't there.
+- [x] Replace the claim that Instant's rules check each acting user's
+      effective permission, in `api-structure.md` and with a new
+      **Enforcement** section in `permissions.md`.
+- [x] Document the client-vs-server criterion —
+      `architecture.md` § Where work runs.
+- [x] Document the migration lifecycle and pipeline order —
+      `architecture.md` § Schema evolution.
+- [x] Fix `README.md`: the strict permission tier is live, not "deliberately
+      inactive"; checklist triggers are not a Netlify Function.
+- [x] Fix the `instant.perms.ts` comment claiming per-field rules don't
+      exist.
+- [x] Fix the `instant.schema.ts` comment saying attachment targets are five
+      links. There are six.
+- [x] Write ADRs 0001–0004.
 
 ---
 
@@ -64,3 +54,6 @@ page specs do not, so those convert incrementally instead (Phase 7).
 **When nothing above is open**, read `docs/ROADMAP.md` and propose the next
 items to promote into this file. Don't start them unprompted — propose, then
 wait.
+
+Next up there: **Phase 2, the pnpm migration** — which lands alone, verified
+against a `beta` deploy, because it touches the deploy path.

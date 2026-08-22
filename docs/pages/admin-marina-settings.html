@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -40,15 +40,15 @@
     <p class="lede">The single settings record that lets one codebase serve very differently-run properties — GPS defaults, retention, recording, phone lines, and the shift report distribution list.</p>
 
     <h2>Purpose</h2>
-    <p>Reached from <a href="admin-home.html">Admin Home</a>, gated by <code>manage_marina_settings</code>. Edits the one <code>MarinaSettings</code> record per marina, per <a href="../data-model.html">Data Model</a> — there's exactly one, not a list.</p>
+    <p>Reached from <a href="admin-home.html">Admin Home</a>, gated by <code>manage_marina_settings</code>. Edits the one <code>MarinaSettings</code> record per marina, per <a href="../data-model.md">Data Model</a> — there's exactly one, not a list.</p>
 
     <h2>Data shown / form fields</h2>
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
       <tr><td>GPS validation radius default</td><td>MarinaSettings.gps_validation_radius_default</td><td>Fallback used by any Checkpoint without its own override, per <a href="admin-locations.html">Location Types &amp; Locations setup</a>.</td></tr>
-      <tr><td>Activity Log retention</td><td>MarinaSettings.activity_log_retention_days</td><td>Entries older than this are eligible for purge by the <code>activity-log-retention</code> Scheduled Function unless flagged <strong>Protected</strong>, per <a href="../api-structure.html">API Structure</a>.</td></tr>
+      <tr><td>Activity Log retention</td><td>MarinaSettings.activity_log_retention_days</td><td>Entries older than this are eligible for purge by the <code>activity-log-retention</code> Scheduled Function unless flagged <strong>Protected</strong>, per <a href="../api-structure.md">API Structure</a>.</td></tr>
       <tr><td>Call recording / transcription toggles</td><td>MarinaSettings.call_recording_enabled / call_transcription_enabled</td><td>Governs whether <a href="active-call-panel.html">Active Call Panel</a> and call history ever show a recording/transcript at all.</td></tr>
-      <tr><td>Shift report recipients</td><td>MarinaSettings.shift_report_recipients</td><td>Email distribution list, per <a href="../architecture.html">Architecture — Shift report delivery</a>. An inline warning appears directly beside this field, and only here, when it's empty — see States &amp; edge cases below.</td></tr>
+      <tr><td>Shift report recipients</td><td>MarinaSettings.shift_report_recipients</td><td>Email distribution list, per <a href="../architecture.md">Architecture — Shift report delivery</a>. An inline warning appears directly beside this field, and only here, when it's empty — see States &amp; edge cases below.</td></tr>
       <tr><td>Phone lines</td><td>MarinaSettings.phone_lines</td><td>Each line's Twilio number, label, and routing behavior (e.g. a Security line skipping straight to a security menu).</td></tr>
       <tr><td>Allow overlapping reservations</td><td>MarinaSettings.allow_overlapping_reservations</td><td>Off by default. Governs whether <a href="new-reservation-form.html">New Reservation Form</a> blocks a booking whose dates overlap an existing one for the same target, or permits it (e.g. for a marina running a waitlist/overbooking model).</td></tr>
       <tr><td>Haul-out mode</td><td>MarinaSettings.haul_out_mode</td><td>Ask (default) or Customer. Controls whether <a href="boat-detail.html">Boat Detail</a>'s haul-out action prompts for who performed the haul-out — marina or customer — or assumes customer without asking. Marina haul-outs generate a Ticket for the work; customer ones don't.</td></tr>

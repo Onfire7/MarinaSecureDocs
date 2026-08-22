@@ -4,8 +4,8 @@
 //
 // Conventions:
 // - "Exactly one attachment target" (Note / Incident / Ticket → Location |
-//   Checkpoint | Boat | Contact | Asset) is modeled as five optional links;
-//   the app enforces that exactly one is set.
+//   Checkpoint | Boat | Vehicle | Contact | Asset) is modeled as six optional
+//   links; the app enforces that exactly one is set.
 // - Ordered ref[] lists (tour checkpoints, boat owner succession) carry a
 //   sibling `…Order` json field of ids, since links are unordered sets.
 // - Enum-ish fields are lowercase snake strings ("under_review"), mapped to

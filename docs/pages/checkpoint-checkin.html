@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -40,7 +40,7 @@
     <p class="lede">What opens when a guard taps their phone against an NFC tag or scans a QR code at a checkpoint — the checkpoint's own <code>guid_url</code>.</p>
 
     <h2>Purpose</h2>
-    <p>This URL is the checkpoint, functionally: it's bound 1:1 to a <code>Checkpoint</code> record and is the only way this screen is reached. On load it immediately logs the visit and surfaces whatever's relevant right now, per <a href="../workflows.html">Role Workflows — Checking in at a checkpoint</a>. GPS capture happens in the background rather than gating any of this — see below.</p>
+    <p>This URL is the checkpoint, functionally: it's bound 1:1 to a <code>Checkpoint</code> record and is the only way this screen is reached. On load it immediately logs the visit and surfaces whatever's relevant right now, per <a href="../workflows.md">Role Workflows — Checking in at a checkpoint</a>. GPS capture happens in the background rather than gating any of this — see below.</p>
 
     <h2>On-load sequence</h2>
     <p>GPS acquisition is the one step here that can take anywhere from under a second to several seconds depending on signal, so it's deliberately taken off the critical path — the guard is never staring at a spinner waiting for it:</p>
@@ -104,7 +104,7 @@
     <h2>Mobile vs. desktop</h2>
     <p>This screen renders inside the standard app shell (sidenav on desktop, tab bar on mobile) like every other screen — a scan is an entry point into the app, not a detached kiosk view, and the guard needs the nav to get anywhere once the check-in is logged.</p>
 
-    <p>Phone is the primary case — tapping an NFC tag or scanning a QR code in the field — but the screen is built responsively rather than mobile-only: NFC-capable tablets and hybrid laptops are a real, if less common, way this gets opened (a guard using a rugged tablet for rounds, or a hybrid laptop with NFC at a fixed post that still moves between checkpoints). It is not designed for a permanently-placed desktop workstation, since nothing about a fixed desktop ever taps an NFC tag or scans a QR code — that case is only reachable by pasting the URL directly (e.g. testing a checkpoint's link), and renders the same content without any field-specific chrome. Layout scales from a single-column phone view up through tablet/hybrid-laptop widths using the same breakpoint approach as the rest of the app (see <a href="../architecture.html">Architecture — Frontend</a>), rather than assuming one fixed viewport size.</p>
+    <p>Phone is the primary case — tapping an NFC tag or scanning a QR code in the field — but the screen is built responsively rather than mobile-only: NFC-capable tablets and hybrid laptops are a real, if less common, way this gets opened (a guard using a rugged tablet for rounds, or a hybrid laptop with NFC at a fixed post that still moves between checkpoints). It is not designed for a permanently-placed desktop workstation, since nothing about a fixed desktop ever taps an NFC tag or scans a QR code — that case is only reachable by pasting the URL directly (e.g. testing a checkpoint's link), and renders the same content without any field-specific chrome. Layout scales from a single-column phone view up through tablet/hybrid-laptop widths using the same breakpoint approach as the rest of the app (see <a href="../architecture.md">Architecture — Frontend</a>), rather than assuming one fixed viewport size.</p>
 
     <div class="page-foot">
       <a href="active-checklist.html">← Active Checklist</a>

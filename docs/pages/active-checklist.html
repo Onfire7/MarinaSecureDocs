@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -40,7 +40,7 @@
     <p class="lede">Item-by-item completion of an in-progress Checklist instance — the most interaction-heavy screen in the app, since it hosts all five item-type behaviors.</p>
 
     <h2>Purpose</h2>
-    <p>Reached from <a href="checklist-list.html">Checklist list</a>, a checkpoint scan/manual check-in, or a Location-Based Check item opening a nested instance. An instance is fully materialized rows — every <code>ChecklistInstanceSection</code> and its <code>ChecklistInstanceItem</code>s exist in the database from the moment they were assigned — so this page renders exactly what's stored, grouped by section, recording a <code>result</code> per item row locally-first (see <a href="../architecture.html">Architecture — Database</a>); nothing here requires connectivity. Sections still inside their <code>hide_until</code> are filtered out until their moment arrives (a footnote says when the next one unlocks); once visible, a section never re-hides. Items can be completed in whichever order suits the guard — and reordered to match: a per-section Reorder control swaps the rows' own <code>order</code> values, which is what always sorts. Completing an item stamps <code>completed_at</code> and <code>completed_by</code> on its row, so an hour-long checklist records when each thing happened, not just that it all happened by submission.</p>
+    <p>Reached from <a href="checklist-list.html">Checklist list</a>, a checkpoint scan/manual check-in, or a Location-Based Check item opening a nested instance. An instance is fully materialized rows — every <code>ChecklistInstanceSection</code> and its <code>ChecklistInstanceItem</code>s exist in the database from the moment they were assigned — so this page renders exactly what's stored, grouped by section, recording a <code>result</code> per item row locally-first (see <a href="../architecture.md">Architecture — Database</a>); nothing here requires connectivity. Sections still inside their <code>hide_until</code> are filtered out until their moment arrives (a footnote says when the next one unlocks); once visible, a section never re-hides. Items can be completed in whichever order suits the guard — and reordered to match: a per-section Reorder control swaps the rows' own <code>order</code> values, which is what always sorts. Completing an item stamps <code>completed_at</code> and <code>completed_by</code> on its row, so an hour-long checklist records when each thing happened, not just that it all happened by submission.</p>
 
     <h2>Item-type behavior</h2>
     <table>
@@ -49,7 +49,7 @@
       <tr><td>Verify Task</td><td>Confirm done, or reject with a written reason, or reject and immediately raise a linked ticket. If the template's config flags it, a rejection first prompts the guard to attempt the task themselves before finalizing the rejection.</td><td><code>result</code> = Confirmed / Rejected-Reason / Rejected-Ticket; <code>linked_ticket</code> set if a ticket was raised.</td></tr>
       <tr><td>Door Check<br>Lock Check</td><td>Two states are recorded, not one: how it was <strong>found</strong>, and how it was <strong>left</strong>. A door is Open, Unlocked, or Locked (no separate "Closed" state; Unlocked and Locked both imply it's closed); a Lock Check is only Unlocked or Locked, for anything with a lock but no door — a padlocked gate, a fuel pump, a shed hasp. Found as expected is one tap: the final state is implied and no second prompt appears. Found in any other state → an Incident is raised (prefilled, editable) recording that it was wrong before the guard touched it, and a second set of buttons asks what state it was left in. If that's still not the expected state, the guard is offered a Ticket so it gets followed up. The Incident attaches to the Location bound to that door or lock in its template — the guard is never asked to pick a target mid-round.</td><td><code>result</code> carries <code>initial_state</code> and <code>final_state</code> separately, plus the raised <code>incident</code>; <code>linked_ticket</code> set if one was raised.</td></tr>
       <tr><td>Location-Based Check</td><td>Opens a nested sub-checklist scoped to a specific Location; returns to the parent item list on completion.</td><td>Nested Checklist instance, same schema, referenced from the parent item's result.</td></tr>
-      <tr><td>Meter Reading</td><td>Select the asset (fixed by the template, or user-selected at runtime — e.g. "select your patrol vehicle") and enter its current value.</td><td>On submit, creates an <code>AssetMeterReading</code> (source = Checklist item) and updates <code>Asset.meter_reading</code>; maintenance rules are evaluated then, against the submitted value, and may raise Tickets, per <a href="../api-structure.html">API Structure</a>.</td></tr>
+      <tr><td>Meter Reading</td><td>Select the asset (fixed by the template, or user-selected at runtime — e.g. "select your patrol vehicle") and enter its current value.</td><td>On submit, creates an <code>AssetMeterReading</code> (source = Checklist item) and updates <code>Asset.meter_reading</code>; maintenance rules are evaluated then, against the submitted value, and may raise Tickets, per <a href="../api-structure.md">API Structure</a>.</td></tr>
     </table>
 
     <h2>Actions</h2>
@@ -60,7 +60,7 @@
       <tr><td>Edit a completed item</td><td>Same as completing it, and only while the checklist is unsubmitted</td><td>Reopens the item prefilled with what was recorded, so a correction is an adjustment rather than starting over. Safe precisely because nothing it raised has been written yet (see "Deferred side effects"). Once submitted the checklist is a finished record and items are read-only.</td></tr>
       <tr><td>Add a note mid-checklist</td><td><code>create_incidents</code> not required — notes are unrestricted</td><td>Opens <a href="new-note-dialog.html">New note dialog</a>, attached to the checklist's location context if one applies.</td></tr>
       <tr><td>Log an incident mid-checklist</td><td><code>create_incidents</code></td><td>Opens <a href="new-incident-form.html">New incident form</a>.</td></tr>
-      <tr><td>Submit / complete the checklist</td><td>All items resolved — <em>including items of sections still hidden</em>: their work exists, it just hasn't revealed yet, so a checklist can't be submitted out from under a section that hasn't shown</td><td>Writes every deferred Incident, Ticket and meter reading (see below), then sets <code>status</code> = Complete, <code>completed_at</code> = now. A nested instance's submit also stamps its spawning Location-Based Check item's <code>completed_at</code>/<code>completed_by</code>, so the parent's derived section completion time reflects when the sub-checklist actually finished. If this is the shift's <code>end_of_shift_checklist</code>, also sets <code>Shift.ended_at</code> and fires the on-demand shift-report call (see <a href="../architecture.html">Architecture — Shift report delivery</a>).</td></tr>
+      <tr><td>Submit / complete the checklist</td><td>All items resolved — <em>including items of sections still hidden</em>: their work exists, it just hasn't revealed yet, so a checklist can't be submitted out from under a section that hasn't shown</td><td>Writes every deferred Incident, Ticket and meter reading (see below), then sets <code>status</code> = Complete, <code>completed_at</code> = now. A nested instance's submit also stamps its spawning Location-Based Check item's <code>completed_at</code>/<code>completed_by</code>, so the parent's derived section completion time reflects when the sub-checklist actually finished. If this is the shift's <code>end_of_shift_checklist</code>, also sets <code>Shift.ended_at</code> and fires the on-demand shift-report call (see <a href="../architecture.md">Architecture — Shift report delivery</a>).</td></tr>
     </table>
 
     <h2>Deferred side effects</h2>
@@ -71,7 +71,7 @@
     <h2>States &amp; edge cases</h2>
     <ul>
       <li><strong>Offline throughout</strong> — every write here is local-first; leaving and resuming later (even after reconnecting) preserves exact progress with no special handling.</li>
-      <li><strong>Ticket creation from a failed item</strong> — the resulting <code>Ticket.source_incident</code> stays null (this isn't an incident-sourced ticket) but <code>ChecklistItemResult.linked_ticket</code> connects it back; see <a href="../data-model.html">Data Model</a>.</li>
+      <li><strong>Ticket creation from a failed item</strong> — the resulting <code>Ticket.source_incident</code> stays null (this isn't an incident-sourced ticket) but <code>ChecklistItemResult.linked_ticket</code> connects it back; see <a href="../data-model.md">Data Model</a>.</li>
       <li><strong>Abandoning mid-checklist</strong> — status stays In Progress indefinitely; it simply reappears on <a href="checklist-list.html">Checklist list</a> until finished. Anything it recorded — including doors found in the wrong state — stays unwritten until it's submitted, so an abandoned checklist raises no Incidents or Tickets at all.</li>
       <li><strong>Submit fails</strong> — surfaced on the page rather than swallowed, and the checklist stays In Progress so it can be retried; the deferred effects are written in the same transaction that completes it, so a failure leaves neither half applied.</li>
     </ul>

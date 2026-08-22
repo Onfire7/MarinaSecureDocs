@@ -125,11 +125,22 @@ const rules = {
   // - create is manage-only: provisioning happens in Admin → Users.
   // - KNOWN RESIDUAL GAP: update is per-entity, not per-field, so any
   //   *active* user can still update users rows — including linking roles or
-  //   setting the canManage flags on their own row. Closing that needs
-  //   either per-field/link rules from Instant or moving these writes to a
-  //   trusted server endpoint. What this tier does close: outsider Clerk
-  //   accounts (no active marina User) now have no access at all, and role
-  //   *grants* can't be edited without manage_roles.
+  //   setting the canManage flags on their own row. Two vectors, in
+  //   different states (see docs/adr/0002):
+  //     · Setting canManageRoles/canManageUsers on your own row is closable
+  //       now. Instant does support per-field rules — a `fields` block, and
+  //       `newData` comparisons inside `update` — despite what an earlier
+  //       version of this comment claimed.
+  //     · Linking your own row to an admin role may already be closed: if
+  //       linking checks `update` on both namespaces, roles.update already
+  //       requires manage_roles. Undocumented, so unverified. `allow.link` /
+  //       `allow.unlink` exist in the shipped @instantdb/core types but not
+  //       in the published docs — and a rule key the server silently ignores
+  //       looks exactly like one that works. Settle it by experiment against
+  //       a local instance, not by assuming.
+  //   What this tier does close: outsider Clerk accounts (no active marina
+  //   User) now have no access at all, and role *grants* can't be edited
+  //   without manage_roles.
   users: {
     allow: {
       view: `(${SIGNED_IN_ACTIVE_USER}) || (${OWN_ROW_BY_EMAIL})`,

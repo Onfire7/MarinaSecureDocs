@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -40,7 +40,7 @@
     <p class="lede">Build and manage the reusable templates that generate real Checklists — a role-owned template, its ordered sections (each with its own trigger, place attachment, and time rules), and the items inside them.</p>
 
     <h2>Purpose</h2>
-    <p>Reached from <a href="admin-home.html">Admin Home</a>, gated entirely by <code>manage_checklists</code>. Every template belongs to one role — there is no Global or Personal visibility (personal checklists return later as their own feature). Items are <strong>copy-on-edit</strong>: committing a change to an item's label or config writes a new row (version+1, <code>previous_version</code> link) and repoints the section's link, so checklists generated before the edit keep rendering exactly what they were created from — see <a href="../data-model.html">Data Model — ChecklistTemplateItem</a>.</p>
+    <p>Reached from <a href="admin-home.html">Admin Home</a>, gated entirely by <code>manage_checklists</code>. Every template belongs to one role — there is no Global or Personal visibility (personal checklists return later as their own feature). Items are <strong>copy-on-edit</strong>: committing a change to an item's label or config writes a new row (version+1, <code>previous_version</code> link) and repoints the section's link, so checklists generated before the edit keep rendering exactly what they were created from — see <a href="../data-model.md">Data Model — ChecklistTemplateItem</a>.</p>
 
     <h2>Data shown</h2>
     <table>

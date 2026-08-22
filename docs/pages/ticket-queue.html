@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -40,7 +40,7 @@
     <p class="lede">Every maintenance ticket, sorted by priority — the shared worklist for Maintenance, and anyone else who needs to see what's open.</p>
 
     <h2>Purpose</h2>
-    <p>Reached from the Tickets top-level nav item. Viewing the queue has no dedicated permission — every role can see it, matching ticket creation being unrestricted by design (see <a href="../permissions.html">Permissions</a>). What's gated is <em>acting</em> on a ticket: taking one for yourself, or handing one to someone else.</p>
+    <p>Reached from the Tickets top-level nav item. Viewing the queue has no dedicated permission — every role can see it, matching ticket creation being unrestricted by design (see <a href="../permissions.md">Permissions</a>). What's gated is <em>acting</em> on a ticket: taking one for yourself, or handing one to someone else.</p>
 
     <h2>Data shown</h2>
     <table>
@@ -55,7 +55,7 @@
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
       <tr><td>Open a ticket</td><td>None</td><td>Navigates to <a href="ticket-detail.html">Ticket detail</a>.</td></tr>
-      <tr><td>Create a ticket</td><td>None — unrestricted, per <a href="../permissions.html">Permissions</a></td><td>Opens <a href="new-ticket-form.html">New ticket form</a>.</td></tr>
+      <tr><td>Create a ticket</td><td>None — unrestricted, per <a href="../permissions.md">Permissions</a></td><td>Opens <a href="new-ticket-form.html">New ticket form</a>.</td></tr>
       <tr><td>Take an unassigned ticket</td><td><code>assign_ticket_to_self</code></td><td>Sets <code>assigned_to</code> to the current user directly from the queue, no need to open the ticket first.</td></tr>
       <tr><td>Assign to someone else</td><td><code>assign_ticket_to_others</code></td><td>Inline assignee picker from the queue.</td></tr>
       <tr><td>Filter by priority / status / assignee</td><td>None</td><td>Client-side filter over the subscribed query.</td></tr>
@@ -66,7 +66,7 @@
       <li><strong>No queue-visibility permission needed</strong> — worth calling out explicitly since it's the exception rather than the rule elsewhere in the app: there is deliberately no <code>view_tickets</code> permission in the fixed catalog.</li>
       <li><strong>Neither assignment permission</strong> — the queue is still fully visible and creation still works; only the inline take/assign actions are hidden.</li>
       <li><strong>Empty queue</strong> — a genuinely good state, shown plainly rather than as an error.</li>
-      <li><strong>Auto-generated ticket</strong> — <code>auto_generated</code> = true for anything created by a maintenance rule (see <a href="../data-model.html">Data Model — Asset</a>); shown identically to a manually created ticket otherwise.</li>
+      <li><strong>Auto-generated ticket</strong> — <code>auto_generated</code> = true for anything created by a maintenance rule (see <a href="../data-model.md">Data Model — Asset</a>); shown identically to a manually created ticket otherwise.</li>
     </ul>
 
     <h2>Mobile vs. desktop</h2>

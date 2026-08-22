@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -40,7 +40,7 @@
     <p class="lede">Dialer and contact picker for initiating an outbound call, gated by <code>place_calls</code>.</p>
 
     <h2>Purpose</h2>
-    <p>Reached from <a href="comms-home.html">Comms Home</a>, <a href="missed-comms-detail.html">Missed Comms Detail</a> ("call back"), or a Contact/Boat/Location detail page's call action. The dialog itself is thin — it collects who to call and from which line, then hands off to the <a href="../api-structure.html">Twilio Functions API</a> to actually place the call.</p>
+    <p>Reached from <a href="comms-home.html">Comms Home</a>, <a href="missed-comms-detail.html">Missed Comms Detail</a> ("call back"), or a Contact/Boat/Location detail page's call action. The dialog itself is thin — it collects who to call and from which line, then hands off to the <a href="../api-structure.md">Twilio Functions API</a> to actually place the call.</p>
 
     <h2>Data shown / form fields</h2>
     <table>
@@ -52,7 +52,7 @@
     <h2>Actions</h2>
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
-      <tr><td>Call</td><td><code>place_calls</code></td><td>Calls the Twilio Function's <code>POST /calls/initiate</code> (see <a href="../api-structure.html">API Structure</a>), which bridges the call to the requesting user's device and creates the outbound <code>Call</code> record itself. On success, <a href="active-call-panel.html">Active Call Panel</a> takes over.</td></tr>
+      <tr><td>Call</td><td><code>place_calls</code></td><td>Calls the Twilio Function's <code>POST /calls/initiate</code> (see <a href="../api-structure.md">API Structure</a>), which bridges the call to the requesting user's device and creates the outbound <code>Call</code> record itself. On success, <a href="active-call-panel.html">Active Call Panel</a> takes over.</td></tr>
       <tr><td>Cancel</td><td>None</td><td>Closes without placing a call.</td></tr>
     </table>
 
@@ -60,7 +60,7 @@
     <ul>
       <li><strong>No <code>place_calls</code></strong> — this dialog is never reachable; every entry point that would open it is itself gated the same way.</li>
       <li><strong>Contact has multiple numbers</strong> — presented as a picker rather than guessing which to dial.</li>
-      <li><strong>Offline</strong> — calling requires connectivity (telephony is online-only, per <a href="../architecture.html">Architecture</a>); the dialog reflects this honestly (disabled state with an explanation) rather than accepting input it can't act on.</li>
+      <li><strong>Offline</strong> — calling requires connectivity (telephony is online-only, per <a href="../architecture.md">Architecture</a>); the dialog reflects this honestly (disabled state with an explanation) rather than accepting input it can't act on.</li>
       <li><strong>Only one line configured</strong> — the line selector collapses to a label rather than a meaningful choice.</li>
     </ul>
 

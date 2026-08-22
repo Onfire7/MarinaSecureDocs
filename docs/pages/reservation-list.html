@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -40,7 +40,7 @@
     <p class="lede">Every reservation across every reservable Location and Asset — cabins, RV sites, slips, jump packs, whatever a marina has enabled — viewed as a calendar/list, or as a schematic map with color-coded slip rectangles.</p>
 
     <h2>Purpose</h2>
-    <p>Reached from the Reservations top-level nav item. One screen serves every reservable target type uniformly: <code>Reservation.target</code> is a Location or an Asset, and this list doesn't care which — a cabin booking and a jump-pack checkout-by-reservation look the same here beyond their target's type label. A location only ever appears as a possible target if its own <code>reservation_enabled</code> is on, which is what makes a mixed-use Dock work (some Slips bookable here, others tied to a Lease and simply absent from this screen) — see <a href="../data-model.html">Data Model — Location</a>.</p>
+    <p>Reached from the Reservations top-level nav item. One screen serves every reservable target type uniformly: <code>Reservation.target</code> is a Location or an Asset, and this list doesn't care which — a cabin booking and a jump-pack checkout-by-reservation look the same here beyond their target's type label. A location only ever appears as a possible target if its own <code>reservation_enabled</code> is on, which is what makes a mixed-use Dock work (some Slips bookable here, others tied to a Lease and simply absent from this screen) — see <a href="../data-model.md">Data Model — Location</a>.</p>
 
     <h2>List / calendar view</h2>
     <table>
@@ -56,7 +56,7 @@
     <p>A weekly table alongside the monthly calendar: one row per reservable Location, one column per day of the week, with each stay rendered as a chip spanning the days it covers. Each location's row header is tinted by its current standing: <strong>green</strong> when the Location is Available (Vacant), <strong>orange</strong> when its current status equals its own <code>post_reservation_status</code> (e.g. sitting in "Needs Cleaning" after a checkout), and <strong>red</strong> for every other status. Green deliberately outranks orange: a location whose post-reservation status <em>is</em> Vacant — a pavilion that's usable again the moment a reservation ends — reads green, not orange, since there's nothing pending on it. Asset-target reservations have no location row and appear in list/calendar only, same as the map view.</p>
 
     <h2>Map view</h2>
-    <p>A schematic view built on <code>MarinaMap</code> + <code>LocationMapPlacement</code> (see <a href="../data-model.html">Data Model</a>): the same plotted rectangles used by <a href="location-list.html">Location list / map view</a>'s own schematic mode, here color-coded by <em>reservation</em> status instead of occupancy — e.g. green for vacant/available, amber for an upcoming reservation, red for currently checked in — and each rectangle labeled with the location's name. Starts on the marina's root-level overview map (or a chooser between them, for a multi-property marina with more than one root Location); drilling into a parent Location (where one exists) switches to that Location's own detail map, zoomed in on just its children. Asset-target reservations (a jump pack, not a Location) have no rectangle to plot and so only ever appear in the list/calendar view, not on the map.</p>
+    <p>A schematic view built on <code>MarinaMap</code> + <code>LocationMapPlacement</code> (see <a href="../data-model.md">Data Model</a>): the same plotted rectangles used by <a href="location-list.html">Location list / map view</a>'s own schematic mode, here color-coded by <em>reservation</em> status instead of occupancy — e.g. green for vacant/available, amber for an upcoming reservation, red for currently checked in — and each rectangle labeled with the location's name. Starts on the marina's root-level overview map (or a chooser between them, for a multi-property marina with more than one root Location); drilling into a parent Location (where one exists) switches to that Location's own detail map, zoomed in on just its children. Asset-target reservations (a jump pack, not a Location) have no rectangle to plot and so only ever appear in the list/calendar view, not on the map.</p>
 
     <h2>Actions</h2>
     <table>
@@ -71,9 +71,9 @@
 
     <h2>States &amp; edge cases</h2>
     <ul>
-      <li><strong>No dedicated view permission</strong> — same as tickets and reservations elsewhere in the app, browsing this screen is unrestricted; only creating/editing requires <code>manage_reservations</code>, per <a href="../permissions.html">Permissions</a>.</li>
+      <li><strong>No dedicated view permission</strong> — same as tickets and reservations elsewhere in the app, browsing this screen is unrestricted; only creating/editing requires <code>manage_reservations</code>, per <a href="../permissions.md">Permissions</a>.</li>
       <li><strong>Location not yet plotted on any map</strong> — still fully usable in list/calendar view; simply absent from the map view until an admin plots it, per <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>.</li>
-      <li><strong>Upcoming reservation vs. current status</strong> — a target's map rectangle color reflects both: its current occupancy status and, distinctly, an "upcoming" indicator if a reservation is confirmed but not yet active — matching the "displayed alongside, not replacing" rule from <a href="../data-model.html">Data Model — Reservation</a>.</li>
+      <li><strong>Upcoming reservation vs. current status</strong> — a target's map rectangle color reflects both: its current occupancy status and, distinctly, an "upcoming" indicator if a reservation is confirmed but not yet active — matching the "displayed alongside, not replacing" rule from <a href="../data-model.md">Data Model — Reservation</a>.</li>
       <li><strong>Mixed-use dock</strong> — on the map, a Dock's detail map shows only its reservable children; Slips with <code>reservation_enabled</code> off (leased long-term) don't get a rectangle here at all, since they're not part of this screen's dataset.</li>
     </ul>
 

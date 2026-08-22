@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -45,7 +45,7 @@
     <h2>Data shown</h2>
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
-      <tr><td>Location</td><td>Lease.location</td><td>Links to <a href="location-detail.html">Location detail</a>; variances are displayed alongside the Location's (and its current Boat's) info there too, per <a href="../data-model.html">Data Model</a>.</td></tr>
+      <tr><td>Location</td><td>Lease.location</td><td>Links to <a href="location-detail.html">Location detail</a>; variances are displayed alongside the Location's (and its current Boat's) info there too, per <a href="../data-model.md">Data Model</a>.</td></tr>
       <tr><td>Lessees</td><td>Lease.lessees</td><td>Requires <code>view_owner</code> for names, <code>view_contact</code> for phone/email — same gating as everywhere else Contacts appear.</td></tr>
       <tr><td>Dates</td><td>Lease.start_date / end_date</td><td></td></tr>
       <tr><td>Variances &amp; conditions</td><td>Lease.variances_and_conditions</td><td>Freeform text.</td></tr>
@@ -68,7 +68,7 @@
       <li><strong>No <code>view_lease</code></strong> — this page, and any link into it from Location/Contact detail, is unreachable.</li>
       <li><strong><code>view_lease</code> without <code>manage_lease</code></strong> — full read access including document download, but no editing or commenting.</li>
       <li><strong>Expired lease</strong> (<code>end_date</code> passed) — shown plainly as historical; the data model doesn't auto-flip the Location's status or <code>reservation_enabled</code> on expiry, so renewing or transitioning a Slip to reservation-enabled after a lease ends is a manual admin action, not an automated workflow.</li>
-      <li><strong>Reservations turned on for this Location while an active lease exists</strong> — the symmetric case, triggered from <a href="location-detail.html">Location detail</a> or <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>, not from here; also a warning, not a block, per <a href="../data-model.html">Data Model — Location</a>.</li>
+      <li><strong>Reservations turned on for this Location while an active lease exists</strong> — the symmetric case, triggered from <a href="location-detail.html">Location detail</a> or <a href="admin-locations.html">Admin → Location Types &amp; Locations setup</a>, not from here; also a warning, not a block, per <a href="../data-model.md">Data Model — Location</a>.</li>
     </ul>
 
     <h2>Mobile vs. desktop</h2>

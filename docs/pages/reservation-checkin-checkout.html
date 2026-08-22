@@ -10,23 +10,23 @@
 <div class="shell">
 
   <aside class="sidenav">
-    <a href="../index.html" class="brand">MarinaSecure</a>
+    <a href="../README.md" class="brand">MarinaSecure</a>
     <span class="brand-sub">Implementation Docs</span>
     <nav>
       <h3>Overview</h3>
-      <a href="../index.html">Introduction</a>
+      <a href="../README.md">Introduction</a>
       <a href="../../CONTEXT.md">Terminology</a>
 
       <h3>Architecture</h3>
-      <a href="../architecture.html">Stack &amp; Architecture</a>
-      <a href="../api-structure.html">API Structure</a>
+      <a href="../architecture.md">Stack &amp; Architecture</a>
+      <a href="../api-structure.md">API Structure</a>
 
       <h3>Data &amp; Access</h3>
-      <a href="../data-model.html">Data Model</a>
-      <a href="../permissions.html">Permissions</a>
+      <a href="../data-model.md">Data Model</a>
+      <a href="../permissions.md">Permissions</a>
 
       <h3>Behavior</h3>
-      <a href="../workflows.html">Role Workflows</a>
+      <a href="../workflows.md">Role Workflows</a>
 
       <h3>Specifications</h3>
       <a href="index.html" class="current">Page Specifications</a>
@@ -40,7 +40,7 @@
     <p class="lede">Marks a reservation's actual arrival or departure — and, as a side effect, moves the target into whatever status that implies.</p>
 
     <h2>Purpose</h2>
-    <p>Reached from <a href="reservation-detail.html">Reservation detail</a>. Deliberately a separate dialog rather than an inline date edit, because setting <code>actual_checkin</code>/<code>actual_checkout</code> has a real side effect on the target's <code>status</code> that a plain field edit shouldn't casually trigger — see <a href="../data-model.html">Data Model — Reservation</a>.</p>
+    <p>Reached from <a href="reservation-detail.html">Reservation detail</a>. Deliberately a separate dialog rather than an inline date edit, because setting <code>actual_checkin</code>/<code>actual_checkout</code> has a real side effect on the target's <code>status</code> that a plain field edit shouldn't casually trigger — see <a href="../data-model.md">Data Model — Reservation</a>.</p>
 
     <h2>Data shown</h2>
     <table>
@@ -52,7 +52,7 @@
     <h2>Actions</h2>
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
-      <tr><td>Check in</td><td><code>manage_reservations</code></td><td>Sets <code>actual_checkin</code> and <code>status</code> = Checked In. The target's own <code>status</code> updates to reflect occupancy (e.g. a Slip → Occupied) — this is the one moment an <em>upcoming</em> reservation actually changes the target's status, per <a href="../data-model.html">Data Model</a>.</td></tr>
+      <tr><td>Check in</td><td><code>manage_reservations</code></td><td>Sets <code>actual_checkin</code> and <code>status</code> = Checked In. The target's own <code>status</code> updates to reflect occupancy (e.g. a Slip → Occupied) — this is the one moment an <em>upcoming</em> reservation actually changes the target's status, per <a href="../data-model.md">Data Model</a>.</td></tr>
       <tr><td>Check out</td><td><code>manage_reservations</code></td><td>Sets <code>actual_checkout</code> and <code>status</code> = Checked Out. The target moves to its configured <code>post_reservation_status</code> (e.g. Cabin → "Needs Cleaning," Jump Pack → "Needs Charging," via <code>Asset.post_return_status</code> for asset targets).</td></tr>
       <tr><td>Cancel</td><td>None</td><td>Closes without changing anything.</td></tr>
     </table>
