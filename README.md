@@ -2,8 +2,9 @@
 
 The MarinaSecure frontend: React + TypeScript + Vite, backed by InstantDB
 (local-first system of record) with Clerk authentication. See
-[`docs/`](docs/index.html) for the full architecture, data model,
-permissions, page specs, and wireframes this implements.
+[`docs/`](docs/README.md) for the full architecture, data model,
+permissions, page specs, and wireframes this implements, and
+[`CONTEXT.md`](CONTEXT.md) for the domain glossary.
 
 ## Stack
 
@@ -116,20 +117,22 @@ backend, without which some actions can't complete:
 - ⬜ **Twilio Functions** (telephony bridge) — calls and SMS *read* fine, but
   nothing creates that data and sending/placing fails with an explicit
   error until the bridge is deployed.
-- ⬜ **Netlify Functions** — shift-report send, plus the scheduled jobs:
-  checklist-trigger generation, time-based maintenance rules, and the
-  Activity Log retention purge.
-- 🟡 **InstantDB permission rules** — `instant.perms.ts` blocks anonymous
-  access (every namespace requires a signed-in Clerk identity), runtime
-  attribute creation is off, `$users` is read-only, and Activity Log entries
-  can't be deleted from the client. Two stronger tiers are written in that
-  file but deliberately inactive, each with its blocker documented inline:
-  requiring an *active marina User* (blocked until the app actually creates
-  the `userAuth` link on sign-in), and gating `roles`/`users` writes on the
-  `canManageRoles`/`canManageUsers` cache (blocked until that cache is
-  backfilled — enforcing first deadlocks all admin access; it happened).
-  Per-permission enforcement for everything else (`view_incidents`,
-  `manage_locations`, …) is client-side only.
+- ⬜ **Netlify Functions** — shift-report send and its backstop sweep, plus
+  the Activity Log retention purge (the permission rules deny `delete` on
+  `activityLogEntries` to every client, so nothing else can run it).
+  Checklist-trigger generation is deliberately *not* on this list: recurring
+  checklists are created client-side by the first role-holder to open the app
+  on a matching day. Time-based maintenance rules are specified to move to
+  the same pattern — see [ADR 0004](docs/adr/0004-client-first-execution.md).
+- 🟡 **InstantDB permission rules** — the strict tier is live. Every
+  namespace requires a signed-in Clerk identity resolving, through the
+  `userAuth` link, to an *active* marina User; `roles` writes require
+  `manage_roles`, `users` creation requires `manage_roles` or `manage_users`;
+  runtime attribute creation is off; `$users` is own-row only; Activity Log
+  entries can't be deleted from the client. Per-permission enforcement for
+  everything else (`view_incidents`, `manage_locations`, …) is client-side
+  only, with one known escalation gap — both are recorded in
+  [ADR 0002](docs/adr/0002-client-side-permission-enforcement.md).
 - ⬜ **Clerk invitation emails** from Admin → Users need a server-side call;
   provisioning + email-matched first sign-in works today.
 
