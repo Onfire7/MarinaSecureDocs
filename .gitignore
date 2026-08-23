@@ -25,3 +25,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Migration export — regenerate with scripts/export-instant.mjs.
+# Never committed: contains guest contact details.
+migration/instant-export/
