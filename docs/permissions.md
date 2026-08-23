@@ -78,37 +78,156 @@ The **Admin** section of the app (see [Page Specifications](pages/index.html)) i
 
 ## Enforcement
 
-Where a permission is checked matters more than what it grants, and the two
-halves are very unevenly divided.
+Where a permission is checked matters more than what it grants. There are
+three tiers now, where the previous stack had two and the second was empty.
 
-**Enforced by InstantDB's permission rules (server-side).** Every namespace
-requires a signed-in Clerk identity that resolves, through the `userAuth`
-link created on first sign-in, to an **active** marina User. Writes to
-`roles` require `manage_roles`; writes to `users` require `manage_roles` or
-`manage_users` to create, with a narrow own-row bootstrap so a first sign-in
-can claim its record. `activityLogEntries` can be updated but never deleted
-from a client. Runtime attribute creation is denied outright.
+> **Status.** Target design. See [ADR 0005](adr/0005-supabase-and-powersync-replace-instantdb.md).
 
-Those checks read two denormalized booleans on the User record —
-`canManageRoles` and `canManageUsers` — rather than the role grants
-themselves, because a rule can only reach a scalar attribute in a single
-hop. The application never reads those booleans; it always computes
-permissions live from roles. They exist solely so the rules can see them.
+### Resolving the acting user
 
-**Enforced in the UI only (client-side).** Everything else. `view_incidents`,
-`manage_locations`, `view_owner`, `place_calls` and the rest are checked when
-rendering and when initiating a write, and not at all by the database.
+Every policy starts from one function. Clerk is a third-party auth provider to
+Supabase, so the JWT's subject is the Clerk user id and nothing else — roles
+and permissions are deliberately *not* claims:
 
-> **What that means in practice.** The InstantDB app id ships in the browser
-> bundle, by necessity. Anyone signed in as an active marina User can
-> therefore read and write any namespace directly, regardless of which
-> permissions their roles grant. The permission system above is a
-> well-formed model of what staff are *meant* to do, and it is what the
-> interface obeys — but for anything beyond "is this an active staff
-> member", it is not a security boundary.
+```sql
+create function current_marina_user_id() returns uuid
+  language sql stable security definer set search_path = public
+as $$
+  select id from public.users
+  where clerk_user_id = auth.jwt() ->> 'sub'
+    and active
+$$;
+```
 
-This is a deliberate, recorded acceptance rather than an oversight: closing
-it needs either per-field and per-link rules whose semantics are not yet
-settled, or moving those writes behind a trusted server endpoint that does
-not exist. See [ADR 0002](adr/0002-client-side-permission-enforcement.md)
-for the reasoning and the known residual gap.
+It returns null for a Clerk identity with no active marina User — an outsider,
+or a deactivated account. Every policy below fails closed on null, so
+deactivating a user is a complete revocation rather than a UI change.
+
+### Effective permissions, in SQL
+
+The trinary computation translates directly, and `EXCEPT` *is* deny-wins:
+
+```sql
+create view effective_permissions as
+      select ur.user_id, p.permission
+        from user_roles ur
+        join roles r on r.id = ur.role_id
+        cross join lateral unnest(r.allow) as p(permission)
+  except
+      select ur.user_id, p.permission
+        from user_roles ur
+        join roles r on r.id = ur.role_id
+        cross join lateral unnest(r.deny) as p(permission);
+
+create function has_permission(perm text) returns boolean
+  language sql stable security definer set search_path = public
+as $$
+  select exists (
+    select 1 from public.effective_permissions
+    where user_id = public.current_marina_user_id()
+      and permission = perm
+  )
+$$;
+```
+
+**The two denormalized booleans disappear.** `canManageRoles` and
+`canManageUsers` existed only because an InstantDB rule could reach a scalar
+attribute in a single hop and nothing further. A view can join. Deleting them
+also deletes the cache-invalidation cascade the Admin screens had to run
+whenever a role's grants or a user's role links changed — that is a class of
+bug removed, not relocated.
+
+### Tier 0 — every table
+
+`current_marina_user_id() is not null`. An active marina User, or nothing.
+
+### Tier 1 — server-enforced
+
+| Table | Read gated by | Write gated by |
+|---|---|---|
+| `incidents`, `incident_comments` | `view_incidents` | `create_incidents` |
+| `contacts` | `view_owner` | `edit_owner_contact` |
+| `contact_details` | `view_contact` | `edit_owner_contact` |
+| `leases`, `lease_comments` | `view_lease` | `manage_lease` |
+| `calls`, `call_notes` | `view_calls` | `place_calls` |
+| `sms_threads`, `sms_messages` | `view_sms` | `place_calls` |
+| `roles` | Tier 0 | `manage_roles` |
+| `users` | Tier 0 | `manage_roles` or `manage_users` |
+| `user_roles` | Tier 0 | `manage_roles` |
+| `activity_log_entries` | Tier 0 | insert always; update only the Protected flag; **delete never** |
+
+### The privilege-escalation vector closes structurally
+
+[ADR 0002](adr/0002-client-side-permission-enforcement.md) records a residual
+gap in two vectors: an active user could set `canManageRoles` on their own
+row, or link their own row to an existing admin Role, because InstantDB's
+`update` was per-entity rather than per-field or per-link.
+
+Both vanish here, and not by being carefully patched:
+
+- The booleans no longer exist, so there is nothing to set.
+- Role assignment is a row in `user_roles`, which is **its own table with its
+  own policy**. Granting yourself a role is an `INSERT` requiring
+  `manage_roles`. There is no per-entity update that reaches it.
+
+This is the acceptance criterion ADR 0005 carries forward from Phase 4, and
+it is satisfied by the data model rather than by a rule.
+
+### The field-level problem
+
+`view_owner` and `view_contact` are two permissions over **the same row,
+different columns** — knowing an owner's name versus seeing their phone and
+email. RLS is row-level; it cannot express that.
+
+The model resolves it by splitting the row: `contacts` holds identity (name,
+matched phone number for display), `contact_details` holds the reachable
+details (phone, email, address) as a separate table keyed 1:1. Two tables,
+two policies, two sync streams — and a user with `view_owner` but not
+`view_contact` simply never receives the details rows at all, offline or on.
+
+The alternative — one table, columns nulled by a view — fails the offline
+requirement, because a device would have to hold the row it isn't allowed to
+read. Splitting is what makes the boundary hold on a phone in a dead zone,
+not just in a query.
+
+### Tier 2 — client-side only
+
+Everything else: `assign_ticket_to_self`, `assign_ticket_to_others`,
+`manage_checklists`, `view_reports`, `view_all_chats`, `manage_chats`,
+`manage_assets`, `manage_locations`, `manage_reservations`,
+`manage_marina_settings`.
+
+These gate what the interface offers, not what the database permits. That is a
+deliberate stopping point rather than an oversight: they govern *marina
+configuration*, where every holder is staff, the data is not sensitive, and
+the cost of a mistake is a bad checklist template rather than exposed guest
+information. Tier 1 was drawn around the data a guest would care about being
+leaked.
+
+> **What that means in practice.** The Supabase anon key ships in the browser
+> bundle, by necessity. It grants nothing on its own — RLS evaluates against
+> the Clerk JWT — but a signed-in staff member can still write configuration
+> tables their roles say they shouldn't. That is a smaller surface than the
+> previous stack, where *every* table was readable and writable by any active
+> user, but it is not zero, and it is recorded rather than implied.
+
+### Sync scoping reads the same tables
+
+The device only receives rows a sync stream sends it, and the streams resolve
+the acting user exactly as RLS does — a parameter query against the database,
+not a token claim:
+
+```sql
+-- parameter query: who is asking
+SELECT id AS user_id FROM users
+ WHERE clerk_user_id = request.user_id() AND active
+```
+
+Tier 1 tables are then streamed conditionally on `effective_permissions`, so
+an unauthorized row never reaches the device in the first place. RLS remains
+the backstop that makes the boundary true for direct writes; the stream is
+what makes it true for reads on a phone with no signal.
+
+Because both read the same tables, there is **one authorization model rather
+than two that can disagree**, and a role change takes effect on the next
+reconnect without waiting for a token to refresh.
