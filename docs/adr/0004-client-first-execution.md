@@ -1,5 +1,14 @@
 # Work runs client-side unless it provably cannot
 
+> **Amended by [ADR 0005](0005-supabase-and-powersync-replace-instantdb.md).**
+> The premise below — "a static frontend
+> over a local-first database has no server to lean on" — weakens under
+> Supabase, which brings Edge Functions and `pg_cron`. The conclusion
+> survives and the bar stays high. One consequence inverts: the Activity Log
+> retention purge, cited here as the case proving the criterion has teeth,
+> becomes a scheduled SQL statement rather than a Netlify Function. It is
+> still work no client may do; it simply no longer needs infrastructure.
+
 Server-side execution is reserved for work needing one of three things: a
 credential that must never reach the browser, authority the permission rules
 deliberately deny every client, or execution when no client is present at all.

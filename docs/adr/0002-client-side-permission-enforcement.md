@@ -1,5 +1,15 @@
 # Per-permission enforcement is client-side only
 
+> **Superseded by [ADR 0005](0005-supabase-and-powersync-replace-instantdb.md).**
+> The app is leaving InstantDB for
+> Supabase + PowerSync, and per-permission enforcement stops being
+> client-only: reads on the sensitive entities — incidents, contacts,
+> activity log — move behind Postgres RLS. Everything below describes the
+> InstantDB arrangement and is kept because the *reasoning* still applies —
+> particularly the residual privilege-escalation vector, which was never
+> fixed on Instant and carries forward as an acceptance criterion of the
+> replacement.
+
 The InstantDB permission rules enforce exactly one thing: that the caller is
 a signed-in Clerk identity resolving to an *active* marina User, plus
 `manage_roles` / `manage_users` gating on role and user writes via two
