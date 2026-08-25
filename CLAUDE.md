@@ -11,6 +11,16 @@ A Vite + React 19 + TypeScript PWA at the repo root, backed by InstantDB
 marina is a fully independent deployment: its own site, its own Instant app,
 its own Twilio account. Nothing is shared between marinas.
 
+> **Migrating.** InstantDB retires 2027-08-31. The target is Supabase Postgres
+> + PowerSync, keeping Clerk. Read
+> [ADR 0005](docs/adr/0005-supabase-and-powersync-replace-instantdb.md) before
+> touching the data layer — the design is already written in
+> `docs/architecture.md`, `docs/permissions.md`, `docs/data-model.md` and
+> `docs/api-structure.md`. **Feature work and schema growth are frozen until
+> cutover**; ~80% of the codebase touches the database, so new features build
+> refactoring debt. Rules below marked *(InstantDB only)* stop applying after
+> cutover and some become actively wrong.
+
 Reference docs are in `docs/`. They exist **for agents**, not for a
 published site — write them accordingly.
 
@@ -44,11 +54,13 @@ spec-approval time and expensive afterward.
   folding in its wireframe, and delete the HTML pair.
 - **Commit messages** are multi-paragraph and explain the *why*. Trailer:
   `Co-Authored-By: <model> <noreply@anthropic.com>`.
-- **Schema changes are additive only.** Removing an attribute deletes its
-  data immediately and irreversibly. Deprecation has a lifecycle — see
-  `docs/` and `docs/adr/`.
-- **Never roll back the schema.** To undo a migration, stop it and revert
-  the client bundle. Added attributes are harmless; deleting them is not.
+- **Schema changes are additive only.** *(InstantDB only.)* Removing an
+  attribute deletes its data immediately and irreversibly. This is a property
+  of Instant's schema push, not a general rule — Postgres migrations do not
+  behave this way, and carrying the habit across would be cargo-culting.
+- **Never roll back the schema.** *(InstantDB only.)* To undo a migration,
+  stop it and revert the client bundle. Added attributes are harmless;
+  deleting them is not.
 - **Don't weaken permission rules casually.** `instant.perms.ts` documents
   the full history and rationale inline.
 
@@ -78,6 +90,12 @@ Screenshots or it didn't happen.
   so a script under `/tmp` dies with `ERR_MODULE_NOT_FOUND` before it opens a
   browser. Write it to the repo root, run it, delete it. Keep the *state* and
   *screenshots* in `/tmp/pw-test/`.
+- **Export the whole database**: `node scripts/agent-login.mjs` then
+  `node scripts/export-instant.mjs` → `migration/instant-export/` (gitignored;
+  regenerate rather than share — it contains guest contact details). Reads
+  entities and links from `instant.schema.ts`, so it can't miss a namespace.
+  It runs through a signed-in session, so it sees only what the permission
+  rules allow; with an admin token, `instant-admin.mjs` is authoritative.
 - **Direct DB access**: `node scripts/instant-admin.mjs query '<json>'`.
   Add `--as <email>` or `--guest` to route through the permission rules —
   this is the honest way to test them.
@@ -117,7 +135,13 @@ Screenshots or it didn't happen.
 - **Don't trust a React error number second-hand.** #185 is "Maximum update
   depth exceeded"; #310 is the Rules-of-Hooks one. Get the real message —
   that's what `DEBUG_BUILD` in `vite.config.ts` is for — before theorizing.
-- **Instant gotchas**, each of which cost real downtime: browser origins
+- **The auth trap survives the migration, in a new place.** Instant fails
+  the Clerk token exchange on an unallowlisted browser origin. Supabase's
+  equivalent is the third-party auth provider config: without it every policy
+  evaluates against a null identity and every query returns empty — which
+  looks exactly like an unprovisioned account, the same misleading-error
+  failure mode this codebase has already lost hours to.
+- **Instant gotchas** *(InstantDB only)*, each of which cost real downtime: browser origins
   must be allowlisted in the Instant dashboard or the token exchange fails;
   the `$users` row is created *through* the permission rules on first
   sign-in, so `create: "false"` breaks every new sign-in; schema pushes

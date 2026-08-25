@@ -14,6 +14,44 @@ Verify each task against the deployment before moving on.
       `git push origin main` moves the repo's default branch.
 - [ ] **Turn off GitHub Pages.** Repo settings. The docs are Markdown now;
       Pages would serve them as raw files.
+- [ ] **Rotate `CLERK_SECRET_KEY`.** `.env.local` records that it was exposed
+      in a chat transcript on 2026-08-07. Intentionally still live; tracked
+      here so it stops being invisible.
+
+## Migration to Supabase + PowerSync
+
+Sequenced. See [ROADMAP Phase 4](ROADMAP.md) and
+[ADR 0005](adr/0005-supabase-and-powersync-replace-instantdb.md); the design
+lives in `architecture.md`, `permissions.md`, `data-model.md` and
+`api-structure.md`, which are written and should be read before starting.
+
+- [x] **Docs to spec.** ADR 0005 written; ADRs 0001/0002/0004 annotated; the
+      four cross-cutting docs rewritten for the new stack.
+- [x] **Export tooling.** `scripts/export-instant.mjs`; output gitignored,
+      regenerate rather than share.
+- [ ] **Phase 3 tests first.** vitest + unit tests for the pure half of
+      `src/lib`. These transfer intact and are the only automated check on
+      business logic during a 66-file rewrite.
+- [ ] **Provision.** Supabase project, PowerSync instance, Clerk as a
+      third-party auth provider. Confirm Supabase free-tier project pausing
+      (a week of inactivity) is acceptable for whatever this becomes.
+- [ ] **Schema + policies.** 42 tables per `data-model.md`; RLS per its tier
+      column; `effective_permissions` view; `pg_cron` retention job.
+- [ ] **Sync streams.** always / occupancy / age, with the 30-day trailing
+      window. Verify the resident set offline, deliberately — an untested
+      scoping rule is the exact defect being migrated away from.
+- [ ] **Transform + load.** Pure transform, separate load. Drop the one
+      targetless ticket; `num_nonnulls(...) = 1` will reject it.
+- [ ] **Rewrite.** 66 files, ~230 call sites, big-bang on one branch. Each
+      page's queries move into a `src/data/` module. **No page file contains
+      SQL.**
+- [ ] **Offline attachment queue.** Local bytes + `upload_state`, draining
+      independently of PowerSync's write queue.
+- [ ] **Twilio bridge.** PostgREST with a dedicated scoped Postgres role.
+- [ ] **Verify the carried-forward acceptance criterion.** The ADR 0002
+      privilege-escalation vector should close structurally via `user_roles`.
+      Prove it rather than assume it — this is the obligation most likely to
+      be dropped now that its ADR is superseded.
 
 ## Phase 0 — Knowledge architecture ✅
 

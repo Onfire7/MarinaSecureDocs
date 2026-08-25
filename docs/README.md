@@ -53,12 +53,12 @@ A single person often wears more than one of these hats. The system reflects tha
 
 ## The stack, at a glance
 
-Full detail lives in [Stack & Architecture](architecture.md). In short:
+Full detail lives in [Stack & Architecture](architecture.md), and the reasoning behind the stack in [ADR 0005](adr/0005-supabase-and-powersync-replace-instantdb.md). In short:
 
 - **Frontend** — a static site, deployed per-marina to its own Netlify site and subdomain.
-- **Database** — InstantDB, giving the app local-first storage and automatic sync with no custom offline logic to build.
-- **Telephony** — Twilio Functions per marina integrating Twilio for calls and SMS, writing directly into that marina's InstantDB instance. No dedicated server to host.
-- **Auth** — Clerk, via its native InstantDB integration, supporting both personal devices and (via Clerk's multi-session support) shared shift devices.
+- **Database** — Supabase Postgres as the system of record, with PowerSync replicating a scoped subset into SQLite on each device. Local-first reads and writes; dead zones are a non-event.
+- **Telephony** — Twilio Functions per marina integrating Twilio for calls and SMS, writing into that marina's Postgres through a dedicated scoped role. No dedicated server to host.
+- **Auth** — Clerk, as a third-party auth provider to Supabase, supporting both personal devices and (via Clerk's multi-session support) shared shift devices.
 
 ## How to read this document set
 
@@ -75,7 +75,7 @@ these markers exist so that cannot recur silently.
 | [Data Model](data-model.md) | Every entity, its fields, and its relationships. |
 | [Permissions](permissions.md) | The role and trinary-permission system, and the full permission list. |
 | [Role Workflows](workflows.md) | Per-role functional requirements, written as end-to-end narratives. |
-| [API Structure](api-structure.md) | How the frontend, InstantDB, and Twilio Functions communicate. |
+| [API Structure](api-structure.md) | How the frontend, the database, and Twilio Functions communicate. |
 | [Page Specifications](pages/index.html) | A detailed spec for every screen in the application. |
 | [Wireframes](wireframes/index.html) | Low-fidelity HTML wireframes. Being folded into their page specs and retired. |
 | [Roadmap](ROADMAP.md) | Planned phases and deferred work, each with the reason it was deferred. |

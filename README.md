@@ -1,7 +1,7 @@
 # MarinaSecure
 
-The MarinaSecure frontend: React + TypeScript + Vite, backed by InstantDB
-(local-first system of record) with Clerk authentication. See
+The MarinaSecure frontend: React + TypeScript + Vite, local-first, with Clerk
+authentication. See
 [`docs/`](docs/README.md) for the full architecture, data model,
 permissions, page specs, and wireframes this implements, and
 [`CONTEXT.md`](CONTEXT.md) for the domain glossary.
@@ -10,12 +10,16 @@ permissions, page specs, and wireframes this implements, and
 
 - **Vite + React 19 + TypeScript** — fully static build, no SSR (deployed per
   marina to its own Netlify site).
-- **InstantDB** (`@instantdb/react`) — the marina's database; local-first
-  reads/writes with automatic sync, so offline needs no special handling.
-  Schema lives in [`instant.schema.ts`](instant.schema.ts).
+- **InstantDB** (`@instantdb/react`) — the marina's database today. Schema in
+  [`instant.schema.ts`](instant.schema.ts). **Being replaced:** InstantDB
+  retires 2027-08-31; the target is Supabase Postgres with PowerSync
+  replicating a scoped subset into SQLite on each device. See
+  [ADR 0005](docs/adr/0005-supabase-and-powersync-replace-instantdb.md) and
+  [`docs/architecture.md`](docs/architecture.md). Feature work is frozen
+  until cutover.
 - **Clerk** (`@clerk/clerk-react`) — authentication, with multi-session
-  support for shared-device user switching. InstantDB is configured to trust
-  Clerk session JWTs.
+  support for shared-device user switching, which is what makes a shift
+  handoff work in a dead zone. Stays across the migration.
 - **react-router-dom** — client-side routing.
 
 ## Setup
@@ -36,8 +40,8 @@ src/
   lib/
     config.ts            env-driven per-marina configuration
     permissions.ts       trinary permission catalog + effective computation
-    db/                  InstantDB init + entity type aliases
-    auth/                Clerk↔Instant session sync, current-user resolution
+    db/                  database init + entity type aliases
+    auth/                Clerk↔database session sync, current-user resolution
   layout/AppShell.tsx    desktop sidenav / mobile tab-bar shell
   routes/nav.ts          top-level sections + permission gating
   hooks/                 cross-page hooks (e.g. mobile-breakpoint detection)
@@ -106,7 +110,7 @@ src/
   Types & Locations (hierarchy, checkpoints, map upload and drag-plotting),
   Tours, Incident Types, Asset Categories & Maintenance Rules, SMS
   Templates, and Marina Settings — each independently permission-gated
-- ✅ Comms: chat rooms (fully working — ordinary InstantDB data, so offline
+- ✅ Comms: chat rooms (fully working — ordinary synced data, so offline
   too) with participant computation and the join overlay; Comms home's three
   independently gated sections; SMS threads with template picker; call/SMS
   dialogs; active-call panel; floating missed-comms badge
@@ -118,13 +122,13 @@ backend, without which some actions can't complete:
   nothing creates that data and sending/placing fails with an explicit
   error until the bridge is deployed.
 - ⬜ **Netlify Functions** — shift-report send and its backstop sweep, plus
-  the Activity Log retention purge (the permission rules deny `delete` on
-  `activityLogEntries` to every client, so nothing else can run it).
+  and *not* the Activity Log retention purge, which becomes a `pg_cron`
+  statement after the migration rather than a deployed function.
   Checklist-trigger generation is deliberately *not* on this list: recurring
   checklists are created client-side by the first role-holder to open the app
   on a matching day. Time-based maintenance rules are specified to move to
   the same pattern — see [ADR 0004](docs/adr/0004-client-first-execution.md).
-- 🟡 **InstantDB permission rules** — the strict tier is live. Every
+- 🟡 **Server-side permission rules** — the strict tier is live. Every
   namespace requires a signed-in Clerk identity resolving, through the
   `userAuth` link, to an *active* marina User; `roles` writes require
   `manage_roles`, `users` creation requires `manage_roles` or `manage_users`;
@@ -132,7 +136,10 @@ backend, without which some actions can't complete:
   entries can't be deleted from the client. Per-permission enforcement for
   everything else (`view_incidents`, `manage_locations`, …) is client-side
   only, with one known escalation gap — both are recorded in
-  [ADR 0002](docs/adr/0002-client-side-permission-enforcement.md).
+  [ADR 0002](docs/adr/0002-client-side-permission-enforcement.md), which the
+  migration supersedes: sensitive reads move behind Postgres RLS, and the
+  escalation gap closes structurally once role assignment is a row in
+  `user_roles` rather than a link on a user.
 - ⬜ **Clerk invitation emails** from Admin → Users need a server-side call;
   provisioning + email-matched first sign-in works today.
 
@@ -148,4 +155,7 @@ Two per-environment settings live outside the repo:
   Netlify URL, `http://localhost:5173`, a LAN IP for phone testing) must be
   added in the Instant dashboard → Auth, or the Clerk → Instant token
   exchange fails with "Unauthorized origin" and the app shows "Can't reach
-  the marina database" after sign-in.
+  the marina database" after sign-in. Supabase has the same class of trap in
+  a different place — the Clerk third-party auth provider must be configured
+  on the project, or every policy evaluates against a null identity and
+  every query comes back empty.
