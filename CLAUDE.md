@@ -69,6 +69,12 @@ spec-approval time and expensive afterward.
 Before any commit: `pnpm run test` · `pnpm exec tsc -b` · `pnpm exec oxlint` ·
 `pnpm run build` then `rm -rf dist` (dist is gitignored; never commit it).
 
+Database work has its own suite: `pnpm run test:db` runs pgTAP against the
+local Supabase stack (`supabase start`, then `supabase db reset` to apply
+migrations). It covers the permission model, RLS, and the constraints that
+moved out of application code. `supabase db advisors --local --type security`
+is a second, independent check and should report nothing.
+
 The unit suite covers the pure half of `src/lib` only — deliberately, since
 tests written against the database client would be discarded with it. Which
 files are uncovered, and why each one is a decision rather than an oversight,
