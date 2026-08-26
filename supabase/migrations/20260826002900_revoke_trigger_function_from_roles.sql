@@ -1,0 +1,19 @@
+-- Actually revoke the trigger function, and correct the record.
+--
+-- 20260826002800 revoked EXECUTE from PUBLIC and changed nothing, because the
+-- grant was never PUBLIC's to give. Inspecting the ACL shows explicit grants:
+--
+--   trg_refresh_user_permissions: postgres=X | anon=X | authenticated=X | service_role=X
+--
+-- Supabase configures ALTER DEFAULT PRIVILEGES so that every function created
+-- in `public` is granted EXECUTE to anon, authenticated and service_role
+-- directly. So a new function is exposed to both API roles the moment it
+-- exists, and only a revoke naming those roles removes it.
+--
+-- This also corrects 20260826002100's explanation. That migration worked, but
+-- not for the reason its comment gives: what fixed anon was 20260826002000
+-- revoking from anon by name. The PUBLIC revoke beside it was a no-op.
+--
+-- Nothing should call this function: it is a trigger body invoked by the
+-- triggers on user_roles and roles.
+revoke execute on function public.trg_refresh_user_permissions() from anon, authenticated;
