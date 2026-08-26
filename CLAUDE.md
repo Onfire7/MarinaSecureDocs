@@ -71,7 +71,10 @@ Before any commit: `pnpm run test` · `pnpm exec tsc -b` · `pnpm exec oxlint` �
 
 Database work has its own suite: `pnpm run test:db` runs pgTAP against the
 local Supabase stack (`supabase start`, then `supabase db reset` to apply
-migrations). It covers the permission model, RLS, and the constraints that
+migrations). `pnpm run seed` loads the real exported configuration plus a
+simulated year of occupancy; `pnpm run ps:up` starts a local PowerSync against
+that database so sync rules can be developed without touching a marina's real
+one — see `powersync/README.md`, including the podman-specific traps. It covers the permission model, RLS, and the constraints that
 moved out of application code. `supabase db advisors --local --type security`
 is a second, independent check and should report nothing.
 

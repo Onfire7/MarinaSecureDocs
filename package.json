@@ -14,7 +14,11 @@
     "test:coverage": "vitest run --coverage",
     "coverage:check": "node scripts/coverage-check.mjs",
     "test:db": "supabase test db",
-    "seed": "node scripts/seed/index.mjs"
+    "seed": "node scripts/seed/index.mjs",
+    "ps:up": "docker compose -f powersync/docker-compose.yaml --env-file powersync/local.env up -d",
+    "ps:down": "docker compose -f powersync/docker-compose.yaml --env-file powersync/local.env down",
+    "ps:reset": "docker compose -f powersync/docker-compose.yaml --env-file powersync/local.env down -v && docker compose -f powersync/docker-compose.yaml --env-file powersync/local.env up -d",
+    "ps:logs": "docker compose -f powersync/docker-compose.yaml --env-file powersync/local.env logs -f powersync"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.9",

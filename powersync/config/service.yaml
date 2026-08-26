@@ -1,0 +1,49 @@
+# yaml-language-server: $schema=https://unpkg.com/@powersync/service-schema@latest/json-schema/powersync-config.json
+#
+# Local PowerSync (Open Edition) against the local Supabase stack.
+#
+# This exists so sync rules can be developed and broken locally rather than
+# against the marina's real database. PowerSync Cloud replicates from the
+# REMOTE Postgres, so without this, testing a stream would mean pushing seed
+# data to production first.
+_type: self-hosted
+
+telemetry:
+  disable_telemetry_sharing: true
+
+replication:
+  connections:
+    - type: postgresql
+      # supabase_db_<project> on the Supabase compose network. Connects as
+      # powersync_role, created by supabase/seed.sql on `db reset`.
+      uri: !env PS_DATA_SOURCE_URI
+      # Local container-to-container traffic on a private network.
+      sslmode: disable
+
+storage:
+  # Postgres rather than MongoDB: bucket storage is the only reason this stack
+  # would otherwise need a Mongo container, and Postgres storage removes it.
+  type: postgresql
+  uri: !env PS_STORAGE_SOURCE_URI
+  sslmode: disable
+
+port: !env PS_PORT
+
+sync_config:
+  path: sync-config.yaml
+
+client_auth:
+  # Clerk — the same issuer Supabase trusts as a third-party auth provider, so
+  # a device presents ONE token to both. Not `supabase: true`: these are Clerk
+  # tokens, verified against Clerk's JWKS.
+  jwks_uri: !env PS_JWKS_URL
+  audience: ["authenticated", "powersync"]
+
+api:
+  tokens:
+    - local-dev-admin-token
+
+system:
+  logging:
+    level: info
+    format: text

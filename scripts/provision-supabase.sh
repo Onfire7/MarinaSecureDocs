@@ -401,15 +401,17 @@ case "$_sb" in
     printf '  %s✗%s %-28s HTTP %s\n' "$RED" "$RESET" "Supabase REST" "$_sb"
     SKIPPED+=("Supabase REST returned HTTP $_sb — re-check stage 1") ;;
 esac
-# PowerSync's public health path isn't documented as stable, so this only
-# asks whether the host answers at all — DNS, TLS, and a live instance.
-_ps_code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$VITE_POWERSYNC_URL" 2>/dev/null || echo "000")
-if [[ "$_ps_code" == "000" ]]; then
-  printf '  %s✗%s %-28s unreachable\n' "$RED" "$RESET" "PowerSync instance"
-  SKIPPED+=("PowerSync instance URL did not respond — re-check stage 8")
-else
-  printf '  %s✓%s %-28s responded (HTTP %s)\n' "$GREEN" "$RESET" "PowerSync instance" "$_ps_code"
-fi
+# /probes/liveness is PowerSync's documented health endpoint — it is what
+# their own docker-compose healthcheck polls. A 200 means the instance is
+# actually serving, not merely that DNS resolved.
+_ps_code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "${VITE_POWERSYNC_URL%/}/probes/liveness" 2>/dev/null || echo "000")
+case "$_ps_code" in
+  200) printf '  %s✓%s %-28s HTTP 200 — instance is live\n' "$GREEN" "$RESET" "PowerSync instance" ;;
+  000) printf '  %s✗%s %-28s unreachable\n' "$RED" "$RESET" "PowerSync instance"
+       SKIPPED+=("PowerSync instance URL did not respond — re-check stage 8") ;;
+  *)   printf '  %s!%s %-28s HTTP %s — reachable, but not reporting live\n' "$YELLOW" "$RESET" "PowerSync instance" "$_ps_code"
+       SKIPPED+=("PowerSync liveness probe returned HTTP $_ps_code") ;;
+esac
 
 say ""
 if curl -s --max-time 15 "$CLERK_JWKS_URL" 2>/dev/null | grep -q '"keys"'; then

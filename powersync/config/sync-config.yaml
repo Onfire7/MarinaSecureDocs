@@ -1,0 +1,56 @@
+# yaml-language-server: $schema=https://unpkg.com/@powersync/service-sync-rules@latest/schema/sync_rules.json
+#
+# Sync rules — what reaches a device.
+#
+# docs/architecture.md defines three scoping shapes. Only the first is
+# implemented here; occupancy and age scoping are the next task and are the
+# ones with real design in them.
+#
+# NOTE: changes are not watched. Restart the service to apply them.
+config:
+  edition: 3
+
+streams:
+  # ── ALWAYS RESIDENT ────────────────────────────────────────────────────
+  # Marina configuration: small, changes rarely, needed on every screen
+  # whether or not there is signal. This is the tier that fixes the defect
+  # which started the migration — under InstantDB this data was only present
+  # offline if it had been visited online first.
+  marina_config:
+    auto_subscribe: true
+    queries:
+      # people & access
+      - SELECT * FROM users
+      - SELECT * FROM roles
+      - SELECT * FROM user_roles
+      # the property
+      - SELECT * FROM location_types
+      - SELECT * FROM location_type_parents
+      - SELECT * FROM location_statuses
+      - SELECT * FROM locations
+      - SELECT * FROM marina_maps
+      - SELECT * FROM location_map_placements
+      - SELECT * FROM checkpoints
+      - SELECT * FROM tours
+      - SELECT * FROM tour_checkpoints
+      # assets — including their status log, which is small and is what the
+      # device derives current status from now that the column is gone
+      - SELECT * FROM assets
+      - SELECT * FROM asset_statuses
+      - SELECT * FROM maintenance_rules
+      - SELECT * FROM asset_status_logs
+      # checklist authoring
+      - SELECT * FROM checklist_templates
+      - SELECT * FROM template_viewer_roles
+      - SELECT * FROM checklist_template_sections
+      - SELECT * FROM template_section_checkpoints
+      - SELECT * FROM template_section_assets
+      - SELECT * FROM checklist_template_items
+      # lookups & settings
+      - SELECT * FROM incident_types
+      - SELECT * FROM incident_statuses
+      - SELECT * FROM ticket_statuses
+      - SELECT * FROM marina_settings
+      - SELECT * FROM phone_lines
+      - SELECT * FROM sms_templates
+      - SELECT * FROM attachments

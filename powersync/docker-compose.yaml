@@ -1,0 +1,67 @@
+# Local PowerSync stack for development.
+#
+#   supabase start                     # the app database must be up first
+#   docker compose -f powersync/docker-compose.yaml up -d
+#
+# Joins the Supabase compose network so the service can reach the app database
+# by container name. Bucket storage is its own Postgres, kept separate from the
+# app database so `supabase db reset` cannot silently corrupt sync state — and
+# so wiping sync state is a deliberate act (`down -v`) rather than a side
+# effect.
+name: marinasecure-powersync
+
+services:
+  powersync:
+    # Fully qualified on purpose: podman does not do Docker's short-name
+    # resolution without a containers-registries.conf, and fails with
+    # 'short-name ... did not resolve to an alias'.
+    image: docker.io/journeyapps/powersync-service:latest
+    restart: unless-stopped
+    # Unified: API server and replication worker in one container. Splitting
+    # them is a production concern, not a local one.
+    command: ["start", "-r", "unified"]
+    volumes:
+      - ./config:/config
+    environment:
+      POWERSYNC_CONFIG_PATH: /config/service.yaml
+      NODE_OPTIONS: --max-old-space-size=1000
+      PS_DATA_SOURCE_URI: ${PS_DATA_SOURCE_URI}
+      PS_STORAGE_SOURCE_URI: ${PS_STORAGE_SOURCE_URI}
+      PS_JWKS_URL: ${PS_JWKS_URL}
+      PS_PORT: ${PS_PORT}
+    ports:
+      - "${PS_PORT}:${PS_PORT}"
+    depends_on:
+      - ps-storage
+    networks:
+      - ps-internal
+      - supabase
+
+  ps-storage:
+    image: docker.io/postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: powersync
+      POSTGRES_PASSWORD: powersync
+      POSTGRES_DB: powersync_storage
+    volumes:
+      - ps_storage:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U powersync -d powersync_storage"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ps-internal
+
+networks:
+  # Named explicitly rather than relying on the implicit `default`:
+  # podman-compose does not synthesise it once any other network is declared,
+  # and fails with "missing networks: default".
+  ps-internal:
+  supabase:
+    external: true
+    name: ${SUPABASE_NETWORK}
+
+volumes:
+  ps_storage:
