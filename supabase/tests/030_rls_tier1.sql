@@ -8,6 +8,10 @@ create extension if not exists pgtap;
 begin;
 select plan(16);
 
+-- Every assertion below is scoped to the fixture rows this file creates.
+-- Counting a whole table passes only on an empty database, which is not a
+-- property a test should depend on — and running the seed makes it false.
+
 -- ── fixtures (as owner, which bypasses RLS) ──────────────────────────────
 insert into users (id, name, clerk_user_id, active) values
   ('11111111-1111-1111-1111-111111111111', 'Alice — sees all', 'user_alice', true),
@@ -27,8 +31,10 @@ insert into user_roles values
   ('44444444-4444-4444-4444-444444444444','aaaaaaaa-0000-0000-0000-00000000000b'),
   ('33333333-3333-3333-3333-333333333333','aaaaaaaa-0000-0000-0000-00000000000a');
 
-insert into incident_statuses (id, name) values ('bbbbbbbb-0000-0000-0000-000000000001','Open');
-insert into location_types (id, name) values ('cccccccc-0000-0000-0000-000000000001','Slip');
+-- Lookup names are unique, and the seed loads real ones. Fixture rows use
+-- names that cannot collide with production data.
+insert into incident_statuses (id, name) values ('bbbbbbbb-0000-0000-0000-000000000001','Fixture Open');
+insert into location_types (id, name) values ('cccccccc-0000-0000-0000-000000000001','Fixture Slip');
 insert into locations (id, name, location_type_id)
   values ('dddddddd-0000-0000-0000-000000000001','Slip 14','cccccccc-0000-0000-0000-000000000001');
 insert into incidents (id, title, status_id, location_id)
@@ -48,51 +54,51 @@ insert into activity_log_entries (event_type, summary, subject_type, subject_id)
 -- ── incidents ────────────────────────────────────────────────────────────
 select set_config('request.jwt.claims', '{"sub":"user_alice"}', true);
 set local role authenticated;
-select is((select count(*) from incidents)::int, 1, 'view_incidents holder sees the incident');
+select is((select count(*) from incidents where id = 'eeeeeeee-0000-0000-0000-000000000001')::int, 1, 'view_incidents holder sees the incident');
 reset role;
 
 select set_config('request.jwt.claims', '{"sub":"user_bob"}', true);
 set local role authenticated;
-select is((select count(*) from incidents)::int, 0,
+select is((select count(*) from incidents where id = 'eeeeeeee-0000-0000-0000-000000000001')::int, 0,
   'a user without view_incidents gets ZERO ROWS, not an error');
 reset role;
 
 -- ── contacts: identity vs reachable details ──────────────────────────────
 select set_config('request.jwt.claims', '{"sub":"user_olive"}', true);
 set local role authenticated;
-select is((select count(*) from contacts)::int, 1,
+select is((select count(*) from contacts where id = 'ffffffff-0000-0000-0000-000000000001')::int, 1,
   'view_owner alone shows WHO a contact is');
 -- The whole reason contacts was split into two tables. RLS is row-level and
 -- cannot hide a column, so the reachable details are a separate row that never
 -- reaches the device at all.
-select is((select count(*) from contact_details)::int, 0,
+select is((select count(*) from contact_details where contact_id = 'ffffffff-0000-0000-0000-000000000001')::int, 0,
   'view_owner WITHOUT view_contact sees no phone or email');
 reset role;
 
 select set_config('request.jwt.claims', '{"sub":"user_alice"}', true);
 set local role authenticated;
-select is((select count(*) from contact_details)::int, 1, 'view_contact holder sees the details');
+select is((select count(*) from contact_details where contact_id = 'ffffffff-0000-0000-0000-000000000001')::int, 1, 'view_contact holder sees the details');
 reset role;
 
 -- ── leases, calls, sms ───────────────────────────────────────────────────
 select set_config('request.jwt.claims', '{"sub":"user_alice"}', true);
 set local role authenticated;
-select is((select count(*) from leases)::int,       1, 'view_lease holder sees the lease');
-select is((select count(*) from calls)::int,        1, 'view_calls holder sees the call');
-select is((select count(*) from sms_messages)::int, 1, 'view_sms holder sees the message');
+select is((select count(*) from leases where id = '99999999-0000-0000-0000-000000000001')::int, 1, 'view_lease holder sees the lease');
+select is((select count(*) from calls where id = '88888888-0000-0000-0000-000000000001')::int, 1, 'view_calls holder sees the call');
+select is((select count(*) from sms_messages where thread_id = '77777777-0000-0000-0000-000000000001')::int, 1, 'view_sms holder sees the message');
 reset role;
 
 select set_config('request.jwt.claims', '{"sub":"user_bob"}', true);
 set local role authenticated;
-select is((select count(*) from leases)::int,       0, 'no view_lease, no leases');
-select is((select count(*) from calls)::int,        0, 'no view_calls, no calls');
-select is((select count(*) from sms_messages)::int, 0, 'no view_sms, no messages');
+select is((select count(*) from leases where id = '99999999-0000-0000-0000-000000000001')::int, 0, 'no view_lease, no leases');
+select is((select count(*) from calls where id = '88888888-0000-0000-0000-000000000001')::int, 0, 'no view_calls, no calls');
+select is((select count(*) from sms_messages where thread_id = '77777777-0000-0000-0000-000000000001')::int, 0, 'no view_sms, no messages');
 reset role;
 
 -- ── the Activity Log is immutable to every client ────────────────────────
 select set_config('request.jwt.claims', '{"sub":"user_alice"}', true);
 set local role authenticated;
-select is((select count(*) from activity_log_entries)::int, 1, 'staff can read the activity log');
+select is((select count(*) from activity_log_entries where subject_id = 'eeeeeeee-0000-0000-0000-000000000001')::int, 1, 'staff can read the activity log');
 -- Alice holds manage_roles — the most privileged thing in the model — and
 -- still cannot delete an entry. Only the pg_cron purge removes one.
 select throws_ok(
@@ -132,7 +138,7 @@ select is(
 -- closed on it.
 select set_config('request.jwt.claims', '{"sub":"user_dana"}', true);
 set local role authenticated;
-select is((select count(*) from locations)::int, 0,
+select is((select count(*) from locations where id = 'dddddddd-0000-0000-0000-000000000001')::int, 0,
   'a deactivated user reads nothing, even from a Tier 0 table');
 reset role;
 

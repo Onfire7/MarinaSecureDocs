@@ -8,8 +8,10 @@ create extension if not exists pgtap;
 begin;
 select plan(8);
 
-insert into ticket_statuses (id, name) values ('bbbbbbbb-0000-0000-0000-00000000000f','Open');
-insert into location_types  (id, name) values ('cccccccc-0000-0000-0000-00000000000f','Slip');
+-- Lookup names are unique and the seed loads real ones; fixtures use names
+-- that cannot collide.
+insert into ticket_statuses (id, name) values ('bbbbbbbb-0000-0000-0000-00000000000f','Fixture Open');
+insert into location_types  (id, name) values ('cccccccc-0000-0000-0000-00000000000f','Fixture Slip');
 insert into locations (id, name, location_type_id)
   values ('dddddddd-0000-0000-0000-00000000000f','Slip 14','cccccccc-0000-0000-0000-00000000000f');
 insert into assets (id, name) values ('aaaaaaaa-0000-0000-0000-00000000000f','Cart 3');
@@ -46,6 +48,9 @@ select lives_ok(
   'a ticket with exactly one target is accepted');
 
 -- ── marina_settings is a singleton ───────────────────────────────────────
+-- The seed loads a real marina_settings row, so clear it inside this
+-- transaction rather than assuming an empty table. The rollback restores it.
+delete from marina_settings;
 insert into marina_settings (id, marina_name) values (1, 'Harborview');
 select throws_ok(
   $$insert into marina_settings (id, marina_name) values (2, 'Second marina')$$,

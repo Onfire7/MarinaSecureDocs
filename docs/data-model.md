@@ -156,7 +156,7 @@ presentation state read only by the map renderer.
 
 | Column | Type | Notes |
 |---|---|---|
-| checkpoint_id | → checkpoints not null | |
+| checkpoint_id | → checkpoints, **nullable**, `on delete set null` | Null once the checkpoint is deleted. A check-in is evidence that somebody was at a place at a time; removing an NFC tag is a configuration change, not a statement that the rounds never happened. One of 151 exported check-ins is already in this state. |
 | user_id | → users not null | |
 | timestamp | timestamptz not null, indexed | |
 | method | text not null | `scanned` / `manual`. Closed set → enum. |
@@ -203,15 +203,26 @@ visited, onto an already-open instance.
 
 #### `checklist_template_items` — Tier 0 / `manage_checklists` · sync: always
 
-`section_id`, `type` (`simple_check` / `verify_task` / `door_check` /
-`gas_pump_check` / `location_check` / `meter_reading`), `label`, `config jsonb`,
-`position`, `version integer not null default 1`,
+`section_id` (**nullable** — see below), `type` (`simple_check` /
+`verify_task` / `door_check` / `lock_check` / `location_check` /
+`meter_reading` / `question`), `label`, `config jsonb`, `position`,
+`version integer not null default 1`,
 `previous_version_id → checklist_template_items`.
 
 **Copy-on-edit.** Committing an edit writes a *new* row and repoints the
 section, so instance items forever reference the exact row they were created
 from without snapshotting config per instance. There is no forward "current"
 pointer: the live version is whichever row the section points at.
+
+> **`section_id` is nullable, deliberately.** A superseded version is orphaned
+> from its section but keeps its instance references. 5 of 79 exported items
+> are in this state, with 5 instance items pointing at them. `NOT NULL` would
+> force dropping them and silently blank out months-old completed checklists.
+
+> **Unwound.** The type list above is corrected against real data.
+> `instant.schema.ts`'s conventions comment still names `gas_pump_check`,
+> which was renamed to `lock_check` long ago, and omits `question` entirely.
+> `ITEM_TYPE_LABEL` in `src/lib/checklists.ts` is the authority.
 
 #### `checklist_instances` — Tier 0 · sync: **age**
 
