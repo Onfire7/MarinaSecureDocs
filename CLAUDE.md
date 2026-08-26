@@ -66,8 +66,15 @@ spec-approval time and expensive afterward.
 
 ## Verification
 
-Before any commit: `pnpm exec tsc -b` · `pnpm exec oxlint` · `pnpm run build`
-then `rm -rf dist` (dist is gitignored; never commit it).
+Before any commit: `pnpm run test` · `pnpm exec tsc -b` · `pnpm exec oxlint` ·
+`pnpm run build` then `rm -rf dist` (dist is gitignored; never commit it).
+
+The unit suite covers the pure half of `src/lib` only — deliberately, since
+tests written against the database client would be discarded with it. Which
+files are uncovered, and why each one is a decision rather than an oversight,
+is in `docs/testing/coverage-log.md`; `pnpm run coverage:check` fails on any
+zero-coverage file missing from it. There is no coverage threshold, and
+`docs/ROADMAP.md` records why.
 
 This repo uses **pnpm**, pinned exactly in `package.json`'s `packageManager`
 field. Its strict `node_modules` means a transitive dependency is not

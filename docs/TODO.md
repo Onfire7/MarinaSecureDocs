@@ -29,9 +29,11 @@ lives in `architecture.md`, `permissions.md`, `data-model.md` and
       four cross-cutting docs rewritten for the new stack.
 - [x] **Export tooling.** `scripts/export-instant.mjs`; output gitignored,
       regenerate rather than share.
-- [ ] **Phase 3 tests first.** vitest + unit tests for the pure half of
-      `src/lib`. These transfer intact and are the only automated check on
-      business logic during a 66-file rewrite.
+- [x] **Phase 3 tests first.** vitest + 103 unit tests across 13 files
+      covering the pure half of `src/lib`. `permissions.ts`, `contacts.ts`,
+      `detId.ts`, `geo.ts`, `search.ts` and `shiftReport.ts` at 100%.
+      `docs/testing/coverage-log.md` records every untested file with its
+      reason; `pnpm run coverage:check` fails on one that isn't listed.
 - [ ] **Provision.** Supabase project, PowerSync instance, Clerk as a
       third-party auth provider. Confirm Supabase free-tier project pausing
       (a week of inactivity) is acceptable for whatever this becomes.
