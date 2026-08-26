@@ -34,9 +34,13 @@ lives in `architecture.md`, `permissions.md`, `data-model.md` and
       `detId.ts`, `geo.ts`, `search.ts` and `shiftReport.ts` at 100%.
       `docs/testing/coverage-log.md` records every untested file with its
       reason; `pnpm run coverage:check` fails on one that isn't listed.
-- [ ] **Provision.** Supabase project, PowerSync instance, Clerk as a
-      third-party auth provider. Confirm Supabase free-tier project pausing
-      (a week of inactivity) is acceptable for whatever this becomes.
+- [x] **Provision.** Supabase project, PowerSync instance, Clerk as a
+      third-party auth provider — see `scripts/provision-supabase.sh`.
+      Verified: a real minted Clerk JWT is accepted by Supabase with
+      `role: authenticated`, which is the third-party-auth trap ADR 0005
+      flagged. `powersync_role` and the publication are NOT verified from
+      here — Supabase direct connections are IPv6-only without the IPv4
+      add-on, so `psql` can't reach them from this machine.
 - [ ] **Schema + policies.** 42 tables per `data-model.md`; RLS per its tier
       column; `effective_permissions` view; `pg_cron` retention job.
 - [ ] **Sync streams.** always / occupancy / age, with the 30-day trailing

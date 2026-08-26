@@ -27,6 +27,10 @@ permissions, page specs, and wireframes this implements, and
 1. `pnpm install`
 2. Copy `.env.example` to `.env.local` and fill in this marina's
    InstantDB app id and Clerk publishable key.
+   For the Supabase + PowerSync half, run
+   [`scripts/provision-supabase.sh`](scripts/provision-supabase.sh) — an
+   interactive wizard that opens each dashboard, tells you what to click, and
+   writes the captured values to `.env.local`.
 3. Push the schema to the InstantDB app: `pnpm dlx instant-cli@latest push schema`
 4. `pnpm dev`
 
