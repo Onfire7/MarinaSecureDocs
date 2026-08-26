@@ -120,6 +120,62 @@ blocked needs it.
 **Smaller than it was.** The Activity Log retention purge has left this list
 — under Supabase it is a `pg_cron` statement, not a deployed function.
 
+### Records Archive
+
+Deleting a configuration entity — a cabin, a dock, an asset — exports
+everything that hangs off it to an archived snapshot (a zip in Supabase
+Storage), and only then deletes. A **Records Archive** section browses those
+snapshots, with a record viewer for reading them.
+
+**What it changes.** Once it exists, the evidentiary foreign keys go back to
+`ON DELETE CASCADE` in a one-line migration and the archive is what earns
+them. Deleting stops requiring the thing be emptied first, nothing is
+orphaned, and the database does not carry history forever.
+
+**It also reframes the Activity Log.** The log's job is getting caught up on
+what happened recently, and answering "what happened to this?" quickly. It is
+*not* the audit trail — a record viewer over archived snapshots is a far
+better answer to an audit than a list of one-line summaries. With the archive
+in place the log can be pruned aggressively (30 days rather than years),
+because scheduled archiving covers the long-term copy.
+
+**Two distinct exports, and conflating them is the mistake to avoid:**
+
+- *Delete-triggered* — snapshots one entity's cascade at the moment it is
+  removed. Covers deletions only.
+- *Scheduled* — periodically archives records **including the Activity Log**.
+  This is what licenses short in-database retention, and only this. A
+  delete-triggered archive says nothing about a record that still exists, so
+  purging the log at 30 days without it loses the audit trail for everything
+  that was never deleted.
+
+**Why it cannot run on the client.** Deletion is not time-sensitive and may be
+*initiated* by a client, but it cannot be *performed* by one. A device holds a
+scoped subset — check-ins age-scoped, contacts occupancy-scoped — so it
+physically does not have the five years of reservations it is about to
+destroy, and cannot build the snapshot. This belongs in a Netlify Function or
+the database, and is a legitimate criterion-1/2 case under
+[ADR 0004](adr/0004-client-first-execution.md).
+
+**Prerequisites, which are the parts most likely to be forgotten:**
+
+- **Deletion becomes a Tier 1 permission.** `manage_locations` is currently
+  Tier 2 — client-side only — so any active staff member can already delete a
+  location straight through the API. A destructive-and-archiving delete has to
+  be server-enforced and audited.
+- **Notes have no Activity Log coverage at all.** `subject_type` has no
+  `notes` value, so a deleted note currently leaves no trace anywhere. The
+  archive has to cover it, or the log has to start recording it.
+- **The archive needs its own retention and backup policy.** Moving evidence
+  out of the database moves the obligation with it.
+
+**Why deferred:** it is a feature, and features are frozen until cutover. It
+is also not yet reachable — the app has no location delete at all today
+(`grep '.delete()' src/pages/locations/` finds nothing), so the cascade
+semantics it would fix are currently hypothetical. `ON DELETE RESTRICT` holds
+the line until then at the cost of one line per foreign key, turning silent
+evidence loss into a visible error.
+
 ### Time-based maintenance rules move to the client
 
 Per the client-first criterion, "every 90 days since last completed" needs

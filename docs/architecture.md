@@ -199,6 +199,14 @@ The Activity Log is generated at write time, immutably, by the same code paths t
 
 Each marina configures a retention period; individual entries can be flagged **Protected** to survive any purge, for legal or evidentiary reasons.
 
+> **What the log is for.** Getting caught up on what happened recently, and
+> answering "what happened to this?" quickly. It is deliberately *not* the
+> audit trail: it stores one-line summaries, not records, and it is purged on a
+> timer. The long-term evidentiary copy is the Records Archive — see
+> [Roadmap](ROADMAP.md). Until that exists, evidentiary foreign keys are
+> `ON DELETE RESTRICT` so deleting configuration cannot quietly remove the
+> records attached to it.
+
 The log is the largest table by a wide margin — an estimated 100k–250k rows per year — which is what makes retention enforcement mandatory rather than optional, and why it is age-scoped in sync and never fully resident on a device.
 
 ## Inline editing and the local-first echo
