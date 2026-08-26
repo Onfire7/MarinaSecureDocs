@@ -77,9 +77,14 @@ Three scoping shapes, and every entity uses one:
 > schedule, and the sync rules filter on that column. Changing what "recent"
 > means is a change to that function, not to the rules.
 >
-> Two consequences are recorded in [Roadmap](ROADMAP.md) rather than solved:
-> child tables need their own flag instead of a subquery off their parent, and
-> permission gating cannot yet be expressed in a stream at all.
+> The same constraint applies to permission gating and to child rows. A gate
+> must compare a ROW COLUMN to a request-keyed subquery to compile into a
+> bucket parameter, so each Tier 1 table carries `required_permission` and the
+> stream reads `required_permission IN (SELECT permission FROM
+> user_permissions WHERE clerk_user_id = auth.user_id())` — producing
+> `incidents[view_incidents]`, a bucket a client is only offered when it holds
+> that permission. Child rows carry their parent's scope flag for the same
+> reason.
 
 > **Why this matters numerically.** Contacts accumulate at roughly 8,300/year at a marina of this size — weekly cabin turnover, biweekly camping — while only ~1,860 are ever physically present. Syncing all contacts would put tens of thousands of rows on a phone to serve a couple of thousand useful ones, and the ratio worsens every year.
 

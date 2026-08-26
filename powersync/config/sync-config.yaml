@@ -2,45 +2,49 @@
 #
 # Sync rules — what reaches a device.
 #
-# ⚠ TWO KINDS OF FILTER DO NOT WORK HERE, AND BOTH FAIL SILENTLY.
-#
-# A data query is a pure function of ONE ROW. PowerSync's own internals doc is
+# A data query is a pure function of ONE ROW. PowerSync's internals doc is
 # explicit: "none of these SQL queries are actually executed against any SQL
-# database" — they pre-process each row at replication time to decide which
-# buckets it belongs to. There is no database to consult.
+# database" — each row is evaluated at replication time to decide its buckets,
+# with no database to consult. Two consequences shape every line below.
 #
-#   1. now() and range operators. Bucket assignment is pre-computed, so a
-#      rolling window cannot be a predicate. The windows live in
-#      refresh_sync_scopes() (migration 20260826002600) and arrive here as
-#      booleans. Changing "recent" is a change to that function, not this file.
+#   1. No now(), no range operators. Bucket assignment is pre-computed, so a
+#      rolling window cannot be a predicate. Windows live in
+#      refresh_sync_scopes() (migration 20260826002600) and arrive as booleans.
+#      Changing what "recent" means is a change to that function, not to this
+#      file.
 #
-#   2. Cross-table subqueries whose inner filter is a ROW VALUE. Only an inner
-#      filter keyed off a REQUEST parameter compiles to a lookup index — the
-#      documented shape is `x IN (SELECT id FROM t WHERE owner = auth.user_id())`.
-#      `... IN (SELECT id FROM contacts WHERE is_resident = true)` forms no
-#      constraint and matches EVERYTHING. Measured: 8,401 of 8,401
-#      contact_details bucketed instead of 1,936, unchanged after forcing all
-#      6,466 non-resident rows to re-evaluate.
+#   2. Every filter must be a ROW VALUE. A subquery only constrains anything
+#      when its inner filter keys off a REQUEST parameter — that is what
+#      compiles to a lookup index and produces a bucket parameter. Comparing a
+#      literal, or filtering the inner query on a row value, produces NO
+#      constraint and silently matches everything.
 #
-# Permission gating was removed for the same reason and is NOT yet enforced
-# here. Proven by revoking view_incidents from every role and watching all 16
-# incidents stay in the bucket. RLS still protects direct API reads; it does
-# not filter replication, because powersync_role holds BYPASSRLS by necessity.
-# See docs/ROADMAP.md — "Permission-scoped sync streams".
+# So both scoping and permission gating are columns:
 #
-# Streams below filter ONLY on a row's own columns, which is measured exact.
+#   is_recent / is_resident / is_current   maintained by refresh_sync_scopes_all()
+#   required_permission                    the permission a row demands
+#
+#   required_permission IN (SELECT permission FROM user_permissions
+#                            WHERE clerk_user_id = auth.user_id())
+#
+# compiles to a bucket named `incidents[view_incidents]`, which a client is
+# only offered when its parameter query yields that permission. Verified by
+# revoking view_incidents from every role and watching the lookup stop
+# offering it.
+#
+# RLS does NOT filter replication — powersync_role holds BYPASSRLS by
+# necessity — so these gates, not RLS, are what keep a Tier 1 row off a device.
+# RLS remains the backstop for direct API reads.
 #
 # Changes are not watched. Restart the service to apply them.
-
 config:
   edition: 3
 
 streams:
   # ── ALWAYS RESIDENT ────────────────────────────────────────────────────
   # Marina configuration: small, rarely changes, needed on every screen with
-  # or without signal. This is the tier that fixes the defect which started
-  # the migration — data that was previously only offline if visited online
-  # first.
+  # or without signal. The tier that fixes the defect which started the
+  # migration — data previously only offline if visited online first.
   marina_config:
     auto_subscribe: true
     queries:
@@ -74,8 +78,8 @@ streams:
       - SELECT * FROM sms_templates
       - SELECT * FROM attachments
 
-  # Own permissions only. The device needs them to render the UI; it has no
-  # business holding everyone else's.
+  # Own permissions only — the device needs them to render the UI and has no
+  # business holding anyone else's.
   my_permissions:
     auto_subscribe: true
     query: |
@@ -83,25 +87,17 @@ streams:
        WHERE user_id IN (SELECT id FROM users WHERE clerk_user_id = auth.user_id())
 
   # ── OCCUPANCY-SCOPED ───────────────────────────────────────────────────
-  # Who and what is physically at the marina, plus a trailing window so an
-  # incident follow-up on last week's departed guest still works offline.
-  # ~1,936 contacts of 8,402 after one simulated year.
+  # What is physically at the marina, plus a trailing window so a follow-up on
+  # last week's departed guest still works offline.
   occupancy:
     auto_subscribe: true
     queries:
-      - SELECT * FROM leases WHERE is_current = true
-      - SELECT * FROM reservations WHERE is_current = true
       - SELECT * FROM boats WHERE is_resident = true
       - SELECT * FROM vehicles WHERE is_resident = true
-      # UNSCOPED. These are junctions off a scoped parent, and the subquery
-      # that would scope them forms no constraint (see the header). They
-      # need their own denormalised flag; until then they sync in full,
-      # which is small — a few thousand rows — but is not the design.
-      - SELECT * FROM lease_lessees
-      - SELECT * FROM lease_documents
-      - SELECT * FROM boat_owners
-      - SELECT * FROM boat_authorized_users
-      - SELECT * FROM vehicle_owners
+      - SELECT * FROM boat_owners WHERE is_resident = true
+      - SELECT * FROM boat_authorized_users WHERE is_resident = true
+      - SELECT * FROM vehicle_owners WHERE is_resident = true
+      - SELECT * FROM reservations WHERE is_current = true
 
   # Identity of resident contacts — gated on view_owner.
   occupancy_contacts:
@@ -109,49 +105,70 @@ streams:
     query: |
       SELECT * FROM contacts
        WHERE is_resident = true
+         AND required_permission IN (
+           SELECT permission FROM user_permissions WHERE clerk_user_id = auth.user_id())
 
-  # Reachable details — a SEPARATE stream on a separate permission. This is
-  # the whole reason contacts was split in two: a holder of view_owner but not
-  # view_contact never receives these rows at all, so the boundary holds on a
-  # phone in a dead zone and not merely inside a query.
+  # Reachable details — a SEPARATE stream on a SEPARATE permission. This is
+  # why contacts was split in two: a holder of view_owner but not view_contact
+  # never receives these rows, so the boundary holds on a phone in a dead zone
+  # and not merely inside a query.
   occupancy_contact_details:
     auto_subscribe: true
     query: |
       SELECT * FROM contact_details
+       WHERE is_resident = true
+         AND required_permission IN (
+           SELECT permission FROM user_permissions WHERE clerk_user_id = auth.user_id())
 
-  lease_detail:
+  leases:
     auto_subscribe: true
     queries:
       - |
-        SELECT * FROM lease_comments
+        SELECT * FROM leases WHERE is_current = true
+           AND required_permission IN (
+             SELECT permission FROM user_permissions WHERE clerk_user_id = auth.user_id())
+      - |
+        SELECT * FROM lease_lessees WHERE is_current = true
+           AND required_permission IN (
+             SELECT permission FROM user_permissions WHERE clerk_user_id = auth.user_id())
+      - |
+        SELECT * FROM lease_documents WHERE is_current = true
+           AND required_permission IN (
+             SELECT permission FROM user_permissions WHERE clerk_user_id = auth.user_id())
+      - |
+        SELECT * FROM lease_comments WHERE is_current = true
+           AND required_permission IN (
+             SELECT permission FROM user_permissions WHERE clerk_user_id = auth.user_id())
 
   # ── AGE-SCOPED ─────────────────────────────────────────────────────────
-  # A recent window only; never fully resident.
   rounds:
     auto_subscribe: true
     query: SELECT * FROM check_ins WHERE is_recent = true
 
   # Work items stay resident while OPEN however old they are. An incident
-  # nobody closed is exactly what a guard needs on a dock, and dropping it for
-  # age would reproduce the defect this migration exists to fix.
+  # nobody closed is exactly what a guard needs on a dock; dropping it for age
+  # would reproduce the defect this migration exists to fix.
   work:
     auto_subscribe: true
     queries:
       - SELECT * FROM tickets WHERE is_recent = true
       - SELECT * FROM notes WHERE is_recent = true
       - SELECT * FROM checklist_instances WHERE is_recent = true
-      - SELECT * FROM checklist_instance_sections
-      - SELECT * FROM checklist_instance_items
+      - SELECT * FROM checklist_instance_sections WHERE is_recent = true
+      - SELECT * FROM checklist_instance_items WHERE is_recent = true
       - SELECT * FROM shifts WHERE is_recent = true
 
   incidents:
     auto_subscribe: true
     queries:
       - |
-        SELECT * FROM incidents
-         WHERE is_recent = true
+        SELECT * FROM incidents WHERE is_recent = true
+           AND required_permission IN (
+             SELECT permission FROM user_permissions WHERE clerk_user_id = auth.user_id())
       - |
-        SELECT * FROM incident_comments
+        SELECT * FROM incident_comments WHERE is_recent = true
+           AND required_permission IN (
+             SELECT permission FROM user_permissions WHERE clerk_user_id = auth.user_id())
 
   # Telephony is online-only in the UI, but the RECORD of a call is ordinary
   # data and should read offline like anything else.
@@ -160,21 +177,29 @@ streams:
     queries:
       - |
         SELECT * FROM calls WHERE is_recent = true
+           AND required_permission IN (
+             SELECT permission FROM user_permissions WHERE clerk_user_id = auth.user_id())
       - |
-        SELECT * FROM call_notes
+        SELECT * FROM call_notes WHERE is_recent = true
+           AND required_permission IN (
+             SELECT permission FROM user_permissions WHERE clerk_user_id = auth.user_id())
       - |
         SELECT * FROM sms_threads WHERE is_recent = true
+           AND required_permission IN (
+             SELECT permission FROM user_permissions WHERE clerk_user_id = auth.user_id())
       - |
-        SELECT * FROM sms_messages
+        SELECT * FROM sms_messages WHERE is_recent = true
+           AND required_permission IN (
+             SELECT permission FROM user_permissions WHERE clerk_user_id = auth.user_id())
 
   chat:
     auto_subscribe: true
     queries:
       - SELECT * FROM chat_rooms WHERE is_recent = true
-      - SELECT * FROM chat_room_users
-      - SELECT * FROM chat_room_roles
-      - SELECT * FROM chat_messages
-      - SELECT * FROM chat_message_attachments
+      - SELECT * FROM chat_room_users WHERE is_recent = true
+      - SELECT * FROM chat_room_roles WHERE is_recent = true
+      - SELECT * FROM chat_messages WHERE is_recent = true
+      - SELECT * FROM chat_message_attachments WHERE is_recent = true
 
   audit:
     auto_subscribe: true

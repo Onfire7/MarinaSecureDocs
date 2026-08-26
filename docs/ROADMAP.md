@@ -120,46 +120,30 @@ blocked needs it.
 **Smaller than it was.** The Activity Log retention purge has left this list
 — under Supabase it is a `pg_cron` statement, not a deployed function.
 
-### Permission-scoped sync streams
+### Permission-scoped sync streams — RESOLVED
 
-Tier 1 tables currently reach **every** signed-in device, regardless of
-permissions. RLS still protects direct API reads, so this is not an open door
-to the API — but a device holds rows its user may not view, which defeats the
-reason `contacts` was split from `contact_details`.
+Was: Tier 1 tables reached every device regardless of permission, because a
+gate written as `auth.user_id() IN (SELECT clerk_user_id FROM users JOIN
+user_permissions ...)` formed no constraint and silently matched everything.
 
-**Why the obvious approach failed.** A PowerSync data query is a pure function
-of one row: "none of these SQL queries are actually executed against any SQL
-database" — each row is evaluated at replication time to decide its buckets,
-with no database to consult. A subquery only compiles to a lookup index when
-its inner filter keys off a REQUEST parameter, the documented shape being
-`x IN (SELECT id FROM t WHERE owner = auth.user_id())`. A gate like
-`auth.user_id() IN (SELECT clerk_user_id FROM users JOIN user_permissions ...)`
-forms no constraint and silently matches everything.
+**Resolved.** A sync data query can only produce a bucket parameter by
+comparing a ROW COLUMN to a request-keyed subquery — comparing a literal does
+not compile. So the permission a row demands lives on the row
+(`required_permission`), and the gate reads
+`required_permission IN (SELECT permission FROM user_permissions WHERE
+clerk_user_id = auth.user_id())`. That produces `incidents[view_incidents]`,
+which a client is only offered when its parameter query yields that
+permission. Verified by revoking view_incidents from every role and watching
+the parameter lookup stop offering it.
 
-**Measured, not assumed:** revoking `view_incidents` from every role and forcing
-all 16 incidents to re-replicate left all 16 in the bucket.
+### Denormalised scope flags on child tables — RESOLVED
 
-**Likely fix, to be settled by experiment against the local stack:**
-denormalise `clerk_user_id` onto `user_permissions` so the gate becomes
-`'view_incidents' IN (SELECT permission FROM user_permissions WHERE clerk_user_id = auth.user_id())`
-— an inner filter on a request parameter, which is the shape that compiles.
+Was: junctions and child rows synced in full, because the subquery scoping
+them off their parent was the same non-constraint.
 
-### Denormalised scope flags on child tables
-
-Junctions and child rows — `contact_details`, `lease_lessees`, `boat_owners`,
-`incident_comments`, `checklist_instance_sections`/`_items`, `call_notes`,
-`sms_messages`, the `chat_*` tables — currently sync **in full**, because the
-subquery that would scope them off their parent is the same non-constraint
-described above. Measured: 8,401 of 8,401 `contact_details` bucketed instead
-of 1,936, unchanged after forcing all 6,466 non-resident rows to re-evaluate.
-
-The fix is mechanical rather than clever: each needs its own boolean,
-maintained alongside its parent's in `refresh_sync_scopes()`, so the filter is
-a row value. Roughly 14 columns.
-
-**Why deferred:** it is volume, not risk. These tables are small today, and the
-same refresh function already exists — but it should be done before the
-rewrite starts querying against sync scope, not after.
+**Resolved.** Sixteen child tables carry their parent's flag, maintained by
+`refresh_child_sync_scopes()` in the same job. contact_details went from 8,401
+of 8,401 bucketed to 1,935 — matching the database row for row.
 
 ### Records Archive
 
