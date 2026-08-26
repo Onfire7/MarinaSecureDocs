@@ -68,7 +68,18 @@ Three scoping shapes, and every entity uses one:
 | **Occupancy-scoped** | Contacts, boats, vehicles, leases, reservations | Attached to an active lease or current reservation, **plus a 30-day trailing window** so an incident follow-up on last week's departed guest still works offline. |
 | **Age-scoped** | Check-ins, activity log, shifts, checklist instances, incidents, tickets, calls, SMS, chat | A recent window only. Never fully resident. |
 
-Occupancy scoping is a *relational* scope, not an age scope: it joins through lease and reservation date windows. Sync Streams support JOINs, which is what makes it expressible as a rule instead of hand-written pull logic.
+> **How this is actually expressed.** Not as a query predicate. A PowerSync
+> data query is a pure function of one row, evaluated at replication time with
+> no database to consult, so neither `now()` nor a cross-table subquery on a
+> row value forms a constraint — both fail *silently*, matching everything.
+> The windows therefore live in `refresh_sync_scopes()` (migration
+> `20260826002600`), which writes a boolean onto each row on a `pg_cron`
+> schedule, and the sync rules filter on that column. Changing what "recent"
+> means is a change to that function, not to the rules.
+>
+> Two consequences are recorded in [Roadmap](ROADMAP.md) rather than solved:
+> child tables need their own flag instead of a subquery off their parent, and
+> permission gating cannot yet be expressed in a stream at all.
 
 > **Why this matters numerically.** Contacts accumulate at roughly 8,300/year at a marina of this size — weekly cabin turnover, biweekly camping — while only ~1,860 are ever physically present. Syncing all contacts would put tens of thousands of rows on a phone to serve a couple of thousand useful ones, and the ratio worsens every year.
 

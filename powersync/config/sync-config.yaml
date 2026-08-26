@@ -2,28 +2,51 @@
 #
 # Sync rules — what reaches a device.
 #
-# docs/architecture.md defines three scoping shapes. Only the first is
-# implemented here; occupancy and age scoping are the next task and are the
-# ones with real design in them.
+# ⚠ TWO KINDS OF FILTER DO NOT WORK HERE, AND BOTH FAIL SILENTLY.
 #
-# NOTE: changes are not watched. Restart the service to apply them.
+# A data query is a pure function of ONE ROW. PowerSync's own internals doc is
+# explicit: "none of these SQL queries are actually executed against any SQL
+# database" — they pre-process each row at replication time to decide which
+# buckets it belongs to. There is no database to consult.
+#
+#   1. now() and range operators. Bucket assignment is pre-computed, so a
+#      rolling window cannot be a predicate. The windows live in
+#      refresh_sync_scopes() (migration 20260826002600) and arrive here as
+#      booleans. Changing "recent" is a change to that function, not this file.
+#
+#   2. Cross-table subqueries whose inner filter is a ROW VALUE. Only an inner
+#      filter keyed off a REQUEST parameter compiles to a lookup index — the
+#      documented shape is `x IN (SELECT id FROM t WHERE owner = auth.user_id())`.
+#      `... IN (SELECT id FROM contacts WHERE is_resident = true)` forms no
+#      constraint and matches EVERYTHING. Measured: 8,401 of 8,401
+#      contact_details bucketed instead of 1,936, unchanged after forcing all
+#      6,466 non-resident rows to re-evaluate.
+#
+# Permission gating was removed for the same reason and is NOT yet enforced
+# here. Proven by revoking view_incidents from every role and watching all 16
+# incidents stay in the bucket. RLS still protects direct API reads; it does
+# not filter replication, because powersync_role holds BYPASSRLS by necessity.
+# See docs/ROADMAP.md — "Permission-scoped sync streams".
+#
+# Streams below filter ONLY on a row's own columns, which is measured exact.
+#
+# Changes are not watched. Restart the service to apply them.
+
 config:
   edition: 3
 
 streams:
   # ── ALWAYS RESIDENT ────────────────────────────────────────────────────
-  # Marina configuration: small, changes rarely, needed on every screen
-  # whether or not there is signal. This is the tier that fixes the defect
-  # which started the migration — under InstantDB this data was only present
-  # offline if it had been visited online first.
+  # Marina configuration: small, rarely changes, needed on every screen with
+  # or without signal. This is the tier that fixes the defect which started
+  # the migration — data that was previously only offline if visited online
+  # first.
   marina_config:
     auto_subscribe: true
     queries:
-      # people & access
       - SELECT * FROM users
       - SELECT * FROM roles
       - SELECT * FROM user_roles
-      # the property
       - SELECT * FROM location_types
       - SELECT * FROM location_type_parents
       - SELECT * FROM location_statuses
@@ -33,20 +56,16 @@ streams:
       - SELECT * FROM checkpoints
       - SELECT * FROM tours
       - SELECT * FROM tour_checkpoints
-      # assets — including their status log, which is small and is what the
-      # device derives current status from now that the column is gone
       - SELECT * FROM assets
       - SELECT * FROM asset_statuses
       - SELECT * FROM maintenance_rules
       - SELECT * FROM asset_status_logs
-      # checklist authoring
       - SELECT * FROM checklist_templates
       - SELECT * FROM template_viewer_roles
       - SELECT * FROM checklist_template_sections
       - SELECT * FROM template_section_checkpoints
       - SELECT * FROM template_section_assets
       - SELECT * FROM checklist_template_items
-      # lookups & settings
       - SELECT * FROM incident_types
       - SELECT * FROM incident_statuses
       - SELECT * FROM ticket_statuses
@@ -54,3 +73,109 @@ streams:
       - SELECT * FROM phone_lines
       - SELECT * FROM sms_templates
       - SELECT * FROM attachments
+
+  # Own permissions only. The device needs them to render the UI; it has no
+  # business holding everyone else's.
+  my_permissions:
+    auto_subscribe: true
+    query: |
+      SELECT * FROM user_permissions
+       WHERE user_id IN (SELECT id FROM users WHERE clerk_user_id = auth.user_id())
+
+  # ── OCCUPANCY-SCOPED ───────────────────────────────────────────────────
+  # Who and what is physically at the marina, plus a trailing window so an
+  # incident follow-up on last week's departed guest still works offline.
+  # ~1,936 contacts of 8,402 after one simulated year.
+  occupancy:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM leases WHERE is_current = true
+      - SELECT * FROM reservations WHERE is_current = true
+      - SELECT * FROM boats WHERE is_resident = true
+      - SELECT * FROM vehicles WHERE is_resident = true
+      # UNSCOPED. These are junctions off a scoped parent, and the subquery
+      # that would scope them forms no constraint (see the header). They
+      # need their own denormalised flag; until then they sync in full,
+      # which is small — a few thousand rows — but is not the design.
+      - SELECT * FROM lease_lessees
+      - SELECT * FROM lease_documents
+      - SELECT * FROM boat_owners
+      - SELECT * FROM boat_authorized_users
+      - SELECT * FROM vehicle_owners
+
+  # Identity of resident contacts — gated on view_owner.
+  occupancy_contacts:
+    auto_subscribe: true
+    query: |
+      SELECT * FROM contacts
+       WHERE is_resident = true
+
+  # Reachable details — a SEPARATE stream on a separate permission. This is
+  # the whole reason contacts was split in two: a holder of view_owner but not
+  # view_contact never receives these rows at all, so the boundary holds on a
+  # phone in a dead zone and not merely inside a query.
+  occupancy_contact_details:
+    auto_subscribe: true
+    query: |
+      SELECT * FROM contact_details
+
+  lease_detail:
+    auto_subscribe: true
+    queries:
+      - |
+        SELECT * FROM lease_comments
+
+  # ── AGE-SCOPED ─────────────────────────────────────────────────────────
+  # A recent window only; never fully resident.
+  rounds:
+    auto_subscribe: true
+    query: SELECT * FROM check_ins WHERE is_recent = true
+
+  # Work items stay resident while OPEN however old they are. An incident
+  # nobody closed is exactly what a guard needs on a dock, and dropping it for
+  # age would reproduce the defect this migration exists to fix.
+  work:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM tickets WHERE is_recent = true
+      - SELECT * FROM notes WHERE is_recent = true
+      - SELECT * FROM checklist_instances WHERE is_recent = true
+      - SELECT * FROM checklist_instance_sections
+      - SELECT * FROM checklist_instance_items
+      - SELECT * FROM shifts WHERE is_recent = true
+
+  incidents:
+    auto_subscribe: true
+    queries:
+      - |
+        SELECT * FROM incidents
+         WHERE is_recent = true
+      - |
+        SELECT * FROM incident_comments
+
+  # Telephony is online-only in the UI, but the RECORD of a call is ordinary
+  # data and should read offline like anything else.
+  comms:
+    auto_subscribe: true
+    queries:
+      - |
+        SELECT * FROM calls WHERE is_recent = true
+      - |
+        SELECT * FROM call_notes
+      - |
+        SELECT * FROM sms_threads WHERE is_recent = true
+      - |
+        SELECT * FROM sms_messages
+
+  chat:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM chat_rooms WHERE is_recent = true
+      - SELECT * FROM chat_room_users
+      - SELECT * FROM chat_room_roles
+      - SELECT * FROM chat_messages
+      - SELECT * FROM chat_message_attachments
+
+  audit:
+    auto_subscribe: true
+    query: SELECT * FROM activity_log_entries WHERE is_recent = true
