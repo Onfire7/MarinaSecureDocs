@@ -1,10 +1,15 @@
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { rangesOverlap } from "../../lib/reservations";
-import { activityTx } from "../../lib/activityLog";
 import { LocationPicker } from "../shared/LocationPicker";
+import {
+  createReservation,
+  findConflict,
+} from "../../data/reservations";
+import { createContact, useContacts } from "../../data/contacts";
+import { useLocations } from "../../data/locations";
+import { useAssets } from "../../data/assets";
+import { useMarinaSettings } from "../../data/settings";
 
 export interface NewReservationState {
   targetKind?: "location" | "asset";
@@ -38,27 +43,26 @@ export function NewReservationPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const { data } = db.useQuery({
-    locations: {
-      $: { where: { reservationEnabled: true } },
-      type: {},
-      parent: {},
-    },
-    assets: { $: { where: { reservationEnabled: true } } },
-    contacts: {},
-    marinaSettings: {},
-  });
+  const { data: allLocations } = useLocations();
+  const { data: allAssets } = useAssets();
+  const { data: allContacts } = useContacts();
+  const settings = useMarinaSettings();
 
-  const locations = data?.locations ?? [];
-  const assets = data?.assets ?? [];
-  const contacts = useMemo(
-    () =>
-      [...(data?.contacts ?? [])].sort((a, b) =>
-        (a.name ?? "").localeCompare(b.name ?? ""),
-      ),
-    [data],
+  // The picker only ever offers reservation-enabled targets — a mixed-use
+  // dock's leased slips simply never appear here.
+  const locations = useMemo(
+    () => allLocations.filter((l) => l.reservation_enabled === 1),
+    [allLocations],
   );
-  const allowOverlap = data?.marinaSettings?.[0]?.allowOverlappingReservations ?? false;
+  const assets = useMemo(
+    () => allAssets.filter((a) => a.reservation_enabled === 1),
+    [allAssets],
+  );
+  const contacts = useMemo(
+    () => [...allContacts].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "")),
+    [allContacts],
+  );
+  const allowOverlap = settings.allowOverlappingReservations;
 
   if (!current.can("manage_reservations")) {
     return (
@@ -77,8 +81,8 @@ export function NewReservationPage() {
   // The target's visibility only sets the default; the same pavilion gets
   // booked both ways without reconfiguring it.
   const defaultBillable =
-    (selectedLocation?.reservationVisibility ?? selectedAsset?.reservationVisibility) ===
-    "public";
+    (selectedLocation?.reservation_visibility ??
+      selectedAsset?.reservation_visibility) === "public";
   const billingType = billingChoice ?? (defaultBillable ? "billable" : "non_billable");
   const billable = billingType === "billable";
 
@@ -91,47 +95,17 @@ export function NewReservationPage() {
     const end = checkout ? new Date(checkout).getTime() : start + 24 * 3600_000;
 
     // Overlap guard (MarinaSettings.allowOverlappingReservations, default off):
-    // blocked outright with the conflicting reservation named.
-    if (!allowOverlap) {
-      const { data: existing } =
-        targetKind === "location"
-          ? await db.queryOnce({
-              reservations: {
-                $: {
-                  where: {
-                    "location.id": targetId,
-                    status: { $in: ["requested", "confirmed", "checked_in"] },
-                  },
-                },
-                contact: {},
-              },
-            })
-          : await db.queryOnce({
-              reservations: {
-                $: {
-                  where: {
-                    "asset.id": targetId,
-                    status: { $in: ["requested", "confirmed", "checked_in"] },
-                  },
-                },
-                contact: {},
-              },
-            });
-      const conflict = (existing?.reservations ?? []).find((r) => {
-        if (!r.expectedCheckin) return false;
-        const rs = new Date(r.expectedCheckin).getTime();
-        const re = r.expectedCheckout
-          ? new Date(r.expectedCheckout).getTime()
-          : rs + 24 * 3600_000;
-        return rangesOverlap(start, end, rs, re);
-      });
+    // blocked outright with the conflicting reservation named. Re-read at
+    // submit rather than trusting the rendered list, which may be minutes old.
+    if (!allowOverlap && targetKind) {
+      const conflict = await findConflict(targetKind, targetId, start, end);
       if (conflict) {
         setError(
           `Conflicts with the existing reservation for ${
-            conflict.contact?.name ?? "an unnamed contact"
-          } (${new Date(conflict.expectedCheckin!).toLocaleDateString()}${
-            conflict.expectedCheckout
-              ? ` – ${new Date(conflict.expectedCheckout).toLocaleDateString()}`
+            conflict.contact_name ?? "an unnamed contact"
+          } (${new Date(conflict.expected_checkin!).toLocaleDateString()}${
+            conflict.expected_checkout
+              ? ` – ${new Date(conflict.expected_checkout).toLocaleDateString()}`
               : ""
           }).`,
         );
@@ -141,46 +115,34 @@ export function NewReservationPage() {
     }
 
     let contact = contactId;
-    const txns = [];
     if (creatingContact && newContact.name.trim()) {
-      contact = id();
-      txns.push(
-        db.tx.contacts[contact].update({
+      contact = await createContact(
+        {
           name: newContact.name.trim(),
-          phone: newContact.phone.trim() || undefined,
-          email: newContact.email.trim() || undefined,
-        }),
+          phone: newContact.phone.trim() || null,
+          email: newContact.email.trim() || null,
+        },
+        current.user?.id ?? null,
       );
     }
 
-    const reservationId = id();
-    txns.push(
-      db.tx.reservations[reservationId]
-        .update({
-          status: confirmed ? "confirmed" : "requested",
-          billingType,
-          expectedCheckin: start,
-          expectedCheckout: checkout ? end : null,
-          ...(billable && rate !== "" ? { rate: Number(rate) } : {}),
-          ...(billable && deposit !== "" ? { deposit: Number(deposit) } : {}),
-        })
-        .link({
-          [targetKind]: targetId,
-          ...(contact ? { contact } : {}),
-        }),
-    );
     const targetName =
       selectedLocation?.name ?? selectedAsset?.name ?? "a reservable target";
-    txns.push(
-      activityTx({
-        eventType: "reservation.created",
-        summary: `Reservation created for ${targetName}`,
-        subjectType: "reservations",
-        subjectId: reservationId,
-        actorId: current.user?.id,
-      }),
+    const reservationId = await createReservation(
+      {
+        status: confirmed ? "confirmed" : "requested",
+        contactId: contact || null,
+        locationId: targetKind === "location" ? targetId : null,
+        assetId: targetKind === "asset" ? targetId : null,
+        billingType,
+        expectedCheckin: new Date(start).toISOString(),
+        expectedCheckout: checkout ? new Date(end).toISOString() : null,
+        rate: billable && rate !== "" ? Number(rate) : null,
+        deposit: billable && deposit !== "" ? Number(deposit) : null,
+      },
+      targetName,
+      current.user?.id ?? null,
     );
-    await db.transact(txns);
     navigate(`/reservations/${reservationId}`, { replace: true });
   };
 

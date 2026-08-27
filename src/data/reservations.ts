@@ -1,5 +1,5 @@
 import { useQuery } from "@powersync/react";
-import { db, stamp } from "../lib/db";
+import { db } from "../lib/db";
 import { insert, transact, update } from "./sql";
 import { recordActivity } from "./activity";
 import type { ReservationTargetColumns } from "../lib/reservations";
@@ -113,6 +113,40 @@ function reservationColumns(input: Partial<ReservationInput>) {
   };
 }
 
+/**
+ * The reservation this booking would collide with, if any.
+ *
+ * Read at submit time rather than from the rendered list, because the list may
+ * be minutes old and the conflicting booking may have arrived since. It is a
+ * guard, not a constraint: two devices offline in the same dead zone can still
+ * both book the same slip, and the marina reconciles that when they sync.
+ * MarinaSettings.allowOverlappingReservations turns it off entirely.
+ */
+export async function findConflict(
+  kind: "location" | "asset",
+  targetId: string,
+  start: number,
+  end: number,
+): Promise<ReservationRow | null> {
+  const column = kind === "location" ? "location_id" : "asset_id";
+  const candidates = await db.getAll<ReservationRow>(
+    `${RESERVATION_SELECT}
+      WHERE r.${column} = ?
+        AND r.status IN ('requested', 'confirmed', 'checked_in')`,
+    [targetId],
+  );
+  return (
+    candidates.find((r) => {
+      if (!r.expected_checkin) return false;
+      const rs = new Date(r.expected_checkin).getTime();
+      const re = r.expected_checkout
+        ? new Date(r.expected_checkout).getTime()
+        : rs + 24 * 3600_000;
+      return start < re && rs < end;
+    }) ?? null
+  );
+}
+
 export async function createReservation(
   input: ReservationInput,
   targetName: string,
@@ -143,63 +177,70 @@ export async function saveReservation(
 }
 
 /**
- * Check a reservation in, and mark its target occupied.
+ * Check a reservation in or out, and move its target's status with it.
  *
- * `early_checkin` records an arrival ahead of the booking rather than
- * rewriting `expected_checkin`, so the booking still says what was agreed and
- * the difference between the two stays visible.
+ * One function for both directions and both target kinds, because they differ
+ * only in which columns get the timestamp and which status the target lands
+ * on — and doing them separately is how a check-in ends up recorded with the
+ * slip still reading vacant.
+ *
+ * A location's status is a column; an asset's is the newest row in its status
+ * log. Both are written here, in the reservation's own transaction, so a device
+ * that goes flat cannot leave one without the other.
+ *
+ * early_checkin / late_checkout record an arrival or departure outside the
+ * booked window rather than rewriting it: the booking still says what was
+ * agreed, and the difference stays visible for billing.
  */
-export async function checkInReservation(
-  reservation: { id: string; expected_checkin: string | null },
-  targetName: string,
-  occupiedStatus: { id: string } | null,
-  locationId: string | null,
-  actorId: string | null,
-): Promise<void> {
-  const now = stamp();
-  const early =
-    reservation.expected_checkin && now < reservation.expected_checkin ? now : null;
-  await transact(async (tx) => {
-    await update(tx, "reservations", reservation.id, {
-      status: "checked_in",
-      actual_checkin: now,
-      early_checkin: early,
-    });
-    if (locationId && occupiedStatus) {
-      await update(tx, "locations", locationId, { status_id: occupiedStatus.id });
-    }
-    await recordActivity(tx, {
-      eventType: "reservation.checked_in",
-      summary: `Checked in at ${targetName}`,
-      subjectType: "reservations",
-      subjectId: reservation.id,
-      actorId,
-    });
-  });
-}
+export async function checkReservation(opts: {
+  reservation: ReservationRow;
+  mode: "in" | "out";
+  at: Date;
+  targetKind: "location" | "asset";
+  targetId: string;
+  targetName: string;
+  /** The status the target takes on. Null leaves it unchanged. */
+  status: { id: string; name: string } | null;
+  guestName: string;
+  actorId: string | null;
+}): Promise<void> {
+  const { reservation, mode, at, targetKind, targetId, status, actorId } = opts;
+  const ts = at.toISOString();
+  const expected =
+    mode === "in" ? reservation.expected_checkin : reservation.expected_checkout;
+  const outsideWindow =
+    expected != null && (mode === "in" ? ts < expected : ts > expected);
 
-export async function checkOutReservation(
-  reservation: { id: string; expected_checkout: string | null },
-  targetName: string,
-  postStatusId: string | null,
-  locationId: string | null,
-  actorId: string | null,
-): Promise<void> {
-  const now = stamp();
-  const late =
-    reservation.expected_checkout && now > reservation.expected_checkout ? now : null;
   await transact(async (tx) => {
     await update(tx, "reservations", reservation.id, {
-      status: "checked_out",
-      actual_checkout: now,
-      late_checkout: late,
+      status: mode === "in" ? "checked_in" : "checked_out",
+      actual_checkin: mode === "in" ? ts : undefined,
+      actual_checkout: mode === "out" ? ts : undefined,
+      early_checkin: mode === "in" && outsideWindow ? ts : undefined,
+      late_checkout: mode === "out" && outsideWindow ? ts : undefined,
     });
-    if (locationId && postStatusId) {
-      await update(tx, "locations", locationId, { status_id: postStatusId });
+
+    if (status) {
+      if (targetKind === "location") {
+        await update(tx, "locations", targetId, { status_id: status.id });
+      } else {
+        await insert(tx, "asset_status_logs", {
+          asset_id: targetId,
+          status_id: status.id,
+          note: mode === "in" ? "Reservation check-in" : "Reservation check-out",
+          timestamp: ts,
+          logged_by_id: actorId,
+        });
+      }
     }
+
     await recordActivity(tx, {
-      eventType: "reservation.checked_out",
-      summary: `Checked out of ${targetName}`,
+      eventType:
+        mode === "in" ? "reservation.checked_in" : "reservation.checked_out",
+      summary:
+        mode === "in"
+          ? `${opts.guestName} checked in to ${opts.targetName}`
+          : `${opts.guestName} checked out of ${opts.targetName}`,
       subjectType: "reservations",
       subjectId: reservation.id,
       actorId,

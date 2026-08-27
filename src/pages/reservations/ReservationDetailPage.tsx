@@ -1,9 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { DEFAULT_POST_RESERVATION_STATUS, statusLabel } from "../../lib/locations";
-import { activityTx } from "../../lib/activityLog";
+import { statusLabel } from "../../lib/locations";
 import { DraftNumberInput } from "../shared/DraftInput";
 import {
   RESERVATION_STATUSES,
@@ -12,6 +10,18 @@ import {
   reservationTargetOf,
   type ReservationTarget,
 } from "../../lib/reservations";
+import {
+  checkReservation,
+  saveReservation,
+  useReservation,
+  type ReservationRow,
+} from "../../data/reservations";
+import {
+  DEFAULT_POST_RESERVATION_STATUS,
+  resolveStatusByName,
+  useAssetStatuses,
+  useLocationStatuses,
+} from "../../data/lookups";
 
 // Reservations — Reservation Detail (see docs/pages/reservation-detail.html).
 // Fully viewable by anyone; every mutating action is manage_reservations.
@@ -23,19 +33,7 @@ export function ReservationDetailPage() {
   const canManage = current.can("manage_reservations");
   const [dialog, setDialog] = useState<"in" | "out" | null>(null);
 
-  const { data } = db.useQuery(
-    reservationId
-      ? {
-          reservations: {
-            $: { where: { id: reservationId } },
-            contact: {},
-            location: { type: {} },
-            asset: {},
-          },
-        }
-      : null,
-  );
-  const reservation = data?.reservations?.[0];
+  const { reservation } = useReservation(reservationId);
 
   if (!reservation) {
     return (
@@ -48,12 +46,15 @@ export function ReservationDetailPage() {
   const target = reservationTargetOf(reservation);
   const billable = isBillable(reservation, target);
 
-  const update = (fields: Record<string, unknown>) => {
-    void db.transact(db.tx.reservations[reservation.id].update(fields));
+  const update = (fields: Parameters<typeof saveReservation>[1]) => {
+    void saveReservation(reservation.id, fields);
   };
 
-  const setDates = (field: "expectedCheckin" | "expectedCheckout", value: string) => {
-    update({ [field]: value ? new Date(value).getTime() : null });
+  const setDates = (
+    field: "expectedCheckin" | "expectedCheckout",
+    value: string,
+  ) => {
+    update({ [field]: value ? new Date(value).toISOString() : null });
   };
 
   const dateInputValue = (v: string | number | null | undefined) =>
@@ -68,12 +69,9 @@ export function ReservationDetailPage() {
             <span className="muted"> · {target?.typeLabel}</span>
           </h1>
           <div className="page-sub">
-            {reservation.contact?.name ?? "No contact"}
-            {current.can("view_contact") && reservation.contact?.phone
-              ? ` · ${reservation.contact.phone}`
-              : ""}
-            {current.can("view_contact") && reservation.contact?.email
-              ? ` · ${reservation.contact.email}`
+            {reservation.contact_name ?? "No contact"}
+            {current.can("view_contact") && reservation.contact_phone
+              ? ` · ${reservation.contact_phone}`
               : ""}
           </div>
         </div>
@@ -172,24 +170,24 @@ export function ReservationDetailPage() {
                 <input
                   type="date"
                   className="input select-inline"
-                  value={dateInputValue(reservation.expectedCheckin)}
+                  value={dateInputValue(reservation.expected_checkin)}
                   onChange={(e) => setDates("expectedCheckin", e.target.value)}
                 />
                 <input
                   type="date"
                   className="input select-inline"
-                  value={dateInputValue(reservation.expectedCheckout)}
+                  value={dateInputValue(reservation.expected_checkout)}
                   onChange={(e) => setDates("expectedCheckout", e.target.value)}
                 />
               </div>
             ) : (
               <div className="field-value">
-                {reservation.expectedCheckin
-                  ? new Date(reservation.expectedCheckin).toLocaleDateString()
+                {reservation.expected_checkin
+                  ? new Date(reservation.expected_checkin).toLocaleDateString()
                   : "—"}{" "}
                 –{" "}
-                {reservation.expectedCheckout
-                  ? new Date(reservation.expectedCheckout).toLocaleDateString()
+                {reservation.expected_checkout
+                  ? new Date(reservation.expected_checkout).toLocaleDateString()
                   : "—"}
               </div>
             )}
@@ -198,12 +196,12 @@ export function ReservationDetailPage() {
           <div className="field">
             <span className="field-label">Actual check-in / check-out</span>
             <div className="field-value">
-              {reservation.actualCheckin
-                ? new Date(reservation.actualCheckin).toLocaleString()
+              {reservation.actual_checkin
+                ? new Date(reservation.actual_checkin).toLocaleString()
                 : "—"}{" "}
               /{" "}
-              {reservation.actualCheckout
-                ? new Date(reservation.actualCheckout).toLocaleString()
+              {reservation.actual_checkout
+                ? new Date(reservation.actual_checkout).toLocaleString()
                 : "—"}
             </div>
           </div>
@@ -231,19 +229,19 @@ export function ReservationDetailPage() {
                 )}
               </div>
             ))}
-            {reservation.earlyCheckin && (
+            {reservation.early_checkin && (
               <div className="field">
                 <span className="field-label">Early check-in</span>
                 <div className="field-value">
-                  {new Date(reservation.earlyCheckin).toLocaleString()}
+                  {new Date(reservation.early_checkin).toLocaleString()}
                 </div>
               </div>
             )}
-            {reservation.lateCheckout && (
+            {reservation.late_checkout && (
               <div className="field">
                 <span className="field-label">Late check-out</span>
                 <div className="field-value">
-                  {new Date(reservation.lateCheckout).toLocaleString()}
+                  {new Date(reservation.late_checkout).toLocaleString()}
                 </div>
               </div>
             )}
@@ -256,7 +254,6 @@ export function ReservationDetailPage() {
           mode={dialog}
           reservation={reservation}
           target={target}
-          billable={billable}
           onClose={() => setDialog(null)}
         />
       )}
@@ -272,100 +269,48 @@ function CheckInOutDialog({
   mode,
   reservation,
   target,
-  billable,
   onClose,
 }: {
   mode: "in" | "out";
-  reservation: {
-    id: string;
-    expectedCheckin?: string | number | null;
-    expectedCheckout?: string | number | null;
-    contact?: { name?: string | null } | null;
-  };
+  reservation: ReservationRow;
   target: ReservationTarget;
-  billable: boolean;
   onClose: () => void;
 }) {
   const current = useCurrent();
+  const { statuses: locationStatuses } = useLocationStatuses();
+  const { statuses: assetStatuses } = useAssetStatuses();
   const [when, setWhen] = useState(() => {
     const d = new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
     return d.toISOString().slice(0, 16);
   });
 
+  // Which status the target lands on. Checking in occupies it; checking out
+  // returns it to the target's own post-reservation status, or to the marina's
+  // "Needs Cleaning" / "Available" if it has none. A marina that has created
+  // neither gets no status change rather than a status that matches no row.
+  const statuses = target.kind === "location" ? locationStatuses : assetStatuses;
+  const nextStatus =
+    mode === "in"
+      ? resolveStatusByName(statuses, target.kind === "location" ? "Occupied" : "In Use")
+      : (resolveStatusByName(statuses, target.postStatus ?? "") ??
+        resolveStatusByName(
+          statuses,
+          target.kind === "location" ? DEFAULT_POST_RESERVATION_STATUS : "Available",
+        ));
+
   const submit = async () => {
-    const ts = new Date(when).getTime();
-    const txns = [];
-
-    if (mode === "in") {
-      const early =
-        billable &&
-        reservation.expectedCheckin &&
-        ts < new Date(reservation.expectedCheckin).getTime();
-      txns.push(
-        db.tx.reservations[reservation.id].update({
-          actualCheckin: ts,
-          status: "checked_in",
-          ...(early ? { earlyCheckin: ts } : {}),
-        }),
-      );
-      if (target.kind === "location") {
-        txns.push(db.tx.locations[target.id].update({ status: "occupied" }));
-      } else {
-        txns.push(db.tx.assets[target.id].update({ currentStatus: "in_use" }));
-        txns.push(
-          db.tx.assetStatusLogs[id()]
-            .update({ status: "in_use", timestamp: ts, note: "Reservation check-in" })
-            .link({
-              asset: target.id,
-              ...(current.user ? { loggedBy: current.user.id } : {}),
-            }),
-        );
-      }
-    } else {
-      const late =
-        billable &&
-        reservation.expectedCheckout &&
-        ts > new Date(reservation.expectedCheckout).getTime();
-      const postStatus =
-        target.postStatus ??
-        (target.kind === "location" ? DEFAULT_POST_RESERVATION_STATUS : "available");
-      txns.push(
-        db.tx.reservations[reservation.id].update({
-          actualCheckout: ts,
-          status: "checked_out",
-          ...(late ? { lateCheckout: ts } : {}),
-        }),
-      );
-      if (target.kind === "location") {
-        txns.push(db.tx.locations[target.id].update({ status: postStatus }));
-      } else {
-        txns.push(db.tx.assets[target.id].update({ currentStatus: postStatus }));
-        txns.push(
-          db.tx.assetStatusLogs[id()]
-            .update({ status: postStatus, timestamp: ts, note: "Reservation check-out" })
-            .link({
-              asset: target.id,
-              ...(current.user ? { loggedBy: current.user.id } : {}),
-            }),
-        );
-      }
-    }
-
-    txns.push(
-      activityTx({
-        eventType: mode === "in" ? "reservation.checked_in" : "reservation.checked_out",
-        summary:
-          mode === "in"
-            ? `${reservation.contact?.name ?? "Guest"} checked in to ${target.name}`
-            : `${reservation.contact?.name ?? "Guest"} checked out of ${target.name}`,
-        subjectType: "reservations",
-        subjectId: reservation.id,
-        actorId: current.user?.id,
-      }),
-    );
-
-    await db.transact(txns);
+    await checkReservation({
+      reservation,
+      mode,
+      at: new Date(when),
+      targetKind: target.kind,
+      targetId: target.id,
+      targetName: target.name,
+      status: nextStatus,
+      guestName: reservation.contact_name ?? "Guest",
+      actorId: current.user?.id ?? null,
+    });
     onClose();
   };
 
@@ -376,13 +321,13 @@ function CheckInOutDialog({
           {mode === "in" ? "Check in" : "Check out"} — {target.name}
         </div>
         <p className="muted small">
-          {reservation.contact?.name ?? "No contact"} · expected{" "}
-          {reservation.expectedCheckin
-            ? new Date(reservation.expectedCheckin).toLocaleDateString()
+          {reservation.contact_name ?? "No contact"} · expected{" "}
+          {reservation.expected_checkin
+            ? new Date(reservation.expected_checkin).toLocaleDateString()
             : "—"}
           {" – "}
-          {reservation.expectedCheckout
-            ? new Date(reservation.expectedCheckout).toLocaleDateString()
+          {reservation.expected_checkout
+            ? new Date(reservation.expected_checkout).toLocaleDateString()
             : "—"}
         </p>
         <div className="field">
@@ -397,14 +342,9 @@ function CheckInOutDialog({
           />
         </div>
         <p className="muted small">
-          {mode === "in"
-            ? `${target.name} will be marked ${target.kind === "location" ? "Occupied" : "In Use"}.`
-            : `${target.name} will move to ${statusLabel(
-                target.postStatus ??
-                  (target.kind === "location"
-                    ? DEFAULT_POST_RESERVATION_STATUS
-                    : "available"),
-              )}.`}
+          {nextStatus
+            ? `${target.name} will be marked ${nextStatus.name}.`
+            : `${target.name}'s status won't change — the marina hasn't defined one for this.`}
         </p>
         <div className="row">
           <button type="button" className="btn btn-primary" onClick={() => void submit()}>
