@@ -1,19 +1,15 @@
 // Assets — shared display helpers (see docs: pages/asset-list.html).
-// Asset.currentStatus is an open, marina-defined set; these are the common
-// values the app offers by default.
+//
+// An asset's status is a row in asset_statuses, named by the marina. The names
+// below are only the ones this palette knows a colour for; anything else falls
+// through to the neutral badge, which is the open-set behaviour intended all
+// along.
+import { statusKey } from "./locations";
 
-export const COMMON_ASSET_STATUSES = [
-  "available",
-  "in_use",
-  "needs_charging",
-  "needs_service",
-  "out_of_service",
-] as const;
-
-export const DEFAULT_POST_RETURN_STATUS = "available";
+export const DEFAULT_POST_RETURN_STATUS = "Available";
 
 export function assetStatusBadgeClass(status: string | null | undefined): string {
-  switch (status) {
+  switch (statusKey(status)) {
     case "available":
       return "badge badge-good";
     case "in_use":
@@ -52,16 +48,16 @@ export function meterTypeLabel(meterType: string | null | undefined): string {
  * separator they'd otherwise put around it.
  */
 export function meterSummary(asset: {
-  hasMeter: boolean;
-  meterType?: string | null;
-  meterReading?: number | null;
+  has_meter: number;
+  meter_type?: string | null;
+  meter_reading?: number | null;
 }): string {
-  const value = asset.meterReading;
-  if (!asset.hasMeter) {
+  const value = asset.meter_reading;
+  if (asset.has_meter !== 1) {
     return value != null ? `${formatNumber(value)} hrs accrued` : "";
   }
   if (value == null) return "No reading yet";
-  return `${formatNumber(value)} ${meterUnit(asset.meterType)}`;
+  return `${formatNumber(value)} ${meterUnit(asset.meter_type)}`;
 }
 
 export function formatNumber(n: number): string {

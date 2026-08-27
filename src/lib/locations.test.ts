@@ -21,8 +21,8 @@ describe("compareNames", () => {
 describe("breadcrumb", () => {
   it("builds the path root-first", () => {
     const marina = aLocation({ id: "m", name: "Marina" });
-    const dock = aLocation({ id: "d", name: "Dock C", parent: { id: "m" } });
-    const slip = aLocation({ id: "s", name: "Slip 14", parent: { id: "d" } });
+    const dock = aLocation({ id: "d", name: "Dock C", parent_id: "m" });
+    const slip = aLocation({ id: "s", name: "Slip 14", parent_id: "d" });
     const byId = new Map([marina, dock, slip].map((l) => [l.id, l]));
     expect(breadcrumb("s", byId)).toEqual(["Marina", "Dock C", "Slip 14"]);
   });
@@ -34,8 +34,8 @@ describe("breadcrumb", () => {
 
   it("terminates on a parent cycle", () => {
     // Bad data shouldn't hang a list page. The depth guard caps it at 20.
-    const a = aLocation({ id: "a", name: "A", parent: { id: "b" } });
-    const b = aLocation({ id: "b", name: "B", parent: { id: "a" } });
+    const a = aLocation({ id: "a", name: "A", parent_id: "b" });
+    const b = aLocation({ id: "b", name: "B", parent_id: "a" });
     const byId = new Map([a, b].map((l) => [l.id, l]));
     expect(breadcrumb("a", byId)).toHaveLength(20);
   });

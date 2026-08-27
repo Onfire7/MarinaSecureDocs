@@ -29,16 +29,16 @@ describe("isBillable", () => {
     defaultBillable: true,
   };
 
-  it("lets the reservation's own billingType win over the target default", () => {
-    expect(isBillable({ billingType: "non_billable" }, publicTarget)).toBe(false);
-    expect(isBillable({ billingType: "billable" }, { ...publicTarget, defaultBillable: false })).toBe(
+  it("lets the reservation's own billing_type win over the target default", () => {
+    expect(isBillable({ billing_type: "non_billable" }, publicTarget)).toBe(false);
+    expect(isBillable({ billing_type: "billable" }, { ...publicTarget, defaultBillable: false })).toBe(
       true,
     );
   });
 
-  it("falls back to the target default when billingType predates the field", () => {
+  it("falls back to the target default when billing_type predates the field", () => {
     expect(isBillable({}, publicTarget)).toBe(true);
-    expect(isBillable({ billingType: null }, { ...publicTarget, defaultBillable: false })).toBe(false);
+    expect(isBillable({ billing_type: null }, { ...publicTarget, defaultBillable: false })).toBe(false);
   });
 
   it("is not billable with no target at all", () => {
@@ -49,25 +49,26 @@ describe("isBillable", () => {
 describe("reservationTargetOf", () => {
   it("derives a location target, defaulting billable from public visibility", () => {
     const target = reservationTargetOf({
-      location: {
-        id: "l1",
-        name: "Slip 14",
-        reservationVisibility: "public",
-        postReservationStatus: "needs_cleaning",
-        type: { name: "Slip" },
-      },
+      location_id: "l1",
+      location_name: "Slip 14",
+      location_visibility: "public",
+      post_reservation_status_name: "Needs Cleaning",
+      location_type_name: "Slip",
     });
     expect(target).toMatchObject({
       kind: "location",
       typeLabel: "Slip",
       defaultBillable: true,
-      postStatus: "needs_cleaning",
+      postStatus: "Needs Cleaning",
     });
   });
 
   it("treats internal visibility as not billable by default", () => {
     const target = reservationTargetOf({
-      asset: { id: "a1", name: "Courtesy cart", category: "Vehicle", reservationVisibility: "internal" },
+      asset_id: "a1",
+      asset_name: "Courtesy cart",
+      asset_category: "Vehicle",
+      asset_visibility: "internal",
     });
     expect(target).toMatchObject({ kind: "asset", typeLabel: "Vehicle", defaultBillable: false });
   });

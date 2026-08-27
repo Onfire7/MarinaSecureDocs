@@ -1,21 +1,30 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { compareNames, statusLabel } from "../../lib/locations";
+import { compareNames } from "../../lib/locations";
 import {
-  COMMON_ASSET_STATUSES,
   assetStatusBadgeClass,
   formatNumber,
   meterSummary,
   meterUnit,
 } from "../../lib/assets";
-import { displayName } from "../../lib/contacts";
 import { TargetActivity } from "../shared/TargetActivity";
 import { LocationPicker } from "../shared/LocationPicker";
-import { activityTx } from "../../lib/activityLog";
 import { CheckoutDialog } from "./CheckoutDialog";
 import { MeterUpdateDialog } from "./MeterUpdateDialog";
+import {
+  moveAsset,
+  setAssetStatus,
+  useAsset,
+  useAssetStatusLog,
+  useCheckoutHistory,
+  useMaintenanceRules,
+  useMeterReadings,
+  type AssetRow,
+} from "../../data/assets";
+import { useLocations } from "../../data/locations";
+import { useReservationsForTarget } from "../../data/reservations";
+import { useAssetStatuses } from "../../data/lookups";
 
 // Assets — Asset Detail (see docs/pages/asset-detail.html).
 // Status history, meter history, read-only maintenance rules (edited in
@@ -26,26 +35,16 @@ export function AssetDetailPage() {
   const canManage = current.can("manage_assets");
   const [dialog, setDialog] = useState<"checkout" | "meter" | "status" | null>(null);
 
-  const { data } = db.useQuery(
-    assetId
-      ? {
-          assets: {
-            $: { where: { id: assetId } },
-            statusLog: { loggedBy: {} },
-            meterReadings: { loggedBy: {} },
-            checkouts: { person: {}, checkedOutBy: {} },
-            reservations: { contact: {} },
-            notes: { author: {} },
-            incidents: {},
-            tickets: {},
-            location: {},
-          },
-          locations: {},
-        }
-      : null,
-  );
-  const asset = data?.assets?.[0];
-  const locationOptions = [...(data?.locations ?? [])].sort((a, b) =>
+  const { asset } = useAsset(assetId);
+  const { data: allLocations } = useLocations();
+  const { data: statusLog } = useAssetStatusLog(assetId);
+  const { data: readings } = useMeterReadings(assetId);
+  const { data: checkouts } = useCheckoutHistory(assetId);
+  const { data: rules } = useMaintenanceRules(assetId);
+  const { data: reservations } = useReservationsForTarget("asset", assetId);
+  const { statuses } = useAssetStatuses();
+
+  const locationOptions = [...allLocations].sort((a, b) =>
     compareNames(a.name, b.name),
   );
 
@@ -57,61 +56,38 @@ export function AssetDetailPage() {
     );
   }
 
-  const byNewest = <T extends { timestamp?: string | number; timeOut?: string | number }>(
-    rows: T[],
-    key: "timestamp" | "timeOut",
-  ) =>
-    [...rows].sort(
-      (a, b) => new Date(b[key]!).getTime() - new Date(a[key]!).getTime(),
-    );
-
-  const statusLog = byNewest(asset.statusLog ?? [], "timestamp");
-  const readings = byNewest(asset.meterReadings ?? [], "timestamp");
-  const checkouts = byNewest(asset.checkouts ?? [], "timeOut");
-  const openCheckout = checkouts.find((c) => !c.timeIn);
-  const rules = asset.maintenanceRules ?? [];
+  // Each list is already newest-first from its own query; the open checkout is
+  // the one with no time_in.
+  const openCheckout = checkouts.find((c) => !c.time_in);
 
   const now = Date.now();
-  const upcoming = (asset.reservations ?? [])
+  const upcoming = reservations
     .filter(
       (r) =>
         r.status !== "cancelled" &&
         r.status !== "checked_out" &&
-        r.expectedCheckin &&
-        new Date(r.expectedCheckin).getTime() > now - 24 * 3600_000,
+        r.expected_checkin &&
+        new Date(r.expected_checkin).getTime() > now - 24 * 3600_000,
     )
     .sort(
       (a, b) =>
-        new Date(a.expectedCheckin!).getTime() - new Date(b.expectedCheckin!).getTime(),
+        new Date(a.expected_checkin!).getTime() -
+        new Date(b.expected_checkin!).getTime(),
     )[0];
+
+  const actorId = current.user?.id ?? null;
+  const assetLocation = asset.location_id
+    ? { id: asset.location_id, name: asset.location_name ?? "its location" }
+    : null;
 
   const reassignLocation = (locationId: string) => {
     if (!locationId) return;
     const to = locationOptions.find((l) => l.id === locationId);
-    void db.transact([
-      db.tx.assets[asset.id].link({ location: locationId }),
-      activityTx({
-        eventType: "asset.location_changed",
-        summary: `${asset.name} moved to ${to?.name ?? "another location"}`,
-        subjectType: "assets",
-        subjectId: asset.id,
-        actorId: current.user?.id,
-      }),
-    ]);
+    void moveAsset(asset, assetLocation, to ?? null, actorId);
   };
   const clearLocation = () => {
-    if (!asset.location) return;
-    const from = asset.location.name;
-    void db.transact([
-      db.tx.assets[asset.id].unlink({ location: asset.location.id }),
-      activityTx({
-        eventType: "asset.location_changed",
-        summary: `${asset.name} removed from ${from}`,
-        subjectType: "assets",
-        subjectId: asset.id,
-        actorId: current.user?.id,
-      }),
-    ]);
+    if (!assetLocation) return;
+    void moveAsset(asset, assetLocation, null, actorId);
   };
 
   const meter = meterSummary(asset);
@@ -134,7 +110,7 @@ export function AssetDetailPage() {
             <button type="button" className="btn btn-sm" onClick={() => setDialog("meter")}>
               Update meter
             </button>
-            {asset.checkoutable && (
+            {asset.checkoutable === 1 && (
               <button
                 type="button"
                 className="btn btn-sm btn-primary"
@@ -152,13 +128,13 @@ export function AssetDetailPage() {
           <div className="field">
             <span className="field-label">Current status</span>
             <div className="field-value row">
-              <span className={assetStatusBadgeClass(asset.currentStatus)}>
-                {asset.currentStatus ? statusLabel(asset.currentStatus) : "No status"}
+              <span className={assetStatusBadgeClass(asset.status_name)}>
+                {asset.status_name ?? "No status"}
               </span>
               {upcoming && (
                 <span className="badge badge-warn">
                   Upcoming reservation{" "}
-                  {new Date(upcoming.expectedCheckin!).toLocaleDateString(undefined, {
+                  {new Date(upcoming.expected_checkin!).toLocaleDateString(undefined, {
                     month: "short",
                     day: "numeric",
                   })}
@@ -170,8 +146,8 @@ export function AssetDetailPage() {
           <div className="field">
             <span className="field-label">Location</span>
             <div className="field-value row">
-              {asset.location ? (
-                <Link to={`/locations/${asset.location.id}`}>{asset.location.name}</Link>
+              {assetLocation ? (
+                <Link to={`/locations/${assetLocation.id}`}>{assetLocation.name}</Link>
               ) : (
                 <span className="muted">Unassigned</span>
               )}
@@ -186,7 +162,7 @@ export function AssetDetailPage() {
                       placeholder="Assign a location…"
                     />
                   </div>
-                  {asset.location && (
+                  {assetLocation && (
                     <button type="button" className="btn btn-sm btn-quiet" onClick={clearLocation}>
                       Unassign
                     </button>
@@ -196,16 +172,19 @@ export function AssetDetailPage() {
             </div>
           </div>
 
-          {asset.reservationEnabled && (
+          {asset.reservation_enabled === 1 && (
             <div className="field">
               <span className="field-label">Reservations</span>
               <div className="field-value small">
                 Enabled ·{" "}
-                {asset.reservationVisibility === "public"
+                {asset.reservation_visibility === "public"
                   ? "defaults to Billable"
                   : "defaults to Non-Billable"}
-                {asset.postReturnStatus &&
-                  ` · returns to ${statusLabel(asset.postReturnStatus)}`}{" "}
+                {asset.post_return_status_id &&
+                  ` · returns to ${
+                    statuses.find((st) => st.id === asset.post_return_status_id)?.name ??
+                    "its post-return status"
+                  }`}{" "}
                 <Link to="/reservations">View calendar</Link>
               </div>
             </div>
@@ -219,11 +198,11 @@ export function AssetDetailPage() {
               </span>
             ) : (
               <div className="stack" style={{ gap: 6 }}>
-                {rules.map((r, i) => (
-                  <div key={i} className="card small">
+                {rules.map((r) => (
+                  <div key={r.id} className="card small">
                     {r.label ??
                       (r.kind === "meter"
-                        ? `Every ${formatNumber(r.every)} ${meterUnit(asset.meterType)}`
+                        ? `Every ${formatNumber(r.every)} ${meterUnit(asset.meter_type)}`
                         : `Every ${formatNumber(r.every)} days`)}
                     <span className="muted"> · {r.kind === "meter" ? "meter-based" : "time-based"}</span>
                   </div>
@@ -245,11 +224,11 @@ export function AssetDetailPage() {
                     <span className="muted small">
                       {" "}
                       · {r.source === "checklist_item" ? "Checklist item" : "Manual"}
-                      {r.correctionReason ? ` · correction: ${r.correctionReason}` : ""}
+                      {r.correction_reason ? ` · correction: ${r.correction_reason}` : ""}
                     </span>
                   </span>
                   <span className="muted small">
-                    {r.loggedBy?.name ? `${r.loggedBy.name} · ` : ""}
+                    {r.logged_by_name ? `${r.logged_by_name} · ` : ""}
                     {new Date(r.timestamp).toLocaleDateString()}
                   </span>
                 </div>
@@ -266,13 +245,13 @@ export function AssetDetailPage() {
               {statusLog.slice(0, 8).map((s) => (
                 <div key={s.id} className="card spread">
                   <span>
-                    <span className={assetStatusBadgeClass(s.status)}>
-                      {statusLabel(s.status)}
+                    <span className={assetStatusBadgeClass(s.status_name)}>
+                      {s.status_name ?? "—"}
                     </span>
                     {s.note && <span className="muted small"> · {s.note}</span>}
                   </span>
                   <span className="muted small">
-                    {s.loggedBy?.name ? `${s.loggedBy.name} · ` : ""}
+                    {s.logged_by_name ? `${s.logged_by_name} · ` : ""}
                     {new Date(s.timestamp).toLocaleDateString()}
                   </span>
                 </div>
@@ -283,7 +262,7 @@ export function AssetDetailPage() {
             </div>
           </div>
 
-          {asset.checkoutable && (
+          {asset.checkoutable === 1 && (
             <div>
               <div className="section-title">Checkout log</div>
               <div className="stack" style={{ gap: 6 }}>
@@ -291,24 +270,24 @@ export function AssetDetailPage() {
                   <div className="card card-done spread">
                     <span>
                       <strong>Currently out</strong>
-                      {openCheckout.person && (
-                        <span> — {displayName(openCheckout.person)}</span>
+                      {openCheckout.person_name && (
+                        <span> — {openCheckout.person_name}</span>
                       )}
                     </span>
                     <span className="muted small">
-                      since {new Date(openCheckout.timeOut).toLocaleString()}
+                      since {new Date(openCheckout.time_out).toLocaleString()}
                     </span>
                   </div>
                 )}
                 {checkouts
-                  .filter((c) => c.timeIn)
+                  .filter((c) => c.time_in)
                   .slice(0, 6)
                   .map((c) => (
                     <div key={c.id} className="card spread">
-                      <span>{c.person ? displayName(c.person) : "—"}</span>
+                      <span>{c.person_name ?? "—"}</span>
                       <span className="muted small">
-                        {new Date(c.timeOut).toLocaleDateString()} –{" "}
-                        {new Date(c.timeIn!).toLocaleDateString()}
+                        {new Date(c.time_out).toLocaleDateString()} –{" "}
+                        {new Date(c.time_in!).toLocaleDateString()}
                       </span>
                     </div>
                   ))}
@@ -320,18 +299,13 @@ export function AssetDetailPage() {
           )}
         </div>
 
-        <TargetActivity
-          target={{ type: "asset", id: asset.id, label: asset.name }}
-          notes={asset.notes ?? []}
-          incidents={asset.incidents ?? []}
-          tickets={asset.tickets ?? []}
-        />
+        <TargetActivity target={{ type: "asset", id: asset.id, label: asset.name }} />
       </div>
 
       {dialog === "checkout" && (
         <CheckoutDialog
           asset={asset}
-          openCheckout={openCheckout}
+          openCheckout={openCheckout ?? null}
           onClose={() => setDialog(null)}
         />
       )}
@@ -345,35 +319,21 @@ export function AssetDetailPage() {
   );
 }
 
-function StatusDialog({
-  asset,
-  onClose,
-}: {
-  asset: { id: string; name: string; currentStatus?: string | null };
-  onClose: () => void;
-}) {
+function StatusDialog({ asset, onClose }: { asset: AssetRow; onClose: () => void }) {
   const current = useCurrent();
-  const [status, setStatus] = useState(asset.currentStatus ?? "available");
+  const { statuses } = useAssetStatuses();
+  const [statusId, setStatusId] = useState(asset.status_id ?? "");
   const [note, setNote] = useState("");
 
   const save = async () => {
-    await db.transact([
-      db.tx.assetStatusLogs[id()]
-        .update({ status, timestamp: Date.now(), note: note.trim() || undefined })
-        .link({
-          asset: asset.id,
-          ...(current.user ? { loggedBy: current.user.id } : {}),
-        }),
-      // currentStatus is the denormalized latest log value.
-      db.tx.assets[asset.id].update({ currentStatus: status }),
-      activityTx({
-        eventType: "asset.status_changed",
-        summary: `${asset.name} set to ${statusLabel(status)}${note.trim() ? ` — ${note.trim()}` : ""}`,
-        subjectType: "assets",
-        subjectId: asset.id,
-        actorId: current.user?.id,
-      }),
-    ]);
+    const status = statuses.find((s) => s.id === statusId);
+    if (!status) return;
+    await setAssetStatus(
+      asset,
+      status,
+      note.trim() || null,
+      current.user?.id ?? null,
+    );
     onClose();
   };
 
@@ -387,17 +347,21 @@ function StatusDialog({
           <span className="field-label">Status</span>
           <select
             className="select"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            value={statusId}
+            onChange={(e) => setStatusId(e.target.value)}
           >
-            {[
-              ...new Set([...COMMON_ASSET_STATUSES, asset.currentStatus ?? "available"]),
-            ].map((s) => (
-              <option key={s} value={s}>
-                {statusLabel(s)}
+            <option value="">Select…</option>
+            {statuses.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
               </option>
             ))}
           </select>
+          {statuses.length === 0 && (
+            <p className="muted small" style={{ marginTop: 4 }}>
+              No asset statuses defined yet — add them in Admin → Assets.
+            </p>
+          )}
         </div>
         <div className="field">
           <span className="field-label">Note (optional)</span>
@@ -409,7 +373,12 @@ function StatusDialog({
           />
         </div>
         <div className="row">
-          <button type="button" className="btn btn-primary" onClick={() => void save()}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!statusId}
+            onClick={() => void save()}
+          >
             Log status
           </button>
           <button type="button" className="btn btn-quiet" onClick={onClose}>
