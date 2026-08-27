@@ -151,6 +151,14 @@ Screenshots or it didn't happen.
 - **Don't trust a React error number second-hand.** #185 is "Maximum update
   depth exceeded"; #310 is the Rules-of-Hooks one. Get the real message —
   that's what `DEBUG_BUILD` in `vite.config.ts` is for — before theorizing.
+- **A sync error is not an `Error`.** PowerSync raises them inside a Web
+  Worker, so they reach the main thread by structured clone: `name`, `message`
+  and `stack` survive, the prototype does not. `err instanceof Error` is false
+  and `String(err)` is `"[object Object]"`. This already bit once — a
+  PSYNC_S2105 rejection was recorded as "[object Object]", failed the
+  is-this-a-refusal test, and left the app advising the user to find signal
+  while the console said exactly what was wrong. Read `.message` off the
+  object; never narrow on the prototype.
 - **The auth trap survives the migration, in a new place.** Instant fails
   the Clerk token exchange on an unallowlisted browser origin. Supabase's
   equivalent is the third-party auth provider config: without it every policy

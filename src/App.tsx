@@ -185,19 +185,23 @@ function ProvisionGate() {
 
   if (current.isLoading) return <Splash />;
 
+  // A recorded REFUSAL outranks everything below it, and this ordering is the
+  // whole point of the screen. A rejected token means the device never
+  // connects, so it also never syncs — which makes every other diagnosis here
+  // true at the same time and all of them wrong. Told "find signal", someone
+  // walks outside; told "ask a manager", they ask about an account that is
+  // fine. Only this screen names the thing that is actually broken.
+  //
+  // Verified against the real failure: with no `aud` claim on the Clerk token,
+  // PowerSync answers PSYNC_S2105 and this is the screen that appears.
+  if (syncAuthError) return <SyncAuthErrorScreen message={syncAuthError} />;
+
   // A device that has never synced holds nothing, so it cannot tell an
   // unprovisioned account from an unsynced one — and the two need opposite
   // advice. Checked before `unprovisioned` because both are true here.
   if (current.needsFirstSync) return <FirstSyncScreen />;
 
   if (current.unprovisioned) {
-    // An empty user query means nothing when the connection itself was
-    // refused — nothing has synced, so every table is empty and the permission
-    // rules are (correctly) denying every direct read. Showing the account
-    // message for that sent a whole debugging session down the wrong road.
-    if (syncAuthError) {
-      return <SyncAuthErrorScreen message={syncAuthError} />;
-    }
     // A Clerk identity with no marina User can't author a check-in, and a
     // guard who just scanned a tag needs to know the scan didn't record —
     // not just that sign-in failed.
