@@ -16,28 +16,31 @@ import { groupByLocation } from "../../lib/checkpoints";
 export type TourCheckpoint = {
   id: string;
   name: string;
-  location?: { id: string; name: string } | null;
+  location_id?: string | null;
+  location_name?: string | null;
+  /** Its place in the tour. Ordering is a column now, not a json array. */
+  position?: number;
 };
 
 export type TourRow = {
   id: string;
   name: string;
   mode: string;
-  checkpointOrder?: string[] | null;
-  checkpoints?: TourCheckpoint[];
 };
 
 export function TourSection({
   tour,
+  checkpoints,
   shiftId,
   visitedIds,
 }: {
   tour: TourRow;
+  /** Already in tour order — tour_checkpoints.position, not a stored array. */
+  checkpoints: TourCheckpoint[];
   /** Absent when no shift is active — steps still show, progress doesn't. */
   shiftId: string | undefined;
   visitedIds: Set<string>;
 }) {
-  const checkpoints = tour.checkpoints ?? [];
   const visited = shiftId ? checkpoints.filter((c) => visitedIds.has(c.id)) : [];
   const remaining = shiftId
     ? checkpoints.filter((c) => !visitedIds.has(c.id))
@@ -70,7 +73,6 @@ export function TourSection({
       {tour.mode === "linear" && (
         <LinearRemaining
           checkpoints={checkpoints}
-          order={tour.checkpointOrder ?? []}
           visitedIds={shiftId ? visitedIds : new Set()}
         />
       )}
@@ -132,16 +134,14 @@ function modeLabel(mode: string): string {
 // rows aren't shown here at all; they live in the shared collapsed section.
 function LinearRemaining({
   checkpoints,
-  order,
   visitedIds,
 }: {
   checkpoints: TourCheckpoint[];
-  order: string[];
   visitedIds: Set<string>;
 }) {
   const byId = new Map(checkpoints.map((c) => [c.id, c]));
-  const ids = order.length > 0 ? order : checkpoints.map((c) => c.id);
-  const remainingIds = ids.filter((cpId) => byId.has(cpId) && !visitedIds.has(cpId));
+  const ids = checkpoints.map((c) => c.id);
+  const remainingIds = ids.filter((cpId) => !visitedIds.has(cpId));
 
   if (remainingIds.length === 0) {
     return (
@@ -167,8 +167,8 @@ function LinearRemaining({
         <div className="card-title" style={{ fontSize: "1.2rem" }}>
           {next.name}
         </div>
-        {next.location?.name && (
-          <div className="muted small">{next.location.name}</div>
+        {next.location_name && (
+          <div className="muted small">{next.location_name}</div>
         )}
       </Link>
 
@@ -186,8 +186,8 @@ function LinearRemaining({
                 <span className="small">
                   <span className="muted">{ids.indexOf(cpId) + 1}. </span>
                   {cp.name}
-                  {cp.location?.name && (
-                    <span className="muted"> · {cp.location.name}</span>
+                  {cp.location_name && (
+                    <span className="muted"> · {cp.location_name}</span>
                   )}
                 </span>
               </Link>
@@ -306,8 +306,8 @@ function RandomizedNext({
       >
         <div className="card-meta">NEXT CHECKPOINT</div>
         <div className="card-title" style={{ fontSize: "1.2rem" }}>{next.name}</div>
-        {next.location?.name && (
-          <div className="muted small">{next.location.name}</div>
+        {next.location_name && (
+          <div className="muted small">{next.location_name}</div>
         )}
       </Link>
       <p className="muted small" style={{ marginTop: 6 }}>

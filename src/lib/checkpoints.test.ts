@@ -7,8 +7,8 @@ describe("locationPathResolver", () => {
     // This is what disambiguates the "Gate" that exists on every dock.
     const path = locationPathResolver([
       aLocation({ id: "m", name: "Marina" }),
-      aLocation({ id: "b", name: "Boathouses", parent: { id: "m" } }),
-      aLocation({ id: "bh30", name: "BH30", parent: { id: "b" } }),
+      aLocation({ id: "b", name: "Boathouses", parent_id: "m" }),
+      aLocation({ id: "bh30", name: "BH30", parent_id: "b" }),
     ]);
     expect(path("bh30")).toBe("Marina → Boathouses → BH30");
   });
@@ -19,8 +19,8 @@ describe("locationPathResolver", () => {
 
   it("terminates on a parent cycle", () => {
     const path = locationPathResolver([
-      aLocation({ id: "a", name: "A", parent: { id: "b" } }),
-      aLocation({ id: "b", name: "B", parent: { id: "a" } }),
+      aLocation({ id: "a", name: "A", parent_id: "b" }),
+      aLocation({ id: "b", name: "B", parent_id: "a" }),
     ]);
     expect(typeof path("a")).toBe("string");
   });
@@ -40,8 +40,8 @@ describe("groupByLocation", () => {
   it("puts unlocated checkpoints last, under an explicit label", () => {
     // They're a defect to fix rather than a place to look.
     const groups = groupByLocation([
-      aCheckpoint({ id: "orphan", name: "Back Door", location: null }),
-      aCheckpoint({ id: "c1", name: "Gate", location: { id: "d", name: "Dock C" } }),
+      aCheckpoint({ id: "orphan", name: "Back Door", location_id: null }),
+      aCheckpoint({ id: "c1", name: "Gate", location_id: "d", location_name: "Dock C" }),
     ]);
     expect(groups.map((g) => g.label)).toEqual(["Dock C", NO_LOCATION_LABEL]);
   });
@@ -49,10 +49,10 @@ describe("groupByLocation", () => {
   it("labels groups with the full path when a resolver is supplied", () => {
     const path = locationPathResolver([
       aLocation({ id: "m", name: "Marina" }),
-      aLocation({ id: "d", name: "Dock C", parent: { id: "m" } }),
+      aLocation({ id: "d", name: "Dock C", parent_id: "m" }),
     ]);
     const groups = groupByLocation(
-      [aCheckpoint({ id: "c1", name: "Gate", location: { id: "d", name: "Dock C" } })],
+      [aCheckpoint({ id: "c1", name: "Gate", location_id: "d", location_name: "Dock C" })],
       path,
     );
     expect(groups[0].label).toBe("Marina → Dock C");

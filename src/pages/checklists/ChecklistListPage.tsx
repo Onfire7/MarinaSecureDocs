@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { activityTx } from "../../lib/activityLog";
-import { deterministicId } from "../../lib/detId";
 import { eligibleToday, isVisibleNow, triggerTypeLabel } from "../../lib/checklists";
 import {
-  buildInstanceTx,
+  createInstanceFromTemplate,
   hasWorkAtCreation,
-  TEMPLATE_INSTANTIATION_QUERY,
-} from "../../lib/checklistInstantiation";
+  recurringInstanceId,
+  useExistingInstanceIds,
+  useInstantiableTemplates,
+  useMonitoredChecklists,
+  useMyChecklists,
+} from "../../data/checklists";
+import { useRoleIdsFor } from "../../data/users";
+import { useTours, useTourCheckpoints } from "../../data/checkpoints";
 import { ManualCheckinDialog } from "./ManualCheckinDialog";
 import { TourSection } from "./TourSection";
 import { useShiftVisits } from "./useShiftVisits";
@@ -45,20 +48,15 @@ export function ChecklistListPage() {
   const [nothingToStart, setNothingToStart] = useState<string | null>(null);
   const [manualTemplateId, setManualTemplateId] = useState("");
 
-  const roleIds = (current.user?.roles ?? []).map((r) => r.id);
+  const roleIds = useRoleIdsFor(userId);
 
   // Manual templates feed the Start button; recurring ones feed the
   // auto-create effect below. Both need the full instantiation shape.
-  const { data: templateData } = db.useQuery({
-    checklistTemplates: {
-      $: { where: { triggerType: { $in: ["manual", "recurring"] } } },
-      ...TEMPLATE_INSTANTIATION_QUERY,
-    },
-  });
-  const myTemplates = (templateData?.checklistTemplates ?? []).filter(
-    (t) => t.assignedRole && roleIds.includes(t.assignedRole.id),
+  const templates = useInstantiableTemplates(["manual", "recurring"]);
+  const myTemplates = templates.filter(
+    (t) => t.assigned_role_id && roleIds.includes(t.assigned_role_id),
   );
-  const manualTemplates = myTemplates.filter((t) => t.triggerType === "manual");
+  const manualTemplates = myTemplates.filter((t) => t.trigger_type === "manual");
 
   const startChecklist = async (template: (typeof manualTemplates)[number]) => {
     if (!userId || starting) return;
@@ -70,17 +68,11 @@ export function ChecklistListPage() {
     }
     setNothingToStart(null);
     setStarting(template.id);
-    const instanceId = id();
-    await db.transact([
-      ...buildInstanceTx({ template, instanceId, userId }),
-      activityTx({
-        eventType: "checklist.started",
-        summary: `${template.name} started manually by ${current.user?.name ?? "a user"}`,
-        subjectType: "checklistInstances",
-        subjectId: instanceId,
-        actorId: userId,
-      }),
-    ]);
+    const instanceId = await createInstanceFromTemplate({
+      template,
+      userId,
+      reason: `${current.user?.name ?? "a user"} starting it manually`,
+    });
     setStarting(null);
     navigate(`/checklists/${instanceId}`);
   };
@@ -91,133 +83,56 @@ export function ChecklistListPage() {
   // to the day this page mounted — a client left open across midnight picks
   // the new day up on its next visit here, which is fine: creation is
   // usage-driven by design.
-  const [today] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-      d.getDate(),
-    ).padStart(2, "0")}`;
-  });
+  const [today] = useState(() => new Date());
   const dueToday = myTemplates.filter(
-    (t) => t.triggerType === "recurring" && eligibleToday(t) && hasWorkAtCreation(t),
+    (t) => t.trigger_type === "recurring" && eligibleToday(t, today) && hasWorkAtCreation(t, today),
   );
-  const expectedRecurringIds = dueToday.map((t) =>
-    deterministicId(`recurring:${t.id}:${today}`),
-  );
-  const { data: existingRecurringData } = db.useQuery(
-    expectedRecurringIds.length > 0
-      ? {
-          checklistInstances: {
-            $: { where: { id: { $in: expectedRecurringIds } } },
-          },
-        }
-      : null,
+  const existingRecurring = useExistingInstanceIds(
+    dueToday.map((t) => recurringInstanceId(t.id, today)),
   );
   const creatingRecurring = useRef(false);
   useEffect(() => {
     if (!userId || creatingRecurring.current) return;
-    if (dueToday.length === 0 || !existingRecurringData) return;
-    const existing = new Set(
-      (existingRecurringData.checklistInstances ?? []).map((c) => c.id),
-    );
     const missing = dueToday.filter(
-      (t) => !existing.has(deterministicId(`recurring:${t.id}:${today}`)),
+      (t) => !existingRecurring.has(recurringInstanceId(t.id, today)),
     );
     if (missing.length === 0) return;
     creatingRecurring.current = true;
-    void db
-      .transact(
-        missing.flatMap((t) => {
-          const instanceId = deterministicId(`recurring:${t.id}:${today}`);
-          return [
-            ...buildInstanceTx({ template: t, instanceId, userId }),
-            activityTx({
-              eventType: "checklist.created",
-              summary: `${t.name} created on its recurring schedule`,
-              subjectType: "checklistInstances",
-              subjectId: instanceId,
-              actorId: userId,
-            }),
-          ];
+    void Promise.all(
+      missing.map((t) =>
+        createInstanceFromTemplate({
+          template: t,
+          userId,
+          instanceId: recurringInstanceId(t.id, today),
+          reason: "its recurring schedule",
+          now: today,
         }),
-      )
-      .catch(console.error);
-  }, [userId, dueToday, existingRecurringData, today]);
+      ),
+    ).catch(console.error);
+  }, [userId, dueToday, existingRecurring, today]);
 
-  const { data: mineData } = db.useQuery(
-    userId
-      ? {
-          checklistInstances: {
-            $: {
-              where: {
-                "assignedTo.id": userId,
-                parentItem: { $isNull: true },
-              },
-            },
-            template: {},
-          },
-        }
-      : null,
-  );
-  const { data: unclaimedData } = db.useQuery(
-    roleIds.length > 0
-      ? {
-          checklistInstances: {
-            $: {
-              where: {
-                assignedTo: { $isNull: true },
-                status: { $in: ["not_started", "in_progress"] },
-                "template.assignedRole.id": { $in: roleIds },
-                parentItem: { $isNull: true },
-              },
-            },
-            template: {},
-          },
-        }
-      : null,
-  );
-  // Read-only monitoring: instances of templates whose viewerRoles include
-  // one of mine but whose assignedRole doesn't — e.g. the office watching
+  const { data: mine } = useMyChecklists(userId, roleIds);
+  const { data: monitored } = useMonitoredChecklists(roleIds);
+
+  const checklists = mine;
+
+  // Read-only monitoring: instances of templates whose viewer roles include one
+  // of mine but whose assigned role doesn't — e.g. the office watching
   // maintenance work through. Client-side only until the perms overhaul.
-  const { data: viewerData } = db.useQuery(
-    roleIds.length > 0
-      ? {
-          checklistInstances: {
-            $: {
-              where: {
-                "template.viewerRoles.id": { $in: roleIds },
-                status: { $in: ["not_started", "in_progress"] },
-                parentItem: { $isNull: true },
-              },
-            },
-            template: { assignedRole: {} },
-            assignedTo: {},
-          },
-        }
-      : null,
-  );
-
-  const checklists = useMemo(() => {
-    const mine = mineData?.checklistInstances ?? [];
-    const unclaimed = unclaimedData?.checklistInstances ?? [];
-    const seen = new Set(mine.map((c) => c.id));
-    return [...mine, ...unclaimed.filter((c) => !seen.has(c.id))];
-  }, [mineData, unclaimedData]);
-
   const monitoring = useMemo(() => {
     const actionable = new Set(checklists.map((c) => c.id));
-    return (viewerData?.checklistInstances ?? []).filter(
+    return monitored.filter(
       (c) =>
         !actionable.has(c.id) &&
-        !(c.template?.assignedRole && roleIds.includes(c.template.assignedRole.id)) &&
+        !(c.assigned_role_id && roleIds.includes(c.assigned_role_id)) &&
         isVisibleNow(c),
     );
-    // roleIds is rebuilt per render but stable in value; the memo exists for
-    // the Set, not referential purity.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewerData, checklists]);
+  }, [monitored, checklists, roleIds]);
 
+  // The template's trigger is joined onto the instance for this label alone;
+  // nothing on an instance records how it came to exist.
   const triggerLabel = (c: (typeof checklists)[number]) =>
-    triggerTypeLabel(c.template?.triggerType);
+    triggerTypeLabel(templates.find((t) => t.id === c.template_id)?.trigger_type);
 
   // In-progress outranks not-started: half-done work goes stale in a way
   // unstarted work doesn't. Instances still inside their hideUntil are
@@ -229,7 +144,7 @@ export function ChecklistListPage() {
       const rank = (s: string) => (s === "in_progress" ? 0 : 1);
       const r = rank(a.status) - rank(b.status);
       if (r !== 0) return r;
-      return (b.startedAt ?? 0) > (a.startedAt ?? 0) ? 1 : -1;
+      return (b.started_at ?? "") > (a.started_at ?? "") ? 1 : -1;
     });
 
   // Backgrounded, not hidden — enough to confirm "yes, that one went
@@ -238,7 +153,7 @@ export function ChecklistListPage() {
   const RECENT_COMPLETED = 15;
   const completed = checklists
     .filter((c) => c.status === "complete")
-    .sort((a, b) => ((b.completedAt ?? 0) > (a.completedAt ?? 0) ? 1 : -1))
+    .sort((a, b) => ((b.completed_at ?? "") > (a.completed_at ?? "") ? 1 : -1))
     .slice(0, RECENT_COMPLETED);
 
   const when = (ts: string | number | null | undefined) =>
@@ -312,11 +227,13 @@ export function ChecklistListPage() {
                   style={{ textDecoration: "none", color: "inherit" }}
                 >
                   <span style={{ minWidth: 0 }}>
-                    <span className="card-title">{c.template?.name ?? "Checklist"}</span>
+                    <span className="card-title">
+                      {c.template_name ?? "Checklist"}
+                    </span>
                     <span className="card-meta" style={{ display: "block" }}>
                       {triggerLabel(c)}
-                      {c.startedAt && ` · started ${when(c.startedAt)}`}
-                      {c.dueBy && ` · due ${when(c.dueBy)}`}
+                      {c.started_at && ` · started ${when(c.started_at)}`}
+                      {c.due_by && ` · due ${when(c.due_by)}`}
                     </span>
                   </span>
                   <span
@@ -352,11 +269,10 @@ export function ChecklistListPage() {
                       style={{ textDecoration: "none", padding: "4px 0" }}
                     >
                       <span className="small" style={{ minWidth: 0 }}>
-                        {c.template?.name ?? "Checklist"}
+                        {c.template_name ?? "Checklist"}
                         <span className="muted">
                           {" · "}
-                          {c.assignedTo?.name ??
-                            c.template?.assignedRole?.name ??
+                          {c.assignee_name ??
                             "unclaimed"}
                         </span>
                       </span>
@@ -400,10 +316,10 @@ export function ChecklistListPage() {
                 style={{ textDecoration: "none", padding: "4px 0" }}
               >
                 <span className="small" style={{ minWidth: 0 }}>
-                  {c.template?.name ?? "Checklist"}
+                  {c.template_name ?? "Checklist"}
                   <span className="muted"> · {triggerLabel(c)}</span>
                 </span>
-                <span className="small muted">{when(c.completedAt) ?? "✓"}</span>
+                <span className="small muted">{when(c.completed_at) ?? "✓"}</span>
               </Link>
             ))}
           </div>
@@ -424,16 +340,15 @@ export function ChecklistListPage() {
 // and its steps belong on the same page as the checklists that trigger at
 // its checkpoints. Tours with work left sort above finished ones.
 function ToursInline() {
-  const { data } = db.useQuery({
-    tours: { checkpoints: { location: {} } },
-  });
+  const { data: tours } = useTours();
+  const { data: tourCheckpoints } = useTourCheckpoints();
   const { activeShift, visitedIds } = useShiftVisits();
-  const tours = data?.tours ?? [];
   if (tours.length === 0) return null;
 
   const ranked = [...tours].sort((a, b) => {
     const rem = (t: (typeof tours)[number]) =>
-      (t.checkpoints ?? []).filter((c) => !visitedIds.has(c.id)).length;
+      tourCheckpoints.filter((c) => c.tour_id === t.id && !visitedIds.has(c.id))
+        .length;
     return (
       (rem(a) === 0 ? 1 : 0) - (rem(b) === 0 ? 1 : 0) ||
       a.name.localeCompare(b.name)
@@ -452,6 +367,7 @@ function ToursInline() {
         <TourSection
           key={t.id}
           tour={t}
+          checkpoints={tourCheckpoints.filter((c) => c.tour_id === t.id)}
           shiftId={activeShift?.id}
           visitedIds={visitedIds}
         />

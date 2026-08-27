@@ -209,6 +209,58 @@ export function useInstances() {
   );
 }
 
+/**
+ * The checklists on a guard's own queue: assigned to them, or unclaimed and
+ * belonging to one of their roles.
+ *
+ * `parent_item_id IS NULL` excludes nested location-check sub-checklists —
+ * those belong to the item that spawned them, not to the queue.
+ */
+export function useMyChecklists(userId: string | undefined, roleIds: string[]) {
+  const placeholders = roleIds.map(() => "?").join(", ");
+  return useQuery<InstanceRow>(
+    `${INSTANCE_SELECT}
+      WHERE i.parent_item_id IS NULL
+        AND (
+          i.assigned_to_id = ?
+          OR (i.assigned_to_id IS NULL
+              AND i.status IN ('not_started', 'in_progress')
+              ${roleIds.length ? `AND t.assigned_role_id IN (${placeholders})` : "AND 0"})
+        )`,
+    [userId ?? "", ...roleIds],
+  );
+}
+
+/**
+ * Open checklists a role of mine may WATCH but not work — the office seeing
+ * maintenance through. Client-side only until the permissions overhaul.
+ */
+export function useMonitoredChecklists(roleIds: string[]) {
+  const placeholders = roleIds.map(() => "?").join(", ");
+  return useQuery<InstanceRow>(
+    roleIds.length
+      ? `${INSTANCE_SELECT}
+           JOIN template_viewer_roles vr ON vr.template_id = i.template_id
+          WHERE i.parent_item_id IS NULL
+            AND i.status IN ('not_started', 'in_progress')
+            AND vr.role_id IN (${placeholders})`
+      : `${INSTANCE_SELECT} WHERE 0`,
+    roleIds,
+  );
+}
+
+/** Which of these ids already exist — the recurring auto-create check. */
+export function useExistingInstanceIds(ids: string[]) {
+  const placeholders = ids.map(() => "?").join(", ");
+  const { data } = useQuery<{ id: string }>(
+    ids.length
+      ? `SELECT id FROM checklist_instances WHERE id IN (${placeholders})`
+      : "SELECT id FROM checklist_instances WHERE 0",
+    ids,
+  );
+  return new Set(data.map((r) => r.id));
+}
+
 export function useInstance(instanceId: string | undefined) {
   const { data, isLoading } = useQuery<InstanceRow>(
     `${INSTANCE_SELECT} WHERE i.id = ?`,

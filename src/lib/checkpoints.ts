@@ -10,13 +10,14 @@
 export interface LocationNode {
   id: string;
   name: string;
-  parent?: { id: string } | null;
+  parent_id?: string | null;
 }
 
 export interface CheckpointLike {
   id: string;
   name: string;
-  location?: { id: string; name: string } | null;
+  location_id?: string | null;
+  location_name?: string | null;
 }
 
 export const NO_LOCATION_LABEL = "No location";
@@ -36,7 +37,7 @@ export function locationPathResolver(
     if (cached != null) return cached;
     const l = byId.get(locationId);
     if (!l) return "";
-    const parentId = l.parent?.id;
+    const parentId = l.parent_id;
     const prefix = parentId && depth < 30 ? resolve(parentId, depth + 1) : "";
     const full = prefix ? `${prefix} → ${l.name}` : l.name;
     cache.set(locationId, full);
@@ -65,13 +66,13 @@ export function groupByLocation<T extends CheckpointLike>(
 ): CheckpointGroup<T>[] {
   const groups = new Map<string, CheckpointGroup<T>>();
   for (const cp of checkpoints) {
-    const locationId = cp.location?.id ?? "";
+    const locationId = cp.location_id ?? "";
     let g = groups.get(locationId);
     if (!g) {
       g = {
         locationId,
-        label: cp.location
-          ? (pathOf?.(cp.location.id) || cp.location.name)
+        label: locationId
+          ? pathOf?.(locationId) || (cp.location_name ?? NO_LOCATION_LABEL)
           : NO_LOCATION_LABEL,
         items: [],
       };

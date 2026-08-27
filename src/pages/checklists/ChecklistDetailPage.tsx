@@ -1,7 +1,13 @@
 import { Fragment, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { db } from "../../lib/db";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import {
+  itemResult,
+  useInstance,
+  useInstanceItems,
+  useInstanceSections,
+  type InstanceItemRow,
+} from "../../data/checklists";
 import {
   doorCheckSummary,
   questionAnswerSummary,
@@ -20,21 +26,9 @@ export function ChecklistDetailPage() {
   const { id: checklistId } = useParams();
   const isMobile = useIsMobile();
 
-  const { data } = db.useQuery(
-    checklistId
-      ? {
-          checklistInstances: {
-            $: { where: { id: checklistId } },
-            template: {},
-            sections: {
-              items: { template: {}, linkedTicket: {}, completedBy: {} },
-            },
-            assignedTo: {},
-          },
-        }
-      : null,
-  );
-  const checklist = data?.checklistInstances?.[0];
+  const { instance: checklist } = useInstance(checklistId);
+  const { data: sectionRows } = useInstanceSections(checklistId);
+  const { data: itemRows } = useInstanceItems(checklistId);
 
   if (!checklist) {
     return (
@@ -44,12 +38,12 @@ export function ChecklistDetailPage() {
     );
   }
 
-  const byOrder = (a: { order: number }, b: { order: number }) => a.order - b.order;
-  const sections = (checklist.sections ?? [])
-    .slice()
-    .sort(byOrder)
-    .map((s) => ({ ...s, items: (s.items ?? []).slice().sort(byOrder) }));
-  const items = sections.flatMap((s) => s.items);
+  // Both arrive ordered from their own queries.
+  const sections = sectionRows.map((s) => ({
+    ...s,
+    items: itemRows.filter((i) => i.section_id === s.id),
+  }));
+  const items = itemRows;
   const showSectionHeadings = sections.length > 1;
 
   const timeOf = (ts: number | string | null | undefined) =>
@@ -65,14 +59,14 @@ export function ChecklistDetailPage() {
   return (
     <div>
       <div className="page-head">
-        <h1 className="page-title">{checklist.template?.name ?? "Checklist"}</h1>
+        <h1 className="page-title">{checklist.template_name ?? "Checklist"}</h1>
       </div>
 
       <div className="field">
         <span className="field-label">Assigned to / completed</span>
         <div className="field-value">
-          {checklist.assignedTo?.name ?? "—"}
-          {checklist.completedAt ? ` · ${timeOf(checklist.completedAt)}` : ""}
+          {checklist.assignee_name ?? "—"}
+          {checklist.completed_at ? ` · ${timeOf(checklist.completed_at)}` : ""}
         </div>
       </div>
 
@@ -118,20 +112,20 @@ export function ChecklistDetailPage() {
                 )}
                 {section.items.map((item) => (
                   <tr key={item.id}>
-                    <td>{item.template?.label ?? "—"}</td>
-                    <td>{item.template ? itemTypeLabel(item.template.type) : "—"}</td>
+                    <td>{item.label ?? "—"}</td>
+                    <td>{itemTypeLabel(item.type)}</td>
                     <td>
                       <ResultSummary
-                        type={item.template?.type ?? ""}
-                        result={item.result as ItemResult | undefined}
+                        type={item.type}
+                        result={itemResult(item) ?? undefined}
                       />
                     </td>
                     <td className="small">
-                      {item.completedAt ? (
+                      {item.completed_at ? (
                         <>
-                          {timeOf(item.completedAt)}
-                          {item.completedBy && (
-                            <span className="muted"> · {item.completedBy.name}</span>
+                          {timeOf(item.completed_at)}
+                          {item.completed_by_name && (
+                            <span className="muted"> · {item.completed_by_name}</span>
                           )}
                         </>
                       ) : (
@@ -139,13 +133,7 @@ export function ChecklistDetailPage() {
                       )}
                     </td>
                     <td>
-                      {item.linkedTicket ? (
-                        <Link to={`/tickets/${item.linkedTicket.id}`}>
-                          {item.linkedTicket.title}
-                        </Link>
-                      ) : (
-                        "—"
-                      )}
+                      <LinkedTicket item={item} />
                     </td>
                   </tr>
                 ))}
@@ -171,7 +159,7 @@ export function ChecklistDetailPage() {
 function SectionCompletion({
   items,
 }: {
-  items: { completedAt?: number | string | null }[];
+  items: { completed_at?: number | string | null }[];
 }) {
   const done = sectionCompletionTime(items);
   if (done == null) return null;
@@ -186,43 +174,30 @@ function SectionCompletion({
   );
 }
 
-interface ItemRowLike {
-  id: string;
-  result?: unknown;
-  completedAt?: number | string | null;
-  completedBy?: { name: string } | null;
-  linkedTicket?: { id: string; title: string } | null;
-  template?: { type: string; label: string } | null;
-}
-
-function ResultCard({ item }: { item: ItemRowLike }) {
-  const type = item.template?.type ?? "";
+function ResultCard({ item }: { item: InstanceItemRow }) {
+  const type = item.type;
   return (
     <div className="card">
       <div className="badge">{itemTypeLabel(type)}</div>
-      <div className="card-title">{item.template?.label ?? "—"}</div>
+      <div className="card-title">{item.label ?? "—"}</div>
       <div className="card-meta">
-        <ResultSummary type={type} result={item.result as ItemResult | undefined} />
-        {item.completedAt && (
+        <ResultSummary type={type} result={itemResult(item) ?? undefined} />
+        {item.completed_at && (
           <span className="muted">
             {" · "}
-            {new Date(item.completedAt).toLocaleTimeString(undefined, {
+            {new Date(item.completed_at).toLocaleTimeString(undefined, {
               hour: "numeric",
               minute: "2-digit",
             })}
-            {item.completedBy ? ` by ${item.completedBy.name}` : ""}
+            {item.completed_by_name ? ` by ${item.completed_by_name}` : ""}
           </span>
         )}
       </div>
-      {item.linkedTicket && (
-        <div style={{ marginTop: 6 }}>
-          <Link to={`/tickets/${item.linkedTicket.id}`}>{item.linkedTicket.title}</Link>
-        </div>
-      )}
-      {type === "location_check" && item.result != null && (
-        <NestedChecklistSummary
-          nestedChecklistId={(item.result as { nestedChecklistId: string }).nestedChecklistId}
-        />
+      <div style={{ marginTop: 6 }}>
+        <LinkedTicket item={item} />
+      </div>
+      {type === "location_check" && nestedIdOf(item) && (
+        <NestedChecklistSummary nestedChecklistId={nestedIdOf(item)!} />
       )}
     </div>
   );
@@ -283,36 +258,26 @@ function ResultSummary({ type, result }: { type: string; result: ItemResult | un
 }
 
 function NestedChecklistStatus({ nestedChecklistId }: { nestedChecklistId: string }) {
-  const { data } = db.useQuery({
-    checklistInstances: { $: { where: { id: nestedChecklistId } } },
-  });
-  const status = data?.checklistInstances?.[0]?.status;
-  return <span>Nested checklist {status === "complete" ? "complete" : (status ?? "…").replace("_", " ")}</span>;
+  const { instance } = useInstance(nestedChecklistId);
+  const status = instance?.status;
+  return (
+    <span>
+      Nested checklist{" "}
+      {status === "complete" ? "complete" : (status ?? "…").replace("_", " ")}
+    </span>
+  );
 }
 
 function NestedChecklistSummary({ nestedChecklistId }: { nestedChecklistId: string }) {
   const [expanded, setExpanded] = useState(false);
-  const { data } = db.useQuery({
-    checklistInstances: {
-      $: { where: { id: nestedChecklistId } },
-      template: {},
-      sections: {
-        items: { template: {}, linkedTicket: {}, completedBy: {} },
-      },
-    },
-  });
-  const nested = data?.checklistInstances?.[0];
+  const { instance: nested } = useInstance(nestedChecklistId);
+  const { data: items } = useInstanceItems(nestedChecklistId);
   if (!nested) return null;
-  const byOrder = (a: { order: number }, b: { order: number }) => a.order - b.order;
-  const items = (nested.sections ?? [])
-    .slice()
-    .sort(byOrder)
-    .flatMap((s) => (s.items ?? []).slice().sort(byOrder));
 
   return (
     <div style={{ marginTop: 8 }}>
       <button type="button" className="btn btn-sm btn-quiet" onClick={() => setExpanded((e) => !e)}>
-        {expanded ? "Hide" : "Show"} nested checklist ({nested.template?.name})
+        {expanded ? "Hide" : "Show"} nested checklist ({nested.template_name})
       </button>
       {expanded && (
         <div className="stack" style={{ marginTop: 8 }}>
@@ -323,6 +288,32 @@ function NestedChecklistSummary({ nestedChecklistId }: { nestedChecklistId: stri
       )}
     </div>
   );
+}
+
+/**
+ * The ticket an item raised, if it raised one.
+ *
+ * Read out of the item's own result rather than from a column: the ticket's id
+ * was minted when the guard described the finding, and stored there so the
+ * result could reference a ticket that did not exist yet. There is no
+ * linked_ticket column, and adding one would duplicate a fact the result
+ * already holds.
+ */
+function LinkedTicket({ item }: { item: InstanceItemRow }) {
+  const result = itemResult(item);
+  const ticketId =
+    result && "pendingTicket" in result
+      ? (result as { pendingTicket?: { id: string; title: string } }).pendingTicket
+      : undefined;
+  if (!ticketId) return <>—</>;
+  return <Link to={`/tickets/${ticketId.id}`}>{ticketId.title}</Link>;
+}
+
+function nestedIdOf(item: InstanceItemRow): string | undefined {
+  const result = itemResult(item);
+  return result && "nestedChecklistId" in result
+    ? (result as { nestedChecklistId?: string }).nestedChecklistId
+    : undefined;
 }
 
 function capitalize(s: string): string {
