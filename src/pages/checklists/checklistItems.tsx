@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { deterministicId } from "../../lib/detId";
 import {
@@ -11,9 +10,18 @@ import {
   STATE_CHECK_KINDS,
 } from "../../lib/checklists";
 import {
-  buildInstanceTx,
-  TEMPLATE_INSTANTIATION_QUERY,
-} from "../../lib/checklistInstantiation";
+  completeItem,
+  createInstanceFromTemplate,
+  itemConfig,
+  itemResult,
+  useInstance,
+  useInstantiableTemplates,
+  type InstanceItemRow,
+} from "../../data/checklists";
+import { update } from "../../data/sql";
+import { db, id } from "../../lib/db";
+import { useLocation as useLocationRow } from "../../data/locations";
+import { useAssets } from "../../data/assets";
 import type {
   DoorCheckConfig,
   QuestionAnswerType,
@@ -28,29 +36,17 @@ import type {
   VerifyTaskConfig,
 } from "../../lib/checklists";
 
-/** The pinned template item behind a row: what the guard is being asked. */
-export interface ItemSpec {
-  id: string;
-  type: string;
-  label: string;
-  config?: Record<string, unknown> | null;
-}
-
-/** The materialized instance-item row being answered. */
-export interface InstanceItemRow {
-  id: string;
-  result?: Record<string, unknown> | null;
-  note?: string | null;
-  completedAt?: number | string | null;
-  completedBy?: { id: string } | null;
-}
-
+/**
+ * One item on a checklist someone is working.
+ *
+ * The question and the answer used to be two props — the pinned template item
+ * and the instance row — because they lived in two places. They are one row
+ * now: the instance item carries its template's type, label and config joined
+ * on, which is also what makes an answered item keep reading as it was asked
+ * after the template is edited.
+ */
 export interface ItemProps {
-  item: ItemSpec;
-  /** Always present now — instance items exist as rows from the moment
-   *  they're assigned. The name survives from when result rows were only
-   *  created on first answer. */
-  existing: InstanceItemRow;
+  item: InstanceItemRow;
   /** The parent checklist instance — nested sub-checklists hang off it. */
   checklistId: string;
   onSaved: (result: ItemResult, ticketId?: string) => void;
@@ -58,30 +54,18 @@ export interface ItemProps {
   editable?: boolean;
 }
 
-async function saveResult(row: InstanceItemRow, result: ItemResult, userId?: string) {
-  await db.transact(
-    db.tx.checklistInstanceItems[row.id]
-      .update({
-        result: result as unknown as Record<string, unknown>,
-        completedAt: Date.now(),
-      })
-      .link(userId ? { completedBy: userId } : {}),
-  );
+function saveResult(
+  row: InstanceItemRow,
+  result: ItemResult,
+  userId?: string,
+): Promise<void> {
+  return completeItem(row.id, result, row.note, userId ?? null);
 }
 
-async function clearResult(row: InstanceItemRow) {
-  // The row is the assignment, not the answer — clearing an answer resets
-  // its fields rather than deleting the row.
-  await db.transact([
-    db.tx.checklistInstanceItems[row.id].update({ result: null, completedAt: null }),
-    ...(row.completedBy
-      ? [
-          db.tx.checklistInstanceItems[row.id].unlink({
-            completedBy: row.completedBy.id,
-          }),
-        ]
-      : []),
-  ]);
+function clearResult(row: InstanceItemRow): Promise<void> {
+  // The row is the assignment, not the answer — clearing an answer resets its
+  // fields rather than deleting the row, and clears who gave it along with it.
+  return completeItem(row.id, null, row.note, null);
 }
 
 /**
@@ -139,15 +123,14 @@ function DoneCard({
 
 export function SimpleCheckItem({
   item,
-  existing,
   onSaved,
   editable = true,
 }: ItemProps) {
   const current = useCurrent();
-  const done = existing.result != null;
+  const done = itemResult(item) != null;
   const complete = async () => {
     const result: ItemResult = { type: "simple_check", completedAt: Date.now() };
-    await saveResult(existing, result, current.user?.id);
+    await saveResult(item, result, current.user?.id);
     onSaved(result);
   };
 
@@ -156,10 +139,10 @@ export function SimpleCheckItem({
       <DoneCard
         title={item.label}
         summary="✓ Complete"
-        at={existing.completedAt}
+        at={item.completed_at}
         // "Complete" is this item's only state, so editing it can only mean
         // undoing it — there's no form to reopen.
-        onEdit={editable ? () => void clearResult(existing) : undefined}
+        onEdit={editable ? () => void clearResult(item) : undefined}
       />
     );
   }
@@ -179,13 +162,12 @@ export function SimpleCheckItem({
 
 export function VerifyTaskItem({
   item,
-  existing,
   onSaved,
   editable = true,
 }: ItemProps) {
   const current = useCurrent();
-  const cfg = (item.config ?? {}) as unknown as VerifyTaskConfig;
-  const existingResult = existing.result as
+  const cfg = itemConfig(item) as VerifyTaskConfig;
+  const existingResult = itemResult(item) as
     | Extract<ItemResult, { type: "verify_task" }>
     | undefined;
   const [stage, setStage] = useState<"initial" | "attempt" | "reason">("initial");
@@ -217,7 +199,7 @@ export function VerifyTaskItem({
           }
         : {}),
     };
-    await saveResult(existing, result, current.user?.id);
+    await saveResult(item, result, current.user?.id);
     setEditing(false);
     setStage("initial");
     onSaved(result, ticketId);
@@ -233,7 +215,7 @@ export function VerifyTaskItem({
       <DoneCard
         title={item.label}
         summary={verifyOutcomeLabel(existingResult)}
-        at={existing.completedAt}
+        at={item.completed_at}
         onEdit={
           editable
             ? () => {
@@ -348,13 +330,12 @@ function verifyOutcomeLabel(r: Extract<ItemResult, { type: "verify_task" }>): st
 function StateCheckItem({
   kind,
   item,
-  existing,
   onSaved,
   editable = true,
 }: ItemProps & { kind: StateCheckType }) {
   const current = useCurrent();
   const spec = STATE_CHECK_KINDS[kind];
-  const cfg = (item.config ?? {}) as unknown as DoorCheckConfig;
+  const cfg = itemConfig(item) as DoorCheckConfig;
   // An item whose config was never opened in the template builder persists as
   // `{}`; fall back to the same default the builder displays rather than
   // crashing on an undefined state.
@@ -373,7 +354,7 @@ function StateCheckItem({
   // No found expectation means no found question, and so no found-state
   // incident — only the left state matters.
   const finalOnly = expectedState == null;
-  const existingResult = existing.result as DoorCheckResult | undefined;
+  const existingResult = itemResult(item) as DoorCheckResult | undefined;
 
   const [initialState, setInitialState] = useState<DoorState | null>(null);
   // Found in the expected state, now being asked what it's being left in —
@@ -393,10 +374,7 @@ function StateCheckItem({
   // the template builder, so the guard is never asked to choose one — that
   // question belongs to whoever authored the template, not to someone
   // standing at a door at 2am.
-  const { data: boundData } = db.useQuery(
-    cfg.locationId ? { locations: { $: { where: { id: cfg.locationId } } } } : null,
-  );
-  const boundLocation = boundData?.locations?.[0];
+  const { location: boundLocation } = useLocationRow(cfg.locationId);
 
   const beginMismatch = (found: DoorState) => {
     setInitialState(found);
@@ -429,7 +407,7 @@ function StateCheckItem({
       initialState: found,
       finalState: found,
     };
-    await saveResult(existing, result, current.user?.id);
+    await saveResult(item, result, current.user?.id);
     setEditing(false);
     setInitialState(null);
     onSaved(result);
@@ -487,7 +465,7 @@ function StateCheckItem({
             }
           : {}),
       };
-      await saveResult(existing, result, current.user?.id);
+      await saveResult(item, result, current.user?.id);
       setEditing(false);
       setInitialState(null);
       setPendingFinal(null);
@@ -537,7 +515,7 @@ function StateCheckItem({
             }
           : {}),
       };
-      await saveResult(existing, result, current.user?.id);
+      await saveResult(item, result, current.user?.id);
       setEditing(false);
       setPendingFinal(null);
       setFoundState(null);
@@ -563,7 +541,7 @@ function StateCheckItem({
         title={item.label}
         summary={doneSummaryText(s)}
         tone={s.leftAsExpected ? "done" : "plain"}
-        at={existing.completedAt}
+        at={item.completed_at}
         onEdit={
           editable
             ? () => {
@@ -818,59 +796,48 @@ function stateLabel(s: DoorState): string {
 
 // ---------------------------------------------------------------- Location-Based Check
 
-export function LocationCheckItem({ item, existing, checklistId, onSaved }: ItemProps) {
-  const cfg = (item.config ?? {}) as unknown as LocationCheckConfig;
-  const existingResult = existing.result as
+export function LocationCheckItem({ item, checklistId, onSaved }: ItemProps) {
+  const cfg = itemConfig(item) as LocationCheckConfig;
+  const existingResult = itemResult(item) as
     | Extract<ItemResult, { type: "location_check" }>
     | undefined;
   const navigate = useNavigate();
   const location = useLocation();
   const current = useCurrent();
 
-  const { data: nestedData } = db.useQuery(
-    existingResult
-      ? { checklistInstances: { $: { where: { id: existingResult.nestedChecklistId } } } }
-      : null,
-  );
-  const { data: locationData } = db.useQuery(
-    !existingResult ? { locations: { $: { where: { id: cfg.locationId } } } } : null,
-  );
+  const { instance: nested } = useInstance(existingResult?.nestedChecklistId);
+  const { location: scopeLocation } = useLocationRow(cfg.locationId);
   // The nested template in instantiable shape — its sections and items are
   // materialized as rows the moment the sub-checklist is created.
-  const { data: templateData } = db.useQuery(
-    !existingResult && cfg.templateId
-      ? {
-          checklistTemplates: {
-            $: { where: { id: cfg.templateId } },
-            ...TEMPLATE_INSTANTIATION_QUERY,
-          },
-        }
-      : null,
-  );
-  const template = templateData?.checklistTemplates?.[0];
-  const nested = nestedData?.checklistInstances?.[0];
-  const locationName = locationData?.locations?.[0]?.name;
+  const templates = useInstantiableTemplates([]);
+  const template = templates.find((t) => t.id === cfg.templateId);
+  const locationName = scopeLocation?.name;
   const nestedComplete = nested?.status === "complete";
 
   const open = async () => {
     let nestedId = existingResult?.nestedChecklistId;
     if (!nestedId) {
       if (!template || !current.user) return;
-      nestedId = deterministicId(`location-check:${checklistId}:${existing.id}`);
-      await db.transact([
-        ...buildInstanceTx({ template, instanceId: nestedId, userId: current.user.id }),
-        // Whoever opened it works it, whatever the template's assignment
-        // says — and parentItem keeps it out of the main checklist list.
-        db.tx.checklistInstances[nestedId].link({
-          assignedTo: current.user.id,
-          parentItem: existing.id,
-        }),
-        // No completedAt here — the sub-checklist's own submit sets it, so
-        // section completion times reflect when the work truly finished.
-        db.tx.checklistInstanceItems[existing.id].update({
-          result: { type: "location_check", nestedChecklistId: nestedId },
-        }),
-      ]);
+      // Derived from the parent item, so reopening this card resumes the same
+      // sub-checklist rather than starting a second one.
+      nestedId = deterministicId(`location-check:${checklistId}:${item.id}`);
+      await createInstanceFromTemplate({
+        template,
+        userId: current.user.id,
+        instanceId: nestedId,
+        reason: `a location check on ${item.label}`,
+      });
+      // Whoever opened it works it, whatever the template's assignment says —
+      // and parent_item_id keeps it out of the main checklist list.
+      await update(db, "checklist_instances", nestedId, {
+        assigned_to_id: current.user.id,
+        parent_item_id: item.id,
+      });
+      // No completed_at here — the sub-checklist's own submit sets it, so
+      // section completion times reflect when the work truly finished.
+      await update(db, "checklist_instance_items", item.id, {
+        result: JSON.stringify({ type: "location_check", nestedChecklistId: nestedId }),
+      });
       onSaved({ type: "location_check", nestedChecklistId: nestedId });
     }
     navigate(`/checklists/${nestedId}`, { state: { returnTo: location.pathname } });
@@ -895,13 +862,12 @@ export function LocationCheckItem({ item, existing, checklistId, onSaved }: Item
 
 export function MeterReadingItem({
   item,
-  existing,
   onSaved,
   editable = true,
 }: ItemProps) {
   const current = useCurrent();
-  const cfg = (item.config ?? {}) as unknown as MeterReadingConfig;
-  const existingResult = existing.result as
+  const cfg = itemConfig(item) as MeterReadingConfig;
+  const existingResult = itemResult(item) as
     | Extract<ItemResult, { type: "meter_reading" }>
     | undefined;
   const [assetId, setAssetId] = useState(cfg.assetId ?? "");
@@ -910,17 +876,20 @@ export function MeterReadingItem({
   const [editing, setEditing] = useState(false);
   const openedAtRef = useRef<number | null>(null);
 
-  const { data } = db.useQuery(
-    cfg.assetId
-      ? { assets: { $: { where: { id: cfg.assetId } } } }
-      : { assets: { $: { where: { hasMeter: true } } } },
-  );
-  const options = cfg.assetId ? [] : data?.assets ?? [];
-  const asset = cfg.assetId ? data?.assets?.[0] : options.find((a) => a.id === assetId);
+  // Every metered asset, filtered here rather than in two queries: the list is
+  // small, always resident, and the fixed-asset case is one lookup in it.
+  const { data: allAssets } = useAssets();
+  const metered = allAssets.filter((a) => a.has_meter === 1);
+  const options = cfg.assetId ? [] : metered;
+  const asset = cfg.assetId
+    ? allAssets.find((a) => a.id === cfg.assetId)
+    : metered.find((a) => a.id === assetId);
 
   const done = existingResult != null && !editing;
   const needsCorrection =
-    asset?.meterReading != null && Number(value) < asset.meterReading && value !== "";
+    asset?.meter_reading != null &&
+    Number(value) < asset.meter_reading &&
+    value !== "";
 
   // The reading, the Asset's meter bump, and any maintenance tickets it
   // triggers are all deferred to submit. Writing them here would bump the
@@ -944,7 +913,7 @@ export function MeterReadingItem({
         ...(needsCorrection && correctionReason ? { correctionReason } : {}),
       },
     };
-    await saveResult(existing, result, current.user?.id);
+    await saveResult(item, result, current.user?.id);
     setEditing(false);
     onSaved(result);
   };
@@ -954,7 +923,7 @@ export function MeterReadingItem({
       <DoneCard
         title={item.label}
         summary={`Recorded ${existingResult.value}${
-          timeOfDay(existing.completedAt) ? ` at ${timeOfDay(existing.completedAt)}` : ""
+          timeOfDay(item.completed_at) ? ` at ${timeOfDay(item.completed_at)}` : ""
         }`}
         onEdit={
           editable
@@ -990,7 +959,8 @@ export function MeterReadingItem({
       )}
       <div className="field">
         <span className="field-label">
-          Reading{asset?.meterReading != null ? ` (current: ${asset.meterReading})` : ""}
+          Reading
+          {asset?.meter_reading != null ? ` (current: ${asset.meter_reading})` : ""}
         </span>
         <input
           className="input"
@@ -1036,16 +1006,15 @@ export function MeterReadingItem({
  */
 export function QuestionItem({
   item,
-  existing,
   onSaved,
   editable = true,
 }: ItemProps) {
   const current = useCurrent();
-  const cfg = (item.config ?? {}) as unknown as QuestionConfig;
+  const cfg = itemConfig(item) as QuestionConfig;
   const answerType: QuestionAnswerType = cfg.answerType ?? "single_line";
   const detailsOn = cfg.detailsOn ?? "none";
   const step = cfg.step && cfg.step > 0 ? cfg.step : 1;
-  const previous = existing.result as QuestionResult | undefined;
+  const previous = itemResult(item) as QuestionResult | undefined;
 
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(previous?.text ?? "");
@@ -1081,7 +1050,7 @@ export function QuestionItem({
         if (detailsWanted && details.trim()) base.details = details.trim();
       }
       const result: ItemResult = { ...base, ...over };
-      await saveResult(existing, result, current.user?.id);
+      await saveResult(item, result, current.user?.id);
       setEditing(false);
       onSaved(result);
     } finally {
@@ -1095,7 +1064,7 @@ export function QuestionItem({
         title={item.label}
         summary={questionAnswerSummary(previous)}
         tone="done"
-        at={existing.completedAt}
+        at={item.completed_at}
         onEdit={editable ? () => setEditing(true) : undefined}
       />
     );

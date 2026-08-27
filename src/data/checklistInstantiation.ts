@@ -54,6 +54,8 @@ export interface InstantiableTemplate {
   name: string;
   /** What creates instances of it — clock_in, recurring, checkpoint, … */
   trigger_type: string;
+  /** Its own recurrence gate: a checkpoint template can be Tuesdays-only. */
+  triggerConfig?: TriggerConfig | null;
   /** Absent reads as false: the instance belongs to the role pool. */
   assigned_to_user?: number | null;
   hide_until_rule?: string | null;

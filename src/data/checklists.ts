@@ -18,6 +18,11 @@ import {
   type InstantiableSection,
   type InstantiableTemplate,
 } from "./checklistInstantiation";
+import {
+  writePendingEffects,
+  type Collected,
+  type MaintenanceCheck,
+} from "./checklistSubmit";
 
 // Checklists — templates, and the instances made from them.
 //
@@ -151,7 +156,7 @@ export function useTemplateItems(sectionId?: string) {
   );
 }
 
-export function itemConfig(row: TemplateItemRow): ItemConfig {
+export function itemConfig(row: { config: string | null }): ItemConfig {
   return json<ItemConfig>(row.config, {} as ItemConfig);
 }
 
@@ -178,13 +183,15 @@ export interface InstanceRow {
   due_by: string | null;
   parent_item_id: string | null;
   template_name: string | null;
+  /** The template's role, joined for the who-may-work-this check. */
+  assigned_role_id: string | null;
   assignee_name: string | null;
   item_count: number;
   done_count: number;
 }
 
 const INSTANCE_SELECT = `
-  SELECT i.*, t.name AS template_name, u.name AS assignee_name,
+  SELECT i.*, t.name AS template_name, t.assigned_role_id, u.name AS assignee_name,
          (SELECT COUNT(*) FROM checklist_instance_items ii
             JOIN checklist_instance_sections isec ON isec.id = ii.section_id
            WHERE isec.instance_id = i.id) AS item_count,
@@ -263,6 +270,118 @@ export function useInstanceItems(instanceId: string | undefined) {
   );
 }
 
+export interface SectionAtPlace extends InstanceSectionRow {
+  instance_status: string;
+  instance_hide_until: string | null;
+  checklist_name: string | null;
+  items_total: number;
+  items_done: number;
+}
+
+/**
+ * Open instance sections belonging to a checkpoint, or to its location.
+ *
+ * A section with checkpoint links belongs to THOSE checkpoints only; one with
+ * only a location belongs to every checkpoint in it. Instance sections carry no
+ * checkpoint links of their own — only the template section does — so the test
+ * runs through template_section_checkpoints.
+ */
+export function useSectionsAtCheckpoint(
+  checkpointId: string | undefined,
+  locationId: string | undefined,
+) {
+  return useQuery<SectionAtPlace>(
+    `SELECT s.*, l.name AS location_name,
+            i.status AS instance_status,
+            i.hide_until AS instance_hide_until,
+            t.name AS checklist_name,
+            (SELECT COUNT(*) FROM checklist_instance_items ii
+              WHERE ii.section_id = s.id) AS items_total,
+            (SELECT COUNT(*) FROM checklist_instance_items ii
+              WHERE ii.section_id = s.id AND ii.completed_at IS NOT NULL)
+              AS items_done
+       FROM checklist_instance_sections s
+       JOIN checklist_instances i ON i.id = s.instance_id
+       LEFT JOIN checklist_templates t ON t.id = i.template_id
+       LEFT JOIN locations l ON l.id = s.location_id
+      WHERE i.status IN ('not_started', 'in_progress')
+        AND (
+          EXISTS (SELECT 1 FROM template_section_checkpoints sc
+                   WHERE sc.section_id = s.template_section_id
+                     AND sc.checkpoint_id = ?)
+          OR (s.location_id IS NOT NULL AND s.location_id = ?
+              AND NOT EXISTS (SELECT 1 FROM template_section_checkpoints sc
+                               WHERE sc.section_id = s.template_section_id))
+        )
+      ORDER BY t.name, s.position`,
+    [checkpointId ?? "", locationId ?? ""],
+  );
+}
+
+export interface AnchoredTemplateSection {
+  section: InstantiableSection;
+  template: InstantiableTemplate;
+  /** Ids of this template's instances that are still open. */
+  openInstanceIds: string[];
+}
+
+/**
+ * Template sections a scan at this place would fire, with enough of their
+ * template to build a whole checklist from.
+ *
+ * "Anchored here" means the section's own trigger names this checkpoint, or
+ * names this checkpoint's location — not merely that it sits in this location,
+ * which is what a manual section in the same place does.
+ */
+export function useSectionsAnchoredAt(
+  checkpointId: string | undefined,
+  locationId: string | undefined,
+): AnchoredTemplateSection[] {
+  const { data: sections } = useQuery<
+    TemplateSectionRow & { location_status_name: string | null }
+  >(
+    `SELECT s.*, t.name AS template_name, l.name AS location_name,
+            ls.name AS location_status_name
+       FROM checklist_template_sections s
+       LEFT JOIN checklist_templates t ON t.id = s.template_id
+       LEFT JOIN locations l ON l.id = s.location_id
+       LEFT JOIN location_statuses ls ON ls.id = l.status_id
+      WHERE s.is_active = 1
+        AND (
+          (s.trigger_type = 'checkpoint'
+           AND EXISTS (SELECT 1 FROM template_section_checkpoints sc
+                        WHERE sc.section_id = s.id AND sc.checkpoint_id = ?))
+          OR (s.trigger_type = 'location' AND s.location_id = ?)
+        )
+      ORDER BY s.position`,
+    [checkpointId ?? "", locationId ?? ""],
+  );
+
+  // An empty trigger list means every template — the anchor filter above has
+  // already narrowed this to the handful that fire here.
+  const templates = useInstantiableTemplates([]);
+  const { data: openInstances } = useQuery<{ id: string; template_id: string }>(
+    "SELECT id, template_id FROM checklist_instances WHERE status IN ('not_started', 'in_progress')",
+  );
+  const { data: items } = useTemplateItems();
+  const { data: sectionCheckpoints } = useSectionCheckpoints();
+  const { data: sectionAssets } = useSectionAssets();
+
+  return sections.flatMap((s) => {
+    const template = templates.find((t) => t.id === s.template_id);
+    if (!template) return [];
+    return [
+      {
+        section: toInstantiableSection(s, items, sectionCheckpoints, sectionAssets),
+        template,
+        openInstanceIds: openInstances
+          .filter((i) => i.template_id === template.id)
+          .map((i) => i.id),
+      },
+    ];
+  });
+}
+
 export function itemResult(row: InstanceItemRow): ItemResult | null {
   return json<ItemResult | null>(row.result, null);
 }
@@ -282,6 +401,55 @@ export async function completeItem(
     completed_at: result === null ? null : stamp(),
     completed_by_id: result === null ? null : actorId,
   });
+}
+
+/**
+ * Open a checklist for work, claiming it if nobody has.
+ *
+ * A role-assigned instance belongs to the pool until someone opens it; opening
+ * it is the claim. Both writes are conditional and both happen at once, so an
+ * instance cannot end up started but unclaimed.
+ */
+export async function startAndClaimInstance(
+  instanceId: string,
+  templateName: string,
+  opts: { start: boolean; claim: boolean },
+  actorId: string,
+): Promise<void> {
+  await transact(async (tx) => {
+    await update(tx, "checklist_instances", instanceId, {
+      status: opts.start ? "in_progress" : undefined,
+      started_at: opts.start ? stamp() : undefined,
+      assigned_to_id: opts.claim ? actorId : undefined,
+    });
+    if (opts.start) {
+      await recordActivity(tx, {
+        eventType: "checklist.started",
+        summary: `"${templateName}" started`,
+        subjectType: "checklist_instances",
+        subjectId: instanceId,
+        actorId,
+      });
+    }
+  });
+}
+
+/** Rewrite the working order of a section's items after a drag. */
+export async function reorderInstanceItems(itemIds: string[]): Promise<void> {
+  await transact(async (tx) => {
+    for (const [position, itemId] of itemIds.entries()) {
+      await update(tx, "checklist_instance_items", itemId, { position });
+    }
+  });
+}
+
+/** The shift this checklist closes, if it is an end-of-shift one. */
+export function useShiftEndedBy(checklistId: string | undefined) {
+  const { data } = useQuery<{ id: string; guard_id: string; ended_at: string | null }>(
+    "SELECT id, guard_id, ended_at FROM shifts WHERE end_of_shift_checklist_id = ?",
+    [checklistId ?? ""],
+  );
+  return data[0] ?? null;
 }
 
 export async function startInstance(
@@ -304,22 +472,66 @@ export async function startInstance(
   });
 }
 
-export async function completeInstance(
-  instance: { id: string; template_name: string | null },
-  actorId: string | null,
-): Promise<void> {
+/**
+ * Submit a checklist: write everything its items described, complete it, and
+ * close whatever it closes — all in one transaction.
+ *
+ * One transaction is the whole point. Until this moment an item could be
+ * reopened and changed freely, which is only safe because none of the incidents
+ * and tickets it described existed yet. Splitting the write would create a
+ * window where a checklist is complete but the incident it raised is not — the
+ * exact state nothing downstream could tell from "no incident was found".
+ */
+export async function submitInstance(opts: {
+  instanceId: string;
+  templateName: string;
+  parentItemId: string | null;
+  /** The shift this checklist closes, if it is an end-of-shift one. */
+  endedShift: { id: string; guardName: string } | null;
+  collected: Collected;
+  maintenance: MaintenanceCheck[];
+  statusIds: { incidentOpen: string | null; ticketOpen: string | null };
+  actorId: string | null;
+}): Promise<void> {
+  const now = stamp();
   await transact(async (tx) => {
-    await update(tx, "checklist_instances", instance.id, {
+    await writePendingEffects(
+      tx,
+      opts.collected,
+      opts.maintenance,
+      opts.statusIds,
+      opts.actorId,
+    );
+    await update(tx, "checklist_instances", opts.instanceId, {
       status: "complete",
-      completed_at: stamp(),
+      completed_at: now,
     });
+    // A nested location-check instance completes its spawning item too, so the
+    // parent's section completion time reflects when the sub-checklist actually
+    // finished rather than when it was opened.
+    if (opts.parentItemId) {
+      await update(tx, "checklist_instance_items", opts.parentItemId, {
+        completed_at: now,
+        completed_by_id: opts.actorId,
+      });
+    }
     await recordActivity(tx, {
       eventType: "checklist.completed",
-      summary: `"${instance.template_name ?? "Checklist"}" completed`,
+      summary: `"${opts.templateName}" completed`,
       subjectType: "checklist_instances",
-      subjectId: instance.id,
-      actorId,
+      subjectId: opts.instanceId,
+      actorId: opts.actorId,
     });
+    if (opts.endedShift) {
+      await update(tx, "shifts", opts.endedShift.id, { ended_at: now });
+      await recordActivity(tx, {
+        eventType: "shift.ended",
+        summary: `Shift ended by end-of-shift checklist "${opts.templateName}"`,
+        subjectType: "shifts",
+        subjectId: opts.endedShift.id,
+        actorId: opts.actorId,
+      });
+    }
   });
 }
 
@@ -595,6 +807,7 @@ function assembleTemplate(
     id: t.id,
     name: t.name,
     trigger_type: t.trigger_type,
+    triggerConfig: templateTriggerConfig(t),
     assigned_to_user: t.assigned_to_user,
     hide_until_rule: t.hide_until_rule,
     dueBy: dueByRule(t),
