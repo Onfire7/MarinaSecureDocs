@@ -9,6 +9,14 @@ Verify each task against the deployment before moving on.
 
 ## Awaiting user action
 
+- [ ] **Decide when `beta` moves to the rewrite.** `rewrite/powersync` is
+      pushed and building at
+      https://rewrite-powersync--marinasecure.netlify.app — Netlify's
+      `allowed_branches` now holds `beta` and `rewrite/powersync`, so both
+      deploy. beta.marinasecure.com is still the InstantDB build and still
+      works; it stays that way until you fast-forward `beta`, which is a
+      clean fast-forward (no merge commit).
+
 - [ ] **Push `main`.** `beta` has been merged in cleanly (no conflicts; the
       trees are identical). The merge commit is local and unpushed —
       `git push origin main` moves the repo's default branch.
@@ -79,10 +87,26 @@ lives in `architecture.md`, `permissions.md`, `data-model.md` and
 
       Still to do here: repeat it against `beta` once the remote database has
       data, which is the next item.
+- [ ] **Point PowerSync Cloud at Clerk's JWKS.** The remote instance rejects
+      every token with `PSYNC_S2204 — JWKS request failed`, so nothing syncs
+      from the remote at all. Clerk's endpoint is public and healthy
+      (`https://<clerk-domain>/.well-known/jwks.json` → 200), so this is a
+      missing or wrong JWKS URI in the instance's auth config, not a Clerk
+      problem. Stage 4 of `scripts/finish-powersync-cutover.sh`. Verified from
+      a real signed-in session against the deployed branch on 2026-08-27; the
+      app's refusal screen quotes the code correctly.
+
 - [ ] **Seed or import the remote database.** PowerSync Cloud replicates from
-      the REMOTE Postgres, so beta shows an empty app until this happens.
-      Decide whether that is the real Instant export, the synthetic year, or
-      the real config alone.
+      the REMOTE Postgres, so the app shows an empty marina until this
+      happens. Decide whether that is the real Instant export, the synthetic
+      year, or the real config alone.
+
+      Two traps here. `pnpm run seed` defaults to
+      `postgresql://postgres:postgres@127.0.0.1:54322/postgres` and silently
+      seeds your laptop unless `SEED_DATABASE_URL` is set — it does not warn.
+      And the project's direct database host is IPv6-only (no A record), so
+      from an IPv4 network it must be reached through the transaction pooler
+      URI from Project Settings → Database, not the direct one.
 - [ ] **Offline attachment queue.** Local bytes + `upload_state`, draining
       independently of PowerSync's write queue. `captureAttachment()` writes
       the row first and fails loudly if the bytes cannot go, so nothing is
