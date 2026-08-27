@@ -58,22 +58,27 @@ lives in `architecture.md`, `permissions.md`, `data-model.md` and
 
 ### Blocking, and only you can do it
 
-- [ ] **Add `"aud": "authenticated"` to the Clerk session token.** Clerk
-      dashboard → Configure → Sessions → Customize session token. PowerSync
-      requires the claim unconditionally and rejects every token without one
-      (`PSYNC_S2105`); Supabase accepts the token either way, verified with a
-      real minted JWT. Until this is done **nothing syncs**, and the app says
-      so on a screen quoting the error. Stage 3 of
-      `scripts/provision-supabase.sh`.
+- [x] **Add `"aud": "authenticated"` to the Clerk session token.** Done —
+      PowerSync accepts the token and streams. Clerk dashboard → Configure →
+      Sessions → Customize session token; PowerSync requires the claim
+      unconditionally and rejected every token without one (`PSYNC_S2105`).
+      Stage 3 of `scripts/provision-supabase.sh`, stage 1 of
+      `scripts/finish-powersync-cutover.sh`.
 
 ### Then
 
-- [ ] **Verify a real signed-in session against synced data.** The whole
-      rewrite is compiled and booted but not yet exercised against rows: the
-      `aud` claim blocks it. Once it lands, run the loop from CLAUDE.md
-      against the LOCAL stack first (`supabase start`, `pnpm run ps:up`,
-      `pnpm run seed`, `pnpm run dev`) — the local database has the seeded
-      year; the remote has none.
+- [x] **Verify a real signed-in session against synced data.** Done against
+      the LOCAL stack, 2026-08-27. Sync down with every stream scoped
+      correctly — contacts 1,929 of 8,402, reservations 641 of 4,481,
+      check_ins 183 of 9,857, activity 711 of 6,190, `user_permissions` 22
+      (this user alone) — and sync up proven end to end: taking a ticket wrote
+      `assigned_to_id` and its `ticket.assigned` activity row into Postgres in
+      one transaction. Twelve pages toured with no page errors, no console
+      errors and no ≥400 responses. It also found the LEFT-JOIN scan that
+      CLAUDE.md now documents; the list pages were 30s before the fix.
+
+      Still to do here: repeat it against `beta` once the remote database has
+      data, which is the next item.
 - [ ] **Seed or import the remote database.** PowerSync Cloud replicates from
       the REMOTE Postgres, so beta shows an empty app until this happens.
       Decide whether that is the real Instant export, the synthetic year, or
