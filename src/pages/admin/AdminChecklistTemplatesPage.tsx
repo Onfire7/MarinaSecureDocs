@@ -1,6 +1,38 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
+import {
+  createItem,
+  createSection,
+  createTemplate,
+  deleteItem,
+  deleteSection,
+  deleteTemplate,
+  duplicateTemplate,
+  dueByRule,
+  itemConfig,
+  itemHasInstances,
+  orphanItem,
+  reorderItems,
+  reorderSections,
+  reviseItem,
+  saveSection,
+  saveTemplate,
+  setSectionAssets,
+  setSectionCheckpoints,
+  setTemplateViewerRoles,
+  templateTriggerConfig,
+  useSectionAssets,
+  useSectionCheckpoints,
+  useTemplateItems,
+  useTemplates,
+  useTemplateSections,
+  useTemplateViewerRoles,
+} from "../../data/checklists";
+import { useRoles } from "../../data/users";
+import { useLocations } from "../../data/locations";
+import { useCheckpoints } from "../../data/checkpoints";
+import { useAssets } from "../../data/assets";
+import { useLocationStatuses } from "../../data/lookups";
 import {
   hideUntilWarning,
   ITEM_TYPE_LABEL,
@@ -14,10 +46,11 @@ import {
   type ItemType,
   type QuestionAnswerType,
   type StateCheckType,
+  type TriggerConfig,
   type YesNoDetailsOn,
 } from "../../lib/checklists";
 import { LocationPicker } from "../shared/LocationPicker";
-import { STANDARD_STATUSES, statusLabel } from "../../lib/locations";
+import { compareNames } from "../../lib/locations";
 import { MultiSelectDialog } from "../shared/MultiSelectDialog";
 import { ReorderableList } from "../shared/ReorderableList";
 import { AdminHeader } from "./AdminHomePage";
@@ -47,60 +80,112 @@ export function AdminChecklistTemplatesPage() {
     };
   }, []);
 
-  const { data } = db.useQuery({
-    checklistTemplates: {
-      assignedRole: {},
-      viewerRoles: {},
-      creator: {},
-      sections: { location: {}, checkpoints: {}, assets: {}, items: {} },
-    },
-    roles: {},
-    checkpoints: { location: {} },
-    locations: { parent: {}, type: {} },
-    assets: {},
-  });
+  // Six flat lists, assembled once into the nested shape the editor reads.
+  // The editor is a tree — a template holds sections, a section holds items and
+  // its checkpoint and asset attachments — and building that here means the
+  // 1,500 lines below never have to know it came from six tables.
+  const { data: templateRows } = useTemplates();
+  const { data: sectionRows } = useTemplateSections();
+  const { data: itemRows } = useTemplateItems();
+  const { data: sectionCheckpoints } = useSectionCheckpoints();
+  const { data: sectionAssets } = useSectionAssets();
+  const { data: viewerRoles } = useTemplateViewerRoles();
+  const { roles } = useRoles();
+  const { data: allLocations } = useLocations();
+  const { data: checkpointRows } = useCheckpoints();
+  const { data: assetRows } = useAssets();
 
-  const templates = useMemo(
-    () =>
-      [...(data?.checklistTemplates ?? [])].sort((a, b) =>
-        a.name.localeCompare(b.name),
-      ),
-    [data],
-  );
-
-  const roles = data?.roles ?? [];
   const locations = useMemo(
-    () =>
-      [...(data?.locations ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
-    [data],
+    () => [...allLocations].sort((a, b) => compareNames(a.name, b.name)),
+    [allLocations],
   );
   const allCheckpoints = useMemo(
-    () =>
-      [...(data?.checkpoints ?? [])].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { numeric: true }),
-      ),
-    [data],
+    () => [...checkpointRows].sort((a, b) => compareNames(a.name, b.name)),
+    [checkpointRows],
   );
   const allAssets = useMemo(
-    () => [...(data?.assets ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
-    [data],
+    () => [...assetRows].sort((a, b) => compareNames(a.name, b.name)),
+    [assetRows],
   );
+
+  const templates = useMemo<TemplateRow[]>(() => {
+    const roleById = new Map(roles.map((r) => [r.id, r]));
+    const locationById = new Map(allLocations.map((l) => [l.id, l]));
+    const checkpointById = new Map(checkpointRows.map((c) => [c.id, c]));
+    const assetById = new Map(assetRows.map((a) => [a.id, a]));
+    return templateRows.map((t) => ({
+      id: t.id,
+      name: t.name,
+      triggerType: t.trigger_type,
+      triggerConfig: templateTriggerConfig(t),
+      assignedToUser: t.assigned_to_user === 1,
+      hideUntilRule: t.hide_until_rule ?? undefined,
+      dueBy: dueByRule(t) ?? undefined,
+      assignedRole: t.assigned_role_id
+        ? (roleById.get(t.assigned_role_id) ?? null)
+        : null,
+      viewerRoles: viewerRoles
+        .filter((v) => v.template_id === t.id)
+        .map((v) => roleById.get(v.role_id))
+        .filter((r): r is NonNullable<typeof r> => Boolean(r)),
+      creator: t.creator_name ? { id: t.creator_id!, name: t.creator_name } : null,
+      sections: sectionRows
+        .filter((sec) => sec.template_id === t.id)
+        .map((sec) => ({
+          id: sec.id,
+          name: sec.name,
+          order: sec.position,
+          isActive: sec.is_active === 1,
+          triggerConfig: templateTriggerConfig(sec),
+          triggerType: sec.trigger_type,
+          hideUntilRule: sec.hide_until_rule ?? undefined,
+          dueBy: dueByRule(sec) ?? undefined,
+          location: sec.location_id
+            ? (locationById.get(sec.location_id) ?? null)
+            : null,
+          checkpoints: sectionCheckpoints
+            .filter((sc) => sc.section_id === sec.id)
+            .map((sc) => checkpointById.get(sc.checkpoint_id))
+            .filter((c): c is NonNullable<typeof c> => Boolean(c)),
+          assets: sectionAssets
+            .filter((sa) => sa.section_id === sec.id)
+            .map((sa) => assetById.get(sa.asset_id))
+            .filter((a): a is NonNullable<typeof a> => Boolean(a)),
+          items: itemRows
+            .filter((it) => it.section_id === sec.id)
+            .map((it) => ({
+              id: it.id,
+              type: it.type,
+              label: it.label,
+              order: it.position,
+              config: itemConfig(it) as Record<string, unknown>,
+            })),
+        })),
+    }));
+  }, [
+    templateRows,
+    sectionRows,
+    itemRows,
+    sectionCheckpoints,
+    sectionAssets,
+    viewerRoles,
+    roles,
+    allLocations,
+    checkpointRows,
+    assetRows,
+  ]);
 
   // Created with a placeholder name and opened straight into the editor,
   // where the name field already lives — a prompt first would just be a
   // modal asking for something the next screen also asks for. The required
   // role is asked for in the editor too, with a warning until it's set.
   const create = async () => {
-    const templateId = id();
-    await db.transact(
-      db.tx.checklistTemplates[templateId]
-        .update({
-          name: "New template",
-          triggerType: "manual",
-          assignedToUser: true,
-        })
-        .link(current.user ? { creator: current.user.id } : {}),
-    );
+    const templateId = await createTemplate({
+      name: "New template",
+      triggerType: "manual",
+      assignedToUser: true,
+      creatorId: current.user?.id ?? null,
+    });
     setEditing(templateId);
   };
 
@@ -184,20 +269,25 @@ type SectionRow = {
   order: number;
   isActive: boolean;
   triggerType: string;
-  triggerConfig?: Record<string, unknown>;
+  triggerConfig?: TriggerConfig;
   hideUntilRule?: string;
   dueBy?: DueByRule;
-  location?: { id: string; name: string } | null;
+  location?: { id: string; name: string; status_name?: string | null } | null;
   checkpoints?: { id: string; name: string }[];
   assets?: { id: string; name: string }[];
   items?: TemplateItemRow[];
 };
 
+/**
+ * The nested shape this editor reads, assembled from six flat tables at the
+ * top of the page. Everything below treats a template as a tree, because that
+ * is what it is to whoever is authoring one.
+ */
 type TemplateRow = {
   id: string;
   name: string;
   triggerType: string;
-  triggerConfig?: Record<string, unknown>;
+  triggerConfig?: TriggerConfig;
   assignedToUser?: boolean;
   hideUntilRule?: string;
   dueBy?: DueByRule;
@@ -233,40 +323,21 @@ const ELLIPSIS = {
 /**
  * Runs a write and says so when it fails.
  *
- * Every mutation here used to be `void db.transact(...)`, which throws the
- * promise away. Instant applies writes optimistically, so a rejected one
+ * Every mutation here used to be a fire-and-forget transaction, which throws
+ * the promise away. Local-first writes apply optimistically, so a rejected one
  * rolls back — the row you just edited silently reverts or vanishes, with
- * nothing in the UI and only an anonymous unhandled rejection in the
- * console. Copy-on-edit makes that worse: the failing transaction both
- * creates the new row and unlinks the old, so a partial refusal reads as
- * "my item disappeared". Failures are announced now, with the operation
- * that caused them.
+ * nothing in the UI and only an anonymous unhandled rejection in the console.
+ * Copy-on-edit makes that worse: the failing write both creates the new row and
+ * orphans the old, so a partial refusal reads as "my item disappeared".
+ *
+ * It matters MORE on this stack, not less: a local write succeeds first and is
+ * refused later, on upload, by RLS or a constraint. See the connector's note on
+ * unretryable writes.
  */
 let reportWriteError: ((message: string) => void) | null = null;
 
-/**
- * Whether any instance item still reads through this template row — the one
- * thing that decides whether a superseded or removed row has to be kept.
- *
- * Asked per edit rather than joined into the page query: `items: { instances:
- * {} }` there would drag every instance row ever generated from every
- * template into the editor. On any doubt this answers "yes" — orphaning a
- * draft row is untidy, deleting one a checklist still renders through is a
- * broken checklist.
- */
-async function hasInstances(itemId: string) {
-  try {
-    const { data } = await db.queryOnce({
-      checklistTemplateItems: { $: { where: { id: itemId } }, instances: {} },
-    });
-    return (data.checklistTemplateItems[0]?.instances ?? []).length > 0;
-  } catch {
-    return true;
-  }
-}
-
-function write(what: string, tx: Parameters<typeof db.transact>[0]) {
-  void db.transact(tx).catch((err: unknown) => {
+function write(what: string, run: Promise<unknown>) {
+  void run.catch((err: unknown) => {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`checklist templates — ${what} failed:`, err);
     reportWriteError?.(`Couldn't ${what}: ${message}`);
@@ -618,7 +689,7 @@ function TemplateCard({
     status?: string | null;
     parent?: { id: string } | null;
   }[];
-  allCheckpoints: { id: string; name: string; location?: { id: string; name: string } | null }[];
+  allCheckpoints: { id: string; name: string; location_id?: string | null }[];
   allAssets: { id: string; name: string }[];
   expanded: boolean;
   onToggle: () => void;
@@ -632,8 +703,8 @@ function TemplateCard({
   // The section just created, so it can mount already open.
   const [openedSectionId, setOpenedSectionId] = useState<string | null>(null);
 
-  const update = (fields: Record<string, unknown>) =>
-    void db.transact(db.tx.checklistTemplates[template.id].update(fields));
+  const update = (changes: Parameters<typeof saveTemplate>[1]) =>
+    write("save that template", saveTemplate(template.id, changes));
 
   const sections = useMemo(
     () =>
@@ -661,83 +732,24 @@ function TemplateCard({
     locationId?: string,
     checkpointIds?: string[],
   ) => {
-    const newId = id();
     write(
       "add that section",
-      db.tx.checklistTemplateSections[newId]
-        .update({
-          name,
-          order: sections.length,
-          isActive: true,
-          triggerType: "manual",
-        })
-        .link({
-          template: template.id,
-          ...(locationId ? { location: locationId } : {}),
-          ...(checkpointIds?.length ? { checkpoints: checkpointIds } : {}),
-        }),
+      createSection({
+        templateId: template.id,
+        name,
+        position: sections.length,
+        isActive: true,
+        triggerType: "manual",
+        locationId: locationId ?? null,
+      }).then(async (newId) => {
+        if (checkpointIds?.length) await setSectionCheckpoints(newId, checkpointIds);
+        setOpenedSectionId(newId);
+      }),
     );
-    setOpenedSectionId(newId);
   };
 
   const duplicate = async () => {
-    const copyId = id();
-    await db.transact([
-      db.tx.checklistTemplates[copyId]
-        .update({
-          name: `${template.name} (copy)`,
-          triggerType: template.triggerType,
-          triggerConfig: template.triggerConfig ?? {},
-          assignedToUser: template.assignedToUser ?? false,
-          ...(template.hideUntilRule ? { hideUntilRule: template.hideUntilRule } : {}),
-          ...(template.dueBy ? { dueBy: template.dueBy } : {}),
-        })
-        .link({
-          ...(template.assignedRole ? { assignedRole: template.assignedRole.id } : {}),
-          ...(template.viewerRoles?.length
-            ? { viewerRoles: template.viewerRoles.map((r) => r.id) }
-            : {}),
-          ...(template.creator ? { creator: template.creator.id } : {}),
-        }),
-      // Sections and items are their own entities, so a copy needs its own
-      // set rather than links to the originals' — editing the copy must not
-      // touch the template it came from. Copied items restart at version 1
-      // with no previousVersion: the copy has no history of its own.
-      ...sections.flatMap((s) => {
-        const sectionCopyId = id();
-        return [
-          db.tx.checklistTemplateSections[sectionCopyId]
-            .update({
-              name: s.name,
-              order: s.order,
-              isActive: s.isActive,
-              triggerType: s.triggerType,
-              triggerConfig: s.triggerConfig ?? {},
-              ...(s.hideUntilRule ? { hideUntilRule: s.hideUntilRule } : {}),
-              ...(s.dueBy ? { dueBy: s.dueBy } : {}),
-            })
-            .link({
-              template: copyId,
-              ...(s.location ? { location: s.location.id } : {}),
-              ...(s.checkpoints?.length
-                ? { checkpoints: s.checkpoints.map((c) => c.id) }
-                : {}),
-              ...(s.assets?.length ? { assets: s.assets.map((a) => a.id) } : {}),
-            }),
-          ...s.items.map((it, i) =>
-            db.tx.checklistTemplateItems[id()]
-              .update({
-                type: it.type,
-                label: it.label,
-                order: i,
-                version: 1,
-                config: it.config ?? {},
-              })
-              .link({ section: sectionCopyId }),
-          ),
-        ];
-      }),
-    ]);
+    const copyId = await duplicateTemplate(template.id, `${template.name} (copy)`);
     onDuplicated(copyId);
   };
 
@@ -748,13 +760,12 @@ function TemplateCard({
       )
     )
       return;
-    // The template and its sections go; item rows stay — instance items of
-    // already-generated checklists render their label/type/config through
-    // them, the same way superseded versions survive an edit.
-    await db.transact([
-      ...sections.map((s) => db.tx.checklistTemplateSections[s.id].delete()),
-      db.tx.checklistTemplates[template.id].delete(),
-    ]);
+    // The template and its sections go; item rows stay. That is not the
+    // client's doing — checklist_template_items.section_id is ON DELETE SET
+    // NULL, so an item survives its section exactly as a superseded version
+    // survives an edit, and every checklist generated from this template keeps
+    // rendering the labels it was created with.
+    write("delete that template", deleteTemplate(template.id));
   };
 
   return (
@@ -867,11 +878,7 @@ function TemplateCard({
                     // The placeholder option carries no id — linking it
                     // would write an empty ref.
                     if (!e.target.value) return;
-                    void db.transact(
-                      db.tx.checklistTemplates[template.id].link({
-                        assignedRole: e.target.value,
-                      }),
-                    );
+                    update({ assignedRoleId: e.target.value });
                   }}
                 >
                   <option value="">Pick a role…</option>
@@ -905,14 +912,14 @@ function TemplateCard({
                   placeholder="Nobody else"
                   emptyMessage="No other roles exist."
                   onToggle={(roleId, on) =>
-                    void db.transact(
-                      on
-                        ? db.tx.checklistTemplates[template.id].link({
-                            viewerRoles: roleId,
-                          })
-                        : db.tx.checklistTemplates[template.id].unlink({
-                            viewerRoles: roleId,
-                          }),
+                    write(
+                      "change who can read this",
+                      setTemplateViewerRoles(
+                        template.id,
+                        on
+                          ? [...viewerRoleIds, roleId]
+                          : [...viewerRoleIds].filter((x) => x !== roleId),
+                      ),
                     )
                   }
                 />
@@ -980,11 +987,7 @@ function TemplateCard({
               <ReorderableList
                 items={sections}
                 onReorder={(orderedIds) =>
-                  void db.transact(
-                    orderedIds.map((sectionId, i) =>
-                      db.tx.checklistTemplateSections[sectionId].update({ order: i }),
-                    ),
-                  )
+                  write("reorder those sections", reorderSections(orderedIds))
                 }
                 renderItem={(section) => (
                   <SectionEditor
@@ -1035,8 +1038,9 @@ function TemplateCard({
           options={viewerRoleChoices.map((r) => ({ id: r.id, name: r.name }))}
           onConfirm={(ids) => {
             if (ids.length > 0)
-              void db.transact(
-                db.tx.checklistTemplates[template.id].link({ viewerRoles: ids }),
+              write(
+                "add those roles",
+                setTemplateViewerRoles(template.id, [...viewerRoleIds, ...ids]),
               );
           }}
           onClose={() => setAddingViewerRoles(false)}
@@ -1066,7 +1070,7 @@ function SectionEditor({
     status?: string | null;
     parent?: { id: string } | null;
   }[];
-  allCheckpoints: { id: string; name: string; location?: { id: string; name: string } | null }[];
+  allCheckpoints: { id: string; name: string; location_id?: string | null }[];
   allAssets: { id: string; name: string }[];
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -1092,9 +1096,10 @@ function SectionEditor({
       return next;
     });
 
-  const update = (fields: Record<string, unknown>) =>
-    void db.transact(db.tx.checklistTemplateSections[section.id].update(fields));
+  const update = (changes: Parameters<typeof saveSection>[1]) =>
+    write("save that section", saveSection(section.id, changes));
 
+  const { statuses } = useLocationStatuses();
   const items = section.items;
   const cfg = (section.triggerConfig ?? {}) as {
     recurrenceRule?: string;
@@ -1103,39 +1108,39 @@ function SectionEditor({
   const selectedStatuses = new Set(cfg.statuses ?? []);
   // The standard set plus any status a location is actually sitting in, so
   // an admin-invented one is selectable without being typed twice.
+  // The marina's own statuses, plus any this section already names — so a
+  // status retired after the rule was written stays selected and visible
+  // rather than silently dropping out of the gate.
   const statusOptions = useMemo(() => {
-    const seen = new Set<string>(STANDARD_STATUSES);
-    for (const l of locations) if (l.status) seen.add(l.status);
-    for (const st of selectedStatuses) seen.add(st);
-    return [...seen].map((st) => ({ id: st, name: statusLabel(st) }));
+    const options = statuses.map((st) => ({ id: st.name, name: st.name }));
+    for (const st of selectedStatuses) {
+      if (!options.some((o) => o.id === st)) options.push({ id: st, name: st });
+    }
+    return options;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locations, cfg.statuses]);
+  }, [statuses, cfg.statuses]);
 
   // A section belongs to exactly one location, and its checkpoints must be
   // in it — so changing the location also drops any checkpoint that isn't.
   const setLocation = (locationId: string | undefined) => {
-    const stale = (section.checkpoints ?? []).filter((c) => {
-      const full = allCheckpoints.find((a) => a.id === c.id);
-      return locationId ? full?.location?.id !== locationId : false;
-    });
-    void db.transact([
-      ...(locationId
-        ? [db.tx.checklistTemplateSections[section.id].link({ location: locationId })]
-        : section.location
-          ? [
-              db.tx.checklistTemplateSections[section.id].unlink({
-                location: section.location.id,
-              }),
-            ]
-          : []),
-      ...stale.map((c) =>
-        db.tx.checklistTemplateSections[section.id].unlink({ checkpoints: c.id }),
+    const keep = (section.checkpoints ?? [])
+      .filter((c) => {
+        const full = allCheckpoints.find((a) => a.id === c.id);
+        return !locationId || full?.location_id === locationId;
+      })
+      .map((c) => c.id);
+    write(
+      "move that section",
+      saveSection(section.id, { locationId: locationId ?? null }).then(() =>
+        keep.length === (section.checkpoints ?? []).length
+          ? undefined
+          : setSectionCheckpoints(section.id, keep),
       ),
-    ]);
+    );
   };
 
   const checkpointChoices = allCheckpoints.filter(
-    (c) => !section.location || c.location?.id === section.location.id,
+    (c) => !section.location || c.location_id === section.location.id,
   );
   const attachedCheckpointIds = new Set((section.checkpoints ?? []).map((c) => c.id));
   const attachedAssetIds = new Set((section.assets ?? []).map((a) => a.id));
@@ -1148,95 +1153,107 @@ function SectionEditor({
     item: TemplateItemRow,
     patch: { label?: string; config?: Record<string, unknown> },
   ) => {
-    const newId = id();
-    // Hand the open panel to the replacement before anything awaits, so the
-    // row doesn't blink shut while the check below runs.
-    setOpenItemIds((prev) => {
-      if (!prev.has(item.id)) return prev;
-      const next = new Set(prev);
-      next.delete(item.id);
-      next.add(newId);
-      return next;
-    });
-
     // Only a row some instance points at has to survive being edited — that
-    // reference is the whole reason copy-on-edit exists. A template still
-    // being written has none, and keeping every superseded draft would leave
-    // the namespace full of rows no query can reach.
-    const referenced = await hasInstances(item.id);
-
-    write("save this item's change", [
-      db.tx.checklistTemplateItems[newId]
-        .update({
-          type: item.type,
+    // reference is the whole reason copy-on-edit exists. A template still being
+    // written has none, and keeping every superseded draft would leave the
+    // table full of rows no query can reach.
+    const referenced = await itemHasInstances(item.id);
+    if (referenced) {
+      const newId = await reviseItem(
+        {
+          id: item.id,
+          section_id: section.id,
+          type: item.type as ItemType,
+          label: item.label,
+          config: JSON.stringify(item.config ?? {}),
+          position: item.order,
+          version: item.version ?? 1,
+          previous_version_id: null,
+        },
+        {
+          type: item.type as ItemType,
           label: patch.label ?? item.label,
-          order: item.order,
-          version: (item.version ?? 1) + 1,
-          config: patch.config ?? item.config ?? {},
-        })
-        // No previousVersion when the old row is going away — the link would
-        // only point at a hole.
-        .link({
-          section: section.id,
-          ...(referenced ? { previousVersion: item.id } : {}),
-        }),
-      referenced
-        ? db.tx.checklistTemplateItems[item.id].unlink({ section: section.id })
-        : db.tx.checklistTemplateItems[item.id].delete(),
-    ]);
+          config: (patch.config ?? item.config ?? {}) as never,
+        },
+      );
+      // Hand the open panel to the replacement, so the row does not blink shut.
+      setOpenItemIds((prev) => {
+        if (!prev.has(item.id)) return prev;
+        const next = new Set(prev);
+        next.delete(item.id);
+        next.add(newId);
+        return next;
+      });
+      return;
+    }
+    // Nothing reads through it, so edit it in place — no version, no orphan.
+    write(
+      "save this item's change",
+      createItem({
+        sectionId: section.id,
+        type: item.type as ItemType,
+        label: patch.label ?? item.label,
+        config: (patch.config ?? item.config ?? {}) as never,
+        position: item.order,
+      }).then(async (newId) => {
+        await deleteItem(item.id);
+        setOpenItemIds((prev) => {
+          if (!prev.has(item.id)) return prev;
+          const next = new Set(prev);
+          next.delete(item.id);
+          next.add(newId);
+          return next;
+        });
+      }),
+    );
   };
 
-  // A door or lock needs a Location, and the section's own location is
-  // almost always the right one — so default it.
-  // Arrives open with its name selected: picking a type from the menu is an
-  // intention to describe the thing, and the next thing you want is the
-  // cursor in the field, not a second tap to get there.
+  // A door or lock needs a location, and the section's own location is almost
+  // always the right one — so default it. Arrives open with its name selected:
+  // picking a type from the menu is an intention to describe the thing, and the
+  // next thing you want is the cursor in the field.
   const addItem = (type: ItemType) => {
-    const newId = id();
     write(
       "add that item",
-      db.tx.checklistTemplateItems[newId]
-        .update({
-          type,
-          label: defaultItemLabel(type, section.location?.name),
-          order: items.length,
-          version: 1,
-          config:
-            isStateCheck(type) && section.location
-              ? { locationId: section.location.id }
-              : {},
-        })
-        .link({ section: section.id }),
+      createItem({
+        sectionId: section.id,
+        type,
+        label: defaultItemLabel(type, section.location?.name),
+        config: (isStateCheck(type) && section.location
+          ? { locationId: section.location.id }
+          : {}) as never,
+        position: items.length,
+      }).then((newId) => {
+        setOpenItemIds((prev) => new Set(prev).add(newId));
+        setNamingItemId(newId);
+        setLastAddedType(type);
+      }),
     );
-    setOpenItemIds((prev) => new Set(prev).add(newId));
-    setNamingItemId(newId);
-    setLastAddedType(type);
   };
 
   const duplicateItem = (item: TemplateItemRow) =>
-    write("duplicate that item", 
-      db.tx.checklistTemplateItems[id()]
-        .update({
-          type: item.type,
-          label: `${item.label} (copy)`,
-          order: items.length,
-          version: 1,
-          config: item.config ?? {},
-        })
-        .link({ section: section.id }),
+    write(
+      "duplicate that item",
+      createItem({
+        sectionId: section.id,
+        type: item.type as ItemType,
+        label: `${item.label} (copy)`,
+        config: (item.config ?? {}) as never,
+        position: items.length,
+      }),
     );
 
-  // Removal unlinks rather than deletes: instance items on already-generated
-  // checklists render through this row forever.
-  // Same rule as an edit: a row no instance reads through is the editor's
-  // own scratch work, and unlinking it would leave exactly the orphan that
-  // deleting the superseded version was meant to stop.
+  // Removal orphans rather than deletes: instance items on already-generated
+  // checklists render through this row forever. Same rule as an edit — a row no
+  // instance reads through is the editor's own scratch work, and orphaning it
+  // would leave exactly the litter that deleting a superseded draft avoids.
   const removeItem = async (itemId: string) => {
+    const referenced = await itemHasInstances(itemId);
     write(
       "remove that item",
-      (await hasInstances(itemId))
-        ? db.tx.checklistTemplateItems[itemId].unlink({ section: section.id })
-        : db.tx.checklistTemplateItems[itemId].delete(),
+      referenced
+        ? orphanItem(itemId)
+        : deleteItem(itemId),
     );
   };
 
@@ -1247,7 +1264,7 @@ function SectionEditor({
       )
     )
       return;
-    write("delete that section", db.tx.checklistTemplateSections[section.id].delete());
+    write("delete that section", deleteSection(section.id));
   };
 
   return (
@@ -1481,13 +1498,12 @@ function SectionEditor({
               onToggle={(checkpointId, on) =>
                 write(
                   on ? "attach that checkpoint" : "remove that checkpoint",
-                  on
-                    ? db.tx.checklistTemplateSections[section.id].link({
-                        checkpoints: checkpointId,
-                      })
-                    : db.tx.checklistTemplateSections[section.id].unlink({
-                        checkpoints: checkpointId,
-                      }),
+                  setSectionCheckpoints(
+                    section.id,
+                    on
+                      ? [...attachedCheckpointIds, checkpointId]
+                      : [...attachedCheckpointIds].filter((x) => x !== checkpointId),
+                  ),
                 )
               }
             />
@@ -1504,10 +1520,12 @@ function SectionEditor({
                       type="button"
                       className="btn btn-sm btn-quiet"
                       onClick={() =>
-                        void db.transact(
-                          db.tx.checklistTemplateSections[section.id].unlink({
-                            assets: a.id,
-                          }),
+                        write(
+                          "detach that asset",
+                          setSectionAssets(
+                            section.id,
+                            [...attachedAssetIds].filter((x) => x !== a.id),
+                          ),
                         )
                       }
                     >
@@ -1539,11 +1557,7 @@ function SectionEditor({
           <ReorderableList
             items={items}
             onReorder={(orderedIds) =>
-              void db.transact(
-                orderedIds.map((itemId, i) =>
-                  db.tx.checklistTemplateItems[itemId].update({ order: i }),
-                ),
-              )
+              write("reorder those items", reorderItems(orderedIds))
             }
             renderItem={(item) => (
               <ItemRow
@@ -1632,8 +1646,9 @@ function SectionEditor({
             .map((a) => ({ id: a.id, name: a.name }))}
           onConfirm={(ids) => {
             if (ids.length > 0)
-              void db.transact(
-                db.tx.checklistTemplateSections[section.id].link({ assets: ids }),
+              write(
+                "attach those assets",
+                setSectionAssets(section.id, [...attachedAssetIds, ...ids]),
               );
           }}
           onClose={() => setAddingAssets(false)}
@@ -1944,17 +1959,15 @@ function StateCheckConfigFields({
   defaultLabel: string;
 }) {
   const spec = STATE_CHECK_KINDS[kind];
-  const { data } = db.useQuery({
-    locations: { parent: {}, type: {} },
-    assets: {},
-  });
+  const { data: allLocations } = useLocations();
+  const { data: allAssets } = useAssets();
   const locations = useMemo(
-    () => [...(data?.locations ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
-    [data],
+    () => [...allLocations].sort((a, b) => compareNames(a.name, b.name)),
+    [allLocations],
   );
   const assets = useMemo(
-    () => [...(data?.assets ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
-    [data],
+    () => [...allAssets].sort((a, b) => compareNames(a.name, b.name)),
+    [allAssets],
   );
   const locationId = (cfg.locationId as string) ?? "";
   const assetId = (cfg.assetId as string) ?? "";
@@ -2082,13 +2095,11 @@ function LocationCheckConfig({
   // A flat <select> of every location is unusable past a hundred slips, and
   // it can't disambiguate the "Slip 14" that exists on every dock — which is
   // exactly what LocationPicker's ancestor paths are for.
-  const { data } = db.useQuery({
-    locations: { parent: {}, type: {} },
-    checklistTemplates: {},
-  });
+  const { data: allLocations } = useLocations();
+  const { data: templates } = useTemplates();
   const locations = useMemo(
-    () => [...(data?.locations ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
-    [data],
+    () => [...allLocations].sort((a, b) => compareNames(a.name, b.name)),
+    [allLocations],
   );
 
   return (
@@ -2108,7 +2119,7 @@ function LocationCheckConfig({
         onChange={(e) => setConfig({ templateId: e.target.value || undefined })}
       >
         <option value="">Nested template…</option>
-        {(data?.checklistTemplates ?? []).map((t) => (
+        {templates.map((t) => (
           <option key={t.id} value={t.id}>
             {t.name}
           </option>
@@ -2199,7 +2210,8 @@ function MeterConfig({
   cfg: Record<string, unknown>;
   setConfig: (patch: Record<string, unknown>) => void;
 }) {
-  const { data } = db.useQuery({ assets: { $: { where: { hasMeter: true } } } });
+  const { data: allAssets } = useAssets();
+  const metered = allAssets.filter((a) => a.has_meter === 1);
   return (
     <div className="row">
       <select
@@ -2208,7 +2220,7 @@ function MeterConfig({
         onChange={(e) => setConfig({ assetId: e.target.value || undefined })}
       >
         <option value="">Selected at completion</option>
-        {(data?.assets ?? []).map((a) => (
+        {metered.map((a) => (
           <option key={a.id} value={a.id}>
             {a.name}
           </option>

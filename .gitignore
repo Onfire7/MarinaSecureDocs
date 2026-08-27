@@ -32,8 +32,3 @@ migration/instant-export/
 
 # Vitest coverage output.
 coverage/
-
-# PowerSync's SQLite worker and WASM, copied out of node_modules by
-# scripts/copy-powersync-assets.mjs (run by `pnpm run dev` and `pnpm run
-# build`). Generated, version-locked to the SDK, and 2.5 MB.
-public/@powersync/

@@ -626,8 +626,126 @@ export function saveTemplate(
   return update(db, "checklist_templates", templateId, templateColumns(input));
 }
 
+/**
+ * Delete a template.
+ *
+ * Its sections cascade; its ITEMS do not — checklist_template_items.section_id
+ * is ON DELETE SET NULL, so the item rows are orphaned rather than removed and
+ * every checklist already generated keeps rendering its labels. That is the
+ * same thing an edit does, and for the same reason.
+ */
 export function deleteTemplate(templateId: string): Promise<void> {
   return remove(db, "checklist_templates", templateId);
+}
+
+/**
+ * Whether any instance item still reads through this template row.
+ *
+ * The one thing that decides whether a superseded or removed row has to be
+ * kept. Asked per edit rather than joined into the page query, which would drag
+ * every instance ever generated into the editor. On any doubt this answers
+ * yes: orphaning a draft row is untidy, deleting one a checklist still renders
+ * through is a broken checklist.
+ */
+export async function itemHasInstances(itemId: string): Promise<boolean> {
+  try {
+    const row = await db.getOptional<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM checklist_instance_items WHERE template_item_id = ?",
+      [itemId],
+    );
+    return (row?.n ?? 1) > 0;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Deep-copy a template: its settings, its sections with their attachments, and
+ * its items.
+ *
+ * Sections and items are their own rows, so a copy needs its own set rather
+ * than links to the originals' — editing the copy must not touch what it came
+ * from. Copied items restart at version 1 with no previous version: the copy
+ * has no history of its own.
+ */
+export async function duplicateTemplate(
+  templateId: string,
+  name: string,
+): Promise<string> {
+  return transact(async (tx) => {
+    const source = await tx.get<TemplateRow>(
+      "SELECT * FROM checklist_templates WHERE id = ?",
+      [templateId],
+    );
+    const copyId = await insert(tx, "checklist_templates", {
+      name,
+      trigger_type: source.trigger_type,
+      trigger_config: source.trigger_config,
+      assigned_role_id: source.assigned_role_id,
+      assigned_to_user: source.assigned_to_user,
+      hide_until_rule: source.hide_until_rule,
+      due_by: source.due_by,
+      creator_id: source.creator_id,
+    });
+
+    const viewers = await tx.getAll<{ role_id: string }>(
+      "SELECT role_id FROM template_viewer_roles WHERE template_id = ?",
+      [templateId],
+    );
+    for (const v of viewers) {
+      await insert(tx, "template_viewer_roles", {
+        template_id: copyId,
+        role_id: v.role_id,
+      });
+    }
+
+    const sections = await tx.getAll<TemplateSectionRow>(
+      "SELECT * FROM checklist_template_sections WHERE template_id = ? ORDER BY position",
+      [templateId],
+    );
+    for (const section of sections) {
+      const sectionCopyId = await insert(tx, "checklist_template_sections", {
+        template_id: copyId,
+        name: section.name,
+        position: section.position,
+        is_active: section.is_active,
+        trigger_type: section.trigger_type,
+        trigger_config: section.trigger_config,
+        hide_until_rule: section.hide_until_rule,
+        due_by: section.due_by,
+        location_id: section.location_id,
+      });
+      for (const table of ["template_section_checkpoints", "template_section_assets"] as const) {
+        const column =
+          table === "template_section_checkpoints" ? "checkpoint_id" : "asset_id";
+        const links = await tx.getAll<Record<string, string>>(
+          `SELECT ${column} FROM ${table} WHERE section_id = ?`,
+          [section.id],
+        );
+        for (const link of links) {
+          await insert(tx, table, {
+            section_id: sectionCopyId,
+            [column]: link[column],
+          });
+        }
+      }
+      const items = await tx.getAll<TemplateItemRow>(
+        "SELECT * FROM checklist_template_items WHERE section_id = ? ORDER BY position",
+        [section.id],
+      );
+      for (const [position, item] of items.entries()) {
+        await insert(tx, "checklist_template_items", {
+          section_id: sectionCopyId,
+          type: item.type,
+          label: item.label,
+          config: item.config,
+          position,
+          version: 1,
+        });
+      }
+    }
+    return copyId;
+  });
 }
 
 export interface SectionInput {
@@ -718,6 +836,17 @@ export async function reviseItem(
 
 export function deleteItem(itemId: string): Promise<void> {
   return remove(db, "checklist_template_items", itemId);
+}
+
+/**
+ * Orphan an item from its section without deleting it.
+ *
+ * What "removing" an item from a template means when instances still read
+ * through it: the row survives, so every checklist already generated keeps
+ * rendering the question it actually asked.
+ */
+export function orphanItem(itemId: string): Promise<void> {
+  return update(db, "checklist_template_items", itemId, { section_id: null });
 }
 
 export async function reorderItems(itemIds: string[]): Promise<void> {

@@ -45,27 +45,40 @@ export default defineConfig({
       // register a second time and the hook would never see the waiting
       // worker.
       injectRegister: null,
-      // App-shell caching. The build has no code-splitting (one JS bundle),
-      // so precaching it — which globPatterns below does — already includes
-      // the InstantDB and Clerk SDK code itself: the app still boots and
-      // renders offline. What must NOT be cached is their *live network
-      // traffic* (auth token exchange, Instant's sync/query calls) — those
-      // are cross-origin requests to instantdb.com / clerk.com, which this
-      // generateSW config never intercepts (no runtimeCaching entries for
-      // them), so they always hit the network and fail cleanly offline
-      // rather than replaying a stale/signed-out response. InstantDB's own
-      // local-first cache (IndexedDB, independent of the service worker)
-      // is what actually keeps data usable offline once the shell has
-      // loaded. The default navigateFallback (this precached index.html)
+      // App-shell caching. Precaching the bundle — which globPatterns below
+      // does — includes the PowerSync and Clerk SDK code itself, so the app
+      // still boots and renders offline. What must NOT be cached is their
+      // *live network traffic* (the Clerk token, PowerSync's sync stream) — those
+      // are cross-origin requests to the marina's Supabase, its PowerSync
+      // instance, and clerk.com, which this generateSW config never intercepts
+      // (no runtimeCaching entries for them), so they always hit the network
+      // and fail cleanly offline rather than replaying a stale or signed-out
+      // response. The device's own SQLite database — held in IndexedDB,
+      // independent of the service worker — is what actually keeps data usable
+      // offline once the shell has loaded. The default navigateFallback (this precached index.html)
       // applies to every navigation, including /checkin/:guidUrl — the
       // NFC/QR deep link is client-routed by React Router once the shell
       // loads, so it must fall back the same as any other route.
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
-        // The unminified debug bundle blows past Workbox's 2 MiB default,
-        // which would silently drop the app shell from the precache and
-        // quietly break offline support — the one thing the PWA is for.
-        ...(DEBUG_BUILD ? { maximumFileSizeToCacheInBytes: 8 * 1024 * 1024 } : {}),
+        // .wasm is in here because the app cannot open its own database
+        // without it. PowerSync's SQLite runs in WebAssembly; a shell that
+        // precached its JavaScript and not its WASM would boot offline and
+        // then have nowhere to read from, which is worse than not booting.
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,wasm}'],
+        // Four WASM builds ship — {plain, multi-cipher} × {sync, async} — and
+        // exactly one is reachable: the default IDBBatchAtomicVFS is
+        // asynchronous, and no encryptionKey is passed to PowerSyncDatabase,
+        // which is what selects the mc- variants. Precaching the other three
+        // would cost a marina phone 5 MB of WASM it will never execute, on an
+        // app whose whole purpose is working where the signal is bad. If the
+        // VFS or encryption settings in src/lib/db/index.ts change, this
+        // changes with them — and getting it wrong is loud, because the
+        // database fails to open.
+        globIgnores: ['**/mc-wa-sqlite*', '**/wa-sqlite-[!a]*.wasm'],
+        // The WASM alone is 2.2 MiB, past Workbox's default limit — which
+        // silently DROPS an oversized file from the precache rather than
+        // failing, and would quietly break the one thing the PWA is for.
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
       },
       manifest: {
         name: 'MarinaSecure',
