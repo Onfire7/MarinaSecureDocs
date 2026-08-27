@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import type { AttachmentTarget } from "../../lib/attachments";
+import type { AttachmentTarget } from "../../data/attachments";
+import { useCheckpointByGuid } from "../../data/checkpoints";
 import { NoteDialog } from "../shared/NoteDialog";
 import { useCheckpointVisit } from "./useCheckpointVisit";
 import { CheckpointCheckinView } from "./CheckpointCheckinPage";
@@ -33,10 +33,10 @@ export function CheckpointScanModal({
   const current = useCurrent();
   const [showNoteDialog, setShowNoteDialog] = useState(false);
 
-  const { data, isLoading: cpLoading } = db.useQuery({
-    checkpoints: { $: { where: { guidUrl } }, location: {} },
-  });
-  const checkpoint = data?.checkpoints?.[0];
+  // guid_url is indexed in the device's own SQLite, so resolving a scanned tag
+  // is a local lookup — which is the only kind that works standing in front of
+  // the tag.
+  const { checkpoint, isLoading: cpLoading } = useCheckpointByGuid(guidUrl);
 
   // No resumeCheckInId to pass — useCheckpointVisit's own dedupe window
   // finds a just-created check-in at this checkpoint on its own, so

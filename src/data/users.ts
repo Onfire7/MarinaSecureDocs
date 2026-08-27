@@ -273,11 +273,18 @@ export function isActive(user: { active: number }): boolean {
   return bool(user.active);
 }
 
+/**
+ * The signed-in user's own dashboard arrangement.
+ *
+ * `null` clears it, which is not the same as saving an empty list: null means
+ * "derive from my roles", and an empty list means "I hid everything". The
+ * Reset button relies on that difference.
+ */
 export async function saveDashboardLayout(
   userId: string,
-  layout: unknown,
+  layout: unknown | null,
 ): Promise<void> {
   await update(db, "users", userId, {
-    dashboard_layout: JSON.stringify(layout),
+    dashboard_layout: layout === null ? null : JSON.stringify(layout),
   });
 }

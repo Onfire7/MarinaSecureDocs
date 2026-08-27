@@ -449,13 +449,13 @@ export interface TriggerConfig {
   recurrenceRule?: string;
 }
 
-/** The parts of a ChecklistTemplateItem every consumer here relies on. */
+/** The parts of a checklist_template_items row every consumer here relies on. */
 export interface TemplateItemLike {
   id: string;
   type: string;
   label: string;
-  order: number;
-  config?: Record<string, unknown>;
+  position: number;
+  config?: Record<string, unknown> | null;
 }
 
 // ---- Rule resolution (template rules → instance timestamps) ----
@@ -588,10 +588,10 @@ export function recurrenceMatchesDay(
  * No rule means eligible whenever the creating event happens.
  */
 export function eligibleToday(
-  row: { triggerType: string; triggerConfig?: Record<string, unknown> | null },
+  row: { trigger_type: string; triggerConfig?: TriggerConfig | null },
   day: Date = new Date(),
 ): boolean {
-  return recurrenceMatchesDay((row.triggerConfig as TriggerConfig | null)?.recurrenceRule, day);
+  return recurrenceMatchesDay(row.triggerConfig?.recurrenceRule, day);
 }
 
 // ---- Instance visibility & derived completion ----
@@ -602,11 +602,11 @@ export function eligibleToday(
  * Once now passes hideUntil the row is permanently visible — nothing re-hides.
  */
 export function isVisibleNow(
-  row: { hideUntil?: number | string | null },
+  row: { hide_until?: number | string | null },
   now: number = Date.now(),
 ): boolean {
-  if (row.hideUntil == null) return true;
-  return now >= new Date(row.hideUntil).getTime();
+  if (row.hide_until == null) return true;
+  return now >= new Date(row.hide_until).getTime();
 }
 
 /**
@@ -615,13 +615,13 @@ export function isVisibleNow(
  * extra write on every item completion just to keep a summary in sync.
  */
 export function sectionCompletionTime(
-  items: { completedAt?: number | string | null }[],
+  items: { completed_at?: number | string | null }[],
 ): number | null {
   if (items.length === 0) return null;
   let latest = 0;
   for (const it of items) {
-    if (it.completedAt == null) return null;
-    latest = Math.max(latest, new Date(it.completedAt).getTime());
+    if (it.completed_at == null) return null;
+    latest = Math.max(latest, new Date(it.completed_at).getTime());
   }
   return latest;
 }

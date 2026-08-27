@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
+import { saveDashboardLayout } from "../../data/users";
+import { json } from "../../lib/db";
 import {
   CARD_REGISTRY,
   defaultLayout,
@@ -16,7 +17,10 @@ export function DashboardPage() {
   const [editing, setEditing] = useState(false);
 
   const roleNames = current.roleNames;
-  const saved = current.user?.dashboardLayout ?? null;
+  // A jsonb column arrives as text. null means "no saved layout" — derive it
+  // from the current roles — which is distinct from an empty array, meaning a
+  // user who hid every card.
+  const saved = json<LayoutEntry[] | null>(current.user?.dashboard_layout, null);
   const layout: LayoutEntry[] = saved ?? defaultLayout(roleNames);
 
   const defById = new Map(CARD_REGISTRY.map((d) => [d.id, d]));
@@ -38,9 +42,7 @@ export function DashboardPage() {
 
   const persist = (next: LayoutEntry[] | null) => {
     if (!current.user) return;
-    db.transact(
-      db.tx.users[current.user.id].update({ dashboardLayout: next }),
-    ).catch(console.error);
+    void saveDashboardLayout(current.user.id, next).catch(console.error);
   };
 
   const move = (cardId: string, delta: -1 | 1) => {

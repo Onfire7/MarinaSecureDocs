@@ -1,9 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { displayName, isNameless } from "../../lib/contacts";
+import { isNameless } from "../../lib/contacts";
 import { formatPhone, twilioRequest } from "../../lib/comms";
+import {
+  addCallNote,
+  useActiveCalls,
+  useCallNotes,
+  type CallRow,
+} from "../../data/comms";
+import { useMarinaSettings } from "../../data/settings";
+import { useReservationsForContact } from "../../data/reservations";
+import { useContactCraft } from "../../data/boats";
 
 // Comms — Active Call Panel (see docs/pages/active-call-panel.html).
 // Mounted app-wide: it appears whenever a call is live, so whoever answers
@@ -16,44 +24,24 @@ export function ActiveCallPanel() {
   const current = useCurrent();
   const [dismissed, setDismissed] = useState<string | null>(null);
 
-  const { data } = db.useQuery({
-    calls: {
-      $: { where: { duration: { $isNull: true }, missed: false } },
-      contact: {},
-    },
-    marinaSettings: {},
-  });
+  const { data: activeCalls } = useActiveCalls();
+  const settings = useMarinaSettings();
 
-  const live = (data?.calls ?? [])
-    .filter((c) => c.startedAt != null)
-    .sort(
-      (a, b) => new Date(b.startedAt!).getTime() - new Date(a.startedAt!).getTime(),
-    )[0];
+  const live = activeCalls.filter((c) => c.started_at != null)[0];
 
   if (!live || dismissed === live.id) return null;
 
   return (
     <CallPanelBody
       call={live}
-      recordingEnabled={Boolean(data?.marinaSettings?.[0]?.callRecordingEnabled)}
-      transcriptionEnabled={Boolean(data?.marinaSettings?.[0]?.callTranscriptionEnabled)}
+      recordingEnabled={settings.callRecordingEnabled}
+      transcriptionEnabled={settings.callTranscriptionEnabled}
       canSeeContext={current.can("view_calls")}
       canControl={current.can("place_calls")}
       onDismiss={() => setDismissed(live.id)}
     />
   );
 }
-
-type Call = {
-  id: string;
-  direction: string;
-  line?: string;
-  fromNumber?: string;
-  startedAt?: string | number;
-  recordingUrl?: string;
-  transcript?: string;
-  contact?: { id: string; name?: string | null; phone?: string | null } | null;
-};
 
 function CallPanelBody({
   call,
@@ -63,7 +51,7 @@ function CallPanelBody({
   canControl,
   onDismiss,
 }: {
-  call: Call;
+  call: CallRow;
   recordingEnabled: boolean;
   transcriptionEnabled: boolean;
   canSeeContext: boolean;
@@ -81,37 +69,26 @@ function CallPanelBody({
     return () => clearInterval(t);
   }, []);
 
-  const contactId = call.contact?.id;
-  const { data } = db.useQuery(
-    canSeeContext && contactId
-      ? {
-          reservations: {
-            $: {
-              where: {
-                "contact.id": contactId,
-                status: { $in: ["confirmed", "checked_in"] },
-              },
-            },
-            location: {},
-            asset: {},
-          },
-          boats: { $: { where: { "owners.id": contactId } }, currentSlip: {} },
-          callNotes: { $: { where: { "call.contact.id": contactId } }, author: {} },
-        }
-      : null,
-  );
+  const contactId = call.contact_id ?? undefined;
+  const { data: reservations } = useReservationsForContact(contactId);
+  const { data: craft } = useContactCraft(contactId);
+  // Notes on THIS call, not every call this contact has ever made. The old
+  // query walked call → contact → all their calls' notes, which on a regular
+  // caller buried the note about the call you are actually on.
+  const { data: priorNotes } = useCallNotes(call.id);
 
-  const elapsed = call.startedAt
-    ? Math.floor((Date.now() - new Date(call.startedAt).getTime()) / 1000)
+  const active = reservations.filter(
+    (r) => r.status === "confirmed" || r.status === "checked_in",
+  );
+  const boats = craft.filter((c) => c.kind === "boat");
+
+  const elapsed = call.started_at
+    ? Math.floor((Date.now() - new Date(call.started_at).getTime()) / 1000)
     : 0;
 
   const addNote = async () => {
     if (!note.trim() || !current.user) return;
-    await db.transact(
-      db.tx.callNotes[id()]
-        .update({ body: note.trim(), createdAt: Date.now() })
-        .link({ call: call.id, author: current.user.id }),
-    );
+    await addCallNote(call.id, note.trim(), current.user.id);
     setNote("");
   };
 
@@ -136,11 +113,9 @@ function CallPanelBody({
           <div className="card-title">
             {/* Contact identity requires view_calls; the raw call state
                 doesn't, since it's this user's own device. */}
-            {canSeeContext
-              ? call.contact
-                ? displayName(call.contact)
-                : formatPhone(call.fromNumber)
-              : formatPhone(call.fromNumber)}
+            {canSeeContext && call.contact_name
+              ? call.contact_name
+              : formatPhone(call.from_number)}
           </div>
           <div className="card-meta">
             {call.line ? `${call.line} · ` : ""}
@@ -154,53 +129,53 @@ function CallPanelBody({
 
       {canSeeContext ? (
         <div style={{ marginTop: 10 }}>
-          {call.contact && isNameless(call.contact) && (
-            <Link to={`/contacts/${call.contact.id}`} className="badge badge-warn">
+          {call.contact_id && isNameless({ id: call.contact_id, name: call.contact_name }) && (
+            <Link to={`/contacts/${call.contact_id}`} className="badge badge-warn">
               Unknown caller — name &amp; merge
             </Link>
           )}
 
-          {(data?.reservations ?? []).length > 0 && (
+          {active.length > 0 && (
             <div className="field">
               <span className="field-label">Active reservations</span>
-              {(data?.reservations ?? []).map((r) => (
+              {active.map((r) => (
                 <div key={r.id} className="small">
                   <Link to={`/reservations/${r.id}`}>
-                    {r.location?.name ?? r.asset?.name ?? "Reservation"}
+                    {r.location_name ?? r.asset_name ?? "Reservation"}
                   </Link>
-                  {r.expectedCheckin &&
-                    ` · ${new Date(r.expectedCheckin).toLocaleDateString()}`}
+                  {r.expected_checkin &&
+                    ` · ${new Date(r.expected_checkin).toLocaleDateString()}`}
                 </div>
               ))}
             </div>
           )}
 
-          {current.can("view_owner") && (data?.boats ?? []).length > 0 && (
+          {current.can("view_owner") && boats.length > 0 && (
             <div className="field">
               <span className="field-label">Boats</span>
-              {(data?.boats ?? []).map((b) => (
+              {boats.map((b) => (
                 <div key={b.id} className="small">
-                  <Link to={`/boats/${b.id}`}>{b.name}</Link>
-                  {b.currentSlip && ` · ${b.currentSlip.name}`}
+                  <Link to={`/boats/${b.id}`}>{b.label}</Link>
+                  <span className="muted"> · {b.role}</span>
                 </div>
               ))}
             </div>
           )}
 
-          {(data?.callNotes ?? []).length > 0 && (
+          {priorNotes.length > 0 && (
             <div className="field">
-              <span className="field-label">Prior notes</span>
-              {(data?.callNotes ?? []).slice(0, 4).map((n) => (
+              <span className="field-label">Notes on this call</span>
+              {priorNotes.slice(0, 4).map((n) => (
                 <div key={n.id} className="small">
                   {n.body}
-                  <span className="muted"> — {n.author?.name ?? "—"}</span>
+                  <span className="muted"> — {n.author_name ?? "—"}</span>
                 </div>
               ))}
             </div>
           )}
 
-          {recordingEnabled && call.recordingUrl && (
-            <audio controls src={call.recordingUrl} style={{ width: "100%" }} />
+          {recordingEnabled && call.recording_url && (
+            <audio controls src={call.recording_url} style={{ width: "100%" }} />
           )}
           {transcriptionEnabled && call.transcript && (
             <p className="small" style={{ whiteSpace: "pre-wrap" }}>

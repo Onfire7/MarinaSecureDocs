@@ -65,6 +65,32 @@ export async function update(
   );
 }
 
+/**
+ * Insert a row only if its id is not already present.
+ *
+ * The idempotent half of deterministic ids: a re-scanned checkpoint or a
+ * replayed write queue derives the same id and must not write a second row —
+ * or, worse, overwrite the first and lose whatever was recorded against it.
+ *
+ * Not `INSERT OR REPLACE`: PowerSync's local tables are views with INSTEAD OF
+ * triggers, and a replace becomes a DELETE followed by an INSERT — which would
+ * put a spurious delete in the upload queue for a row that never went away.
+ */
+export async function insertIfAbsent(
+  executor: Executor,
+  table: string,
+  rowId: string,
+  row: Row,
+): Promise<boolean> {
+  const existing = await executor.getOptional<{ id: string }>(
+    `SELECT id FROM ${table} WHERE id = ?`,
+    [rowId],
+  );
+  if (existing) return false;
+  await insert(executor, table, { ...row, id: rowId });
+  return true;
+}
+
 /** Delete one row by id. */
 export async function remove(
   executor: Executor,

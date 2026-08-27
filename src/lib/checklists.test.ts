@@ -45,12 +45,12 @@ describe("recurrenceMatchesDay", () => {
 describe("eligibleToday", () => {
   it("gates a recurring row on its rule and lets non-recurring rows through", () => {
     const recurring = {
-      triggerType: "recurring",
+      trigger_type: "recurring",
       triggerConfig: { recurrenceRule: "FREQ=WEEKLY;BYDAY=TU" },
     };
     expect(eligibleToday(recurring, TUESDAY)).toBe(true);
     expect(eligibleToday(recurring, WEDNESDAY)).toBe(false);
-    expect(eligibleToday({ triggerType: "manual" }, WEDNESDAY)).toBe(true);
+    expect(eligibleToday({ trigger_type: "manual" }, WEDNESDAY)).toBe(true);
   });
 });
 
@@ -100,22 +100,22 @@ describe("resolveHideUntil", () => {
 
 describe("isVisibleNow", () => {
   it("is visible with no hideUntil", () => {
-    expect(isVisibleNow({ hideUntil: null })).toBe(true);
+    expect(isVisibleNow({ hide_until: null })).toBe(true);
     expect(isVisibleNow({})).toBe(true);
   });
 
   it("accepts hideUntil as a number or an ISO string", () => {
     const at = Date.UTC(2026, 7, 25, 19, 0, 0);
-    expect(isVisibleNow({ hideUntil: at }, at + 1)).toBe(true);
-    expect(isVisibleNow({ hideUntil: new Date(at).toISOString() }, at + 1)).toBe(true);
-    expect(isVisibleNow({ hideUntil: at }, at - 1)).toBe(false);
+    expect(isVisibleNow({ hide_until: at }, at + 1)).toBe(true);
+    expect(isVisibleNow({ hide_until: new Date(at).toISOString() }, at + 1)).toBe(true);
+    expect(isVisibleNow({ hide_until: at }, at - 1)).toBe(false);
   });
 
   it("is visible exactly at hideUntil", () => {
     // Boundary is inclusive: a row must not stay hidden for the one tick it
     // becomes due.
     const at = Date.UTC(2026, 7, 25, 19, 0, 0);
-    expect(isVisibleNow({ hideUntil: at }, at)).toBe(true);
+    expect(isVisibleNow({ hide_until: at }, at)).toBe(true);
   });
 });
 
@@ -145,16 +145,16 @@ describe("sectionCompletionTime", () => {
   });
 
   it("is null until every item is complete", () => {
-    expect(sectionCompletionTime([{ completedAt: 1000 }, { completedAt: null }])).toBeNull();
-    expect(sectionCompletionTime([{ completedAt: 1000 }, {}])).toBeNull();
+    expect(sectionCompletionTime([{ completed_at: 1000 }, { completed_at: null }])).toBeNull();
+    expect(sectionCompletionTime([{ completed_at: 1000 }, {}])).toBeNull();
   });
 
   it("is the latest completion once all items are done", () => {
     const later = Date.UTC(2026, 7, 25, 20, 0, 0);
     expect(
       sectionCompletionTime([
-        { completedAt: Date.UTC(2026, 7, 25, 19, 0, 0) },
-        { completedAt: new Date(later).toISOString() },
+        { completed_at: Date.UTC(2026, 7, 25, 19, 0, 0) },
+        { completed_at: new Date(later).toISOString() },
       ]),
     ).toBe(later);
   });

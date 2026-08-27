@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { displayName } from "../../lib/contacts";
 import { formatPhone } from "../../lib/comms";
 import { NewCallDialog } from "./NewCommsDialogs";
+import { useMissedCalls, useSmsThreads } from "../../data/comms";
+import { useMarinaSettings } from "../../data/settings";
 
 // Comms — Missed Calls / Unread SMS Detail (see
 // docs/pages/missed-comms-detail.html). A combined catch-up worklist, not a
@@ -16,15 +16,11 @@ export function MissedCommsPage() {
   const canPlace = current.can("place_calls");
   const [callingBack, setCallingBack] = useState(false);
 
-  const { data } = db.useQuery({
-    calls: { $: { where: { missed: true } }, contact: {} },
-    smsThreads: { $: { where: { unread: true } }, contact: {} },
-    marinaSettings: {},
-  });
-
-  const settings = data?.marinaSettings?.[0];
-  const missedCalls = canCalls ? (data?.calls ?? []) : [];
-  const unreadThreads = canSms ? (data?.smsThreads ?? []) : [];
+  const settings = useMarinaSettings();
+  const { data: calls } = useMissedCalls();
+  const { data: threads } = useSmsThreads();
+  const missedCalls = canCalls ? calls : [];
+  const unreadThreads = canSms ? threads.filter((t) => t.unread === 1) : [];
 
   if (!canCalls && !canSms) {
     return (
@@ -55,12 +51,12 @@ export function MissedCommsPage() {
                   <div className="spread" style={{ flexWrap: "wrap" }}>
                     <div>
                       <div className="card-title">
-                        {c.contact ? displayName(c.contact) : formatPhone(c.fromNumber)}
+                        {c.contact_name ?? formatPhone(c.from_number)}
                       </div>
                       <div className="card-meta">
                         {c.line ? `${c.line} · ` : ""}
-                        {c.startedAt
-                          ? new Date(c.startedAt).toLocaleString(undefined, {
+                        {c.started_at
+                          ? new Date(c.started_at).toLocaleString(undefined, {
                               month: "short",
                               day: "numeric",
                               hour: "numeric",
@@ -81,10 +77,14 @@ export function MissedCommsPage() {
                   </div>
                   {/* Voicemail plays inline; recording/transcript sections are
                       omitted entirely when the marina has them disabled. */}
-                  {c.voicemailUrl && (
-                    <audio controls src={c.voicemailUrl} style={{ width: "100%", marginTop: 6 }} />
+                  {c.voicemail_url && (
+                    <audio
+                      controls
+                      src={c.voicemail_url}
+                      style={{ width: "100%", marginTop: 6 }}
+                    />
                   )}
-                  {settings?.callTranscriptionEnabled && c.transcript && (
+                  {settings.callTranscriptionEnabled && c.transcript && (
                     <p className="small" style={{ whiteSpace: "pre-wrap" }}>
                       {c.transcript}
                     </p>
@@ -110,9 +110,7 @@ export function MissedCommsPage() {
                   style={{ textDecoration: "none", color: "inherit" }}
                 >
                   <span>
-                    <span className="card-title">
-                      {t.contact ? displayName(t.contact) : "Unknown"}
-                    </span>
+                    <span className="card-title">{t.contact_name ?? "Unknown"}</span>
                     <span className="card-meta">{t.line ?? ""}</span>
                   </span>
                   <span className="badge badge-accent">Unread</span>

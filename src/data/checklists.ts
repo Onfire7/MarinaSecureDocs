@@ -2,6 +2,8 @@ import { useQuery } from "@powersync/react";
 import { db, json, stamp } from "../lib/db";
 import { insert, remove, transact, update } from "./sql";
 import { recordActivity } from "./activity";
+import { id as newId, json as parseJson } from "../lib/db";
+import { deterministicId } from "../lib/detId";
 import type {
   DueByRule,
   ItemConfig,
@@ -9,6 +11,13 @@ import type {
   ItemType,
   TriggerConfig,
 } from "../lib/checklists";
+import {
+  hasWorkAtCreation,
+  insertInstance,
+  insertSectionInstance,
+  type InstantiableSection,
+  type InstantiableTemplate,
+} from "./checklistInstantiation";
 
 // Checklists — templates, and the instances made from them.
 //
@@ -530,4 +539,158 @@ async function replaceLinks(
       }
     }
   });
+}
+
+
+// ---------------------------------------------------------------- instantiation
+
+/**
+ * Templates assembled into the shape instantiation needs.
+ *
+ * A section's eligibility depends on four tables — the section, the status of
+ * the location it belongs to, its checkpoint and asset links, and its items —
+ * and none of that is on the section row. Rather than one query with three
+ * fan-out joins (which would multiply every section by its items), each table
+ * is read once and stitched together here. Every one of them is always
+ * resident, so this is a handful of local reads.
+ */
+export function useInstantiableTemplates(
+  triggerTypes: string[],
+): InstantiableTemplate[] {
+  const placeholders = triggerTypes.map(() => "?").join(", ");
+  const { data: templates } = useQuery<TemplateRow>(
+    triggerTypes.length
+      ? `${TEMPLATE_SELECT} WHERE t.trigger_type IN (${placeholders})`
+      : `${TEMPLATE_SELECT}`,
+    triggerTypes,
+  );
+  const { data: sections } = useQuery<
+    TemplateSectionRow & { location_status_name: string | null }
+  >(
+    `SELECT s.*, t.name AS template_name, l.name AS location_name,
+            ls.name AS location_status_name
+       FROM checklist_template_sections s
+       LEFT JOIN checklist_templates t ON t.id = s.template_id
+       LEFT JOIN locations l ON l.id = s.location_id
+       LEFT JOIN location_statuses ls ON ls.id = l.status_id
+      ORDER BY s.position`,
+  );
+  const { data: items } = useTemplateItems();
+  const { data: sectionCheckpoints } = useSectionCheckpoints();
+  const { data: sectionAssets } = useSectionAssets();
+
+  return templates.map((t) =>
+    assembleTemplate(t, sections, items, sectionCheckpoints, sectionAssets),
+  );
+}
+
+function assembleTemplate(
+  t: TemplateRow,
+  sections: (TemplateSectionRow & { location_status_name: string | null })[],
+  items: TemplateItemRow[],
+  sectionCheckpoints: { section_id: string; checkpoint_id: string }[],
+  sectionAssets: { section_id: string; asset_id: string }[],
+): InstantiableTemplate {
+  return {
+    id: t.id,
+    name: t.name,
+    trigger_type: t.trigger_type,
+    assigned_to_user: t.assigned_to_user,
+    hide_until_rule: t.hide_until_rule,
+    dueBy: dueByRule(t),
+    assigned_role_id: t.assigned_role_id,
+    sections: sections
+      .filter((s) => s.template_id === t.id)
+      .map((s) => toInstantiableSection(s, items, sectionCheckpoints, sectionAssets)),
+  };
+}
+
+function toInstantiableSection(
+  s: TemplateSectionRow & { location_status_name: string | null },
+  items: TemplateItemRow[],
+  sectionCheckpoints: { section_id: string; checkpoint_id: string }[],
+  sectionAssets: { section_id: string; asset_id: string }[],
+): InstantiableSection {
+  return {
+    id: s.id,
+    name: s.name,
+    position: s.position,
+    is_active: s.is_active,
+    trigger_type: s.trigger_type,
+    triggerConfig: templateTriggerConfig(s),
+    hide_until_rule: s.hide_until_rule,
+    dueBy: dueByRule(s),
+    location_id: s.location_id,
+    location_status_name: s.location_status_name,
+    checkpointIds: sectionCheckpoints
+      .filter((sc) => sc.section_id === s.id)
+      .map((sc) => sc.checkpoint_id),
+    assetIds: sectionAssets
+      .filter((sa) => sa.section_id === s.id)
+      .map((sa) => sa.asset_id),
+    items: items
+      .filter((i) => i.section_id === s.id)
+      .map((i) => ({
+        id: i.id,
+        type: i.type,
+        label: i.label,
+        position: i.position,
+        config: parseJson<Record<string, unknown>>(i.config, {}),
+      })),
+  };
+}
+
+export { hasWorkAtCreation };
+
+/**
+ * Create a checklist from a template, and log why.
+ *
+ * `instanceId` may be passed in to make the creation idempotent — a recurring
+ * template derives one from the template and the day, so two clients opening
+ * the app on the same morning converge on one checklist rather than two.
+ */
+export async function createInstanceFromTemplate(opts: {
+  template: InstantiableTemplate;
+  userId: string;
+  instanceId?: string;
+  reason: string;
+  now?: Date;
+}): Promise<string> {
+  const instanceId = opts.instanceId ?? newId();
+  return transact(async (tx) => {
+    await insertInstance(tx, {
+      template: opts.template,
+      instanceId,
+      userId: opts.userId,
+      now: opts.now,
+    });
+    await recordActivity(tx, {
+      eventType: "checklist.created",
+      summary: `${opts.template.name} created by ${opts.reason}`,
+      subjectType: "checklist_instances",
+      subjectId: instanceId,
+      actorId: opts.userId,
+    });
+    return instanceId;
+  });
+}
+
+/**
+ * The id a recurring template's checklist takes on a given day.
+ *
+ * Deterministic so that whoever opens the app first creates it and everyone
+ * after finds it, rather than each device generating its own copy of the same
+ * round.
+ */
+export function recurringInstanceId(templateId: string, day: Date): string {
+  return deterministicId(`recurring:${templateId}:${day.toDateString()}`);
+}
+
+/** Materialize one event-anchored section onto an existing instance. */
+export function addSectionToInstance(
+  instanceId: string,
+  section: InstantiableSection,
+  now?: Date,
+): Promise<string> {
+  return transact((tx) => insertSectionInstance(tx, instanceId, section, now));
 }
