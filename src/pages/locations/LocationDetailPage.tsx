@@ -1,20 +1,32 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { NoteDialog } from "../shared/NoteDialog";
 import { ManualCheckinDialog } from "../checklists/ManualCheckinDialog";
-import { activityTx } from "../../lib/activityLog";
-import type { AttachmentTarget } from "../../lib/attachments";
+import type { AttachmentTarget } from "../../data/attachments";
 import {
-  STANDARD_STATUSES,
   breadcrumb,
   compareNames,
   statusBadgeClass,
   statusLabel,
 } from "../../lib/locations";
+import {
+  setLocationStatus,
+  tracksStatus,
+  useChildLocations,
+  useLocation as useLocationRow,
+  useLocations,
+} from "../../data/locations";
+import { useLocationStatuses } from "../../data/lookups";
+import { useCheckpointsForLocation } from "../../data/checkpoints";
+import { useNotesForTarget } from "../../data/notes";
+import { useIncidentsForTarget } from "../../data/incidents";
+import { useTicketsForTarget } from "../../data/tickets";
+import { useLeasesForLocation } from "../../data/leases";
+import { useReservationsForTarget } from "../../data/reservations";
+import { useBoatOwners, useVehicleOwners } from "../../data/boats";
 
 // Locations — Location Detail (see pages/location-detail.html).
 // The hub for everything attached to one physical place. Owner, lease, and
@@ -29,37 +41,24 @@ export function LocationDetailPage() {
   const [showNoteDialog, setShowNoteDialog] = useState(false);
   const [showCheckin, setShowCheckin] = useState(false);
 
-  const { data } = db.useQuery(
-    locationId
-      ? {
-          locations: {
-            $: { where: { id: locationId } },
-            type: {},
-            parent: {},
-            children: { type: {} },
-            currentBoat: { owners: {} },
-            currentVehicle: { owners: {} },
-            checkpoints: {},
-            notes: { author: {} },
-            incidents: {},
-            tickets: {},
-            leases: { lessees: {} },
-            reservations: {
-              $: { where: { status: { $in: ["requested", "confirmed"] } } },
-              contact: {},
-            },
-          },
-        }
-      : null,
+  const { location } = useLocationRow(locationId);
+  const { data: allLocations } = useLocations();
+  const { data: children } = useChildLocations(locationId);
+  const { data: checkpoints } = useCheckpointsForLocation(locationId);
+  const { data: notes } = useNotesForTarget("location_id", locationId);
+  const { data: incidents } = useIncidentsForTarget("location_id", locationId);
+  const { data: tickets } = useTicketsForTarget("location_id", locationId);
+  const { data: leases } = useLeasesForLocation(locationId);
+  const { data: reservations } = useReservationsForTarget("location", locationId);
+  const { statuses } = useLocationStatuses();
+  // Owners of whichever occupant is here — boat first, then vehicle.
+  const { data: boatOwners } = useBoatOwners(location?.current_boat_id ?? undefined);
+  const { data: vehicleOwners } = useVehicleOwners(
+    location?.current_vehicle_id ?? undefined,
   );
-  const location = data?.locations?.[0];
 
-  const { data: crumbData } = db.useQuery({ locations: { parent: {} } });
   const byId = new Map(
-    (crumbData?.locations ?? []).map((l) => [
-      l.id,
-      { name: l.name, parent: l.parent ? { id: l.parent.id } : null },
-    ]),
+    allLocations.map((l) => [l.id, { name: l.name, parent_id: l.parent_id }]),
   );
 
   if (!location) {
@@ -70,45 +69,38 @@ export function LocationDetailPage() {
     );
   }
 
-  const crumbs = breadcrumb(location.parent?.id, byId);
+  const crumbs = breadcrumb(location.parent_id ?? undefined, byId);
   // Presence of the field is driven by the type's flags; an occupant that
   // exists anyway (data predating a flag change) still shows.
-  const carriesBoat = Boolean(location.type?.hasBoat || location.currentBoat);
-  const carriesVehicle = Boolean(location.type?.hasVehicle || location.currentVehicle);
-  // Owner section reflects whichever occupant is present (boat first).
-  const owners = [
-    ...(location.currentBoat?.owners ?? []),
-    ...(location.currentVehicle?.owners ?? []),
-  ];
+  const carriesBoat = Boolean(location.current_boat_id) || location.boat_name != null;
+  const carriesVehicle =
+    Boolean(location.current_vehicle_id) || location.vehicle_description != null;
+  const owners = [...boatOwners, ...vehicleOwners];
   const now = Date.now();
-  const activeLease = (location.leases ?? []).find(
+  const activeLease = leases.find(
     (l) =>
-      (!l.startDate || new Date(l.startDate).getTime() <= now) &&
-      (!l.endDate || new Date(l.endDate).getTime() >= now),
+      (!l.start_date || new Date(l.start_date).getTime() <= now) &&
+      (!l.end_date || new Date(l.end_date).getTime() >= now),
   );
-  const upcoming = (location.reservations ?? [])
-    .filter((r) => r.expectedCheckin && new Date(r.expectedCheckin).getTime() > now - 24 * 3600_000)
+  const upcoming = reservations
+    .filter(
+      (r) =>
+        (r.status === "requested" || r.status === "confirmed") &&
+        r.expected_checkin &&
+        new Date(r.expected_checkin).getTime() > now - 24 * 3600_000,
+    )
     .sort(
       (a, b) =>
-        new Date(a.expectedCheckin!).getTime() - new Date(b.expectedCheckin!).getTime(),
+        new Date(a.expected_checkin!).getTime() -
+        new Date(b.expected_checkin!).getTime(),
     )[0];
 
-  const setStatus = (status: string) => {
-    void db.transact([
-      db.tx.locations[location.id].update({ status }),
-      activityTx({
-        eventType: "location.status_changed",
-        summary: `${location.name} set to ${statusLabel(status)}`,
-        subjectType: "locations",
-        subjectId: location.id,
-        actorId: current.user?.id,
-      }),
-    ]);
+  const setStatus = (statusId: string) => {
+    const status = statuses.find((st) => st.id === statusId);
+    if (status) void setLocationStatus(location, status, current.user?.id ?? null);
   };
 
-  const children = [...(location.children ?? [])].sort((a, b) =>
-    compareNames(a.name, b.name),
-  );
+  const sortedChildren = [...children].sort((a, b) => compareNames(a.name, b.name));
 
   const selfTarget: AttachmentTarget = {
     type: "location",
@@ -122,7 +114,7 @@ export function LocationDetailPage() {
         <div>
           <h1 className="page-title">{location.name}</h1>
           <div className="page-sub">
-            {location.type?.name}
+            {location.type_name}
             {crumbs.length > 0 && ` · ${crumbs.join(" → ")}`}
           </div>
         </div>
@@ -148,7 +140,7 @@ export function LocationDetailPage() {
           >
             + Ticket
           </button>
-          {(location.checkpoints ?? []).length > 0 && (
+          {checkpoints.length > 0 && (
             <button
               type="button"
               className="btn btn-sm"
@@ -162,33 +154,32 @@ export function LocationDetailPage() {
 
       <div className={isMobile ? undefined : "grid-2"}>
         <div>
-          {location.type?.tracksStatus && (
+          {tracksStatus(location) && (
           <div className="field">
             <span className="field-label">Status</span>
             <div className="field-value row">
               {canManage ? (
                 <select
                   className="select select-inline"
-                  value={location.status ?? "vacant"}
+                  value={location.status_id ?? ""}
                   onChange={(e) => setStatus(e.target.value)}
                 >
-                  {[
-                    ...new Set([...STANDARD_STATUSES, location.status ?? "vacant"]),
-                  ].map((s) => (
-                    <option key={s} value={s}>
-                      {statusLabel(s)}
+                  {!location.status_id && <option value="">—</option>}
+                  {statuses.map((st) => (
+                    <option key={st.id} value={st.id}>
+                      {st.name}
                     </option>
                   ))}
                 </select>
               ) : (
-                <span className={statusBadgeClass(location.status)}>
-                  {statusLabel(location.status)}
+                <span className={statusBadgeClass(location.status_name)}>
+                  {location.status_name ?? "—"}
                 </span>
               )}
               {upcoming && (
                 <span className="badge badge-warn">
                   Upcoming reservation{" "}
-                  {new Date(upcoming.expectedCheckin!).toLocaleDateString(undefined, {
+                  {new Date(upcoming.expected_checkin!).toLocaleDateString(undefined, {
                     month: "short",
                     day: "numeric",
                   })}
@@ -208,9 +199,9 @@ export function LocationDetailPage() {
             <div className="field">
               <span className="field-label">Current boat</span>
               <div className="field-value">
-                {location.currentBoat ? (
-                  <Link to={`/boats/${location.currentBoat.id}`}>
-                    {location.currentBoat.name}
+                {location.current_boat_id ? (
+                  <Link to={`/boats/${location.current_boat_id}`}>
+                    {location.boat_name}
                   </Link>
                 ) : (
                   <span className="muted">Vacant — no boat</span>
@@ -223,12 +214,9 @@ export function LocationDetailPage() {
             <div className="field">
               <span className="field-label">Current vehicle</span>
               <div className="field-value">
-                {location.currentVehicle ? (
-                  <Link to={`/vehicles/${location.currentVehicle.id}`}>
-                    {location.currentVehicle.description}
-                    {location.currentVehicle.plateNumber
-                      ? ` · ${location.currentVehicle.plateNumber}`
-                      : ""}
+                {location.current_vehicle_id ? (
+                  <Link to={`/vehicles/${location.current_vehicle_id}`}>
+                    {location.vehicle_description}
                   </Link>
                 ) : (
                   <span className="muted">Vacant — no vehicle</span>
@@ -242,13 +230,12 @@ export function LocationDetailPage() {
               <span className="field-label">Owner{owners.length > 1 ? "s" : ""}</span>
               <div className="field-value">
                 {owners.map((o) => (
-                  <div key={o.id}>
-                    <Link to={`/contacts/${o.id}`}>{o.name ?? "Unnamed contact"}</Link>
-                    {current.can("view_contact") && (
-                      <span className="muted small">
-                        {o.phone ? ` · ${o.phone}` : ""}
-                        {o.email ? ` · ${o.email}` : ""}
-                      </span>
+                  <div key={o.link_id}>
+                    <Link to={`/contacts/${o.contact_id}`}>
+                      {o.name ?? "Unnamed contact"}
+                    </Link>
+                    {current.can("view_contact") && o.phone && (
+                      <span className="muted small">{` · ${o.phone}`}</span>
                     )}
                   </div>
                 ))}
@@ -262,17 +249,15 @@ export function LocationDetailPage() {
               {activeLease ? (
                 <div className="field-value">
                   <Link to={`/contacts/leases/${activeLease.id}`}>
-                    {(activeLease.lessees ?? [])
-                      .map((c) => c.name ?? "Unnamed")
-                      .join(", ") || "Lease on file"}
+                    {activeLease.lessee_names || "Lease on file"}
                   </Link>
                   <span className="muted small">
-                    {activeLease.endDate
-                      ? ` · through ${new Date(activeLease.endDate).toLocaleDateString()}`
+                    {activeLease.end_date
+                      ? ` · through ${new Date(activeLease.end_date).toLocaleDateString()}`
                       : " · open-ended"}
                   </span>
                 </div>
-              ) : current.can("manage_lease") && location.leaseEnabled ? (
+              ) : current.can("manage_lease") && location.lease_enabled === 1 ? (
                 <div className="field-value">
                   <button
                     type="button"
@@ -294,13 +279,13 @@ export function LocationDetailPage() {
         </div>
 
         <div className="stack">
-          <Section title={`Checkpoints (${(location.checkpoints ?? []).length})`} isMobile={isMobile}>
-            {(location.checkpoints ?? []).map((cp) => (
+          <Section title={`Checkpoints (${checkpoints.length})`} isMobile={isMobile}>
+            {checkpoints.map((cp) => (
               <Link key={cp.id} to={`/locations/checkpoints/${cp.id}`} className="card" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
                 <span className="card-title">{cp.name}</span>
               </Link>
             ))}
-            {(location.checkpoints ?? []).length === 0 && (
+            {checkpoints.length === 0 && (
               <span className="muted small">
                 None here.
                 {canManage && (
@@ -313,14 +298,14 @@ export function LocationDetailPage() {
             )}
           </Section>
 
-          {children.length > 0 && (
-            <Section title={`Contains (${children.length})`} isMobile={isMobile}>
-              {children.map((c) => (
+          {sortedChildren.length > 0 && (
+            <Section title={`Contains (${sortedChildren.length})`} isMobile={isMobile}>
+              {sortedChildren.map((c) => (
                 <Link key={c.id} to={`/locations/${c.id}`} className="card spread" style={{ textDecoration: "none", color: "inherit" }}>
                   <span className="card-title">{c.name}</span>
-                  {c.type?.tracksStatus && (
-                    <span className={statusBadgeClass(c.status)}>
-                      {statusLabel(c.status)}
+                  {tracksStatus(c) && (
+                    <span className={statusBadgeClass(c.status_name)}>
+                      {c.status_name ?? "—"}
                     </span>
                   )}
                 </Link>
@@ -328,45 +313,43 @@ export function LocationDetailPage() {
             </Section>
           )}
 
-          <Section title={`Notes (${(location.notes ?? []).length})`} isMobile={isMobile}>
-            {[...(location.notes ?? [])]
-              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-              .map((n) => (
-                <div key={n.id} className="card">
-                  <div className="small">{n.body}</div>
-                  <div className="card-meta">
-                    {n.author?.name ?? "—"} ·{" "}
-                    {new Date(n.createdAt).toLocaleString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
-                  </div>
+          <Section title={`Notes (${notes.length})`} isMobile={isMobile}>
+            {notes.map((n) => (
+              <div key={n.id} className="card">
+                <div className="small">{n.body}</div>
+                <div className="card-meta">
+                  {n.author_name ?? "—"} ·{" "}
+                  {new Date(n.created_at).toLocaleString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
                 </div>
-              ))}
-            {(location.notes ?? []).length === 0 && (
+              </div>
+            ))}
+            {notes.length === 0 && (
               <span className="muted small">No notes yet.</span>
             )}
           </Section>
 
           {current.can("view_incidents") && (
-            <Section title={`Incidents (${(location.incidents ?? []).length})`} isMobile={isMobile}>
-              {(location.incidents ?? []).map((i) => (
-                <Link key={i.id} to="/incidents" className="card spread" style={{ textDecoration: "none", color: "inherit" }}>
+            <Section title={`Incidents (${incidents.length})`} isMobile={isMobile}>
+              {incidents.map((i) => (
+                <Link key={i.id} to={`/incidents/${i.id}`} className="card spread" style={{ textDecoration: "none", color: "inherit" }}>
                   <span>{i.title}</span>
-                  <span className="badge">{statusLabel(i.status)}</span>
+                  <span className="badge">{i.status_name}</span>
                 </Link>
               ))}
-              {(location.incidents ?? []).length === 0 && (
+              {incidents.length === 0 && (
                 <span className="muted small">No incidents.</span>
               )}
             </Section>
           )}
 
-          <Section title={`Tickets (${(location.tickets ?? []).length})`} isMobile={isMobile}>
-            {(location.tickets ?? []).map((t) => (
-              <Link key={t.id} to="/tickets" className="card spread" style={{ textDecoration: "none", color: "inherit" }}>
+          <Section title={`Tickets (${tickets.length})`} isMobile={isMobile}>
+            {tickets.map((t) => (
+              <Link key={t.id} to={`/tickets/${t.id}`} className="card spread" style={{ textDecoration: "none", color: "inherit" }}>
                 <span>{t.title}</span>
                 <span
                   className={
@@ -379,7 +362,7 @@ export function LocationDetailPage() {
                 </span>
               </Link>
             ))}
-            {(location.tickets ?? []).length === 0 && (
+            {tickets.length === 0 && (
               <span className="muted small">No tickets.</span>
             )}
           </Section>
@@ -392,7 +375,7 @@ export function LocationDetailPage() {
 
       {showCheckin && (
         <ManualCheckinDialog
-          initialCheckpointId={(location.checkpoints ?? [])[0]?.id}
+          initialCheckpointId={checkpoints[0]?.id}
           onClose={() => setShowCheckin(false)}
         />
       )}

@@ -59,6 +59,8 @@ export function useLeasesForLocation(locationId: string | undefined) {
 
 export interface LeaseLesseeRow {
   link_id: string;
+  /** Named `id` as well, so the contact display helpers accept it directly. */
+  id: string;
   contact_id: string;
   name: string | null;
   phone: string | null;
@@ -66,7 +68,7 @@ export interface LeaseLesseeRow {
 
 export function useLeaseLessees(leaseId: string | undefined) {
   return useQuery<LeaseLesseeRow>(
-    `SELECT ll.id AS link_id, c.id AS contact_id, c.name, d.phone
+    `SELECT ll.id AS link_id, c.id, c.id AS contact_id, c.name, d.phone
        FROM lease_lessees ll
        JOIN contacts c ON c.id = ll.contact_id
        LEFT JOIN contact_details d ON d.contact_id = c.id
@@ -178,6 +180,27 @@ export function addLessee(leaseId: string, contactId: string): Promise<string> {
 
 export function removeLessee(linkId: string): Promise<void> {
   return remove(db, "lease_lessees", linkId);
+}
+
+/** Make a lease's lessees exactly `contactIds`. */
+export async function setLessees(
+  leaseId: string,
+  contactIds: string[],
+): Promise<void> {
+  await transact(async (tx) => {
+    const existing = await tx.getAll<{ id: string; contact_id: string }>(
+      "SELECT id, contact_id FROM lease_lessees WHERE lease_id = ?",
+      [leaseId],
+    );
+    for (const row of existing) {
+      if (!contactIds.includes(row.contact_id)) await remove(tx, "lease_lessees", row.id);
+    }
+    for (const contactId of contactIds) {
+      if (!existing.some((e) => e.contact_id === contactId)) {
+        await insert(tx, "lease_lessees", { lease_id: leaseId, contact_id: contactId });
+      }
+    }
+  });
 }
 
 export function addLeaseDocument(
