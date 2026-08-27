@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
-import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { displayName, findSimilarContacts, type ContactLike } from "../../lib/contacts";
-import { activityTx } from "../../lib/activityLog";
+import { mergeContact, renameContact, useContacts } from "../../data/contacts";
 
 // Owners & Contacts — Nameless-Contact Name Prompt & Merge Dialog (see
 // docs/pages/nameless-contact-merge.html). An unmatched inbound call/text
@@ -24,43 +23,33 @@ export function NamelessContactDialog({
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
 
-  const { data } = db.useQuery(canEdit ? { contacts: { mergedInto: {} } } : null);
+  const { data: allContacts } = useContacts();
   const similar = useMemo(
-    () => findSimilarContacts(name, contact, data?.contacts ?? []),
-    [name, contact, data],
+    () => findSimilarContacts(name, contact, allContacts),
+    [name, contact, allContacts],
   );
 
   const saveName = async () => {
-    await db.transact([
-      db.tx.contacts[contact.id].update({ name: name.trim() }),
-      activityTx({
-        eventType: "contact.named",
-        summary: `Unnamed contact ${contact.phone ?? ""} named "${name.trim()}"`.trim(),
-        subjectType: "contacts",
-        subjectId: contact.id,
-        actorId: current.user?.id,
-      }),
-    ]);
+    await renameContact(
+      contact.id,
+      name.trim(),
+      contact.phone ?? null,
+      current.user?.id ?? null,
+    );
     onResolved(contact.id);
   };
 
-  // The nameless record keeps its phone number (so future calls from it still
-  // match directly); display resolves through mergedInto to the canonical one.
+  // The nameless record keeps its phone number, so future calls from it still
+  // match directly; display resolves through merged_into_id to the canonical
+  // one.
   const confirmMerge = async () => {
     if (!selected) return;
     const into = similar.find((c) => c.id === selected);
-    await db.transact([
-      db.tx.contacts[contact.id].link({ mergedInto: selected }),
-      activityTx({
-        eventType: "contact.merged",
-        summary:
-          `Contact ${contact.phone ?? "record"} merged into ` +
-          `${into ? displayName(into) : "another contact"}`,
-        subjectType: "contacts",
-        subjectId: selected,
-        actorId: current.user?.id,
-      }),
-    ]);
+    await mergeContact(
+      { id: contact.id, name: contact.phone ?? null },
+      { id: selected, name: into ? displayName(into) : null },
+      current.user?.id ?? null,
+    );
     onResolved(selected);
   };
 

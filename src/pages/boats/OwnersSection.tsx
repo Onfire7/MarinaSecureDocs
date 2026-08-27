@@ -1,64 +1,70 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
+import { useContacts } from "../../data/contacts";
+import {
+  addBoatOwner,
+  addVehicleOwner,
+  removeAttachedContact,
+  reorderOwners,
+  useBoatOwners,
+  useVehicleOwners,
+} from "../../data/boats";
 
-type Contact = { id: string; name?: string | null; phone?: string | null; email?: string | null };
-
-// Ordered owners-in-succession for a Boat or Vehicle (see docs/pages/
-// boat-detail.html / vehicle-detail.html): order = who to contact first,
-// stored in the entity's ownerOrder json since links are unordered sets.
-// Omitted entirely (by the caller) without view_owner or when empty —
-// "unknown owner" and "can't see it" look identical by design.
+// Ordered owners-in-succession for a boat or vehicle (see docs/pages/
+// boat-detail.html / vehicle-detail.html): order = who to contact first.
+//
+// That order used to live in an `ownerOrder` json array on the boat, because
+// Instant's links were an unordered set and there was nowhere else to put it —
+// which meant two writes per change and two things that could disagree. It is
+// now boat_owners.position, so the order IS the link, and adding an owner
+// cannot leave them unranked.
+//
+// Omitted entirely (by the caller) without view_owner or when empty — "unknown
+// owner" and "can't see it" look identical by design.
 export function OwnersSection({
   entityType,
   entityId,
-  owners,
-  ownerOrder,
 }: {
   entityType: "boats" | "vehicles";
   entityId: string;
-  owners: Contact[];
-  ownerOrder: string[] | undefined;
 }) {
   const current = useCurrent();
   const canEdit = current.can("edit_owner_contact");
   const canContact = current.can("view_contact");
   const [addingId, setAddingId] = useState("");
 
-  const { data } = db.useQuery(canEdit ? { contacts: {} } : null);
-  const allContacts = data?.contacts ?? [];
+  const linkTable = entityType === "boats" ? "boat_owners" : "vehicle_owners";
+  const boatOwners = useBoatOwners(entityType === "boats" ? entityId : undefined);
+  const vehicleOwners = useVehicleOwners(
+    entityType === "vehicles" ? entityId : undefined,
+  );
+  const ordered = entityType === "boats" ? boatOwners.data : vehicleOwners.data;
 
-  const ordered = orderOwners(owners, ownerOrder);
-  const tx = db.tx[entityType][entityId];
+  const { data: allContacts } = useContacts();
 
-  const persistOrder = (ids: string[]) => {
-    void db.transact(tx.update({ ownerOrder: ids }));
-  };
-
-  const move = (contactId: string, delta: -1 | 1) => {
-    const ids = ordered.map((o) => o.id);
-    const idx = ids.indexOf(contactId);
-    const target = idx + delta;
-    if (idx < 0 || target < 0 || target >= ids.length) return;
-    [ids[idx], ids[target]] = [ids[target], ids[idx]];
-    persistOrder(ids);
+  const move = (index: number, delta: -1 | 1) => {
+    const target = index + delta;
+    if (target < 0 || target >= ordered.length) return;
+    const ids = ordered.map((o) => o.link_id);
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    void reorderOwners(linkTable, ids);
   };
 
   const add = () => {
     if (!addingId) return;
-    void db.transact([
-      tx.link({ owners: addingId }),
-      tx.update({ ownerOrder: [...ordered.map((o) => o.id), addingId] }),
-    ]);
+    const position = ordered.length;
+    void (entityType === "boats"
+      ? addBoatOwner(entityId, addingId, position)
+      : addVehicleOwner(entityId, addingId, position));
     setAddingId("");
   };
 
-  const remove = (contactId: string) => {
-    void db.transact([
-      tx.unlink({ owners: contactId }),
-      tx.update({ ownerOrder: ordered.map((o) => o.id).filter((i) => i !== contactId) }),
-    ]);
+  const removeOwner = (linkId: string) => {
+    // Positions are left with a gap rather than rewritten. Order is all that
+    // is read, never the numbers themselves, and rewriting every remaining row
+    // would push each of them to every device holding this boat.
+    void removeAttachedContact(linkTable, linkId);
   };
 
   return (
@@ -68,15 +74,14 @@ export function OwnersSection({
       </div>
       <div className="stack" style={{ gap: 6 }}>
         {ordered.map((o, i) => (
-          <div key={o.id} className="card spread">
+          <div key={o.link_id} className="card spread">
             <span>
               {ordered.length > 1 && <span className="muted small">{i + 1}. </span>}
-              <Link to={`/contacts/${o.id}`}>{o.name ?? "Unnamed contact"}</Link>
-              {canContact && (
-                <span className="muted small">
-                  {o.phone ? ` · ${o.phone}` : ""}
-                  {o.email ? ` · ${o.email}` : ""}
-                </span>
+              <Link to={`/contacts/${o.contact_id}`}>
+                {o.name ?? "Unnamed contact"}
+              </Link>
+              {canContact && o.phone && (
+                <span className="muted small">{` · ${o.phone}`}</span>
               )}
             </span>
             {canEdit && (
@@ -85,7 +90,7 @@ export function OwnersSection({
                   type="button"
                   className="btn btn-sm btn-quiet"
                   disabled={i === 0}
-                  onClick={() => move(o.id, -1)}
+                  onClick={() => move(i, -1)}
                   aria-label="Move up in succession"
                 >
                   ↑
@@ -94,7 +99,7 @@ export function OwnersSection({
                   type="button"
                   className="btn btn-sm btn-quiet"
                   disabled={i === ordered.length - 1}
-                  onClick={() => move(o.id, 1)}
+                  onClick={() => move(i, 1)}
                   aria-label="Move down in succession"
                 >
                   ↓
@@ -102,7 +107,7 @@ export function OwnersSection({
                 <button
                   type="button"
                   className="btn btn-sm btn-quiet"
-                  onClick={() => remove(o.id)}
+                  onClick={() => removeOwner(o.link_id)}
                 >
                   Remove
                 </button>
@@ -120,7 +125,7 @@ export function OwnersSection({
             >
               <option value="">Add owner…</option>
               {allContacts
-                .filter((c) => !ordered.some((o) => o.id === c.id))
+                .filter((c) => !ordered.some((o) => o.contact_id === c.id))
                 .map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name ?? "Unnamed contact"}
@@ -135,17 +140,4 @@ export function OwnersSection({
       </div>
     </div>
   );
-}
-
-function orderOwners(
-  owners: Contact[],
-  ownerOrder: string[] | undefined,
-): Contact[] {
-  if (!ownerOrder || ownerOrder.length === 0) return owners;
-  const byId = new Map(owners.map((o) => [o.id, o]));
-  const ordered = ownerOrder
-    .map((id) => byId.get(id))
-    .filter((o): o is Contact => Boolean(o));
-  const inOrder = new Set(ownerOrder);
-  return [...ordered, ...owners.filter((o) => !inOrder.has(o.id))];
 }

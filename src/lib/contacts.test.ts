@@ -13,8 +13,8 @@ const byId = <T extends { id: string }>(all: T[]) => new Map(all.map((c) => [c.i
 describe("resolveContact", () => {
   it("follows a merge chain to the canonical record", () => {
     const canonical = aContact({ id: "c" });
-    const middle = aContact({ id: "b", mergedInto: { id: "c" } });
-    const start = aContact({ id: "a", mergedInto: { id: "b" } });
+    const middle = aContact({ id: "b", merged_into_id: "c" });
+    const start = aContact({ id: "a", merged_into_id: "b" });
     expect(resolveContact(start, byId([start, middle, canonical])).id).toBe("c");
   });
 
@@ -22,13 +22,13 @@ describe("resolveContact", () => {
     // A cycle is only reachable through bad data, but this walks the chain on
     // every render of every call and SMS row — looping here freezes the UI
     // rather than showing a wrong name.
-    const a = aContact({ id: "a", mergedInto: { id: "b" } });
-    const b = aContact({ id: "b", mergedInto: { id: "a" } });
+    const a = aContact({ id: "a", merged_into_id: "b" });
+    const b = aContact({ id: "b", merged_into_id: "a" });
     expect(["a", "b"]).toContain(resolveContact(a, byId([a, b])).id);
   });
 
   it("stops at the last resolvable record when the target is missing", () => {
-    const orphan = aContact({ id: "a", mergedInto: { id: "gone" } });
+    const orphan = aContact({ id: "a", merged_into_id: "gone" });
     expect(resolveContact(orphan, byId([orphan])).id).toBe("a");
   });
 });
@@ -79,7 +79,7 @@ describe("findSimilarContacts", () => {
 
   it("excludes the contact being named and anything already merged away", () => {
     const self = aContact({ id: "self", name: "Dana", phone: "555-123-4567" });
-    const merged = aContact({ id: "merged", name: "Dana", phone: "555-123-4567", mergedInto: { id: "x" } });
+    const merged = aContact({ id: "merged", name: "Dana", phone: "555-123-4567", merged_into_id: "x" });
     expect(findSimilarContacts("Dana", self, [self, merged])).toEqual([]);
   });
 

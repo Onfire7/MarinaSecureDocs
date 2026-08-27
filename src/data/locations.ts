@@ -81,6 +81,20 @@ export function useChildLocations(parentId: string | undefined) {
   );
 }
 
+/**
+ * Locations that can hold a boat, or a vehicle.
+ *
+ * The filter is on the TYPE, not the location: "can a boat go here" is a
+ * property of being a slip, and a marina that invents a new slip-like type
+ * gets it in this list without a code change.
+ */
+export function useLocationsHolding(what: "boat" | "vehicle") {
+  const column = what === "boat" ? "has_boat" : "has_vehicle";
+  return useQuery<LocationRow>(
+    `${LOCATION_SELECT} WHERE t.${column} = 1 ORDER BY l.name`,
+  );
+}
+
 export function useLocationTypes() {
   return useQuery<LocationTypeRow>("SELECT * FROM location_types ORDER BY name");
 }

@@ -1,12 +1,17 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { compareNames } from "../../lib/locations";
 import { OwnersSection } from "./OwnersSection";
 import { TargetActivity } from "../shared/TargetActivity";
 import { LocationPicker } from "../shared/LocationPicker";
-import { activityTx } from "../../lib/activityLog";
+import {
+  moveVehicle,
+  saveVehicle,
+  useVehicle,
+  type VehicleRow,
+} from "../../data/boats";
+import { useLocationsHolding } from "../../data/locations";
 
 // Boats & Vehicles — Vehicle Detail (see docs/pages/vehicle-detail.html).
 // Mirrors Boat Detail: a partial record ("trailer, no plate, by the fuel
@@ -18,29 +23,9 @@ export function VehicleDetailPage() {
   const canEdit = current.can("edit_owner_contact");
   const [editing, setEditing] = useState(false);
 
-  const { data } = db.useQuery(
-    vehicleId
-      ? {
-          vehicles: {
-            $: { where: { id: vehicleId } },
-            owners: {},
-            currentLocation: {},
-            notes: { author: {} },
-            incidents: {},
-            tickets: {},
-          },
-          locations: {
-            $: { where: { "type.hasVehicle": true } },
-            parent: {},
-            type: {},
-          },
-        }
-      : null,
-  );
-  const vehicle = data?.vehicles?.[0];
-  const locationOptions = [...(data?.locations ?? [])].sort((a, b) =>
-    compareNames(a.name, b.name),
-  );
+  const { vehicle } = useVehicle(vehicleId);
+  const { data: options } = useLocationsHolding("vehicle");
+  const locationOptions = [...options].sort((a, b) => compareNames(a.name, b.name));
 
   if (!vehicle) {
     return (
@@ -50,33 +35,19 @@ export function VehicleDetailPage() {
     );
   }
 
+  const actorId = current.user?.id ?? null;
+  const currentLocation = vehicle.location_id
+    ? { id: vehicle.location_id, name: vehicle.location_name ?? "its location" }
+    : null;
+
   const reassign = (locationId: string) => {
     if (!locationId) return;
     const to = locationOptions.find((l) => l.id === locationId);
-    void db.transact([
-      db.tx.vehicles[vehicle.id].link({ currentLocation: locationId }),
-      activityTx({
-        eventType: "vehicle.location_changed",
-        summary: `${vehicle.description} moved to ${to?.name ?? "another location"}`,
-        subjectType: "vehicles",
-        subjectId: vehicle.id,
-        actorId: current.user?.id,
-      }),
-    ]);
+    void moveVehicle(vehicle, currentLocation, to ?? null, actorId);
   };
   const clearLocation = () => {
-    if (!vehicle.currentLocation) return;
-    const from = vehicle.currentLocation.name;
-    void db.transact([
-      db.tx.vehicles[vehicle.id].unlink({ currentLocation: vehicle.currentLocation.id }),
-      activityTx({
-        eventType: "vehicle.departed",
-        summary: `${vehicle.description} departed ${from}`,
-        subjectType: "vehicles",
-        subjectId: vehicle.id,
-        actorId: current.user?.id,
-      }),
-    ]);
+    if (!currentLocation) return;
+    void moveVehicle(vehicle, currentLocation, null, actorId);
   };
 
   return (
@@ -84,7 +55,7 @@ export function VehicleDetailPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">{vehicle.description}</h1>
-          <div className="page-sub">Plate: {vehicle.plateNumber ?? "—"}</div>
+          <div className="page-sub">Plate: {vehicle.plate_number ?? "—"}</div>
         </div>
         {canEdit && !editing && (
           <button type="button" className="btn btn-sm" onClick={() => setEditing(true)}>
@@ -105,9 +76,9 @@ export function VehicleDetailPage() {
           <div className="field">
             <span className="field-label">Current location</span>
             <div className="field-value row">
-              {vehicle.currentLocation ? (
-                <Link to={`/locations/${vehicle.currentLocation.id}`}>
-                  {vehicle.currentLocation.name}
+              {currentLocation ? (
+                <Link to={`/locations/${currentLocation.id}`}>
+                  {currentLocation.name}
                 </Link>
               ) : (
                 <span className="muted">Unassigned</span>
@@ -123,7 +94,7 @@ export function VehicleDetailPage() {
                       placeholder="Reassign to a location…"
                     />
                   </div>
-                  {vehicle.currentLocation && (
+                  {currentLocation && (
                     <button
                       type="button"
                       className="btn btn-sm btn-quiet"
@@ -138,20 +109,12 @@ export function VehicleDetailPage() {
           </div>
 
           {current.can("view_owner") && (
-            <OwnersSection
-              entityType="vehicles"
-              entityId={vehicle.id}
-              owners={vehicle.owners ?? []}
-              ownerOrder={vehicle.ownerOrder}
-            />
+            <OwnersSection entityType="vehicles" entityId={vehicle.id} />
           )}
         </div>
 
         <TargetActivity
           target={{ type: "vehicle", id: vehicle.id, label: vehicle.description }}
-          notes={vehicle.notes ?? []}
-          incidents={vehicle.incidents ?? []}
-          tickets={vehicle.tickets ?? []}
         />
       </div>
     </div>
@@ -162,19 +125,17 @@ function EditVehicle({
   vehicle,
   onDone,
 }: {
-  vehicle: { id: string; description: string; plateNumber?: string | null };
+  vehicle: VehicleRow;
   onDone: () => void;
 }) {
   const [description, setDescription] = useState(vehicle.description);
-  const [plate, setPlate] = useState(vehicle.plateNumber ?? "");
+  const [plate, setPlate] = useState(vehicle.plate_number ?? "");
 
   const save = async () => {
-    await db.transact(
-      db.tx.vehicles[vehicle.id].update({
-        description: description.trim(),
-        plateNumber: plate.trim() || undefined,
-      }),
-    );
+    await saveVehicle(vehicle.id, {
+      description: description.trim(),
+      plateNumber: plate.trim() || null,
+    });
     onDone();
   };
 
