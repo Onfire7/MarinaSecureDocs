@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Fails if any src/lib file sits at zero coverage without an entry in
-// docs/testing/coverage-log.md.
+// Fails if any src/lib or src/data file sits at zero coverage without an entry
+// in docs/testing/coverage-log.md.
 //
 // The goal isn't a coverage threshold — docs/ROADMAP.md records why a
 // threshold during a rewrite is either meaningless or obstructive, and why it
@@ -40,4 +40,6 @@ if (unlogged.length) {
 }
 
 const total = summary.total.statements.pct;
-console.log(`coverage-check: ok — every zero-coverage file is logged (src/lib total ${total}%)`);
+console.log(
+  `coverage-check: ok — every zero-coverage file is logged (${total}% of src/lib + src/data)`,
+);

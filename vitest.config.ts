@@ -21,7 +21,10 @@ export default defineConfig({
     include: ["src/**/*.test.ts"],
     coverage: {
       provider: "v8",
-      include: ["src/lib/**/*.ts"],
+      // src/data is in scope. It is the layer the rewrite created, and leaving
+      // it out would mean the "every untested file is a decision" rule quietly
+      // stopped applying to the newest half of the codebase.
+      include: ["src/lib/**/*.ts", "src/data/**/*.ts"],
       exclude: ["src/lib/db/**", "src/lib/auth/**"],
       reporter: ["text", "json-summary"],
     },
