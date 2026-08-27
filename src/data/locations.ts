@@ -165,6 +165,23 @@ export function createLocation(input: LocationInput): Promise<string> {
   return insert(db, "locations", locationColumns(input));
 }
 
+/**
+ * Apply the same change to many locations at once — the bulk-edit bar.
+ *
+ * One transaction, so a bulk edit either happens or does not. Callers skip
+ * rows the change does not apply to (a type that does not allow leases) and
+ * report the count, rather than writing a field the type has no meaning for.
+ */
+export async function bulkUpdateLocations(
+  edits: { id: string; changes: Partial<LocationInput> }[],
+): Promise<void> {
+  await transact(async (tx) => {
+    for (const edit of edits) {
+      await update(tx, "locations", edit.id, locationColumns(edit.changes));
+    }
+  });
+}
+
 export function saveLocation(
   locationId: string,
   input: Partial<LocationInput>,
@@ -182,6 +199,61 @@ export function saveLocation(
  */
 export function deleteLocation(locationId: string): Promise<void> {
   return remove(db, "locations", locationId);
+}
+
+export interface LocationDependencies {
+  children: number;
+  checkpoints: number;
+  maps: number;
+  leases: number;
+  reservations: number;
+  incidents: number;
+  tickets: number;
+  notes: number;
+  placements: number;
+  has_boat: number;
+  has_vehicle: number;
+}
+
+/**
+ * Everything that would break if this location were deleted.
+ *
+ * Deliberately one query scoped to one location and mounted only while its row
+ * is expanded: the tree view would otherwise pull every ticket and reservation
+ * in the marina to render a disabled button.
+ *
+ * Only map placements are allowed to go with it — they carry no information of
+ * their own once the location is gone. Everything else blocks, and the database
+ * agrees: those foreign keys are ON DELETE RESTRICT, so this check is a courtesy
+ * that explains WHICH thing rather than the thing preventing the delete.
+ */
+export function useLocationDependencies(locationId: string) {
+  const { data, isLoading } = useQuery<LocationDependencies>(
+    `SELECT
+       (SELECT COUNT(*) FROM locations WHERE parent_id = ?1) AS children,
+       (SELECT COUNT(*) FROM checkpoints WHERE location_id = ?1) AS checkpoints,
+       (SELECT COUNT(*) FROM marina_maps WHERE scope_id = ?1) AS maps,
+       (SELECT COUNT(*) FROM leases WHERE location_id = ?1) AS leases,
+       (SELECT COUNT(*) FROM reservations WHERE location_id = ?1) AS reservations,
+       (SELECT COUNT(*) FROM incidents WHERE location_id = ?1) AS incidents,
+       (SELECT COUNT(*) FROM tickets WHERE location_id = ?1) AS tickets,
+       (SELECT COUNT(*) FROM notes WHERE location_id = ?1) AS notes,
+       (SELECT COUNT(*) FROM location_map_placements WHERE location_id = ?1) AS placements,
+       (SELECT COUNT(*) FROM locations WHERE id = ?1 AND current_boat_id IS NOT NULL) AS has_boat,
+       (SELECT COUNT(*) FROM locations WHERE id = ?1 AND current_vehicle_id IS NOT NULL) AS has_vehicle`,
+    [locationId],
+  );
+  return { dependencies: data[0] ?? null, isLoading };
+}
+
+/** Delete a location along with the map placements that only describe it. */
+export async function deleteLocationWithPlacements(locationId: string): Promise<void> {
+  await transact(async (tx) => {
+    await tx.execute("DELETE FROM location_map_placements WHERE location_id = ?", [
+      locationId,
+    ]);
+    await remove(tx, "locations", locationId);
+  });
 }
 
 export function saveLocationType(type: {
