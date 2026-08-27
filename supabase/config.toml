@@ -357,10 +357,21 @@ enabled = false
 # user_pool_region = "us-east-1"
 
 # Use Clerk as a third-party provider alongside Supabase Auth.
+#
+# This is the local half of THE trap that provision-supabase.sh shouts about.
+# Without it Supabase has no key to verify a Clerk token with, so every request
+# is anonymous, every RLS policy evaluates against a null identity, and every
+# query comes back empty — which looks exactly like an unprovisioned account.
+# The remote project is configured through the dashboard; this configures the
+# same thing for `supabase start`, so local development exercises the real
+# authentication path rather than a permissive stand-in.
+#
+# The domain is per-marina and lives in .env.local beside every other
+# deployment value. It is not a secret — it is the `iss` of every token this
+# app issues.
 [auth.third_party.clerk]
-enabled = false
-# Obtain from https://clerk.com/setup/supabase
-# domain = "example.clerk.accounts.dev"
+enabled = true
+domain = "env(CLERK_DOMAIN)"
 
 # OAuth server configuration
 [auth.oauth_server]

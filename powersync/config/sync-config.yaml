@@ -63,7 +63,13 @@ streams:
       - SELECT * FROM assets
       - SELECT * FROM asset_statuses
       - SELECT * FROM maintenance_rules
+      # An asset's log, its current holder, and its meter. All three are
+      # bounded by the number of assets rather than by marina activity, and
+      # all three are needed to check a radio out or record a meter reading
+      # while standing next to it with no signal.
       - SELECT * FROM asset_status_logs
+      - SELECT * FROM asset_checkouts
+      - SELECT * FROM asset_meter_readings
       - SELECT * FROM checklist_templates
       - SELECT * FROM template_viewer_roles
       - SELECT * FROM checklist_template_sections

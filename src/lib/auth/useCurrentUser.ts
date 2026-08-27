@@ -1,106 +1,123 @@
-import { useEffect, useMemo } from "react";
-import { useUser } from "@clerk/clerk-react";
-import { db } from "../db";
-import type { UserWithRoles } from "../db";
-import {
-  computeEffectivePermissions,
-  hasAnyManagePermission,
-  type Permission,
-} from "../permissions";
+import { useEffect, useMemo, useRef } from "react";
+import { useAuth } from "@clerk/clerk-react";
+import { useQuery, useStatus } from "@powersync/react";
+import { supabase } from "../db/supabase";
+import type { Database } from "../db";
+import { setSyncAuthError } from "./syncAuthStatus";
+import type { Permission } from "../permissions";
+
+export type UserRow = Database["users"];
 
 export interface CurrentUser {
-  /** The marina's User record (with roles) for the active Clerk session. */
-  user: UserWithRoles | null;
-  /** True while either Clerk or the user query is still resolving. */
+  /** The marina's own user record for the active Clerk session. */
+  user: UserRow | null;
+  /** True while Clerk, the first sync, or the user query is still resolving. */
   isLoading: boolean;
   /**
-   * The Clerk session authenticated but no active User record exists for it —
-   * the account was never provisioned via Admin → Users, or was deactivated.
-   * Per the Sign In spec both cases present the same generic failure.
+   * There is a verified Clerk session, but no active user record belongs to
+   * it — the account was never provisioned in Admin → Users, or was
+   * deactivated. Per the Sign In spec both present the same generic failure.
    */
   unprovisioned: boolean;
+  /**
+   * This device has never completed a sync and is offline, so it holds no
+   * data at all and cannot tell an unprovisioned account from an unsynced
+   * one. Distinct from `unprovisioned` because the remedy is opposite: find
+   * signal, rather than find a manager.
+   */
+  needsFirstSync: boolean;
   permissions: Set<Permission>;
   can: (p: Permission) => boolean;
   isAdmin: boolean;
   roleNames: string[];
 }
 
-// Resolves the active Clerk identity to the marina's own User record.
-// Users are provisioned via Admin → Users; clerkUserId is set on first
-// sign-in (matched by email), per the Data Model.
+/**
+ * Resolves the active Clerk identity to this marina's own user record.
+ *
+ * Permissions come from `user_permissions`, not from recomputing the role
+ * arrays on the device. That table is the same one the sync streams gate on
+ * and the same one `has_permission()` reads in every RLS policy, so a control
+ * this hook shows is a control whose write the database will actually accept.
+ * A second, independently-computed answer here would drift, and the way it
+ * would present is a button that appears to do nothing.
+ */
 export function useCurrentUser(): CurrentUser {
-  const { isLoaded, user: clerkUser } = useUser();
-  // Instant's own auth identity (the $users row created by the Clerk token
-  // exchange) — needed to lazily create the userAuth link below.
-  const { user: instantAuthUser } = db.useAuth();
-  const clerkUserId = clerkUser?.id;
-  const email = clerkUser?.primaryEmailAddress?.emailAddress;
+  const { isLoaded, isSignedIn, userId: clerkUserId } = useAuth();
+  const status = useStatus();
 
-  const { data, isLoading } = db.useQuery(
-    clerkUserId
-      ? {
-          users: {
-            $: {
-              where: {
-                or: [
-                  { clerkUserId },
-                  ...(email ? [{ email }] : []),
-                ],
-              },
-            },
-            roles: {},
-            // The User's own Contact record, where one is linked — used to
-            // default "checking out to" on asset checkout.
-            contact: {},
-            // The linked $users identity (own row only, per $users view
-            // rules) — read to decide whether the link still needs creating.
-            authUser: {},
-          },
-        }
-      : null,
+  // "" matches no row, which is what we want while signed out — a query that
+  // is merely absent would leave the previous user's result on screen through
+  // a User Switch.
+  const key = clerkUserId ?? "";
+
+  const { data: users, isLoading: usersLoading } = useQuery<UserRow>(
+    "SELECT * FROM users WHERE clerk_user_id = ? AND active = 1",
+    [key],
+  );
+  const user = users[0] ?? null;
+
+  const { data: permissionRows } = useQuery<{ permission: string }>(
+    "SELECT permission FROM user_permissions WHERE user_id = ?",
+    [user?.id ?? ""],
   );
 
-  const candidates = (data?.users ?? []) as UserWithRoles[];
-  const byClerkId = candidates.find((u) => u.clerkUserId === clerkUserId);
-  const byEmail = candidates.find((u) => !u.clerkUserId && u.email === email);
-  const matched = byClerkId ?? byEmail ?? null;
-  const user = matched && matched.active ? matched : null;
+  const { data: roleRows } = useQuery<{ name: string }>(
+    `SELECT r.name FROM user_roles ur
+       JOIN roles r ON r.id = ur.role_id
+      WHERE ur.user_id = ?
+      ORDER BY r.name`,
+    [user?.id ?? ""],
+  );
 
-  // First sign-in: claim the email-matched User record for this Clerk identity.
+  // First sign-in. The user row is provisioned by email with no clerk_user_id,
+  // so nothing here matches it and — because every RLS policy joins on that
+  // column — this session currently has no identity in the database at all.
+  // claim_marina_user() binds the two, using only the verified email in the
+  // JWT. It is the one call in the app that goes to Postgres directly, because
+  // it necessarily runs before this device can sync anything.
+  const claimed = useRef<string | null>(null);
   useEffect(() => {
-    if (byEmail && !byClerkId && byEmail.active && clerkUserId) {
-      db.transact(db.tx.users[byEmail.id].update({ clerkUserId })).catch(
-        console.error,
-      );
-    }
-  }, [byEmail, byClerkId, clerkUserId]);
+    if (!isSignedIn || !clerkUserId) return;
+    if (user || usersLoading) return;
+    if (!status.hasSynced) return; // Absence proves nothing until we've synced.
+    if (claimed.current === clerkUserId) return;
+    claimed.current = clerkUserId;
 
-  // Same lazy-claim pattern for the userAuth link ($users.profile ↔
-  // users.authUser). signInWithIdToken creates the $users row and nothing
-  // else — without this link, auth.ref('$user.profile.…') in
-  // instant.perms.ts resolves to [] and the stricter rule tiers can never
-  // be enabled. Created here rather than at provisioning time because the
-  // $users row doesn't exist until the person's first actual sign-in.
-  useEffect(() => {
-    if (!user || !instantAuthUser) return;
-    if (user.authUser?.id === instantAuthUser.id) return;
-    db.transact(
-      db.tx.users[user.id].link({ authUser: instantAuthUser.id }),
-    ).catch(console.error);
-  }, [user, instantAuthUser]);
+    void supabase
+      .rpc("claim_marina_user")
+      .then(({ error }) => {
+        if (error) {
+          // A failure here is indistinguishable from an unprovisioned account
+          // in the UI unless it is recorded — and the most likely cause is
+          // Supabase not trusting Clerk as a third-party auth provider, which
+          // is a deployment fault, not the user's.
+          console.warn("claim_marina_user failed", error);
+          setSyncAuthError(error.message);
+        }
+      });
+  }, [isSignedIn, clerkUserId, user, usersLoading, status.hasSynced]);
 
   const permissions = useMemo(
-    () => computeEffectivePermissions(user?.roles ?? []),
-    [user],
+    () => new Set(permissionRows.map((r) => r.permission as Permission)),
+    [permissionRows],
   );
+
+  const signedIn = Boolean(isSignedIn && clerkUserId);
+  const neverSynced = signedIn && !status.hasSynced;
 
   return {
     user,
-    isLoading: !isLoaded || (Boolean(clerkUserId) && isLoading),
-    unprovisioned: Boolean(clerkUserId) && !isLoading && !user,
+    // Note the asymmetry with `needsFirstSync`: a device that has never synced
+    // and has no connection is not loading, it is stuck, and saying so is the
+    // difference between a spinner that ends and one that does not.
+    isLoading:
+      !isLoaded || (signedIn && (usersLoading || (neverSynced && status.connected))),
+    unprovisioned: signedIn && status.hasSynced && !usersLoading && !user,
+    needsFirstSync: neverSynced && !status.connected,
     permissions,
     can: (p) => permissions.has(p),
-    isAdmin: hasAnyManagePermission(permissions),
-    roleNames: (user?.roles ?? []).map((r) => r.name),
+    isAdmin: [...permissions].some((p) => p.startsWith("manage_")),
+    roleNames: roleRows.map((r) => r.name),
   };
 }

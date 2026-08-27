@@ -184,7 +184,7 @@ finish() {
 # Replace the example below. Set TOTAL_STAGES to match the stages you write.
 # ──────────────────────────────────────────────────────────────────────────
 
-TOTAL_STAGES=9
+TOTAL_STAGES=10
 
 # This repo's per-marina config lives in .env.local (gitignored via *.local),
 # not .env — see .env.example.
@@ -192,7 +192,7 @@ ENV_FILE=".env.local"
 
 banner "MarinaSecure — provision Supabase + PowerSync + Clerk"
 
-# ── 1 ─────────────────────────────────────────────────────────────────────
+# ── 1 ──────────────────────────────────────────────────────────────────
 stage "Supabase — create this marina's project"
 say "Every marina gets its own Supabase project. Nothing is shared."
 note "docs/architecture.md — Per-marina isolation"
@@ -221,7 +221,7 @@ ask VITE_SUPABASE_ANON_KEY "Paste the anon / publishable key:"
 write_env VITE_SUPABASE_URL "$VITE_SUPABASE_URL"
 write_env VITE_SUPABASE_ANON_KEY "$VITE_SUPABASE_ANON_KEY"
 
-# ── 2 ─────────────────────────────────────────────────────────────────────
+# ── 2 ──────────────────────────────────────────────────────────────────
 stage "Clerk — activate the Supabase integration"
 say "Clerk stays as the identity provider. Supabase is configured to trust it,"
 say "so every RLS policy evaluates against a verified Clerk identity."
@@ -241,7 +241,30 @@ CLERK_DOMAIN="${CLERK_DOMAIN#http://}"
 CLERK_DOMAIN="${CLERK_DOMAIN%/}"
 write_env CLERK_DOMAIN "$CLERK_DOMAIN"
 
-# ── 3 ─────────────────────────────────────────────────────────────────────
+# ── 3 ──────────────────────────────────────────────────────────────────
+stage "Clerk — add the audience PowerSync requires"
+warn "Skip this and NOTHING SYNCS. PowerSync rejects every token with"
+warn "PSYNC_S2105: 'JWT payload is missing a required claim \"aud\"'. It is"
+warn "unconditional — there is no way to switch the check off in PowerSync."
+say ""
+say "Clerk's session token does not carry an aud claim. Supabase does not"
+say "need one; PowerSync will not accept a token without one. Adding it to"
+say "the session token keeps ONE token serving both, which is what makes"
+say "src/lib/auth/clerkToken.ts a single function rather than two."
+open_url "https://dashboard.clerk.com/"
+step "Configure → Sessions → Customize session token → Edit."
+step "Add this claim to the JSON:"
+say  ""
+say  '      "aud": "authenticated"'
+say  ""
+step "Save."
+note "Reference: https://clerk.com/docs/guides/sessions/customize-session-tokens"
+note "'authenticated' rather than a PowerSync-specific value because it is"
+note "also what a native Supabase token carries, so the same token reads"
+note "correctly to anything that inspects it."
+pause "Session token saved with the aud claim?"
+
+# ── 4 ──────────────────────────────────────────────────────────────────
 stage "Supabase — trust Clerk as a third-party auth provider"
 warn "This is THE trap. Skip it and every policy evaluates against a null"
 warn "identity, every query returns empty, and it looks exactly like an"
@@ -258,7 +281,7 @@ note "https://github.com/supabase/supabase/issues/44527 — some paths serve"
 note "/.well-known/jwks rather than /.well-known/jwks.json."
 pause "Clerk provider added and saved?"
 
-# ── 4 ─────────────────────────────────────────────────────────────────────
+# ── 5 ──────────────────────────────────────────────────────────────────
 stage "Supabase — create the PowerSync replication role"
 say "PowerSync replicates from Postgres with its own least-privilege role,"
 say "rather than a superuser or the service_role key."
@@ -290,7 +313,7 @@ note "The publication MUST be named 'powersync'."
 open_url "https://supabase.com/dashboard/project/_/sql/new"
 pause "SQL run without errors?"
 
-# ── 5 ─────────────────────────────────────────────────────────────────────
+# ── 6 ──────────────────────────────────────────────────────────────────
 stage "Supabase — grab the database connection details"
 say "PowerSync connects directly to Postgres, so it needs host/port/database"
 say "plus the powersync_role credentials from the previous stage."
@@ -315,7 +338,7 @@ say "    username  powersync_role"
 say "    password  (saved in $ENV_FILE as POWERSYNC_DB_PASSWORD)"
 pause "Got the connection details?"
 
-# ── 6 ─────────────────────────────────────────────────────────────────────
+# ── 7 ──────────────────────────────────────────────────────────────────
 stage "PowerSync — create the instance and connect it"
 open_url "https://docs.powersync.com/integrations/supabase/guide"
 say "That guide is the authority; the dashboard is here:"
@@ -327,7 +350,7 @@ warn "If the connection test fails, stop and fix it here. A half-configured"
 warn "instance fails later in ways that look like client bugs."
 pause "Connection test passed?"
 
-# ── 7 ─────────────────────────────────────────────────────────────────────
+# ── 8 ──────────────────────────────────────────────────────────────────
 stage "PowerSync — trust Clerk's JWKS"
 say "PowerSync verifies the same Clerk token Supabase does, so a device can"
 say "only sync as a real signed-in identity."
@@ -340,11 +363,13 @@ step "In the PowerSync dashboard, open your instance's Client Auth view."
 step "Add the JWKS URL above as a custom / third-party auth source."
 step "Save and Deploy."
 note "Reference: https://docs.powersync.com/configuration/auth/custom"
-note "Leave the audience blank unless PowerSync rejects tokens — Clerk's"
-note "Supabase-integration tokens carry aud 'authenticated'."
+step "Set the audience to: authenticated"
+note "This must match the aud claim added in stage 3. Leaving it blank does"
+note "NOT disable the check — PowerSync requires aud on every token either"
+note "way, and rejects the request with PSYNC_S2105."
 pause "Client Auth saved and deployed?"
 
-# ── 8 ─────────────────────────────────────────────────────────────────────
+# ── 9 ──────────────────────────────────────────────────────────────────
 stage "PowerSync — copy the instance URL"
 step "On the instance overview, copy the instance URL."
 note "Looks like: https://<id>.powersync.journeyapps.com"
@@ -363,7 +388,7 @@ note "netlify.toml's SECRETS_SCAN_OMIT_KEYS will need the new VITE_ names,"
 note "or the secrets scanner fails the build."
 pause "Netlify variables added (or deferred)?"
 
-# ── 9 ─────────────────────────────────────────────────────────────────────
+# ── 10 ─────────────────────────────────────────────────────────────────
 stage "Verify — prove each piece actually answers"
 say "Anonymous probes only prove the easy half. These confirm the endpoints"
 say "exist and are reachable; a real signed-in session is still the only"
