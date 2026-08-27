@@ -1,7 +1,7 @@
 import { useQuery } from "@powersync/react";
 import type { LockContext } from "@powersync/web";
 import { db, stamp } from "../lib/db";
-import { insert } from "./sql";
+import { insert, update } from "./sql";
 import type { Permission } from "../lib/permissions";
 
 // The Activity Log — written at the moment of the change, never reconstructed.
@@ -164,11 +164,29 @@ export interface ActivityEntry {
   subject_id: string;
   actor_id: string | null;
   actor_name: string | null;
+  /** Survives the retention purge. Set by hand, never by the app. */
+  protected: number;
+}
+
+/**
+ * Mark an entry as surviving retention, or stop.
+ *
+ * The one write the client makes to the activity log, and the log never logs
+ * it — an audit trail that records its own curation would be recursive noise.
+ * Clients cannot delete entries at all; retention is a pg_cron job.
+ */
+export function setEntryProtected(
+  entryId: string,
+  isProtected: boolean,
+): Promise<void> {
+  return update(db, "activity_log_entries", entryId, {
+    protected: isProtected ? 1 : 0,
+  });
 }
 
 const FEED_SELECT = `
   SELECT a.id, a.event_type, a.summary, a.timestamp,
-         a.subject_type, a.subject_id, a.actor_id,
+         a.subject_type, a.subject_id, a.actor_id, a.protected,
          u.name AS actor_name
     FROM activity_log_entries a
     LEFT JOIN users u ON u.id = a.actor_id`;

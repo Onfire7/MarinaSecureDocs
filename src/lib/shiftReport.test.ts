@@ -10,13 +10,13 @@ describe("shiftWindowMs", () => {
     const now = START + 8 * 3_600_000;
     vi.useFakeTimers();
     vi.setSystemTime(now);
-    expect(shiftWindowMs({ startedAt: START })).toEqual({ start: START, end: now });
-    expect(shiftWindowMs({ startedAt: START, endedAt: null })).toEqual({ start: START, end: now });
+    expect(shiftWindowMs({ started_at: START })).toEqual({ start: START, end: now });
+    expect(shiftWindowMs({ started_at: START, ended_at: null })).toEqual({ start: START, end: now });
   });
 
   it("ends a closed shift at endedAt", () => {
     const ended = START + 3_600_000;
-    expect(shiftWindowMs({ startedAt: START, endedAt: ended })).toEqual({
+    expect(shiftWindowMs({ started_at: START, ended_at: ended })).toEqual({
       start: START,
       end: ended,
     });
@@ -25,8 +25,8 @@ describe("shiftWindowMs", () => {
   it("accepts ISO strings as well as epoch numbers", () => {
     expect(
       shiftWindowMs({
-        startedAt: new Date(START).toISOString(),
-        endedAt: new Date(START + 60_000).toISOString(),
+        started_at: new Date(START).toISOString(),
+        ended_at: new Date(START + 60_000).toISOString(),
       }),
     ).toEqual({ start: START, end: START + 60_000 });
   });

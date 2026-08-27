@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import {
-  SUBJECT_LABEL,
+  setEntryProtected,
+  subjectLabel,
   subjectPath,
   subjectPermission,
-  type SubjectType,
-} from "../../lib/activityLog";
+  useActivityFeed,
+} from "../../data/activity";
+import { useUsers } from "../../data/users";
 
 // Activity Log — Feed (see docs/pages/activity-log.html).
 // No single "view activity log" permission: each entry is scoped by whatever
@@ -29,38 +30,34 @@ export function ActivityLogPage() {
   // history") pre-filter to that record.
   const subjectIdFilter = searchParams.get("subjectId");
 
-  const { data } = db.useQuery({
-    activityLogEntries: {
-      $: { order: { timestamp: "desc" }, limit },
-      actor: {},
-    },
-    users: { $: { where: { active: true } } },
-  });
+  const { data: entries } = useActivityFeed(limit);
+  const { data: users } = useUsers();
 
-  const entries = useMemo(() => data?.activityLogEntries ?? [], [data]);
-  const users = data?.users ?? [];
-
-  // Per-entry gating, applied before any user-facing filter — so no filter
-  // can surface something otherwise invisible.
+  // Per-entry gating, applied before any user-facing filter — so no filter can
+  // surface something otherwise invisible. It is a second line rather than the
+  // only one: an entry about an incident is on this device at all only if the
+  // incidents stream delivered it, and the audit stream carries every entry
+  // regardless of subject.
   const visible = useMemo(
     () =>
       entries.filter((e) => {
-        const required = subjectPermission(e.subjectType);
+        const required = subjectPermission(e.subject_type);
         return !required || current.can(required);
       }),
     [entries, current],
   );
 
   const subjectTypes = useMemo(
-    () => [...new Set(visible.map((e) => e.subjectType))].sort(),
+    () => [...new Set(visible.map((e) => e.subject_type))].sort(),
     [visible],
   );
 
   const filtered = visible.filter((e) => {
-    if (subjectIdFilter && e.subjectId !== subjectIdFilter) return false;
-    if (typeFilter && e.subjectType !== typeFilter) return false;
+    if (subjectIdFilter && e.subject_id !== subjectIdFilter) return false;
+    if (typeFilter && e.subject_type !== typeFilter) return false;
     if (actorFilter) {
-      if (actorFilter === "system" ? e.actor : e.actor?.id !== actorFilter) return false;
+      if (actorFilter === "system" ? e.actor_id : e.actor_id !== actorFilter)
+        return false;
     }
     const ts = new Date(e.timestamp).getTime();
     if (fromDate && ts < new Date(fromDate).getTime()) return false;
@@ -70,7 +67,7 @@ export function ActivityLogPage() {
 
   const toggleProtected = (entryId: string, next: boolean) => {
     // The Activity Log never logs its own writes (see docs/architecture.md).
-    void db.transact(db.tx.activityLogEntries[entryId].update({ protected: next }));
+    void setEntryProtected(entryId, next);
   };
 
   return (
@@ -102,7 +99,7 @@ export function ActivityLogPage() {
           <option value="">All types</option>
           {subjectTypes.map((t) => (
             <option key={t} value={t}>
-              {SUBJECT_LABEL[t as SubjectType] ?? t}
+              {subjectLabel(t)}
             </option>
           ))}
         </select>
@@ -137,25 +134,23 @@ export function ActivityLogPage() {
 
       <div className="stack" style={{ gap: 6 }}>
         {filtered.map((e) => {
-          const path = subjectPath(e.subjectType, e.subjectId);
+          const path = subjectPath(e.subject_type, e.subject_id);
           return (
             <div key={e.id} className="card spread" style={{ flexWrap: "wrap" }}>
               <div style={{ minWidth: 0 }}>
                 <div>
                   {path ? <Link to={path}>{e.summary}</Link> : e.summary}
-                  {canProtect && e.protected && (
+                  {canProtect && e.protected === 1 && (
                     <span className="badge badge-accent" style={{ marginLeft: 8 }}>
                       Protected
                     </span>
                   )}
                 </div>
                 <div className="card-meta">
-                  <span className="badge">
-                    {SUBJECT_LABEL[e.subjectType as SubjectType] ?? e.subjectType}
-                  </span>{" "}
-                  <code className="small">{e.eventType}</code> ·{" "}
+                  <span className="badge">{subjectLabel(e.subject_type)}</span>{" "}
+                  <code className="small">{e.event_type}</code> ·{" "}
                   {/* A null actor is a system-generated event, not a blank. */}
-                  {e.actor?.name ?? "System"}
+                  {e.actor_name ?? "System"}
                 </div>
               </div>
               <div className="row">
@@ -172,9 +167,9 @@ export function ActivityLogPage() {
                     type="button"
                     className="btn btn-sm btn-quiet"
                     title="Protected entries survive the retention purge"
-                    onClick={() => toggleProtected(e.id, !e.protected)}
+                    onClick={() => toggleProtected(e.id, e.protected !== 1)}
                   >
-                    {e.protected ? "Unprotect" : "Protect"}
+                    {e.protected === 1 ? "Unprotect" : "Protect"}
                   </button>
                 )}
               </div>

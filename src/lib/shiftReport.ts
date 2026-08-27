@@ -1,21 +1,23 @@
 // Shift report compilation (see docs: pages/shift-report.html,
 // docs/architecture.md — Shift report delivery).
 //
-// Records aren't linked to a Shift by reference; association is computed from
+// Records aren't linked to a shift by reference; association is computed from
 // timestamps falling inside the shift's start/end window (per docs/data-model.md
-// — Shift). An open shift's window runs to "now", so viewing mid-shift shows
+// — Shift). That is not a shortcut: a shift started on one device and walked on
+// another has no id to carry, and the window is the only definition that
+// survives it. An open shift's window runs to "now", so viewing mid-shift shows
 // progress so far. This is the same compilation the send path performs, which
 // is why viewing always reflects current data rather than an email snapshot.
 
 export interface ShiftWindow {
-  startedAt: string | number;
-  endedAt?: string | number | null;
+  started_at: string | number;
+  ended_at?: string | number | null;
 }
 
 export function shiftWindowMs(shift: ShiftWindow): { start: number; end: number } {
   return {
-    start: new Date(shift.startedAt).getTime(),
-    end: shift.endedAt ? new Date(shift.endedAt).getTime() : Date.now(),
+    start: new Date(shift.started_at).getTime(),
+    end: shift.ended_at ? new Date(shift.ended_at).getTime() : Date.now(),
   };
 }
 
