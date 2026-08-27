@@ -14,12 +14,18 @@ its own Twilio account. Nothing is shared between marinas.
 > **Migrating.** InstantDB retires 2027-08-31. The target is Supabase Postgres
 > + PowerSync, keeping Clerk. Read
 > [ADR 0005](docs/adr/0005-supabase-and-powersync-replace-instantdb.md) before
-> touching the data layer — the design is already written in
-> `docs/architecture.md`, `docs/permissions.md`, `docs/data-model.md` and
-> `docs/api-structure.md`. **Feature work and schema growth are frozen until
-> cutover**; ~80% of the codebase touches the database, so new features build
-> refactoring debt. Rules below marked *(InstantDB only)* stop applying after
-> cutover and some become actively wrong.
+> touching the data layer — the design is in `docs/architecture.md`,
+> `docs/permissions.md`, `docs/data-model.md` and `docs/api-structure.md`.
+>
+> **The rewrite is done, on the `rewrite/powersync` branch.** `beta` still
+> deploys the InstantDB build and still works; nothing in `src/` on the branch
+> imports InstantDB. It compiles, boots, and opens its own SQLite database, and
+> has not yet been exercised against synced rows — see `docs/TODO.md` for the
+> one dashboard change blocking that. Rules below marked *(InstantDB only)*
+> already do not apply on the branch, and some are actively wrong there.
+>
+> **Feature work and schema growth stay frozen until cutover**; ~80% of the
+> codebase touches the database.
 
 Reference docs are in `docs/`. They exist **for agents**, not for a
 published site — write them accordingly.
@@ -47,6 +53,11 @@ spec-approval time and expensive afterward.
 ## Conventions
 
 - **Work on `beta`.** It deploys to https://beta.marinasecure.com in ~45s.
+- **Pages never touch the database.** *(On `rewrite/powersync`.)* Queries and
+  writes live in per-domain modules under `src/data/`; **no page file contains
+  SQL**. `src/lib/db/schema.ts` is generated from the live database by
+  `pnpm run schema:gen` — never hand-edited, and `pnpm run schema:check` fails
+  when it drifts.
 - **Behavior changes update the spec and the code together.** Page specs are
   co-located: `src/pages/x/ThingPage.spec.md` beside `ThingPage.tsx`.
   Migration in progress — most components still name a `docs/pages/*.html`

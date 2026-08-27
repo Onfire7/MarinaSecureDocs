@@ -41,23 +41,54 @@ lives in `architecture.md`, `permissions.md`, `data-model.md` and
       flagged. `powersync_role` and the publication are NOT verified from
       here — Supabase direct connections are IPv6-only without the IPv4
       add-on, so `psql` can't reach them from this machine.
-- [ ] **Schema + policies.** 42 tables per `data-model.md`; RLS per its tier
+- [x] **Schema + policies.** 42 tables per `data-model.md`; RLS per its tier
       column; `effective_permissions` view; `pg_cron` retention job.
-- [ ] **Sync streams.** always / occupancy / age, with the 30-day trailing
-      window. Verify the resident set offline, deliberately — an untested
-      scoping rule is the exact defect being migrated away from.
-- [ ] **Transform + load.** Pure transform, separate load. Drop the one
-      targetless ticket; `num_nonnulls(...) = 1` will reject it.
-- [ ] **Rewrite.** 66 files, ~230 call sites, big-bang on one branch. Each
-      page's queries move into a `src/data/` module. **No page file contains
-      SQL.**
+- [x] **Sync streams.** always / occupancy / age, with the 30-day trailing
+      window, and permission gates that compile to bucket parameters.
+- [x] **Transform + load.** Pure transform, separate load. Local only — the
+      remote database has the schema and none of the data.
+- [x] **Rewrite.** Done on `rewrite/powersync`. 19 modules under `src/data/`,
+      every page converted, no page file contains SQL, and nothing in `src/`
+      imports InstantDB. tsc 0 · oxlint 0 · 106 unit tests · 55 pgTAP · build
+      clean.
+- [x] **Verify the carried-forward acceptance criterion.** Closed
+      structurally: `computeManagementFlags()` is deleted, `user_permissions`
+      is maintained by a database trigger, and there is no permission column
+      on the user row for a client to write. See `src/lib/permissions.ts`.
+
+### Blocking, and only you can do it
+
+- [ ] **Add `"aud": "authenticated"` to the Clerk session token.** Clerk
+      dashboard → Configure → Sessions → Customize session token. PowerSync
+      requires the claim unconditionally and rejects every token without one
+      (`PSYNC_S2105`); Supabase accepts the token either way, verified with a
+      real minted JWT. Until this is done **nothing syncs**, and the app says
+      so on a screen quoting the error. Stage 3 of
+      `scripts/provision-supabase.sh`.
+
+### Then
+
+- [ ] **Verify a real signed-in session against synced data.** The whole
+      rewrite is compiled and booted but not yet exercised against rows: the
+      `aud` claim blocks it. Once it lands, run the loop from CLAUDE.md
+      against the LOCAL stack first (`supabase start`, `pnpm run ps:up`,
+      `pnpm run seed`, `pnpm run dev`) — the local database has the seeded
+      year; the remote has none.
+- [ ] **Seed or import the remote database.** PowerSync Cloud replicates from
+      the REMOTE Postgres, so beta shows an empty app until this happens.
+      Decide whether that is the real Instant export, the synthetic year, or
+      the real config alone.
 - [ ] **Offline attachment queue.** Local bytes + `upload_state`, draining
-      independently of PowerSync's write queue.
+      independently of PowerSync's write queue. `captureAttachment()` writes
+      the row first and fails loudly if the bytes cannot go, so nothing is
+      silently lost meanwhile.
 - [ ] **Twilio bridge.** PostgREST with a dedicated scoped Postgres role.
-- [ ] **Verify the carried-forward acceptance criterion.** The ADR 0002
-      privilege-escalation vector should close structurally via `user_roles`.
-      Prove it rather than assume it — this is the obligation most likely to
-      be dropped now that its ADR is superseded.
+- [ ] **Gate `marina_config` on being a marina user.** Found during the
+      rewrite: the always-resident stream has no parameter query, so any valid
+      Clerk token for this instance syncs every marina-configuration table —
+      including `users`, with names, emails and phone numbers. Every other
+      stream is gated. Needs a sync-rules experiment to fix, which the local
+      PowerSync makes cheap.
 
 ## Phase 0 — Knowledge architecture ✅
 
