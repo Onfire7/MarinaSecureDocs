@@ -251,6 +251,32 @@ export async function saveRole(
   });
 }
 
+/** How many users hold each role — what deleting one costs. */
+export function useRoleHolderCounts() {
+  const { data } = useQuery<{ role_id: string; holders: number }>(
+    "SELECT role_id, COUNT(*) AS holders FROM user_roles GROUP BY role_id",
+  );
+  return new Map(data.map((r) => [r.role_id, r.holders]));
+}
+
+export async function renameRole(
+  roleId: string,
+  from: string,
+  to: string,
+  actorId: string | null,
+): Promise<void> {
+  await transact(async (tx) => {
+    await update(tx, "roles", roleId, { name: to });
+    await recordActivity(tx, {
+      eventType: "role.renamed",
+      summary: `Role "${from}" renamed to "${to}"`,
+      subjectType: "roles",
+      subjectId: roleId,
+      actorId,
+    });
+  });
+}
+
 export async function deleteRole(
   roleId: string,
   name: string,

@@ -1,5 +1,10 @@
-// Trinary role-based permissions (see docs/permissions.md — including
-// Enforcement, which records that all of this is client-side only).
+// Trinary role-based permissions (see docs/permissions.md — Enforcement).
+//
+// This is the *client's* copy of a rule the database also implements. The
+// authority is the `effective_permissions` view — allow minus deny, expressed
+// as EXCEPT — materialised into `user_permissions`, which is what RLS reads and
+// what the sync streams gate on. What follows must agree with it; the tests in
+// permissions.test.ts are the executable statement of what "agree" means.
 // Each role maps permission → "allow" | "deny" | (absent = undefined).
 // Effective value per permission: default Deny; any Allow grants; any explicit
 // Deny cancels every Allow. Deny always wins.
@@ -33,10 +38,15 @@ export type Permission = (typeof PERMISSIONS)[number];
 
 export interface RoleLike {
   name: string;
-  // Permission keys this role grants / explicitly denies. Two plain arrays
-  // rather than one map<Permission, "allow"|"deny">, because InstantDB's
-  // CEL permission rules can test list membership but can't index into a
-  // JSON map — see instant.schema.ts (Role) and instant.perms.ts.
+  /**
+   * Permission keys this role grants / explicitly denies.
+   *
+   * Two plain arrays rather than one map, originally because InstantDB's rules
+   * could test list membership but not index into a JSON map. They stayed two
+   * arrays because `EXCEPT` over two `unnest()`s is the clearest possible SQL
+   * statement of deny-wins — the shape turned out to suit the destination
+   * better than the origin.
+   */
   allow?: string[];
   deny?: string[];
 }
@@ -56,22 +66,16 @@ export function computeEffectivePermissions(roles: RoleLike[]): Set<Permission> 
   return granted;
 }
 
-/**
- * The two booleans written to User.canManageRoles/canManageUsers — the
- * denormalized cache instant.perms.ts rules read. Call this any time a
- * role's grants or a user's role assignments change (Admin Roles / Admin
- * Users), never from the affected user's own session — see instant.perms.ts
- * for why the write itself is gated by manage_users/manage_roles.
- */
-export function computeManagementFlags(
-  roles: RoleLike[],
-): { canManageRoles: boolean; canManageUsers: boolean } {
-  const perms = computeEffectivePermissions(roles);
-  return {
-    canManageRoles: perms.has("manage_roles"),
-    canManageUsers: perms.has("manage_users"),
-  };
-}
+// computeManagementFlags() used to live here. It wrote canManageRoles and
+// canManageUsers onto the user row, because Instant's rules could not compute
+// a user's effective permissions and had to read a cache instead — and the
+// client wrote that cache, which is precisely the privilege-escalation vector
+// ADR 0002 recorded and carried forward.
+//
+// It is gone, and nothing replaces it. `user_permissions` is maintained by a
+// database trigger off `effective_permissions`, so a client cannot write its
+// own permissions at all: there is no column to write. The vector closes
+// structurally rather than by a rule that has to keep being right.
 
 // The Admin section is visible to anyone holding at least one manage_* permission.
 export const MANAGE_PERMISSIONS = PERMISSIONS.filter((p) =>

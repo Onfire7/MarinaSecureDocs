@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   computeEffectivePermissions,
-  computeManagementFlags,
   hasAnyManagePermission,
 } from "./permissions";
 import { aRole } from "../test/fixtures";
@@ -63,17 +62,6 @@ describe("computeEffectivePermissions", () => {
     ]);
     expect(perms.has("view_reports" as never)).toBe(true);
     expect([...perms]).not.toContain("not_a_real_permission");
-  });
-});
-
-describe("computeManagementFlags", () => {
-  it("derives both flags from effective permissions, honouring Deny", () => {
-    const admin = aRole({ name: "Admin", allow: ["manage_roles", "manage_users"] });
-    const restricted = aRole({ name: "Restricted", deny: ["manage_users"] });
-    expect(computeManagementFlags([admin, restricted])).toEqual({
-      canManageRoles: true,
-      canManageUsers: false,
-    });
   });
 });
 
