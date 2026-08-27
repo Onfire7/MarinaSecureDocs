@@ -170,6 +170,18 @@ Screenshots or it didn't happen.
   is-this-a-refusal test, and left the app advising the user to find signal
   while the console said exactly what was wrong. Read `.message` off the
   object; never narrow on the prototype.
+- **A `LEFT JOIN` on anything but `id` is a full scan.** PowerSync's local
+  tables are views over a JSON blob, so `id` is the only real column — every
+  other one is `CAST(json_extract(data, '$.x'))`, and every index you declare
+  is an *expression* index. SQLite uses those to satisfy a WHERE constraint but
+  **not a JOIN constraint**, so `LEFT JOIN t ON t.fk = outer.id` scans all of
+  `t` once per outer row, and `EXPLAIN QUERY PLAN` says `SCAN … LEFT-JOIN`
+  rather than `SEARCH`. The contact list paid 5,461ms for 1,929 rows this way;
+  the same rows as correlated scalar subqueries took 59ms. `ANALYZE` does not
+  help and neither does wrapping the inner side in a subquery — SQLite flattens
+  it. Join on `id` freely; correlate on anything else. `src/data/assets.ts`
+  still carries one (`asset_checkouts` on `asset_id`), left alone only because
+  that table is tiny.
 - **The auth trap survives the migration, in a new place.** Instant fails
   the Clerk token exchange on an unallowlisted browser origin. Supabase's
   equivalent is the third-party auth provider config: without it every policy

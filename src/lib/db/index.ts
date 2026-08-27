@@ -18,6 +18,21 @@ export const db = new PowerSyncDatabase({
   },
 });
 
+// A handle on the device's own database, in development only.
+//
+// "The screen is empty" has at least four causes on this stack — the stream
+// never delivered the row, the query is wrong, the permission gate excluded
+// it, or the sync simply has not finished — and from outside the app they look
+// identical. This makes the difference one question:
+//
+//   await __ps.get("SELECT COUNT(*) AS n FROM boats")
+//
+// import.meta.env.DEV is a compile-time constant, so this whole block is gone
+// from a production bundle rather than merely unreachable in one.
+if (import.meta.env.DEV) {
+  (globalThis as unknown as { __ps: typeof db }).__ps = db;
+}
+
 export { AppSchema };
 export type { Database };
 

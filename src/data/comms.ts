@@ -104,12 +104,13 @@ export interface SmsThreadRow {
 }
 
 const THREAD_SELECT = `
-  SELECT t.*, c.name AS contact_name, d.phone AS contact_phone,
+  SELECT t.*, c.name AS contact_name,
+         (SELECT d.phone FROM contact_details d WHERE d.contact_id = t.contact_id)
+           AS contact_phone,
          (SELECT COUNT(*) FROM sms_messages m WHERE m.thread_id = t.id)
            AS message_count
     FROM sms_threads t
-    LEFT JOIN contacts c ON c.id = t.contact_id
-    LEFT JOIN contact_details d ON d.contact_id = c.id`;
+    LEFT JOIN contacts c ON c.id = t.contact_id`;
 
 export function useSmsThreads() {
   return useQuery<SmsThreadRow>(

@@ -33,7 +33,8 @@ export interface ReservationRow extends ReservationTargetColumns {
 const RESERVATION_SELECT = `
   SELECT r.*,
          c.name AS contact_name,
-         cd.phone AS contact_phone,
+         (SELECT cd.phone FROM contact_details cd WHERE cd.contact_id = r.contact_id)
+           AS contact_phone,
          l.name AS location_name,
          lt.name AS location_type_name,
          l.reservation_visibility AS location_visibility,
@@ -44,7 +45,6 @@ const RESERVATION_SELECT = `
          aps.name AS post_return_status_name
     FROM reservations r
     LEFT JOIN contacts c ON c.id = r.contact_id
-    LEFT JOIN contact_details cd ON cd.contact_id = c.id
     LEFT JOIN locations l ON l.id = r.location_id
     LEFT JOIN location_types lt ON lt.id = l.location_type_id
     LEFT JOIN location_statuses lps ON lps.id = l.post_reservation_status_id
