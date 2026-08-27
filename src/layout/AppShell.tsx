@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useClerk } from "@clerk/clerk-react";
 import { useCurrent } from "../lib/auth/CurrentUserContext";
-import { db } from "../lib/db";
+import { useMarinaName } from "../data/settings";
 import { visibleSections, MOBILE_TAB_COUNT } from "../routes/nav";
 import { ActiveCallPanel } from "../pages/comms/ActiveCallPanel";
 import { MissedCommsBadge } from "../pages/comms/MissedCommsBadge";
@@ -153,9 +153,4 @@ export function AppShell() {
       </nav>
     </div>
   );
-}
-
-function useMarinaName(): string {
-  const { data } = db.useQuery({ marinaSettings: {} });
-  return data?.marinaSettings?.[0]?.marinaName ?? "Marina";
 }

@@ -1,22 +1,26 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { statusLabel } from "../../lib/locations";
-import {
-  ATTACHMENT_LINKS_QUERY,
-  attachmentOf,
-  targetPath,
-} from "../../lib/attachments";
+import { attachmentOf, targetPath } from "../../data/attachments";
 import type { NewTicketState } from "../tickets/NewTicketPage";
 import { incidentStatusBadgeClass } from "../../lib/workItems";
-import { activityTx } from "../../lib/activityLog";
+import {
+  addIncidentComment,
+  assignIncident,
+  editIncidentOriginal,
+  setIncidentStatus,
+  useCanEditOriginal,
+  useIncident,
+  useIncidentComments,
+  useTicketsFromIncident,
+} from "../../data/incidents";
+import { useIncidentStatuses } from "../../data/lookups";
+import { useUsers } from "../../data/users";
 
 // Incidents — Incident Detail (see pages/incident-detail.html).
 // Two distinct edit windows: the original content locks to its author at the
 // end of their shift; the addendum thread never locks for anyone holding
 // create_incidents.
-const INCIDENT_STATUSES = ["open", "under_review", "resolved", "closed"] as const;
 
 export function IncidentDetailPage() {
   const { id: incidentId } = useParams();
@@ -25,24 +29,14 @@ export function IncidentDetailPage() {
   const [comment, setComment] = useState("");
   const [editing, setEditing] = useState(false);
 
-  const { data } = db.useQuery(
-    incidentId
-      ? {
-          incidents: {
-            $: { where: { id: incidentId } },
-            type: {},
-            author: { shifts: {} },
-            assignedTo: {},
-            comments: { author: {} },
-            linkedTickets: {},
-            ...ATTACHMENT_LINKS_QUERY,
-          },
-          users: { $: { where: { active: true } } },
-        }
-      : null,
-  );
-  const incident = data?.incidents?.[0];
-  const users = data?.users ?? [];
+  const { incident } = useIncident(incidentId);
+  const { data: users } = useUsers();
+  const { statuses } = useIncidentStatuses();
+  const { data: comments } = useIncidentComments(incidentId);
+  const { data: linkedTickets } = useTicketsFromIncident(incidentId);
+  // Hooks before any early return — the author-edit window is a query, and a
+  // conditional one would break the rules of hooks on the branch below.
+  const canEditOriginal = useCanEditOriginal(incident, current.user?.id);
 
   if (!current.can("view_incidents")) {
     return (
@@ -61,57 +55,24 @@ export function IncidentDetailPage() {
 
   const target = attachmentOf(incident);
   const canHandle = current.can("create_incidents");
-  const isAuthor = Boolean(current.user && incident.author?.id === current.user.id);
+  const actorId = current.user?.id ?? null;
 
-  // Author-edit window: open while the author's shift containing the
-  // incident's creation is still running. An author with no shift records at
-  // all (e.g. office staff who never clock in) is never locked out — the
-  // shift boundary simply doesn't exist for them.
-  const authorShifts = incident.author?.shifts ?? [];
-  const createdAt = new Date(incident.createdAt).getTime();
-  const containingShiftOpen = authorShifts.some(
-    (s) => new Date(s.startedAt).getTime() <= createdAt && !s.endedAt,
-  );
-  const canEditOriginal =
-    isAuthor && (authorShifts.length === 0 || containingShiftOpen);
-
-  const logIncident = (eventType: string, summary: string) =>
-    activityTx({
-      eventType,
-      summary,
-      subjectType: "incidents",
-      subjectId: incident.id,
-      actorId: current.user?.id,
-    });
-
-  const setStatus = (status: string) => {
-    void db.transact([
-      db.tx.incidents[incident.id].update({ status }),
-      logIncident(
-        "incident.status_changed",
-        `"${incident.title}" set to ${statusLabel(status)}`,
-      ),
-    ]);
+  const setStatus = (statusId: string) => {
+    const status = statuses.find((st) => st.id === statusId);
+    if (status) void setIncidentStatus(incident, status, actorId);
   };
   const assign = (userId: string) => {
     if (!userId) return;
     const assignee = users.find((u) => u.id === userId);
-    void db.transact([
-      db.tx.incidents[incident.id].link({ assignedTo: userId }),
-      logIncident(
-        "incident.assigned",
-        `"${incident.title}" assigned to ${assignee?.name ?? "someone"}`,
-      ),
-    ]);
+    void assignIncident(
+      incident,
+      { id: userId, name: assignee?.name ?? "someone" },
+      actorId,
+    );
   };
   const addComment = async () => {
     if (!comment.trim() || !current.user) return;
-    await db.transact([
-      db.tx.incidentComments[id()]
-        .update({ body: comment.trim(), createdAt: Date.now() })
-        .link({ incident: incident.id, author: current.user.id }),
-      logIncident("incident.commented", `Addendum added to "${incident.title}"`),
-    ]);
+    await addIncidentComment(incident, comment.trim(), actorId);
     setComment("");
   };
 
@@ -125,19 +86,15 @@ export function IncidentDetailPage() {
     });
   };
 
-  const comments = [...(incident.comments ?? [])].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-  );
-
   return (
     <div>
       <div className="page-head">
         <div>
           <h1 className="page-title">{incident.title}</h1>
           <div className="page-sub">
-            {incident.type?.name ? `${incident.type.name} · ` : ""}
-            {incident.author?.name ?? "—"} ·{" "}
-            {new Date(incident.createdAt).toLocaleString(undefined, {
+            {incident.type_name ? `${incident.type_name} · ` : ""}
+            {incident.author_name ?? "—"} ·{" "}
+            {new Date(incident.created_at).toLocaleString(undefined, {
               month: "short",
               day: "numeric",
               hour: "numeric",
@@ -165,18 +122,21 @@ export function IncidentDetailPage() {
               {canHandle ? (
                 <select
                   className="select select-inline"
-                  value={incident.status}
+                  value={incident.status_id}
                   onChange={(e) => setStatus(e.target.value)}
                 >
-                  {[...new Set([...INCIDENT_STATUSES, incident.status])].map((s) => (
-                    <option key={s} value={s}>
-                      {statusLabel(s)}
+                  {statuses.some((st) => st.id === incident.status_id) || (
+                    <option value={incident.status_id}>{incident.status_name}</option>
+                  )}
+                  {statuses.map((st) => (
+                    <option key={st.id} value={st.id}>
+                      {st.name}
                     </option>
                   ))}
                 </select>
               ) : (
-                <span className={incidentStatusBadgeClass(incident.status)}>
-                  {statusLabel(incident.status)}
+                <span className={incidentStatusBadgeClass(incident.status_name)}>
+                  {incident.status_name}
                 </span>
               )}
             </div>
@@ -186,7 +146,9 @@ export function IncidentDetailPage() {
             <span className="field-label">Assigned to</span>
             <div className="field-value row">
               <span>
-                {incident.assignedTo?.name ?? <span className="muted">Unassigned</span>}
+                {incident.assignee_name ?? (
+                  <span className="muted">Unassigned</span>
+                )}
               </span>
               {canHandle && (
                 <select
@@ -231,11 +193,11 @@ export function IncidentDetailPage() {
             <p className="muted small">No further details recorded.</p>
           )}
 
-          {(incident.linkedTickets ?? []).length > 0 && (
+          {linkedTickets.length > 0 && (
             <div style={{ marginTop: 16 }}>
               <div className="section-title">Linked tickets</div>
               <div className="stack" style={{ gap: 8 }}>
-                {(incident.linkedTickets ?? []).map((t) => (
+                {linkedTickets.map((t) => (
                   <Link
                     key={t.id}
                     to={`/tickets/${t.id}`}
@@ -243,7 +205,7 @@ export function IncidentDetailPage() {
                     style={{ textDecoration: "none", color: "inherit" }}
                   >
                     <span>{t.title}</span>
-                    <span className="badge">{statusLabel(t.status)}</span>
+                    <span className="badge">{t.status_name}</span>
                   </Link>
                 ))}
               </div>
@@ -258,8 +220,8 @@ export function IncidentDetailPage() {
               <div key={c.id} className="card">
                 <div className="small" style={{ whiteSpace: "pre-wrap" }}>{c.body}</div>
                 <div className="card-meta">
-                  {c.author?.name ?? "—"} ·{" "}
-                  {new Date(c.createdAt).toLocaleString(undefined, {
+                  {c.author_name ?? "—"} ·{" "}
+                  {new Date(c.created_at).toLocaleString(undefined, {
                     month: "short",
                     day: "numeric",
                     hour: "numeric",
@@ -316,19 +278,12 @@ function EditOriginal({
   const [details, setDetails] = useState(initialDetails);
 
   const save = async () => {
-    await db.transact([
-      db.tx.incidents[incidentId].update({
-        title: title.trim(),
-        details: details.trim() || undefined,
-      }),
-      activityTx({
-        eventType: "incident.edited",
-        summary: `"${title.trim()}" edited by its author`,
-        subjectType: "incidents",
-        subjectId: incidentId,
-        actorId: current.user?.id,
-      }),
-    ]);
+    await editIncidentOriginal(
+      incidentId,
+      title.trim(),
+      details.trim(),
+      current.user?.id ?? null,
+    );
     onDone();
   };
 

@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { attachmentLink, type AttachmentTarget } from "../../lib/attachments";
-import { activityTx } from "../../lib/activityLog";
+import type { AttachmentTarget } from "../../data/attachments";
+import { createNote } from "../../data/notes";
 
 // Minimal pre-attached note entry — the full shared New Note dialog (with a
 // free target picker) arrives with the Shared dialogs group; callers here
@@ -18,22 +17,7 @@ export function NoteDialog({
   const [body, setBody] = useState("");
 
   const save = async () => {
-    const noteId = id();
-    await db.transact([
-      db.tx.notes[noteId]
-        .update({ body: body.trim(), createdAt: Date.now() })
-        .link({
-          ...attachmentLink(target),
-          ...(current.user ? { author: current.user.id } : {}),
-        }),
-      activityTx({
-        eventType: "note.created",
-        summary: `Note added on ${target.label}`,
-        subjectType: "notes",
-        subjectId: noteId,
-        actorId: current.user?.id,
-      }),
-    ]);
+    await createNote(body.trim(), target, current.user?.id ?? null);
     onClose();
   };
 

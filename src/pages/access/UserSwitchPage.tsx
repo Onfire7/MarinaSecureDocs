@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useClerk, useSessionList } from "@clerk/clerk-react";
-import { db } from "../../lib/db";
+import { roleNames, useUsersByClerkIds } from "../../data/users";
 
 type SessionResource = NonNullable<
   ReturnType<typeof useSessionList>["sessions"]
@@ -11,8 +11,8 @@ import { useCurrentUser } from "../../lib/auth/useCurrentUser";
 // Access — User Switch (see pages/user-switch.html).
 // Shared-device handoff over Clerk's multi-session support: picking a user
 // calls setActive() on their existing session — no credential re-entry, and it
-// works offline since both the Clerk session and Instant's local data are
-// already on the device.
+// works offline since both the Clerk session and the marina's data are already
+// on the device.
 export function UserSwitchPage() {
   const { isLoaded, sessions, setActive } = useSessionList();
   const { session: activeSession } = useClerk();
@@ -24,19 +24,12 @@ export function UserSwitchPage() {
     .map((s) => s.user?.id)
     .filter((id): id is string => Boolean(id));
 
-  // Resolve marina User records (name, roles) for everyone on this device.
-  const { data } = db.useQuery(
-    clerkIds.length > 0
-      ? {
-          users: {
-            $: { where: { clerkUserId: { $in: clerkIds } } },
-            roles: {},
-          },
-        }
-      : null,
-  );
+  // Resolve marina user records (name, roles) for everyone on this device.
+  // These come from the device's own database, so the handoff list renders in
+  // a dead zone — which is the only place a handoff ever actually happens.
+  const { data: profiles } = useUsersByClerkIds(clerkIds);
   const profileByClerkId = new Map(
-    (data?.users ?? []).map((u) => [u.clerkUserId, u]),
+    profiles.map((u) => [u.clerk_user_id, u]),
   );
 
   const switchTo = async (session: SessionResource) => {
@@ -71,9 +64,9 @@ export function UserSwitchPage() {
             clerkUser?.fullName ??
             clerkUser?.primaryEmailAddress?.emailAddress ??
             "Unknown user";
-          const roleNames = (profile?.roles ?? []).map((r) => r.name);
+          const roles = profile ? roleNames(profile) : [];
           const isActive = session.id === activeSession?.id;
-          const isSelf = clerkUser?.id === current.user?.clerkUserId;
+          const isSelf = clerkUser?.id === current.user?.clerk_user_id;
           const canRemove = isSelf || current.can("manage_users");
           return (
             <div key={session.id} className="session-item row">
@@ -102,7 +95,7 @@ export function UserSwitchPage() {
                     {name}
                   </span>
                   <span className="muted small">
-                    {roleNames.join(" · ") || "—"}
+                    {roles.join(" · ") || "—"}
                     {isActive ? " · current" : ""}
                   </span>
                 </span>

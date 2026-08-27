@@ -1,6 +1,6 @@
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { SignIn, useAuth, useSessionList } from "@clerk/clerk-react";
-import { db } from "../../lib/db";
+import { useMarinaName } from "../../data/settings";
 
 // Access — Sign In (see pages/sign-in.html).
 // Authentication itself is Clerk's embedded component; identifier/challenge
@@ -8,6 +8,9 @@ import { db } from "../../lib/db";
 export function SignInPage() {
   const { isLoaded, isSignedIn } = useAuth();
   const { sessions } = useSessionList();
+  // Branding, read from the device's own copy of marina_settings. On a device
+  // that has synced before this renders the marina's real name while signed
+  // out; on a brand new one it falls back to "Marina".
   const marinaName = useMarinaName();
   const [searchParams] = useSearchParams();
   // A public deep link (e.g. a checkpoint scan) that required sign-in first
@@ -41,10 +44,4 @@ export function SignInPage() {
       </p>
     </div>
   );
-}
-
-function useMarinaName(): string {
-  // MarinaSettings branding, shown before credentials are entered.
-  const { data } = db.useQuery({ marinaSettings: {} });
-  return data?.marinaSettings?.[0]?.marinaName ?? "Marina";
 }

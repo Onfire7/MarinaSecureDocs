@@ -1,6 +1,11 @@
 // Locations — shared display helpers (see pages/location-list.html).
-// Location.status is an open set: the four standard values plus any
-// admin-defined additions, which fall through to the neutral badge.
+//
+// A location's status is an admin-defined row in `location_statuses`, not a
+// fixed enum: the four standard ones plus whatever a marina adds. So its
+// display name is whatever the row says, and only the *colour* needs a rule.
+// statusKey() normalises the name back to a key the standard set can be
+// recognised by; anything a marina invents falls through to the neutral badge,
+// which is the open-set behaviour this was always specified to have.
 
 export const STANDARD_STATUSES = [
   "occupied",
@@ -10,11 +15,13 @@ export const STANDARD_STATUSES = [
   "needs_cleaning",
 ] as const;
 
-// The status a reservation-enabled Location takes on check-out when no
-// per-location override is set (see docs/data-model.md — Location).
-export const DEFAULT_POST_RESERVATION_STATUS = "needs_cleaning";
+/** "Out of Service" → "out_of_service". */
+export function statusKey(name: string | null | undefined): string {
+  return (name ?? "").trim().toLowerCase().replace(/\s+/g, "_");
+}
 
-// Status is absent entirely for types that don't track it (containers, roots).
+// Title-cases an enum value — priorities, reservation statuses, item types.
+// NOT for the lookup-table statuses, whose rows already carry a display name.
 export function statusLabel(status: string | null | undefined): string {
   if (!status) return "—";
   return status
@@ -24,7 +31,7 @@ export function statusLabel(status: string | null | undefined): string {
 }
 
 export function statusBadgeClass(status: string | null | undefined): string {
-  switch (status) {
+  switch (statusKey(status)) {
     case "occupied":
       return "badge badge-bad";
     case "vacant":
@@ -50,7 +57,7 @@ export function statusMapColors(status: string | null | undefined): {
   border: string;
   text: string;
 } {
-  switch (status) {
+  switch (statusKey(status)) {
     case "occupied":
       return { background: "var(--bad-bg)", border: "var(--bad)", text: "var(--bad)" };
     case "vacant":
@@ -67,7 +74,7 @@ export function statusMapColors(status: string | null | undefined): {
 
 // ---------------------------------------------------------------- Map placements
 
-// Mirrors instant.schema.ts's locationMapPlacements.placement shape. cx/cy
+// Mirrors location_map_placements.placement. cx/cy
 // are the one part of this that's genuinely relative (percent of the map
 // image); everything about the rectangle's own size is intrinsic to its
 // label instead, so a rotated label rotates a normally-proportioned box
@@ -116,14 +123,14 @@ export function compareNames(a: string, b: string): number {
 // subscribe to every location, so the chain is resolvable client-side).
 export function breadcrumb(
   locationId: string | undefined,
-  byId: Map<string, { name: string; parent?: { id: string } | null }>,
+  byId: Map<string, { name: string; parent_id?: string | null }>,
 ): string[] {
   const parts: string[] = [];
   let cursor = locationId ? byId.get(locationId) : undefined;
   let guard = 0;
   while (cursor && guard++ < 20) {
     parts.unshift(cursor.name);
-    cursor = cursor.parent?.id ? byId.get(cursor.parent.id) : undefined;
+    cursor = cursor.parent_id ? byId.get(cursor.parent_id) : undefined;
   }
   return parts;
 }

@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { db } from "../../lib/db";
 import {
   TARGET_TYPES,
+  useAttachmentOptions,
   type AttachmentTarget,
   type TargetType,
-} from "../../lib/attachments";
+} from "../../data/attachments";
 
 // Shared attachment-target picker (see pages/attachment-target-picker.html):
 // pick a target type, then a record of that type. Used by the new-ticket and
@@ -18,39 +18,10 @@ export function AttachmentTargetPicker({
 }) {
   const [type, setType] = useState<TargetType | "">(value?.type ?? "");
 
-  const { data } = db.useQuery(
-    type === "location"
-      ? { locations: {} }
-      : type === "checkpoint"
-        ? { checkpoints: {} }
-        : type === "boat"
-          ? { boats: {} }
-          : type === "vehicle"
-            ? { vehicles: {} }
-            : type === "contact"
-              ? { contacts: {} }
-              : type === "asset"
-                ? { assets: {} }
-                : null,
-  );
-
-  const options: { id: string; label: string }[] = !type
-    ? []
-    : type === "vehicle"
-      ? (data?.vehicles ?? []).map((v) => ({ id: v.id, label: v.description }))
-      : type === "contact"
-        ? (data?.contacts ?? []).map((c) => ({ id: c.id, label: c.name ?? "Unnamed contact" }))
-        : (
-            (data?.[
-              type === "location"
-                ? "locations"
-                : type === "checkpoint"
-                  ? "checkpoints"
-                  : type === "boat"
-                    ? "boats"
-                    : "assets"
-            ] ?? []) as { id: string; name: string }[]
-          ).map((r) => ({ id: r.id, label: r.name }));
+  // The label column differs per kind — a vehicle has a description where
+  // everything else has a name — so each kind gets its own SELECT rather than
+  // a query followed by six branches of mapping.
+  const { data: options } = useAttachmentOptions(type);
 
   return (
     <div className="row" style={{ alignItems: "stretch" }}>
@@ -80,14 +51,11 @@ export function AttachmentTargetPicker({
         }}
       >
         <option value="">Select…</option>
-        {options
-          .slice()
-          .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
-          .map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.label}
-            </option>
-          ))}
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.label}
+          </option>
+        ))}
       </select>
     </div>
   );

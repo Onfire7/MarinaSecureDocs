@@ -2,11 +2,15 @@ import { useEffect, useMemo, useRef } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { useQuery, useStatus } from "@powersync/react";
 import { supabase } from "../db/supabase";
-import type { Database } from "../db";
 import { setSyncAuthError } from "./syncAuthStatus";
 import type { Permission } from "../permissions";
+// The row type is declared in the data layer rather than taken from the
+// generated schema, whose columns are all nullable — SQLite has no NOT NULL
+// to carry across, but Postgres does, and a row only reaches this device by
+// passing it.
+import type { UserRow } from "../../data/users";
 
-export type UserRow = Database["users"];
+export type { UserRow };
 
 export interface CurrentUser {
   /** The marina's own user record for the active Clerk session. */
@@ -57,6 +61,12 @@ export function useCurrentUser(): CurrentUser {
   );
   const user = users[0] ?? null;
 
+  const signedIn = Boolean(isSignedIn && clerkUserId);
+  // `hasSynced` is undefined before PowerSync has read its own metadata, which
+  // is a third state and not the same as false. Treated as "not yet" here,
+  // because both mean the absence of a user row proves nothing.
+  const hasSynced = status.hasSynced === true;
+
   const { data: permissionRows } = useQuery<{ permission: string }>(
     "SELECT permission FROM user_permissions WHERE user_id = ?",
     [user?.id ?? ""],
@@ -80,7 +90,7 @@ export function useCurrentUser(): CurrentUser {
   useEffect(() => {
     if (!isSignedIn || !clerkUserId) return;
     if (user || usersLoading) return;
-    if (!status.hasSynced) return; // Absence proves nothing until we've synced.
+    if (!hasSynced) return; // Absence proves nothing until we've synced.
     if (claimed.current === clerkUserId) return;
     claimed.current = clerkUserId;
 
@@ -96,15 +106,14 @@ export function useCurrentUser(): CurrentUser {
           setSyncAuthError(error.message);
         }
       });
-  }, [isSignedIn, clerkUserId, user, usersLoading, status.hasSynced]);
+  }, [isSignedIn, clerkUserId, user, usersLoading, hasSynced]);
 
   const permissions = useMemo(
     () => new Set(permissionRows.map((r) => r.permission as Permission)),
     [permissionRows],
   );
 
-  const signedIn = Boolean(isSignedIn && clerkUserId);
-  const neverSynced = signedIn && !status.hasSynced;
+  const neverSynced = signedIn && !hasSynced;
 
   return {
     user,
@@ -113,7 +122,7 @@ export function useCurrentUser(): CurrentUser {
     // difference between a spinner that ends and one that does not.
     isLoading:
       !isLoaded || (signedIn && (usersLoading || (neverSynced && status.connected))),
-    unprovisioned: signedIn && status.hasSynced && !usersLoading && !user,
+    unprovisioned: signedIn && hasSynced && !usersLoading && !user,
     needsFirstSync: neverSynced && !status.connected,
     permissions,
     can: (p) => permissions.has(p),
