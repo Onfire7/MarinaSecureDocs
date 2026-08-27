@@ -4,9 +4,9 @@ import { formatCallDuration, formatPhone, isParticipant } from "./comms";
 describe("isParticipant", () => {
   const room = {
     id: "r1",
-    createdBy: { id: "creator" },
-    invitedUsers: [{ id: "invited" }],
-    invitedRoles: [{ id: "security" }],
+    created_by_id: "creator",
+    invitedUserIds: ["invited"],
+    invitedRoleIds: ["security"],
   };
 
   it("counts the creator, a direct invite, and a role invite", () => {
@@ -21,7 +21,7 @@ describe("isParticipant", () => {
   });
 
   it("tolerates a room with no invite lists loaded", () => {
-    expect(isParticipant({ id: "r2", createdBy: { id: "c" } }, "other", ["security"])).toBe(false);
+    expect(isParticipant({ id: "r2", created_by_id: "c" }, "other", ["security"])).toBe(false);
   });
 });
 

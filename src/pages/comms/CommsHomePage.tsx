@@ -1,11 +1,21 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
-import { displayName } from "../../lib/contacts";
 import { formatCallDuration, formatPhone, isParticipant } from "../../lib/comms";
 import { NewCallDialog, NewSmsDialog } from "./NewCommsDialogs";
+import {
+  useCallNotes,
+  useCalls,
+  useChatRooms,
+  useChatRoomRoles,
+  useChatRoomUsers,
+  useSmsThreads,
+  type CallRow,
+  type ChatRoomRow,
+  type SmsThreadRow,
+} from "../../data/comms";
+import { useRoleIdsFor } from "../../data/users";
 
 // Comms — Home (see docs/pages/comms-home.html).
 // Three independently gated sections: view_calls, view_sms, and chat (always
@@ -24,39 +34,28 @@ export function CommsHomePage() {
   const [tab, setTab] = useState<Tab>(canCalls ? "calls" : canSms ? "texts" : "chat");
   const [dialog, setDialog] = useState<"call" | "sms" | null>(null);
 
-  const { data } = db.useQuery({
-    calls: { contact: {}, notes: { author: {} } },
-    smsThreads: { contact: {} },
-    chatRooms: { createdBy: {}, invitedUsers: {}, invitedRoles: {}, messages: {} },
-  });
+  // Each list comes back already ordered by its own query. Every one of them
+  // is empty on a device without the matching permission, because the rows
+  // were never synced — the `can` checks decide which SECTION appears, not
+  // which rows are in it.
+  const { data: calls } = useCalls();
+  const { data: threads } = useSmsThreads();
+  const { data: rooms } = useChatRooms();
+  const { data: roomUsers } = useChatRoomUsers();
+  const { data: roomRoles } = useChatRoomRoles();
+  const roleIds = useRoleIdsFor(current.user?.id);
 
-  const calls = useMemo(
-    () =>
-      [...(data?.calls ?? [])].sort(
-        (a, b) =>
-          new Date(b.startedAt ?? 0).getTime() - new Date(a.startedAt ?? 0).getTime(),
-      ),
-    [data],
-  );
-  const threads = useMemo(
-    () =>
-      [...(data?.smsThreads ?? [])].sort(
-        (a, b) =>
-          new Date(b.lastMessageAt ?? 0).getTime() -
-          new Date(a.lastMessageAt ?? 0).getTime(),
-      ),
-    [data],
-  );
-
-  const roleIds = (current.user?.roles ?? []).map((r) => r.id);
   const { mine, others } = useMemo(() => {
-    const all = data?.chatRooms ?? [];
+    const withInvites = rooms.map((r) => ({
+      ...r,
+      invitedUserIds: roomUsers.filter((u) => u.room_id === r.id).map((u) => u.user_id),
+      invitedRoleIds: roomRoles.filter((x) => x.room_id === r.id).map((x) => x.role_id),
+    }));
     return {
-      mine: all.filter((r) => isParticipant(r, current.user?.id, roleIds)),
-      others: all.filter((r) => !isParticipant(r, current.user?.id, roleIds)),
+      mine: withInvites.filter((r) => isParticipant(r, current.user?.id, roleIds)),
+      others: withInvites.filter((r) => !isParticipant(r, current.user?.id, roleIds)),
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, current.user?.id, roleIds.join(",")]);
+  }, [rooms, roomUsers, roomRoles, current.user?.id, roleIds]);
 
   const tabs: Tab[] = [
     ...(canCalls ? (["calls"] as Tab[]) : []),
@@ -131,21 +130,6 @@ export function CommsHomePage() {
   );
 }
 
-type CallRow = {
-  id: string;
-  direction: string;
-  line?: string;
-  fromNumber?: string;
-  toNumber?: string;
-  startedAt?: string | number;
-  duration?: number;
-  missed: boolean;
-  recordingUrl?: string;
-  transcript?: string;
-  contact?: { id: string; name?: string | null; phone?: string | null } | null;
-  notes?: { id: string; body: string; author?: { name: string } | null }[];
-};
-
 function CallsSection({ calls }: { calls: CallRow[] }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   return (
@@ -168,17 +152,19 @@ function CallsSection({ calls }: { calls: CallRow[] }) {
             >
               <span>
                 <span className="card-title">
-                  {c.contact ? displayName(c.contact) : formatPhone(c.fromNumber)}
+                  {c.contact_name ?? formatPhone(c.from_number)}
                 </span>
                 <span className="card-meta">
                   {c.direction === "inbound" ? "Inbound" : "Outbound"}
                   {c.line ? ` · ${c.line}` : ""}
-                  {c.missed ? " · missed" : ` · ${formatCallDuration(c.duration)}`}
+                  {c.missed === 1
+                    ? " · missed"
+                    : ` · ${formatCallDuration(c.duration)}`}
                 </span>
               </span>
               <span className="muted small">
-                {c.startedAt
-                  ? new Date(c.startedAt).toLocaleString(undefined, {
+                {c.started_at
+                  ? new Date(c.started_at).toLocaleString(undefined, {
                       month: "short",
                       day: "numeric",
                       hour: "numeric",
@@ -191,8 +177,8 @@ function CallsSection({ calls }: { calls: CallRow[] }) {
             {/* Expands inline rather than opening a separate detail page. */}
             {expanded === c.id && (
               <div style={{ marginTop: 8 }}>
-                {c.contact && (
-                  <Link to={`/contacts/${c.contact.id}`} className="small">
+                {c.contact_id && (
+                  <Link to={`/contacts/${c.contact_id}`} className="small">
                     Open contact →
                   </Link>
                 )}
@@ -201,15 +187,10 @@ function CallsSection({ calls }: { calls: CallRow[] }) {
                     {c.transcript}
                   </p>
                 )}
-                {c.recordingUrl && (
-                  <audio controls src={c.recordingUrl} style={{ width: "100%" }} />
+                {c.recording_url && (
+                  <audio controls src={c.recording_url} style={{ width: "100%" }} />
                 )}
-                {(c.notes ?? []).map((n) => (
-                  <div key={n.id} className="small">
-                    {n.body}
-                    <span className="muted"> — {n.author?.name ?? "—"}</span>
-                  </div>
-                ))}
+                <CallNotes callId={c.id} />
               </div>
             )}
           </div>
@@ -224,17 +205,24 @@ function CallsSection({ calls }: { calls: CallRow[] }) {
   );
 }
 
-function TextsSection({
-  threads,
-}: {
-  threads: {
-    id: string;
-    line?: string;
-    unread: boolean;
-    lastMessageAt?: string | number;
-    contact?: { id: string; name?: string | null } | null;
-  }[];
-}) {
+function CallNotes({ callId }: { callId: string }) {
+  // Fetched per expanded call rather than joined into the list: only one call
+  // is open at a time, and a join would pull every note on every call in the
+  // history to render none of them.
+  const { data: notes } = useCallNotes(callId);
+  return (
+    <>
+      {notes.map((n) => (
+        <div key={n.id} className="small">
+          {n.body}
+          <span className="muted"> — {n.author_name ?? "—"}</span>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function TextsSection({ threads }: { threads: SmsThreadRow[] }) {
   return (
     <div>
       <div className="section-title">Recent texts</div>
@@ -247,16 +235,14 @@ function TextsSection({
             style={{ textDecoration: "none", color: "inherit" }}
           >
             <span>
-              <span className="card-title">
-                {t.contact ? displayName(t.contact) : "Unknown"}
-              </span>
+              <span className="card-title">{t.contact_name ?? "Unknown"}</span>
               <span className="card-meta">{t.line ?? ""}</span>
             </span>
             <span className="row">
-              {t.unread && <span className="badge badge-accent">Unread</span>}
+              {t.unread === 1 && <span className="badge badge-accent">Unread</span>}
               <span className="muted small">
-                {t.lastMessageAt
-                  ? new Date(t.lastMessageAt).toLocaleDateString(undefined, {
+                {t.last_message_at
+                  ? new Date(t.last_message_at).toLocaleDateString(undefined, {
                       month: "short",
                       day: "numeric",
                     })
@@ -275,28 +261,23 @@ function TextsSection({
   );
 }
 
-type RoomRow = {
-  id: string;
-  title: string;
-  topic?: string;
-  messages?: { id: string; timestamp: string | number }[];
-};
-
 function ChatSection({
   mine,
   others,
   canSeeAllChats,
 }: {
-  mine: RoomRow[];
-  others: RoomRow[];
+  mine: ChatRoomRow[];
+  others: ChatRoomRow[];
   canSeeAllChats: boolean;
 }) {
-  const lastActivity = (r: RoomRow) =>
-    Math.max(0, ...(r.messages ?? []).map((m) => new Date(m.timestamp).getTime()));
-  const sortRooms = (rooms: RoomRow[]) =>
-    [...rooms].sort((a, b) => lastActivity(b) - lastActivity(a));
+  // last_message_at and message_count come back on the row, so the sort is a
+  // comparison rather than a scan of every room's messages.
+  const sortRooms = (rooms: ChatRoomRow[]) =>
+    [...rooms].sort((a, b) =>
+      (b.last_message_at ?? "").localeCompare(a.last_message_at ?? ""),
+    );
 
-  const roomCard = (r: RoomRow) => (
+  const roomCard = (r: ChatRoomRow) => (
     <Link
       key={r.id}
       to={`/comms/chat/${r.id}`}
@@ -304,12 +285,11 @@ function ChatSection({
       style={{ textDecoration: "none", color: "inherit" }}
     >
       <span>
-        <span className="card-title">{r.title}</span>
+        <span className="card-title">{r.title ?? "Chat"}</span>
         {r.topic && <span className="card-meta">{r.topic}</span>}
       </span>
       <span className="muted small">
-        {(r.messages ?? []).length} msg
-        {(r.messages ?? []).length === 1 ? "" : "s"}
+        {r.message_count} msg{r.message_count === 1 ? "" : "s"}
       </span>
     </Link>
   );

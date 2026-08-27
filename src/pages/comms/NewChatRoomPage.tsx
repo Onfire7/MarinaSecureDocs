@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
+import { createChatRoom } from "../../data/comms";
+import { useRoles, useUsers } from "../../data/users";
 
 // Comms — New Chat Room (see docs/pages/new-chat-room.html).
 // Creation is deliberately unrestricted: chat is a coordination tool, not a
@@ -14,23 +15,18 @@ export function NewChatRoomPage() {
   const [userIds, setUserIds] = useState<string[]>([]);
   const [roleIds, setRoleIds] = useState<string[]>([]);
 
-  const { data } = db.useQuery({
-    users: { $: { where: { active: true } } },
-    roles: {},
-  });
+  const { data: users } = useUsers();
+  const { roles } = useRoles();
 
   const create = async () => {
     if (!title.trim() || !current.user) return;
-    const roomId = id();
-    await db.transact(
-      db.tx.chatRooms[roomId]
-        .update({ title: title.trim(), topic: topic.trim() || undefined, createdAt: Date.now() })
-        .link({
-          createdBy: current.user.id,
-          ...(userIds.length > 0 ? { invitedUsers: userIds } : {}),
-          ...(roleIds.length > 0 ? { invitedRoles: roleIds } : {}),
-        }),
-    );
+    const roomId = await createChatRoom({
+      title: title.trim(),
+      topic: topic.trim() || null,
+      userIds,
+      roleIds,
+      createdById: current.user.id,
+    });
     navigate(`/comms/chat/${roomId}`, { replace: true });
   };
 
@@ -68,7 +64,7 @@ export function NewChatRoomPage() {
       <div className="field">
         <span className="field-label">Invite users</span>
         <div className="row" style={{ flexWrap: "wrap" }}>
-          {(data?.users ?? [])
+          {users
             .filter((u) => u.id !== current.user?.id)
             .map((u) => (
               <label key={u.id} className="row" style={{ cursor: "pointer" }}>
@@ -86,7 +82,7 @@ export function NewChatRoomPage() {
       <div className="field">
         <span className="field-label">Invite roles</span>
         <div className="row" style={{ flexWrap: "wrap" }}>
-          {(data?.roles ?? []).map((r) => (
+          {roles.map((r) => (
             <label key={r.id} className="row" style={{ cursor: "pointer" }}>
               <input
                 type="checkbox"

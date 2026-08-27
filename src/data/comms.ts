@@ -268,3 +268,116 @@ export async function createChatRoom(input: {
 export function leaveChatRoom(linkId: string): Promise<void> {
   return remove(db, "chat_room_users", linkId);
 }
+
+/** Invite or uninvite one user or role. */
+export async function setChatRoomInvite(
+  kind: "user" | "role",
+  roomId: string,
+  targetId: string,
+  invited: boolean,
+): Promise<void> {
+  const table = kind === "user" ? "chat_room_users" : "chat_room_roles";
+  const column = kind === "user" ? "user_id" : "role_id";
+  const existing = await db.getOptional<{ id: string }>(
+    `SELECT id FROM ${table} WHERE room_id = ? AND ${column} = ?`,
+    [roomId, targetId],
+  );
+  if (invited && !existing) {
+    await insert(db, table, { room_id: roomId, [column]: targetId });
+  } else if (!invited && existing) {
+    await remove(db, table, existing.id);
+  }
+}
+
+export interface ChatAttachmentRow {
+  id: string;
+  message_id: string;
+  attachment_id: string;
+  storage_path: string | null;
+  upload_state: string | null;
+}
+
+export function useChatAttachments(roomId: string | undefined) {
+  return useQuery<ChatAttachmentRow>(
+    `SELECT ma.*, a.storage_path, a.upload_state
+       FROM chat_message_attachments ma
+       JOIN chat_messages m ON m.id = ma.message_id
+       LEFT JOIN attachments a ON a.id = ma.attachment_id
+      WHERE m.room_id = ?`,
+    [roomId ?? ""],
+  );
+}
+
+/** Post a message carrying an already-captured attachment. */
+export async function postChatAttachment(
+  roomId: string,
+  attachmentId: string,
+  fileName: string,
+  actorId: string | null,
+): Promise<string> {
+  return transact(async (tx) => {
+    const messageId = await insert(tx, "chat_messages", {
+      room_id: roomId,
+      author_id: actorId,
+      body: `📎 ${fileName}`,
+      timestamp: stamp(),
+    });
+    await insert(tx, "chat_message_attachments", {
+      message_id: messageId,
+      attachment_id: attachmentId,
+    });
+    return messageId;
+  });
+}
+
+
+// ---------------------------------------------------------------- templates
+
+export interface SmsTemplateRow {
+  id: string;
+  label: string;
+  body: string;
+  scope: string;
+  owner_id: string | null;
+}
+
+/**
+ * The templates one user may send with: every global one, plus their own.
+ *
+ * Everyone's personal templates sync to every device — sms_templates is in the
+ * always-resident tier and has no per-owner gate — so the filter here is about
+ * not offering someone else's shorthand, not about withholding it.
+ */
+export function useSmsTemplates(ownerId: string | undefined) {
+  return useQuery<SmsTemplateRow>(
+    `SELECT * FROM sms_templates
+      WHERE scope = 'global' OR owner_id = ?
+      ORDER BY scope, label`,
+    [ownerId ?? ""],
+  );
+}
+
+export function createSmsTemplate(input: {
+  label: string;
+  body: string;
+  scope: "global" | "personal";
+  ownerId: string | null;
+}): Promise<string> {
+  return insert(db, "sms_templates", {
+    label: input.label,
+    body: input.body,
+    scope: input.scope,
+    owner_id: input.ownerId,
+  });
+}
+
+export function saveSmsTemplate(
+  templateId: string,
+  input: { label?: string; body?: string },
+): Promise<void> {
+  return update(db, "sms_templates", templateId, input);
+}
+
+export function deleteSmsTemplate(templateId: string): Promise<void> {
+  return remove(db, "sms_templates", templateId);
+}

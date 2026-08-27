@@ -2,19 +2,19 @@
 //
 // Telephony is the one online-only surface in the app: calls and SMS are
 // placed by Twilio Functions, which are also the only writers of
-// Twilio-sourced data (see docs/architecture.md). Chat, by contrast, is
-// ordinary InstantDB data and works fully offline.
+// Twilio-sourced data (see docs/architecture.md). Chat, by contrast, is ours
+// end to end and works fully offline.
 
 export interface ChatRoomLike {
   id: string;
-  createdBy?: { id: string } | null;
-  invitedUsers?: { id: string }[];
-  invitedRoles?: { id: string }[];
+  created_by_id?: string | null;
+  invitedUserIds?: string[];
+  invitedRoleIds?: string[];
 }
 
 /**
  * Participant status isn't stored — it's computed from creator, direct
- * invites, and role invites. invitedRoles is a live reference, so someone
+ * invites, and role invites. The role invite is a live reference, so someone
  * granted that role later gains access without being re-invited.
  *
  * view_all_chats deliberately does NOT satisfy this: it grants reading a
@@ -26,9 +26,9 @@ export function isParticipant(
   userRoleIds: string[],
 ): boolean {
   if (!userId) return false;
-  if (room.createdBy?.id === userId) return true;
-  if ((room.invitedUsers ?? []).some((u) => u.id === userId)) return true;
-  return (room.invitedRoles ?? []).some((r) => userRoleIds.includes(r.id));
+  if (room.created_by_id === userId) return true;
+  if ((room.invitedUserIds ?? []).includes(userId)) return true;
+  return (room.invitedRoleIds ?? []).some((r) => userRoleIds.includes(r));
 }
 
 export interface PhoneLine {

@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { displayName } from "../../lib/contacts";
 import { twilioRequest, type PhoneLine } from "../../lib/comms";
+import { useContacts } from "../../data/contacts";
+import { useSmsThreads } from "../../data/comms";
+import { usePhoneLines } from "../../data/settings";
 
 // Comms — New Call Dialog and New SMS Dialog (see
 // docs/pages/new-call-dialog.html, new-sms-dialog.html).
@@ -12,16 +14,15 @@ import { twilioRequest, type PhoneLine } from "../../lib/comms";
 // records itself. Both are gated by place_calls and are online-only.
 
 function useCommsTargets() {
-  const { data } = db.useQuery({
-    contacts: { mergedInto: {} },
-    marinaSettings: {},
-    smsThreads: { contact: {} },
-  });
-  const contacts = [...(data?.contacts ?? [])]
-    .filter((c) => !c.mergedInto)
+  const { data: allContacts } = useContacts();
+  const { lines } = usePhoneLines();
+  const { data: threads } = useSmsThreads();
+  // Merged-away records never appear as a dial target; the survivor does, and
+  // the merged number still matches on the way back in.
+  const contacts = allContacts
+    .filter((c) => !c.merged_into_id)
     .sort((a, b) => displayName(a).localeCompare(displayName(b)));
-  const lines = (data?.marinaSettings?.[0]?.phoneLines ?? []) as PhoneLine[];
-  return { contacts, lines, threads: data?.smsThreads ?? [] };
+  return { contacts, lines: lines as PhoneLine[], threads };
 }
 
 export function NewCallDialog({ onClose }: { onClose: () => void }) {
@@ -148,7 +149,7 @@ export function NewSmsDialog({ onClose }: { onClose: () => void }) {
   // A thread is identified by contact + line, so an existing pairing is
   // routed into rather than duplicated.
   const existing = threads.find(
-    (t) => t.contact?.id === contactId && t.line === line,
+    (t) => t.contact_id === contactId && t.line === line,
   );
 
   const send = async () => {
