@@ -1,5 +1,19 @@
 import { useMemo, useState } from "react";
-import { db, id } from "../../lib/db";
+import {
+  addTourCheckpoints,
+  deleteTour,
+  duplicateTour,
+  removeTourCheckpoint,
+  saveTour,
+  setTourCheckpoints,
+  useCheckpoints,
+  useTourCheckpoints,
+  useTours,
+  type CheckpointRow,
+  type TourCheckpointRow,
+  type TourRow,
+} from "../../data/checkpoints";
+import { useLocations } from "../../data/locations";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
 import { MultiSelectDialog } from "../shared/MultiSelectDialog";
@@ -25,37 +39,19 @@ function Tours() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
 
-  const { data } = db.useQuery({
-    tours: { checkpoints: { location: {} } },
-    checkpoints: { location: {} },
-    // Ancestor paths for group labels — a bare location name can repeat
-    // between docks, which is the ambiguity grouping exists to remove.
-    locations: { parent: {} },
-  });
-  const tours = useMemo(
-    () => [...(data?.tours ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
-    [data],
-  );
-  const allCheckpoints = useMemo(
-    () =>
-      [...(data?.checkpoints ?? [])].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { numeric: true }),
-      ),
-    [data],
-  );
-  const pathOf = useMemo(
-    () => locationPathResolver(data?.locations ?? []),
-    [data],
-  );
+  const { data: tours } = useTours();
+  const { data: allCheckpoints } = useCheckpoints();
+  const { data: allTourCheckpoints } = useTourCheckpoints();
+  // Ancestor paths for group labels — a bare location name can repeat between
+  // docks, which is the ambiguity grouping exists to remove.
+  const { data: locations } = useLocations();
+  const pathOf = useMemo(() => locationPathResolver(locations), [locations]);
 
   // Named inline rather than through a prompt dialog, matching how Location
   // Types are added — one box, one button, no modal to dismiss.
   const addTour = async () => {
     if (!newName.trim()) return;
-    const tourId = id();
-    await db.transact(
-      db.tx.tours[tourId].update({ name: newName.trim(), mode: "freeform" }),
-    );
+    const tourId = await saveTour({ name: newName.trim(), mode: "freeform" });
     setNewName("");
     setExpanded(tourId);
   };
@@ -97,6 +93,7 @@ function Tours() {
           <TourCard
             key={t.id}
             tour={t}
+            members={allTourCheckpoints.filter((c) => c.tour_id === t.id)}
             allCheckpoints={allCheckpoints}
             pathOf={pathOf}
             expanded={expanded === t.id}
@@ -114,17 +111,9 @@ function Tours() {
   );
 }
 
-type TourRow = {
-  id: string;
-  name: string;
-  mode: string;
-  /** Null once a tour has left linear mode — see setMode. */
-  checkpointOrder?: string[] | null;
-  checkpoints?: { id: string; name: string; location?: { id: string; name: string } | null }[];
-};
-
 function TourCard({
   tour,
+  members,
   allCheckpoints,
   pathOf,
   expanded,
@@ -132,95 +121,50 @@ function TourCard({
   onDuplicated,
 }: {
   tour: TourRow;
-  allCheckpoints: { id: string; name: string; location?: { id: string; name: string } | null }[];
+  /** Already in tour order — tour_checkpoints.position. */
+  members: TourCheckpointRow[];
+  allCheckpoints: CheckpointRow[];
   pathOf: (locationId: string) => string;
   expanded: boolean;
   onToggle: () => void;
   onDuplicated: (tourId: string) => void;
 }) {
   const [adding, setAdding] = useState(false);
-  const members = useMemo(() => tour.checkpoints ?? [], [tour.checkpoints]);
   const memberIds = new Set(members.map((c) => c.id));
 
-  // Linear mode carries an explicit order; the others are a plain set.
-  const ordered = useMemo(() => {
-    const order = tour.checkpointOrder ?? [];
-    const byId = new Map(members.map((c) => [c.id, c]));
-    const inOrder = order.map((cid) => byId.get(cid)).filter(Boolean) as typeof members;
-    const rest = members.filter((c) => !order.includes(c.id));
-    return [...inOrder, ...rest];
-  }, [tour.checkpointOrder, members]);
+  // Every mode reads the same ordered list. Order used to be a json array that
+  // only linear mode carried, and switching away from linear had to explicitly
+  // null it — otherwise a stale sequence survived the round trip and came back
+  // when linear was re-selected. Position is a column on the link now, so
+  // there is no second copy to go stale.
+  const ordered = members;
 
   const isLinear = tour.mode === "linear";
   const memberGroups = useMemo(() => groupByLocation(members, pathOf), [members, pathOf]);
 
   const setMode = (mode: string) => {
-    void db.transact(
-      db.tx.tours[tour.id].update({
-        mode,
-        // Switching to linear seeds an order from the current set; leaving
-        // linear drops it, since the other modes don't carry one.
-        //
-        // Cleared with null, not undefined: undefined keys are dropped from
-        // the transaction payload entirely, so the old order silently
-        // survived a round-trip through freeform and came back when linear
-        // was re-selected — resurrecting a stale sequence instead of
-        // reseeding from current membership.
-        checkpointOrder: mode === "linear" ? ordered.map((c) => c.id) : null,
-      }),
-    );
+    void saveTour({ id: tour.id, name: tour.name, mode });
   };
 
   // One transaction however many are picked — the dialog is what makes
   // "every checkpoint on Dock C" a single action instead of a dozen.
   const addCheckpoints = (ids: string[]) => {
     if (ids.length === 0) return;
-    void db.transact(
-      db.tx.tours[tour.id]
-        .link({ checkpoints: ids })
-        .update(
-          isLinear
-            ? { checkpointOrder: [...ordered.map((c) => c.id), ...ids] }
-            : {},
-        ),
-    );
+    void addTourCheckpoints(tour.id, ids);
   };
 
-  const removeCheckpoint = (checkpointId: string) => {
-    void db.transact(
-      db.tx.tours[tour.id]
-        .unlink({ checkpoints: checkpointId })
-        .update(
-          isLinear
-            ? {
-                checkpointOrder: ordered
-                  .map((c) => c.id)
-                  .filter((cid) => cid !== checkpointId),
-              }
-            : {},
-        ),
-    );
+  const removeCheckpoint = (linkId: string) => {
+    void removeTourCheckpoint(linkId);
   };
 
   const duplicate = async () => {
-    const copyId = id();
-    await db.transact(
-      db.tx.tours[copyId]
-        .update({
-          name: `${tour.name} (copy)`,
-          mode: tour.mode,
-          // The copy points at the same checkpoints, so the saved order
-          // transfers as-is.
-          ...(isLinear ? { checkpointOrder: ordered.map((c) => c.id) } : {}),
-        })
-        .link(members.length > 0 ? { checkpoints: members.map((c) => c.id) } : {}),
-    );
+    const copyId = await duplicateTour(tour.id, `${tour.name} (copy)`, tour.mode);
     onDuplicated(copyId);
   };
 
   const remove = async () => {
     if (!window.confirm(`Delete tour "${tour.name}"?`)) return;
-    await db.transact(db.tx.tours[tour.id].delete());
+    await deleteTour(tour.id);
   };
 
   return (
@@ -231,7 +175,7 @@ function TourCard({
             className="input select-inline"
             value={tour.name}
             aria-label="Tour name"
-            onCommit={(name) => void db.transact(db.tx.tours[tour.id].update({ name }))}
+            onCommit={(name) => void saveTour({ id: tour.id, name, mode: tour.mode })}
           />
           <div className="card-meta">
             {tour.mode.charAt(0).toUpperCase() + tour.mode.slice(1)} ·{" "}
@@ -278,24 +222,20 @@ function TourCard({
             <ReorderableList
               items={ordered}
               enabled
-              onReorder={(orderedIds) =>
-                void db.transact(
-                  db.tx.tours[tour.id].update({ checkpointOrder: orderedIds }),
-                )
-              }
+              onReorder={(orderedIds) => void setTourCheckpoints(tour.id, orderedIds)}
               renderItem={(c, i) => (
                 <div className="card spread">
                   <span className="small">
                     <span className="muted">{i + 1}. </span>
                     {c.name}
-                    {c.location?.name && (
-                      <span className="muted"> · {c.location.name}</span>
+                    {c.location_name && (
+                      <span className="muted"> · {c.location_name}</span>
                     )}
                   </span>
                   <button
                     type="button"
                     className="btn btn-sm btn-quiet"
-                    onClick={() => removeCheckpoint(c.id)}
+                    onClick={() => removeCheckpoint(c.link_id)}
                   >
                     Remove
                   </button>
@@ -315,7 +255,7 @@ function TourCard({
                       <button
                         type="button"
                         className="btn btn-sm btn-quiet"
-                        onClick={() => removeCheckpoint(c.id)}
+                        onClick={() => removeCheckpoint(c.link_id)}
                       >
                         Remove
                       </button>
@@ -363,7 +303,7 @@ function TourCard({
             .map((c) => ({
               id: c.id,
               name: c.name,
-              group: c.location ? pathOf(c.location.id) : "No location",
+              group: c.location_id ? pathOf(c.location_id) : "No location",
             }))}
           onConfirm={addCheckpoints}
           onClose={() => setAdding(false)}

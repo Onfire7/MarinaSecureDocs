@@ -29,6 +29,66 @@ export function useCheckpoints() {
   return useQuery<CheckpointRow>(`${CHECKPOINT_SELECT} ORDER BY c.name`);
 }
 
+export interface CheckpointUsageRow extends CheckpointRow {
+  tour_names: string | null;
+  template_names: string | null;
+}
+
+/**
+ * Checkpoints with what uses them — the tours they are on and the checklist
+ * sections that fire at them.
+ *
+ * Both are group_concat rather than joins, because a checkpoint on three tours
+ * would otherwise appear three times, and the admin screen filters "unused"
+ * across both at once.
+ */
+export function useCheckpointsWithUsage() {
+  return useQuery<CheckpointUsageRow>(
+    `${CHECKPOINT_SELECT.replace("SELECT c.*,", "SELECT c.*,")}
+       , (SELECT group_concat(t.name, ', ') FROM tour_checkpoints tc
+            JOIN tours t ON t.id = tc.tour_id
+           WHERE tc.checkpoint_id = c.id) AS tour_names
+       , (SELECT group_concat(tpl.name, ', ') FROM template_section_checkpoints sc
+            JOIN checklist_template_sections s ON s.id = sc.section_id
+            JOIN checklist_templates tpl ON tpl.id = s.template_id
+           WHERE sc.checkpoint_id = c.id) AS template_names
+      ORDER BY c.name`,
+  );
+}
+
+/**
+ * One checkpoint per chosen location, named after it.
+ *
+ * The shape almost every marina wants, and what used to take a trip through
+ * the location tree for each one. The guid is generated here and never
+ * user-entered: it is what the physical NFC tag or QR code encodes.
+ */
+export async function createCheckpointsAt(
+  locations: { id: string; name: string }[],
+): Promise<void> {
+  await transact(async (tx) => {
+    for (const location of locations) {
+      const existing = await tx.getAll<{ id: string }>(
+        "SELECT id FROM checkpoints WHERE location_id = ?",
+        [location.id],
+      );
+      await insert(tx, "checkpoints", {
+        name: existing.length === 0 ? location.name : `${location.name} ${existing.length + 1}`,
+        guid_url: crypto.randomUUID(),
+        location_id: location.id,
+      });
+    }
+  });
+}
+
+export async function deleteCheckpoints(checkpointIds: string[]): Promise<void> {
+  await transact(async (tx) => {
+    for (const checkpointId of checkpointIds) {
+      await remove(tx, "checkpoints", checkpointId);
+    }
+  });
+}
+
 export function useCheckpoint(checkpointId: string | undefined) {
   const { data, isLoading } = useQuery<CheckpointRow>(
     `${CHECKPOINT_SELECT} WHERE c.id = ?`,
@@ -159,6 +219,61 @@ export function saveTour(tour: {
 
 export function deleteTour(tourId: string): Promise<void> {
   return remove(db, "tours", tourId);
+}
+
+/** Add checkpoints to a tour, appended after whatever is already in it. */
+export async function addTourCheckpoints(
+  tourId: string,
+  checkpointIds: string[],
+): Promise<void> {
+  await transact(async (tx) => {
+    const existing = await tx.getAll<{ checkpoint_id: string; position: number }>(
+      "SELECT checkpoint_id, position FROM tour_checkpoints WHERE tour_id = ?",
+      [tourId],
+    );
+    let next = existing.reduce((max, r) => Math.max(max, r.position + 1), 0);
+    for (const checkpointId of checkpointIds) {
+      if (existing.some((e) => e.checkpoint_id === checkpointId)) continue;
+      await insert(tx, "tour_checkpoints", {
+        tour_id: tourId,
+        checkpoint_id: checkpointId,
+        position: next++,
+      });
+    }
+  });
+}
+
+export function removeTourCheckpoint(linkId: string): Promise<void> {
+  return remove(db, "tour_checkpoints", linkId);
+}
+
+/**
+ * Copy a tour, its mode and its checkpoints in order.
+ *
+ * The copy points at the same checkpoints, so the order transfers as-is —
+ * which is the whole reason a marina duplicates a tour rather than building
+ * the second one by hand.
+ */
+export async function duplicateTour(
+  tourId: string,
+  name: string,
+  mode: string,
+): Promise<string> {
+  return transact(async (tx) => {
+    const copyId = await insert(tx, "tours", { name, mode });
+    const members = await tx.getAll<{ checkpoint_id: string; position: number }>(
+      "SELECT checkpoint_id, position FROM tour_checkpoints WHERE tour_id = ? ORDER BY position",
+      [tourId],
+    );
+    for (const m of members) {
+      await insert(tx, "tour_checkpoints", {
+        tour_id: copyId,
+        checkpoint_id: m.checkpoint_id,
+        position: m.position,
+      });
+    }
+    return copyId;
+  });
 }
 
 /**
