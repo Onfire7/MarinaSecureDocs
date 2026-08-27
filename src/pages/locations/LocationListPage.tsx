@@ -1,39 +1,29 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import { SchematicMapView } from "../shared/SchematicMapView";
 import {
-  SchematicMapView,
-  type MarinaMapRecord,
-} from "../shared/SchematicMapView";
-import {
-  STANDARD_STATUSES,
   compareNames,
   statusBadgeClass,
-  statusLabel,
   statusMapColors,
 } from "../../lib/locations";
+import {
+  setLocationStatus,
+  tracksStatus,
+  useLocations,
+  useLocationTypes,
+  useMarinaMaps,
+  type LocationRow,
+} from "../../data/locations";
+import { useLocationStatuses } from "../../data/lookups";
 
 // Locations — Location List / Map View (see pages/location-list.html).
 // Three presentations of the same filtered set: hierarchy list, geographic
 // pin map (gps coordinates), and schematic map (MarinaMap image +
 // LocationMapPlacement rectangles).
 type ViewMode = "list" | "pins" | "schematic";
-
-type LocationRow = {
-  id: string;
-  name: string;
-  status?: string;
-  reservationEnabled: boolean;
-  gpsLat?: number;
-  gpsLng?: number;
-  type?: { id: string; name: string; tracksStatus?: boolean } | null;
-  parent?: { id: string } | null;
-  currentBoat?: { id: string; name: string } | null;
-  currentVehicle?: { id: string; description: string } | null;
-};
 
 export function LocationListPage() {
   const current = useCurrent();
@@ -42,30 +32,16 @@ export function LocationListPage() {
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
 
-  const { data } = db.useQuery({
-    locations: { type: {}, parent: {}, currentBoat: {}, currentVehicle: {} },
-    locationTypes: {},
-    marinaMaps: { scope: { parent: {} }, image: {}, placements: { location: {} } },
-  });
-
-  const locations = useMemo(
-    () => (data?.locations ?? []) as LocationRow[],
-    [data],
-  );
-  const types = data?.locationTypes ?? [];
-  const maps = data?.marinaMaps ?? [];
+  const { data: locations } = useLocations();
+  const { data: types } = useLocationTypes();
+  const { data: maps } = useMarinaMaps();
+  const { statuses } = useLocationStatuses();
   const hasSchematic = maps.length > 0;
-
-  const statuses = useMemo(() => {
-    const set = new Set<string>(STANDARD_STATUSES);
-    for (const l of locations) if (l.status) set.add(l.status);
-    return [...set];
-  }, [locations]);
 
   const filtered = locations.filter(
     (l) =>
-      (!typeFilter || l.type?.id === typeFilter) &&
-      (!statusFilter || l.status === statusFilter),
+      (!typeFilter || l.location_type_id === typeFilter) &&
+      (!statusFilter || l.status_id === statusFilter),
   );
   const filterActive = Boolean(typeFilter || statusFilter);
 
@@ -113,8 +89,8 @@ export function LocationListPage() {
         >
           <option value="">All statuses</option>
           {statuses.map((s) => (
-            <option key={s} value={s}>
-              {statusLabel(s)}
+            <option key={s.id} value={s.id}>
+              {s.name}
             </option>
           ))}
         </select>
@@ -134,7 +110,7 @@ export function LocationListPage() {
       ) : view === "pins" ? (
         <PinMap locations={filtered} />
       ) : (
-        <SchematicMap maps={maps} />
+        <SchematicMap locations={locations} />
       )}
     </div>
   );
@@ -159,7 +135,7 @@ function ListView({
   const childrenOf = useMemo(() => {
     const m = new Map<string | null, LocationRow[]>();
     for (const l of locations) {
-      const key = l.parent?.id ?? null;
+      const key = l.parent_id ?? null;
       const list = m.get(key) ?? [];
       list.push(l);
       m.set(key, list);
@@ -251,40 +227,51 @@ function LocationCard({
   childCount?: number;
   onDrill?: () => void;
 }) {
-  const setStatus = (status: string) => {
-    void db.transact(db.tx.locations[location.id].update({ status }));
+  const current = useCurrent();
+  const { statuses } = useLocationStatuses();
+  const setStatus = (statusId: string) => {
+    const status = statuses.find((s) => s.id === statusId);
+    if (status) void setLocationStatus(location, status, current.user?.id ?? null);
   };
   const body = (
     <>
       <div>
         <div className="card-title">{location.name}</div>
         <div className="card-meta">
-          {location.type?.name}
+          {location.type_name}
           {childCount > 0 &&
             ` · ${childCount} ${childCount === 1 ? "child" : "children"}`}
-          {location.currentBoat && ` · Boat: ${location.currentBoat.name}`}
-          {location.currentVehicle && ` · Vehicle: ${location.currentVehicle.description}`}
+          {location.boat_name && ` · Boat: ${location.boat_name}`}
+          {location.vehicle_description &&
+            ` · Vehicle: ${location.vehicle_description}`}
         </div>
       </div>
       <div className="row">
-        {!location.type?.tracksStatus ? null : canManage ? (
+        {!tracksStatus(location) ? null : canManage ? (
           <select
             className="select select-inline"
-            value={location.status ?? "vacant"}
+            value={location.status_id ?? ""}
             onClick={(e) => e.stopPropagation()}
             onChange={(e) => setStatus(e.target.value)}
           >
-            {[
-              ...new Set([...STANDARD_STATUSES, location.status ?? "vacant"]),
-            ].map((s) => (
-              <option key={s} value={s}>
-                {statusLabel(s)}
+            {/* A location whose status row was retired keeps showing it, so
+                that opening this menu is not itself an edit. */}
+            {!location.status_id && <option value="">—</option>}
+            {location.status_id &&
+              !statuses.some((s) => s.id === location.status_id) && (
+                <option value={location.status_id}>
+                  {location.status_name ?? "—"}
+                </option>
+              )}
+            {statuses.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
               </option>
             ))}
           </select>
         ) : (
-          <span className={statusBadgeClass(location.status)}>
-            {statusLabel(location.status)}
+          <span className={statusBadgeClass(location.status_name)}>
+            {location.status_name ?? "—"}
           </span>
         )}
         <Link
@@ -313,7 +300,7 @@ function LocationCard({
 // without coordinates are omitted from this mode but remain in the list.
 function PinMap({ locations }: { locations: LocationRow[] }) {
   const navigate = useNavigate();
-  const pinned = locations.filter((l) => l.gpsLat != null && l.gpsLng != null);
+  const pinned = locations.filter((l) => l.gps_lat != null && l.gps_lng != null);
   if (pinned.length === 0) {
     return (
       <div className="placeholder">
@@ -322,8 +309,8 @@ function PinMap({ locations }: { locations: LocationRow[] }) {
       </div>
     );
   }
-  const lats = pinned.map((l) => l.gpsLat!);
-  const lngs = pinned.map((l) => l.gpsLng!);
+  const lats = pinned.map((l) => l.gps_lat!);
+  const lngs = pinned.map((l) => l.gps_lng!);
   const [minLat, maxLat] = [Math.min(...lats), Math.max(...lats)];
   const [minLng, maxLng] = [Math.min(...lngs), Math.max(...lngs)];
   const span = (v: number, min: number, max: number) =>
@@ -332,20 +319,20 @@ function PinMap({ locations }: { locations: LocationRow[] }) {
   return (
     <div className="map-canvas">
       {pinned.map((l) => {
-        const colors = statusMapColors(l.status);
+        const colors = statusMapColors(l.status_name);
         return (
           <button
             key={l.id}
             type="button"
             className="map-pin"
             style={{
-              left: `${span(l.gpsLng!, minLng, maxLng)}%`,
+              left: `${span(l.gps_lng!, minLng, maxLng)}%`,
               // north up: higher latitude renders nearer the top
-              top: `${100 - span(l.gpsLat!, minLat, maxLat)}%`,
+              top: `${100 - span(l.gps_lat!, minLat, maxLat)}%`,
               background: colors.background,
               borderColor: colors.border,
             }}
-            title={`${l.name} — ${statusLabel(l.status)}`}
+            title={`${l.name} — ${l.status_name ?? "—"}`}
             onClick={() => navigate(`/locations/${l.id}`)}
           >
             {l.name}
@@ -358,14 +345,12 @@ function PinMap({ locations }: { locations: LocationRow[] }) {
 
 // ---------------------------------------------------------------- Schematic
 
-function SchematicMap({ maps }: { maps: MarinaMapRecord[] }) {
+function SchematicMap({ locations }: { locations: LocationRow[] }) {
   const navigate = useNavigate();
-  const { data } = db.useQuery({ locations: {} });
-  const statusById = new Map((data?.locations ?? []).map((l) => [l.id, l.status]));
+  const statusById = new Map(locations.map((l) => [l.id, l.status_name]));
 
   return (
     <SchematicMapView
-      maps={maps}
       colorFor={(locationId) => statusMapColors(statusById.get(locationId) ?? "")}
       onOpen={(locationId) => navigate(`/locations/${locationId}`)}
       footnote="Rectangles are color-coded by status. A ▸ marker drills into that location's own detail map; anything else opens the location."

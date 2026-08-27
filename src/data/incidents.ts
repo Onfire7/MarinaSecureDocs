@@ -60,6 +60,17 @@ export function useIncident(incidentId: string | undefined) {
   return { incident: data[0] ?? null, isLoading };
 }
 
+/** Incidents attached to one target — a location's or boat's own history. */
+export function useIncidentsForTarget(
+  column: "location_id" | "checkpoint_id" | "boat_id" | "vehicle_id" | "contact_id" | "asset_id",
+  targetId: string | undefined,
+) {
+  return useQuery<IncidentRow>(
+    `${INCIDENT_SELECT} WHERE i.${column} = ? ORDER BY i.created_at DESC`,
+    [targetId ?? ""],
+  );
+}
+
 export interface IncidentComment {
   id: string;
   incident_id: string;

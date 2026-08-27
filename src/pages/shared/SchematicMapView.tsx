@@ -1,26 +1,21 @@
-import { useState } from "react";
-import { placementStyle, type PlacementShape } from "../../lib/locations";
+import { useMemo, useState } from "react";
+import { placementStyle } from "../../lib/locations";
+import {
+  placementOf,
+  useMarinaMaps,
+  usePlacements,
+  type MarinaMapRow,
+} from "../../data/locations";
+import { attachmentUrl } from "../../data/files";
 
-// Shared schematic-map renderer: MarinaMap image + LocationMapPlacement
-// rectangles, with root-map chooser and drill-down into scoped detail maps.
-// One shared capability, two overlays (see docs/data-model.md —
-// LocationMapPlacement): Location list colors by occupancy/type, the
-// Reservations map colors by reservation status — callers supply colorFor
-// and which locations to include.
-
-export interface MapPlacementRecord {
-  id: string;
-  placement: PlacementShape;
-  location?: { id: string; name: string } | null;
-}
-
-export interface MarinaMapRecord {
-  id: string;
-  name: string;
-  scope?: { id: string; name: string; parent?: { id: string } | null } | null;
-  image?: { url: string } | null;
-  placements?: MapPlacementRecord[];
-}
+// Shared schematic-map renderer: a marina map image with a rectangle per
+// plotted location, a root-map chooser, and drill-down into scoped detail maps.
+//
+// One capability, two overlays (see docs/data-model.md — LocationMapPlacement):
+// the Location list colours by status, the Reservations map by reservation
+// state. Callers supply colorFor and which locations to include; the maps and
+// placements themselves are the same either way, so this fetches them rather
+// than having both callers carry the same query.
 
 export interface RectStyle {
   background: string;
@@ -29,13 +24,11 @@ export interface RectStyle {
 }
 
 export function SchematicMapView({
-  maps,
   colorFor,
   include,
   onOpen,
   footnote,
 }: {
-  maps: MarinaMapRecord[];
   /** Fill/border for a location's rectangle. */
   colorFor: (locationId: string) => RectStyle;
   /** Omit a location's rectangle entirely when false (e.g. non-reservable). */
@@ -43,11 +36,23 @@ export function SchematicMapView({
   onOpen: (locationId: string) => void;
   footnote?: string;
 }) {
-  const [mapStack, setMapStack] = useState<MarinaMapRecord[]>([]);
+  const { data: maps } = useMarinaMaps();
+  const { data: allPlacements } = usePlacements();
+  const [mapStack, setMapStack] = useState<MarinaMapRow[]>([]);
 
-  const rootMaps = maps.filter((m) => !m.scope?.parent);
+  const placementsByMap = useMemo(() => {
+    const m = new Map<string, typeof allPlacements>();
+    for (const p of allPlacements) {
+      const list = m.get(p.map_id) ?? [];
+      list.push(p);
+      m.set(p.map_id, list);
+    }
+    return m;
+  }, [allPlacements]);
+
+  const rootMaps = maps.filter((m) => !m.scope_parent_id);
   const mapForLocation = (locationId: string) =>
-    maps.find((m) => m.scope?.id === locationId);
+    maps.find((m) => m.scope_id === locationId);
 
   const active =
     mapStack.at(-1) ?? (rootMaps.length === 1 ? rootMaps[0] : undefined);
@@ -65,8 +70,10 @@ export function SchematicMapView({
             style={{ cursor: "pointer", textAlign: "left", font: "inherit" }}
             onClick={() => setMapStack([m])}
           >
-            <span className="card-title">{m.scope?.name ?? m.name}</span>
-            <span className="muted small">{m.placements?.length ?? 0} plotted</span>
+            <span className="card-title">{m.scope_name ?? m.name}</span>
+            <span className="muted small">
+              {(placementsByMap.get(m.id) ?? []).length} plotted
+            </span>
           </button>
         ))}
         {rootMaps.length === 0 && (
@@ -78,6 +85,9 @@ export function SchematicMapView({
       </div>
     );
   }
+
+  const imageUrl = attachmentUrl(active.image_path);
+  const placements = placementsByMap.get(active.id) ?? [];
 
   return (
     <div>
@@ -92,38 +102,37 @@ export function SchematicMapView({
           </button>
         )}
         <span className="section-title" style={{ marginBottom: 0 }}>
-          {active.scope?.name ?? active.name}
+          {active.scope_name ?? active.name}
         </span>
       </div>
 
       <div className="map-canvas map-schematic">
-        {active.image?.url && (
-          <img src={active.image.url} alt={active.name} className="map-image" />
+        {imageUrl && (
+          <img src={imageUrl} alt={active.name} className="map-image" />
         )}
-        {(active.placements ?? []).map((p) => {
-          if (!p.location) return null;
-          if (include && !include(p.location.id)) return null;
-          const colors = colorFor(p.location.id);
-          const childMap = mapForLocation(p.location.id);
+        {placements.map((p) => {
+          if (include && !include(p.location_id)) return null;
+          const colors = colorFor(p.location_id);
+          const childMap = mapForLocation(p.location_id);
           return (
             <button
               key={p.id}
               type="button"
               className="map-rect"
               style={{
-                ...placementStyle(p.placement),
+                ...placementStyle(placementOf(p)),
                 background: colors.background,
                 borderColor: colors.border,
                 color: colors.text,
               }}
-              title={p.location.name}
+              title={p.location_name}
               onClick={() =>
                 childMap
                   ? setMapStack([...mapStack, childMap])
-                  : onOpen(p.location!.id)
+                  : onOpen(p.location_id)
               }
             >
-              {p.location.name}
+              {p.location_name}
               {childMap && " ▸"}
             </button>
           );

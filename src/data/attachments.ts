@@ -100,6 +100,19 @@ function fallbackLabel(type: TargetType): string {
   }
 }
 
+/** The column on notes/incidents/tickets that holds this kind of target. */
+export type TargetColumn =
+  | "location_id"
+  | "checkpoint_id"
+  | "boat_id"
+  | "vehicle_id"
+  | "contact_id"
+  | "asset_id";
+
+export function targetColumn(type: TargetType): TargetColumn {
+  return TARGET_TYPES.find((t) => t.key === type)!.column;
+}
+
 /** Route to a target's detail page. */
 export function targetPath(target: AttachmentTarget): string {
   switch (target.type) {

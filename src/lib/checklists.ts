@@ -148,6 +148,21 @@ export interface MeterReadingConfig {
   assetId?: string;
 }
 
+/**
+ * Whatever a template item's `config` holds, whichever type it is.
+ *
+ * A union rather than an intersection: the item's `type` decides which member
+ * applies, and reading the wrong one is a bug the type system can catch at the
+ * point where `type` is narrowed.
+ */
+export type ItemConfig =
+  | VerifyTaskConfig
+  | DoorCheckConfig
+  | LocationCheckConfig
+  | QuestionConfig
+  | MeterReadingConfig
+  | Record<string, never>;
+
 // ---- Deferred side effects ----
 
 /**

@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { ManualCheckinDialog } from "../checklists/ManualCheckinDialog";
+import { useCheckpoint, useToursForCheckpoint } from "../../data/checkpoints";
+import { useSectionsForCheckpoint } from "../../data/checklists";
+import { useRecentCheckIns } from "../../data/checkins";
+import { useMarinaSettings } from "../../data/settings";
 
 // Locations — Checkpoint Detail (see pages/checkpoint-detail.html).
 // Read-oriented reference/audit view: identity, GUID URL, GPS validation
@@ -13,35 +16,12 @@ export function CheckpointDetailPage() {
   const current = useCurrent();
   const [checkingIn, setCheckingIn] = useState(false);
 
-  const { data } = db.useQuery(
-    checkpointId
-      ? {
-          checkpoints: {
-            $: { where: { id: checkpointId } },
-            location: {},
-            checklistTemplateSections: { template: {} },
-            tours: {},
-          },
-          marinaSettings: {},
-        }
-      : null,
-  );
-  const { data: checkInData } = db.useQuery(
-    checkpointId
-      ? {
-          checkIns: {
-            $: {
-              where: { "checkpoint.id": checkpointId },
-              order: { timestamp: "desc" },
-              limit: 10,
-            },
-            user: {},
-          },
-        }
-      : null,
-  );
+  const { checkpoint } = useCheckpoint(checkpointId);
+  const { data: sections } = useSectionsForCheckpoint(checkpointId);
+  const { data: tours } = useToursForCheckpoint(checkpointId);
+  const { data: checkIns } = useRecentCheckIns(checkpointId, 10);
+  const settings = useMarinaSettings();
 
-  const checkpoint = data?.checkpoints?.[0];
   if (!checkpoint) {
     return (
       <div className="placeholder">
@@ -50,20 +30,19 @@ export function CheckpointDetailPage() {
     );
   }
 
-  const defaultRadius = data?.marinaSettings?.[0]?.gpsValidationRadiusDefault;
-  const radius = checkpoint.gpsValidationRadius ?? defaultRadius;
-  const overridden = checkpoint.gpsValidationRadius != null;
-  const checkIns = checkInData?.checkIns ?? [];
+  const radius =
+    checkpoint.gps_validation_radius ?? settings.gpsValidationRadiusDefault;
+  const overridden = checkpoint.gps_validation_radius != null;
 
   return (
     <div>
       <div className="page-head">
         <div>
           <h1 className="page-title">{checkpoint.name}</h1>
-          {checkpoint.location && (
+          {checkpoint.location_id && (
             <div className="page-sub">
-              <Link to={`/locations/${checkpoint.location.id}`}>
-                {checkpoint.location.name}
+              <Link to={`/locations/${checkpoint.location_id}`}>
+                {checkpoint.location_name}
               </Link>
             </div>
           )}
@@ -105,9 +84,10 @@ export function CheckpointDetailPage() {
                   {overridden ? "Overrides marina default" : "Marina default"}
                 </span>
               </div>
-              {checkpoint.gpsLat != null && checkpoint.gpsLng != null ? (
+              {checkpoint.gps_lat != null && checkpoint.gps_lng != null ? (
                 <p className="muted small" style={{ marginTop: 4 }}>
-                  Anchored at {checkpoint.gpsLat.toFixed(5)}, {checkpoint.gpsLng.toFixed(5)}
+                  Anchored at {checkpoint.gps_lat.toFixed(5)},{" "}
+                  {checkpoint.gps_lng.toFixed(5)}
                 </p>
               ) : (
                 <p className="muted small" style={{ marginTop: 4 }}>
@@ -119,19 +99,19 @@ export function CheckpointDetailPage() {
 
           <div className="section-title">Checklist sections here</div>
           <div className="stack" style={{ gap: 8, marginBottom: 16 }}>
-            {(checkpoint.checklistTemplateSections ?? []).map((s) => (
+            {sections.map((s) => (
               <div key={s.id} className="card spread">
                 <div>
-                  <div className="card-title">{s.template?.name ?? "Checklist"}</div>
+                  <div className="card-title">{s.template_name ?? "Checklist"}</div>
                   <div className="card-meta">
                     {s.name}
-                    {s.hideUntilRule ? ` · shows at ${s.hideUntilRule}` : ""}
+                    {s.hide_until_rule ? ` · shows at ${s.hide_until_rule}` : ""}
                   </div>
                 </div>
-                {!s.isActive && <span className="badge">Inactive</span>}
+                {s.is_active === 0 && <span className="badge">Inactive</span>}
               </div>
             ))}
-            {(checkpoint.checklistTemplateSections ?? []).length === 0 && (
+            {sections.length === 0 && (
               <span className="muted small">
                 None configured — a user can still check in and add a note or incident.
               </span>
@@ -140,7 +120,7 @@ export function CheckpointDetailPage() {
 
           <div className="section-title">Tours</div>
           <div className="stack" style={{ gap: 8 }}>
-            {(checkpoint.tours ?? []).map((t) => (
+            {tours.map((t) => (
               <Link
                 key={t.id}
                 to="/checklists"
@@ -153,7 +133,7 @@ export function CheckpointDetailPage() {
                 </span>
               </Link>
             ))}
-            {(checkpoint.tours ?? []).length === 0 && (
+            {tours.length === 0 && (
               <span className="muted small">Not part of any tour.</span>
             )}
           </div>
@@ -162,7 +142,7 @@ export function CheckpointDetailPage() {
         <div>
           <div className="section-title spread">
             <span>Recent check-ins</span>
-            <Link to="/activity?subjectType=checkIns" className="small">
+            <Link to="/activity?subjectType=check_ins" className="small">
               Full history →
             </Link>
           </div>
@@ -178,7 +158,7 @@ export function CheckpointDetailPage() {
             <tbody>
               {checkIns.map((c) => (
                 <tr key={c.id}>
-                  <td>{c.user?.name ?? "—"}</td>
+                  <td>{c.user_name ?? "—"}</td>
                   <td className="small">
                     {new Date(c.timestamp).toLocaleString(undefined, {
                       month: "short",
@@ -189,13 +169,13 @@ export function CheckpointDetailPage() {
                   </td>
                   <td>{c.method === "scanned" ? "Scanned" : "Manual"}</td>
                   <td>
-                    {c.withinRadius === true && (
+                    {c.within_radius === 1 && (
                       <span className="badge badge-good">OK</span>
                     )}
-                    {c.withinRadius === false && (
+                    {c.within_radius === 0 && (
                       <span className="badge badge-bad">Outside radius</span>
                     )}
-                    {c.withinRadius == null && <span className="muted">—</span>}
+                    {c.within_radius == null && <span className="muted">—</span>}
                   </td>
                 </tr>
               ))}
