@@ -28,10 +28,10 @@ describe("locationPathResolver", () => {
 
 describe("groupByLocation", () => {
   it("groups checkpoints under their location and sorts items numerically", () => {
-    const dock = { id: "d", name: "Dock C" };
+    const dock = { location_id: "d", location_name: "Dock C" };
     const groups = groupByLocation([
-      aCheckpoint({ id: "c2", name: "Gate 10", location: dock }),
-      aCheckpoint({ id: "c1", name: "Gate 2", location: dock }),
+      aCheckpoint({ id: "c2", name: "Gate 10", ...dock }),
+      aCheckpoint({ id: "c1", name: "Gate 2", ...dock }),
     ]);
     expect(groups).toHaveLength(1);
     expect(groups[0].items.map((c) => c.name)).toEqual(["Gate 2", "Gate 10"]);

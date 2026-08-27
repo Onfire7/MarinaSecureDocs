@@ -1,6 +1,6 @@
 import { useQuery } from "@powersync/react";
 import { db, bool, json, jsonArray } from "../lib/db";
-import { update } from "./sql";
+import { insert, remove, update } from "./sql";
 
 // Marina settings — one row, per marina, always resident.
 //
@@ -127,6 +127,21 @@ export interface PhoneLineRow {
   number: string;
   label: string;
   routing: string | null;
+}
+
+export function createPhoneLine(input: {
+  number: string;
+  label: string;
+}): Promise<string> {
+  return insert(db, "phone_lines", {
+    number: input.number,
+    label: input.label,
+    routing: null,
+  });
+}
+
+export function deletePhoneLine(lineId: string): Promise<void> {
+  return remove(db, "phone_lines", lineId);
 }
 
 export function usePhoneLines() {

@@ -222,6 +222,19 @@ export function deleteMaintenanceRule(ruleId: string): Promise<void> {
   return remove(db, "maintenance_rules", ruleId);
 }
 
+/**
+ * Rename an asset category everywhere it appears.
+ *
+ * Categories are not their own entity — they are the set of `assets.category`
+ * strings in use — so renaming one is an update across every asset carrying
+ * that label, done in the database rather than one write per asset.
+ */
+export function renameAssetCategory(from: string, to: string): Promise<void> {
+  return transact(async (tx) => {
+    await tx.execute("UPDATE assets SET category = ? WHERE category = ?", [to, from]);
+  });
+}
+
 /** Move an asset to a location, or take it off one. */
 export async function moveAsset(
   asset: { id: string; name: string },

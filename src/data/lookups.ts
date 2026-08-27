@@ -1,6 +1,6 @@
 import { useQuery } from "@powersync/react";
 import { db, bool } from "../lib/db";
-import { insert, remove, update } from "./sql";
+import { insert, remove, transact, update } from "./sql";
 import { statusKey } from "../lib/locations";
 
 // The admin-defined lookup tables: statuses and types.
@@ -71,11 +71,39 @@ export function useIncidentStatuses() {
   return { isLoading, statuses: data };
 }
 
+export interface IncidentTypeRow extends TypeRow {
+  /** How many incidents carry it — what makes deleting one unsafe. */
+  usage: number;
+}
+
 export function useIncidentTypes() {
-  const { data, isLoading } = useQuery<TypeRow>(
-    "SELECT * FROM incident_types ORDER BY name",
+  const { data, isLoading } = useQuery<IncidentTypeRow>(
+    `SELECT t.*,
+            (SELECT COUNT(*) FROM incidents i WHERE i.incident_type_id = t.id)
+              AS usage
+       FROM incident_types t ORDER BY t.name`,
   );
   return { isLoading, types: data };
+}
+
+/**
+ * Merge one incident type into another: re-point its incidents, then remove it.
+ *
+ * The safe path to retiring a type that is still in use. One transaction,
+ * because a merge that re-pointed half the incidents and then failed would
+ * leave a type that looks unused and is not.
+ */
+export async function mergeIncidentTypes(
+  sourceId: string,
+  targetId: string,
+): Promise<void> {
+  await transact(async (tx) => {
+    await tx.execute(
+      "UPDATE incidents SET incident_type_id = ? WHERE incident_type_id = ?",
+      [targetId, sourceId],
+    );
+    await remove(tx, "incident_types", sourceId);
+  });
 }
 
 export function useLocationStatuses() {

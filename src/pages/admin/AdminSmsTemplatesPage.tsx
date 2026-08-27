@@ -1,5 +1,10 @@
 import { useMemo, useState } from "react";
-import { db, id } from "../../lib/db";
+import {
+  createSmsTemplate,
+  deleteSmsTemplate,
+  saveSmsTemplate,
+  useSmsTemplates,
+} from "../../data/comms";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
 
@@ -18,12 +23,12 @@ function SmsTemplates() {
   const [editing, setEditing] = useState<string | "new" | null>(null);
   const [form, setForm] = useState({ label: "", body: "" });
 
-  const { data } = db.useQuery({
-    smsTemplates: { $: { where: { scope: "global" } } },
-  });
+  // Global scope only. Personal templates belong to their owner and are
+  // managed inline from the SMS thread; this screen does not touch them.
+  const { data: all } = useSmsTemplates(undefined);
   const templates = useMemo(
-    () => [...(data?.smsTemplates ?? [])].sort((a, b) => a.label.localeCompare(b.label)),
-    [data],
+    () => all.filter((t) => t.scope === "global"),
+    [all],
   );
 
   const startEdit = (t?: { id: string; label: string; body: string }) => {
@@ -33,21 +38,26 @@ function SmsTemplates() {
 
   const save = async () => {
     if (!form.label.trim() || !form.body.trim()) return;
-    const templateId = editing === "new" ? id() : editing!;
-    await db.transact(
-      db.tx.smsTemplates[templateId].update({
+    if (editing === "new") {
+      await createSmsTemplate({
         label: form.label.trim(),
         body: form.body.trim(),
         scope: "global",
-      }),
-    );
+        ownerId: null,
+      });
+    } else {
+      await saveSmsTemplate(editing!, {
+        label: form.label.trim(),
+        body: form.body.trim(),
+      });
+    }
     setEditing(null);
   };
 
   const remove = async (templateId: string) => {
-    // Already-sent messages are plain text, not live references, so removing
-    // a template never changes message history.
-    await db.transact(db.tx.smsTemplates[templateId].delete());
+    // Already-sent messages are plain text, not live references, so removing a
+    // template never changes message history.
+    await deleteSmsTemplate(templateId);
   };
 
   return (

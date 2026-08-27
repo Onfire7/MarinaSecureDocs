@@ -93,7 +93,18 @@ export function aLocation(over: Partial<LocationFixture> = {}): LocationFixture 
 }
 
 export function aCheckpoint(
-  over: Partial<{ id: string; name: string; location_id?: string | null }> = {},
+  over: Partial<{
+    id: string;
+    name: string;
+    location_id: string | null;
+    location_name: string | null;
+  }> = {},
 ) {
-  return { id: faker.string.uuid(), name: faker.lorem.word(), location_id: null, ...over };
+  return {
+    id: faker.string.uuid(),
+    name: faker.lorem.word(),
+    location_id: null,
+    location_name: null,
+    ...over,
+  };
 }

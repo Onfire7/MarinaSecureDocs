@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { db, id } from "../../lib/db";
+import {
+  createPhoneLine,
+  deletePhoneLine,
+  saveMarinaSettings,
+  useMarinaSettings,
+  usePhoneLines,
+} from "../../data/settings";
 import { AdminGate } from "./AdminGate";
 import { DraftInput, DraftNumberInput } from "../shared/DraftInput";
 import { AdminHeader } from "./AdminHomePage";
@@ -15,55 +21,19 @@ export function AdminMarinaSettingsPage() {
   );
 }
 
-type PhoneLine = { number: string; label: string; routing?: Record<string, unknown> };
-
 function MarinaSettings() {
-  const { data, isLoading } = db.useQuery({ marinaSettings: {} });
-  const settings = data?.marinaSettings?.[0];
+  // The settings row exists from the first migration — this is a singleton
+  // table with a fixed id, so there is no "create it" branch to write any more.
+  // useMarinaSettings falls back to the documented defaults until it syncs.
+  const settings = useMarinaSettings();
+  const { lines } = usePhoneLines();
   const [recipientDraft, setRecipientDraft] = useState("");
   const [lineDraft, setLineDraft] = useState({ number: "", label: "" });
 
-  if (isLoading) {
-    return (
-      <div className="placeholder">
-        <div className="big">Loading…</div>
-      </div>
-    );
-  }
+  const update = (fields: Parameters<typeof saveMarinaSettings>[1]) =>
+    void saveMarinaSettings(settings.id, fields);
 
-  // A brand-new marina has no settings row yet; create it with the documented
-  // defaults rather than erroring.
-  if (!settings) {
-    const create = () =>
-      void db.transact(
-        db.tx.marinaSettings[id()].update({
-          gpsValidationRadiusDefault: 50,
-          activityLogRetentionDays: 365,
-          callRecordingEnabled: false,
-          callTranscriptionEnabled: false,
-          shiftReportRecipients: [],
-          allowOverlappingReservations: false,
-          haulOutMode: "ask",
-        }),
-      );
-    return (
-      <div>
-        <AdminHeader title="Marina Settings" />
-        <div className="placeholder">
-          <div className="big">No settings record yet</div>
-          <button type="button" className="btn btn-primary" onClick={create}>
-            Create marina settings
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const update = (fields: Record<string, unknown>) =>
-    void db.transact(db.tx.marinaSettings[settings.id].update(fields));
-
-  const recipients = settings.shiftReportRecipients ?? [];
-  const lines = (settings.phoneLines ?? []) as PhoneLine[];
+  const recipients = settings.shiftReportRecipients;
 
   const addRecipient = () => {
     const email = recipientDraft.trim();
@@ -72,25 +42,26 @@ function MarinaSettings() {
     setRecipientDraft("");
   };
 
+  // Phone lines are their own table now, not a json array on settings — so
+  // adding one is a row, and two people adding lines at once no longer
+  // overwrite each other.
   const addLine = () => {
     if (!lineDraft.number.trim()) return;
-    update({
-      phoneLines: [
-        ...lines,
-        { number: lineDraft.number.trim(), label: lineDraft.label.trim() },
-      ],
+    void createPhoneLine({
+      number: lineDraft.number.trim(),
+      label: lineDraft.label.trim(),
     });
     setLineDraft({ number: "", label: "" });
   };
 
-  const removeLine = (index: number) => {
+  const removeLine = (lineId: string) => {
     if (lines.length === 1) {
       const ok = window.confirm(
         "This is the marina's only phone line. Removing it leaves calling and texting with no number to route through — continue?",
       );
       if (!ok) return;
     }
-    update({ phoneLines: lines.filter((_, i) => i !== index) });
+    void deletePhoneLine(lineId);
   };
 
   return (
@@ -104,7 +75,7 @@ function MarinaSettings() {
             <DraftInput
               className="input"
               aria-label="Marina name"
-              value={settings.marinaName ?? ""}
+              value={settings.marinaName}
               onCommit={(marinaName) => update({ marinaName })}
             />
           </div>
@@ -182,7 +153,7 @@ function MarinaSettings() {
             <span className="field-label">Haul-out mode</span>
             <select
               className="select select-inline"
-              value={settings.haulOutMode ?? "ask"}
+              value={settings.haulOutMode}
               onChange={(e) => update({ haulOutMode: e.target.value })}
             >
               <option value="ask">Ask who performed it</option>
@@ -243,8 +214,8 @@ function MarinaSettings() {
           <div className="field">
             <span className="field-label">Phone lines</span>
             <div className="stack" style={{ gap: 4, marginBottom: 6 }}>
-              {lines.map((line, i) => (
-                <div key={`${line.number}-${i}`} className="card spread">
+              {lines.map((line) => (
+                <div key={line.id} className="card spread">
                   <span className="small">
                     <strong>{line.number}</strong>
                     {line.label ? ` · ${line.label}` : ""}
@@ -252,7 +223,7 @@ function MarinaSettings() {
                   <button
                     type="button"
                     className="btn btn-sm btn-quiet"
-                    onClick={() => removeLine(i)}
+                    onClick={() => removeLine(line.id)}
                   >
                     Remove
                   </button>
