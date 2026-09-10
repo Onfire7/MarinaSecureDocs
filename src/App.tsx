@@ -6,7 +6,7 @@ import {
   CurrentUserProvider,
   useCurrent,
 } from "./lib/auth/CurrentUserContext";
-import { useSyncAuthError } from "./lib/auth/syncAuthStatus";
+import { useSyncConfigError } from "./lib/auth/syncStatus";
 import { AppShell } from "./layout/AppShell";
 import { ErrorBoundary } from "./layout/ErrorBoundary";
 import { SignInPage } from "./pages/access/SignInPage";
@@ -179,7 +179,7 @@ function RequireAuth() {
 
 function ProvisionGate() {
   const current = useCurrent();
-  const syncAuthError = useSyncAuthError();
+  const syncConfigError = useSyncConfigError();
   const { signOut } = useClerk();
   const location = useLocation();
 
@@ -194,7 +194,7 @@ function ProvisionGate() {
   //
   // Verified against the real failure: with no `aud` claim on the Clerk token,
   // PowerSync answers PSYNC_S2105 and this is the screen that appears.
-  if (syncAuthError) return <SyncAuthErrorScreen message={syncAuthError} />;
+  if (syncConfigError) return <SyncConfigErrorScreen message={syncConfigError} />;
 
   // A device that has never synced holds nothing, so it cannot tell an
   // unprovisioned account from an unsynced one — and the two need opposite
@@ -254,7 +254,7 @@ function FirstSyncScreen() {
 // a deployment problem, not an account problem. Most likely: PowerSync's JWKS
 // URL doesn't match this Clerk application, or Supabase isn't configured to
 // trust Clerk as a third-party auth provider.
-function SyncAuthErrorScreen({ message }: { message: string }) {
+function SyncConfigErrorScreen({ message }: { message: string }) {
   return (
     <div className="auth-screen">
       <div className="auth-brand">
@@ -262,9 +262,9 @@ function SyncAuthErrorScreen({ message }: { message: string }) {
         <div className="product">MarinaSecure</div>
       </div>
       <p className="muted" style={{ maxWidth: 420, textAlign: "center" }}>
-        You signed in, but the connection to the marina’s database was
-        refused, so nothing can load. This is a setup problem with the app —
-        send this message to whoever maintains it:
+        You signed in, but the marina’s database turned the connection away,
+        so nothing can load. More signal will not help — this is a setup
+        problem with the app. Send this message to whoever maintains it:
       </p>
       <pre
         className="small"

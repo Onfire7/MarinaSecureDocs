@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 
-// Whether the app's connection to the marina's database has been *refused* —
-// as opposed to merely being offline.
+// Whether the marina's database is unreachable for a reason no amount of
+// signal will fix — as opposed to the device merely being offline.
 //
 // The distinction is the whole reason this file exists. Under InstantDB, a
 // rejected Clerk token exchange ("Unauthorized origin") made every query run
@@ -15,6 +15,8 @@ import { useSyncExternalStore } from "react";
 //
 //   * PowerSync rejects the Clerk JWT if its JWKS URL or audience is
 //     misconfigured. Nothing syncs, so every table is empty.
+//   * PowerSync accepts the JWT but has no sync rules deployed, and answers
+//     every request with PSYNC_S2302. Nothing syncs, so every table is empty.
 //   * Supabase accepts the JWT but has no third-party auth provider
 //     configured for Clerk, so every RLS policy evaluates against a null
 //     identity and every write is silently refused.
@@ -24,8 +26,8 @@ import { useSyncExternalStore } from "react";
 let error: string | null = null;
 const listeners = new Set<() => void>();
 
-/** Record a connection failure, or clear it with null once one succeeds. */
-export function setSyncAuthError(message: string | null) {
+/** Record a configuration failure, or clear it with null once one succeeds. */
+export function setSyncConfigError(message: string | null) {
   if (error === message) return;
   error = message;
   for (const l of listeners) l();
@@ -42,7 +44,7 @@ function getSnapshot() {
   return error;
 }
 
-/** Last connection failure message, or null once a connection succeeds. */
-export function useSyncAuthError(): string | null {
+/** Last configuration failure message, or null once a connection succeeds. */
+export function useSyncConfigError(): string | null {
   return useSyncExternalStore(subscribe, getSnapshot);
 }

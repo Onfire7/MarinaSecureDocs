@@ -24,8 +24,60 @@ import { generateOccupancy } from "./synthetic.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const EXPORT_DIR = `${root}migration/instant-export`;
-const CONN = process.env.SEED_DATABASE_URL
-  ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+const LOCAL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+const CONN = resolveTarget();
+
+/**
+ * Which database to seed, said out loud.
+ *
+ * The default is local and stays local — reading a remote connection string
+ * out of .env.local would make seeding production a thing that happens by
+ * accident, which is the opposite of what this script wants. But defaulting
+ * SILENTLY is its own trap: a SEED_DATABASE_URL sitting in .env.local looks
+ * exactly like a configured remote seed, and the run that ignores it prints
+ * nothing to say so. That cost a real debugging round — a remote database
+ * that stayed empty while the seed reported success against a laptop.
+ *
+ * So: still local by default, but never quietly, and never against a string
+ * that is not a Postgres URL.
+ */
+function resolveTarget() {
+  const fromEnv = process.env.SEED_DATABASE_URL;
+
+  if (!fromEnv) {
+    // Look, but do not obey. If the value is in the file, say why nothing
+    // happened rather than seeding the wrong database and reporting success.
+    let inFile = false;
+    try {
+      inFile = /^SEED_DATABASE_URL=\S/m.test(
+        readFileSync(`${root}.env.local`, "utf8"),
+      );
+    } catch { /* no .env.local — fine */ }
+    if (inFile) {
+      console.error(
+        "SEED_DATABASE_URL is set in .env.local, and this script does not read it.\n" +
+        "Seeding a remote database is deliberate, so the value has to be in the\n" +
+        "environment of the command:\n\n" +
+        "  SEED_DATABASE_URL='postgresql://...' pnpm run seed\n",
+      );
+      process.exit(1);
+    }
+    console.log("SEED_DATABASE_URL unset — seeding the LOCAL stack.\n");
+    return LOCAL;
+  }
+
+  if (!/^postgres(ql)?:\/\//.test(fromEnv)) {
+    console.error(
+      `SEED_DATABASE_URL is not a Postgres connection string:\n\n  ${fromEnv}\n\n` +
+      "This looks like a Supabase project API URL. The seed talks to Postgres\n" +
+      "directly, so it needs the connection string from Project Settings →\n" +
+      "Database. Use the transaction pooler host: the direct db.<ref>.supabase.co\n" +
+      "host is IPv6-only and unreachable from most networks.\n",
+    );
+    process.exit(1);
+  }
+  return fromEnv;
+}
 
 const configOnly = process.argv.includes("--config-only");
 const doReset = process.argv.includes("--reset");

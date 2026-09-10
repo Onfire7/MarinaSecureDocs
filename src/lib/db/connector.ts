@@ -6,7 +6,7 @@ import {
 } from "@powersync/web";
 import { POWERSYNC_URL } from "../config";
 import { getClerkToken } from "../auth/clerkToken";
-import { setSyncAuthError } from "../auth/syncAuthStatus";
+import { setSyncConfigError } from "../auth/syncStatus";
 import { supabase } from "./supabase";
 
 // The two halves of the connection to the marina's database.
@@ -80,7 +80,7 @@ export class SupabaseConnector implements PowerSyncBackendConnector {
       // Only now is the local queue cleared. Until this line, an interrupted
       // drain leaves everything queued and it is retried from the top.
       await transaction.complete();
-      setSyncAuthError(null);
+      setSyncConfigError(null);
     } catch (error) {
       const code = (error as { code?: string } | null)?.code ?? "";
       if (FATAL_RESPONSE_CODES.some((re) => re.test(code))) {

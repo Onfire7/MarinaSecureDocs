@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { useQuery, useStatus } from "@powersync/react";
 import { supabase } from "../db/supabase";
-import { setSyncAuthError } from "./syncAuthStatus";
+import { setSyncConfigError } from "./syncStatus";
 import type { Permission } from "../permissions";
 // The row type is declared in the data layer rather than taken from the
 // generated schema, whose columns are all nullable — SQLite has no NOT NULL
@@ -103,7 +103,7 @@ export function useCurrentUser(): CurrentUser {
           // Supabase not trusting Clerk as a third-party auth provider, which
           // is a deployment fault, not the user's.
           console.warn("claim_marina_user failed", error);
-          setSyncAuthError(error.message);
+          setSyncConfigError(error.message);
         }
       });
   }, [isSignedIn, clerkUserId, user, usersLoading, hasSynced]);

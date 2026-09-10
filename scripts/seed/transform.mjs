@@ -38,6 +38,43 @@ const LEGACY_ITEM_TYPES = { gas_pump_check: "lock_check" };
 
 const ATTACH = ["location", "checkpoint", "boat", "vehicle", "contact", "asset"];
 
+// `subject_type` names the table a log entry points at, and a CHECK constraint
+// (migration 20260826003400) holds it to that list. The InstantDB export
+// predates the rule and carries Instant's namespace names for three of them,
+// so a fresh database has to be given the normalised value at load time —
+// the migration's UPDATEs only ever fixed rows that were already there.
+//
+// Unknown values throw rather than pass through. A wrong subject_type is not
+// a row that fails; it is a row that inserts and then never resolves to a
+// subject, which is invisible until someone opens the activity log.
+const SUBJECT_TYPES = new Set([
+  "assets", "boats", "calls", "check_ins", "checklist_instances", "contacts",
+  "incidents", "leases", "locations", "notes", "reservations", "roles",
+  "shifts", "sms_threads", "tickets", "users", "vehicles",
+]);
+
+// `checklists` joins `checklistInstances` because its entries are all
+// checklist.completed against instances that no longer exist — see the
+// migration, which reaches the same conclusion at more length.
+const SUBJECT_TYPE_ALIASES = {
+  checkIns: "check_ins",
+  checklistInstances: "checklist_instances",
+  checklists: "checklist_instances",
+  smsThreads: "sms_threads",
+};
+
+function subjectType(raw) {
+  const mapped = SUBJECT_TYPE_ALIASES[raw] ?? raw;
+  if (!SUBJECT_TYPES.has(mapped)) {
+    throw new Error(
+      `activityLogEntries.subjectType ${JSON.stringify(raw)} is not a known ` +
+      `subject table. Add it to SUBJECT_TYPE_ALIASES if it is an Instant ` +
+      `namespace name, or to the CHECK constraint if it is a new subject.`,
+    );
+  }
+  return mapped;
+}
+
 export function transform(ex) {
   const g = (n) => ex[n] ?? [];
   const tables = {};
@@ -358,7 +395,8 @@ export function transform(ex) {
   put("activity_log_entries", g("activityLogEntries").map((r) => ({
     id: r.id, event_type: r.eventType, summary: r.summary,
     timestamp: ts(r.timestamp), protected: !!r.protected,
-    subject_type: r.subjectType, subject_id: r.subjectId, actor_id: one(r.actor),
+    subject_type: subjectType(r.subjectType), subject_id: r.subjectId,
+    actor_id: one(r.actor),
   })));
 
   // ── comms ───────────────────────────────────────────────────────────────

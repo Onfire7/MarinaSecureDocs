@@ -182,6 +182,24 @@ Screenshots or it didn't happen.
   it. Join on `id` freely; correlate on anything else. `src/data/assets.ts`
   still carries one (`asset_checkouts` on `asset_id`), left alone only because
   that table is tiny.
+- **Anything that is a file locally and a dashboard field remotely will be
+  forgotten.** Four things bit in sequence, each revealed only by fixing the
+  last: the Clerk `aud` claim, PowerSync's JWKS URI, PowerSync's *sync rules*,
+  and Netlify's `VITE_SUPABASE_URL` (pasted with `/rest/v1/` on the end, so
+  supabase-js built `/rest/v1/rest/v1/rpc/...` and every RPC 404'd). The local
+  stack hides all four: `powersync/config/service.yaml` and `sync-config.yaml`
+  are bind-mounted from the repo, and `.env.local` is read directly. Local
+  success proves nothing about any of them. `scripts/finish-powersync-cutover.sh`
+  now covers all four; add to it rather than rediscovering.
+- **A freshly seeded database has no sync scopes.** `is_resident`, `is_current`
+  and `is_recent` are computed by `refresh_sync_scopes_all()` on an hourly
+  `pg_cron` job, and default to values that are wrong until it first runs — so
+  a correct seed against a correct instance still syncs an empty occupancy
+  stream, which reads exactly like a broken permission gate. Run
+  `select refresh_sync_scopes_all()` after seeding. Note the `_all`: plain
+  `refresh_sync_scopes()` skips `refresh_child_sync_scopes()`, which is what
+  scopes `contact_details`, and half-running it is harder to spot than not
+  running it.
 - **The auth trap survives the migration, in a new place.** Instant fails
   the Clerk token exchange on an unallowlisted browser origin. Supabase's
   equivalent is the third-party auth provider config: without it every policy
