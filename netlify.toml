@@ -1,7 +1,17 @@
 # Netlify build config for the MarinaSecure app (see README — Deployment).
 #
-# The site builds from the repo root; docs/ stays on GitHub Pages. Branch
-# deploys of `beta` give a stable preview origin.
+# The site builds from the repo root; docs/ stays on GitHub Pages.
+#
+# TWO Netlify sites build this repo, and this file is shared by both:
+#
+#   marinasecure         branch `beta`   → https://beta.marinasecure.com
+#                        the old InstantDB build, still in daily use
+#   marinasecure-beta2   branch `beta2`  → https://beta2.marinasecure.com
+#                        the Supabase + PowerSync rewrite
+#
+# They share this file and nothing else: the environment variables below are
+# set per site, and beta2 has no VITE_INSTANT_APP_ID because nothing in src/
+# imports InstantDB any more.
 #
 # Required environment variables (Netlify UI → Site settings → Environment):
 #   VITE_CLERK_PUBLISHABLE_KEY  — public by design (pk_...)

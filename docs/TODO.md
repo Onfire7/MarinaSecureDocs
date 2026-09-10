@@ -9,13 +9,13 @@ Verify each task against the deployment before moving on.
 
 ## Awaiting user action
 
-- [ ] **Decide when `beta` moves to the rewrite.** `rewrite/powersync` is
-      pushed and building at
-      https://rewrite-powersync--marinasecure.netlify.app — Netlify's
-      `allowed_branches` now holds `beta` and `rewrite/powersync`, so both
-      deploy. beta.marinasecure.com is still the InstantDB build and still
-      works; it stays that way until you fast-forward `beta`, which is a
-      clean fast-forward (no merge commit).
+- [ ] **Decide when `beta` retires.** The rewrite is live at
+      https://beta2.marinasecure.com on its own Netlify site
+      (`marinasecure-beta2`, production branch `beta2`, its own env vars).
+      beta.marinasecure.com is still the InstantDB build on the original
+      `marinasecure` site, still working, and untouched — the two share a repo
+      and nothing else. Retiring beta is a decision about the marina's daily
+      use, not a deployment step.
 
 - [ ] **Push `main`.** `beta` has been merged in cleanly (no conflicts; the
       trees are identical). The merge commit is local and unpushed —
@@ -55,7 +55,8 @@ lives in `architecture.md`, `permissions.md`, `data-model.md` and
       window, and permission gates that compile to bucket parameters.
 - [x] **Transform + load.** Pure transform, separate load. Local only — the
       remote database has the schema and none of the data.
-- [x] **Rewrite.** Done on `rewrite/powersync`. 19 modules under `src/data/`,
+- [x] **Rewrite.** Done on `beta2` (then named `rewrite/powersync`). 19
+      modules under `src/data/`,
       every page converted, no page file contains SQL, and nothing in `src/`
       imports InstantDB. tsc 0 · oxlint 0 · 106 unit tests · 55 pgTAP · build
       clean.

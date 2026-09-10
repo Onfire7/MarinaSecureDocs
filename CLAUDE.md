@@ -17,7 +17,10 @@ its own Twilio account. Nothing is shared between marinas.
 > touching the data layer — the design is in `docs/architecture.md`,
 > `docs/permissions.md`, `docs/data-model.md` and `docs/api-structure.md`.
 >
-> **The rewrite is done, on the `rewrite/powersync` branch.** `beta` still
+> **The rewrite is done, on the `beta2` branch** (renamed from
+> `rewrite/powersync` on 2026-09-10), deployed to
+> https://beta2.marinasecure.com by its own Netlify site, `marinasecure-beta2`.
+> `beta` still
 > deploys the InstantDB build and still works; nothing in `src/` on the branch
 > imports InstantDB. It compiles, boots, and opens its own SQLite database, and
 > has not yet been exercised against synced rows — see `docs/TODO.md` for the
@@ -52,8 +55,11 @@ spec-approval time and expensive afterward.
 
 ## Conventions
 
-- **Work on `beta`.** It deploys to https://beta.marinasecure.com in ~45s.
-- **Pages never touch the database.** *(On `rewrite/powersync`.)* Queries and
+- **Work on `beta2`.** It deploys to https://beta2.marinasecure.com in ~45s,
+  from its own Netlify site (`marinasecure-beta2`) with its own environment
+  variables. `beta` is the old InstantDB build on the `marinasecure` site and
+  is left alone; the two share a repo and nothing else.
+- **Pages never touch the database.** *(On `beta2`.)* Queries and
   writes live in per-domain modules under `src/data/`; **no page file contains
   SQL**. `src/lib/db/schema.ts` is generated from the live database by
   `pnpm run schema:gen` — never hand-edited, and `pnpm run schema:check` fails
