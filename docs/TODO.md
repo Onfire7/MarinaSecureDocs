@@ -108,6 +108,27 @@ lives in `architecture.md`, `permissions.md`, `data-model.md` and
       stream was empty while every ungated stream was full — which reads
       exactly like a broken permission gate and is not.
 
+- [x] **Reload the remote from a current InstantDB export.** Done 2026-09-10.
+      Truncated and reloaded from a fresh export: 3,585 rows, real data only,
+      no synthetic occupancy. A backup of the previous contents (the synthetic
+      year) is at `/tmp/marina-backup/remote-*.sql` — not in the repo, and not
+      permanent. Verified live: dashboard in 11s, a real shift in progress, 19
+      open incidents, 5 open tickets, 214 check-ins with 54 inside the rounds
+      window, zero errors.
+
+      The export is 18 days newer than the one the synthetic seed was built
+      from, and the marina has been in real use: +888 checklist instance items,
+      +228 sections, +118 activity entries, +63 check-ins, +12 shifts, +6
+      incidents.
+
+- [ ] **Decide what happens to tickets with no attachment target.** The reload
+      dropped exactly one real row — "Door left unlocked: Water Storage Door" —
+      because the schema requires a ticket to point at exactly one subject and
+      that one points at none. The loader reported it rather than failing,
+      which is right for a seed and wrong for a cutover: at real cutover this
+      is silent data loss unless it is either fixed in InstantDB first or the
+      constraint is relaxed. One row today, but it is a class, not an incident.
+
 - [ ] **Rotate the Supabase `postgres` password.** It was handed over in this
       session to seed through the pooler, and the pooler presents Supabase's
       own private CA, so that seed ran over TLS that was encrypted but not
