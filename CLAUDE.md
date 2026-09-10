@@ -19,7 +19,8 @@ its own Twilio account. Nothing is shared between marinas.
 >
 > **The rewrite is done, on the `beta2` branch** (renamed from
 > `rewrite/powersync` on 2026-09-10), deployed to
-> https://beta2.marinasecure.com by its own Netlify site, `marinasecure-beta2`.
+> https://beta2.marinasecure.com by its own Netlify site, `marinasecure2`
+> (`marinasecure2.netlify.app`).
 > `beta` still
 > deploys the InstantDB build and still works; nothing in `src/` on the branch
 > imports InstantDB. It compiles, boots, and opens its own SQLite database, and
@@ -56,7 +57,7 @@ spec-approval time and expensive afterward.
 ## Conventions
 
 - **Work on `beta2`.** It deploys to https://beta2.marinasecure.com in ~45s,
-  from its own Netlify site (`marinasecure-beta2`) with its own environment
+  from its own Netlify site (`marinasecure2`) with its own environment
   variables. `beta` is the old InstantDB build on the `marinasecure` site and
   is left alone; the two share a repo and nothing else.
 - **Pages never touch the database.** *(On `beta2`.)* Queries and

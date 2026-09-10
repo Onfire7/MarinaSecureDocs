@@ -11,7 +11,7 @@ Verify each task against the deployment before moving on.
 
 - [ ] **Decide when `beta` retires.** The rewrite is live at
       https://beta2.marinasecure.com on its own Netlify site
-      (`marinasecure-beta2`, production branch `beta2`, its own env vars).
+      (`marinasecure2`, production branch `beta2`, its own env vars).
       beta.marinasecure.com is still the InstantDB build on the original
       `marinasecure` site, still working, and untouched — the two share a repo
       and nothing else. Retiring beta is a decision about the marina's daily

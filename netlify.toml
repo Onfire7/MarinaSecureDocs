@@ -4,14 +4,22 @@
 #
 # TWO Netlify sites build this repo, and this file is shared by both:
 #
-#   marinasecure         branch `beta`   → https://beta.marinasecure.com
-#                        the old InstantDB build, still in daily use
-#   marinasecure-beta2   branch `beta2`  → https://beta2.marinasecure.com
-#                        the Supabase + PowerSync rewrite
+#   marinasecure    branch `beta`   → https://beta.marinasecure.com
+#                   the old InstantDB build, still in daily use
+#   marinasecure2   branch `beta2`  → https://beta2.marinasecure.com
+#                   the Supabase + PowerSync rewrite
 #
-# They share this file and nothing else: the environment variables below are
-# set per site, and beta2 has no VITE_INSTANT_APP_ID because nothing in src/
-# imports InstantDB any more.
+# Two sites rather than one site with a branch deploy, because the builds need
+# DIFFERENT ENVIRONMENT VARIABLES: `beta` still needs VITE_INSTANT_APP_ID and
+# `beta2` must not have it, and Netlify's environment is per site, not per
+# branch. That is the whole reason; there is no DNS reason.
+#
+# Branch deploys on either site are reachable at
+# `<branch>--<sitename>.netlify.app` — e.g. beta--marinasecure.netlify.app.
+# That URL is built from the site's netlify.app NAME and has nothing to do
+# with its custom domain. (Mapping a branch onto the custom domain instead is
+# a separate feature, branch subdomains, which derives `<branch>.<primary
+# domain>` — not wanted here, and not what makes two sites necessary.)
 #
 # Required environment variables (Netlify UI → Site settings → Environment):
 #   VITE_CLERK_PUBLISHABLE_KEY  — public by design (pk_...)
