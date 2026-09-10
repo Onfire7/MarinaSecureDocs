@@ -271,15 +271,33 @@ fi
 pause "Continue?"
 
 # ── 4 ──────────────────────────────────────────────────────────────────
-stage "PowerSync — accept that audience"
-say "Stage 1 put \"aud\": \"authenticated\" on the token. The PowerSync instance"
-say "has to be told that is a value it accepts, or it keeps rejecting them."
-note "The LOCAL service already allows it — powersync/config/service.yaml."
+stage "PowerSync — trust Clerk's keys, and accept that audience"
+say "Two settings, both on the same screen, and the instance rejects every"
+say "token until BOTH are right. The local service has both — they live in"
+say "powersync/config/service.yaml as jwks_uri and audience — and an earlier"
+say "version of this wizard asked for only the second. That omission is what"
+say "PSYNC_S2204 \"JWKS request failed\" means: the instance is fetching a"
+say "JWKS from somewhere that isn't Clerk, so it can never verify a signature."
+say ""
+say "The JWKS URI is Clerk's, NOT Supabase's. Supabase and PowerSync both"
+say "trust the same Clerk token, so both point at the same Clerk endpoint."
+say ""
+JWKS="https://${CLERK_DOMAIN:-$(_existing CLERK_DOMAIN)}/.well-known/jwks.json"
+say "For this marina that is:"
+printf '  %s%s%s\n' "$BOLD" "$JWKS" "$RESET"
+if curl -fsS -o /dev/null --max-time 10 "$JWKS" 2>/dev/null; then
+  printf '  %s✓%s reachable and serving keys right now\n' "$GREEN" "$RESET"
+else
+  warn "that URL is not answering — check CLERK_DOMAIN in $ENV_FILE first"
+fi
+say ""
 open_url "https://powersync.journeyapps.com/"
 step "Open this marina's instance → Client Auth."
-step "Set the audience to: authenticated"
-step "Save, then Deploy — the setting does nothing until the instance"
-note "  redeploys."
+step "JWKS URI: paste the URL above."
+step "Audience: authenticated"
+step "Leave any \"use Supabase auth\" option OFF — these are Clerk tokens."
+step "Save, then Deploy — neither setting does anything until the instance"
+note "  redeploys. Watch for the deploy to report healthy before testing."
 pause "Deployed?"
 
 # ── 5 ──────────────────────────────────────────────────────────────────
