@@ -198,7 +198,7 @@ finish() {
 # Replace the example below. Set TOTAL_STAGES to match the stages you write.
 # ──────────────────────────────────────────────────────────────────────────
 
-TOTAL_STAGES=6
+TOTAL_STAGES=7
 ENV_FILE=".env.local"
 
 banner "Finish the PowerSync cutover"
@@ -301,6 +301,40 @@ note "  redeploys. Watch for the deploy to report healthy before testing."
 pause "Deployed?"
 
 # ── 5 ──────────────────────────────────────────────────────────────────
+stage "PowerSync — deploy the sync rules"
+say "Client Auth decides WHO may connect. Sync rules decide WHAT they get,"
+say "and an instance with none answers every request with a 500:"
+note "  PSYNC_S2302 — No sync config available"
+say ""
+say "The local service reads powersync/config/sync-config.yaml straight from"
+say "the repo, so this step has no local equivalent and is easy to miss. The"
+say "cloud instance keeps its own copy and it starts empty."
+say ""
+RULES="powersync/config/sync-config.yaml"
+if [[ -f "$RULES" ]]; then
+  printf '  %s✓%s %s — %s lines\n' "$GREEN" "$RESET" "$RULES" "$(wc -l < "$RULES" | tr -d ' ')"
+  if command -v xclip >/dev/null 2>&1 && xclip -selection clipboard < "$RULES" 2>/dev/null; then
+    printf '  %s✓%s copied to your clipboard — just paste it\n' "$GREEN" "$RESET"
+  elif command -v pbcopy >/dev/null 2>&1 && pbcopy < "$RULES" 2>/dev/null; then
+    printf '  %s✓%s copied to your clipboard — just paste it\n' "$GREEN" "$RESET"
+  else
+    note "  open it and copy the whole file (no clipboard tool found)"
+  fi
+else
+  warn "$RULES is missing — you are not in the repo root"
+fi
+say ""
+open_url "https://powersync.journeyapps.com/"
+step "Open this marina's instance → Sync Rules."
+step "Replace whatever is there with the whole file. All of it."
+step "Validate — the editor reports bucket and parameter errors before deploy,"
+note "  and a rule that compiles is not yet a rule that is scoped correctly."
+step "Deploy, and wait for the instance to report healthy."
+warn "After deploying, PowerSync re-replicates from scratch. On a populated"
+warn "database that takes a while; on an empty one it is instant."
+pause "Deployed?"
+
+# ── 6 ──────────────────────────────────────────────────────────────────
 stage "Netlify — the three public values"
 say "beta builds from Netlify, and the build needs the new stack's config."
 say "All three are public by design: they ship in the browser bundle, and the"
@@ -321,7 +355,7 @@ open_url "https://app.netlify.com/"
 step "Site settings → Environment variables → Add a variable, three times."
 pause "Added?"
 
-# ── 6 ──────────────────────────────────────────────────────────────────
+# ── 7 ──────────────────────────────────────────────────────────────────
 stage "Decide what the remote database holds"
 say "PowerSync Cloud replicates from the REMOTE Postgres, not from your"
 say "laptop — so beta shows an empty app until something is in there. The"
