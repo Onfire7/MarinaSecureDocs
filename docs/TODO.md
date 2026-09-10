@@ -87,26 +87,38 @@ lives in `architecture.md`, `permissions.md`, `data-model.md` and
 
       Still to do here: repeat it against `beta` once the remote database has
       data, which is the next item.
-- [ ] **Point PowerSync Cloud at Clerk's JWKS.** The remote instance rejects
-      every token with `PSYNC_S2204 — JWKS request failed`, so nothing syncs
-      from the remote at all. Clerk's endpoint is public and healthy
-      (`https://<clerk-domain>/.well-known/jwks.json` → 200), so this is a
-      missing or wrong JWKS URI in the instance's auth config, not a Clerk
-      problem. Stage 4 of `scripts/finish-powersync-cutover.sh`. Verified from
-      a real signed-in session against the deployed branch on 2026-08-27; the
-      app's refusal screen quotes the code correctly.
+- [x] **Point PowerSync Cloud at Clerk's JWKS.** Done. The instance was
+      rejecting every token with `PSYNC_S2204`; the JWKS URI is Clerk's, not
+      Supabase's. Stage 4 of the cutover wizard now asks for it — it only
+      asked for the audience before, which is why this was missed.
 
-- [ ] **Seed or import the remote database.** PowerSync Cloud replicates from
-      the REMOTE Postgres, so the app shows an empty marina until this
-      happens. Decide whether that is the real Instant export, the synthetic
-      year, or the real config alone.
+- [x] **Deploy the sync rules to PowerSync Cloud.** Done. Auth alone got as
+      far as `PSYNC_S2302 — No sync config available`. The local service
+      bind-mounts `powersync/config/sync-config.yaml` from the repo, so this
+      never looks like a deploy step. Now stage 5 of the cutover wizard.
 
-      Two traps here. `pnpm run seed` defaults to
-      `postgresql://postgres:postgres@127.0.0.1:54322/postgres` and silently
-      seeds your laptop unless `SEED_DATABASE_URL` is set — it does not warn.
-      And the project's direct database host is IPv6-only (no A record), so
-      from an IPv4 network it must be reached through the transaction pooler
-      URI from Project Settings → Database, not the direct one.
+- [x] **Seed the remote database.** Done 2026-09-10 via the transaction
+      pooler: 2,240 config rows + 41,698 synthetic. Verified live — dashboard
+      in 19s, contacts / boats (739) / vehicles (98) / locations /
+      reservations all rendering, zero console errors, zero >=400 responses.
+
+      Two things had to be fixed to get there. The seed transform emitted
+      Instant's `checkIns` against a CHECK constraint that wants table names,
+      and `refresh_sync_scopes_all()` had never run, so every occupancy
+      stream was empty while every ungated stream was full — which reads
+      exactly like a broken permission gate and is not.
+
+- [ ] **Rotate the Supabase `postgres` password.** It was handed over in this
+      session to seed through the pooler, and the pooler presents Supabase's
+      own private CA, so that seed ran over TLS that was encrypted but not
+      verified. Neither is a breach; both are reasons not to leave the
+      credential as it is.
+
+- [ ] **Fix `VITE_SUPABASE_URL` on the `beta` context too.** It was set to
+      `https://<ref>.supabase.co/rest/v1/`, so supabase-js built
+      `/rest/v1/rest/v1/rpc/...` and every RPC 404'd. Corrected for all
+      contexts on 2026-09-10; re-check it when `beta` moves to the rewrite.
+
 - [ ] **Offline attachment queue.** Local bytes + `upload_state`, draining
       independently of PowerSync's write queue. `captureAttachment()` writes
       the row first and fails loudly if the bytes cannot go, so nothing is
