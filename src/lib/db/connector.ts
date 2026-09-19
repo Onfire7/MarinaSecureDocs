@@ -36,6 +36,14 @@ import { supabase } from "./supabase";
  *
  * Everything else (network, 5xx, an expired token) is transient by
  * assumption, and retrying is right.
+ *
+ * None of these codes counts when the response was a 401. A 401 means the
+ * request arrived without a usable identity, and Postgres then refuses it
+ * with the very same 42501 it gives a user who genuinely lacks the privilege.
+ * Treating that as permanent deleted a night's checklist answers: checks made
+ * in a dead spot were uploaded as nobody, refused, discarded, and then erased
+ * from the phone by the next sync. "Who are you?" is never a reason to throw
+ * a write away; "you may not" is.
  */
 const FATAL_RESPONSE_CODES = [/^22\d{3}$/, /^23\d{3}$/, /^42501$/];
 
@@ -53,6 +61,16 @@ export class SupabaseConnector implements PowerSyncBackendConnector {
   async uploadData(database: AbstractPowerSyncDatabase): Promise<void> {
     const transaction = await database.getNextCrudTransaction();
     if (!transaction) return;
+
+    // Never send a write as nobody. Clerk's getToken() returns null once a
+    // device has been offline longer than the token's 60-second life, and it
+    // can stay null for a moment after the network returns — exactly when
+    // PowerSync starts draining the queue. The Supabase client would send the
+    // request anyway, without an identity. Throwing leaves everything queued
+    // and PowerSync retries, by which time Clerk has a token again.
+    if (!(await getClerkToken())) {
+      throw new Error("No Clerk session token yet; upload deferred.");
+    }
 
     let lastOp: { op: UpdateType; table: string; id: string } | null = null;
     try {
@@ -82,8 +100,8 @@ export class SupabaseConnector implements PowerSyncBackendConnector {
       await transaction.complete();
       setSyncConfigError(null);
     } catch (error) {
-      const code = (error as { code?: string } | null)?.code ?? "";
-      if (FATAL_RESPONSE_CODES.some((re) => re.test(code))) {
+      const { code = "", status } = (error ?? {}) as UploadError;
+      if (status !== 401 && FATAL_RESPONSE_CODES.some((re) => re.test(code))) {
         console.error(
           `Discarding unretryable write to ${lastOp?.table} (${code})`,
           lastOp,
@@ -108,9 +126,17 @@ export class SupabaseConnector implements PowerSyncBackendConnector {
 // delivered, and the next sync reverts the local row. That is a permissions
 // bug presenting as a UI that quietly forgets — worth remembering before
 // blaming React.
-async function throwOnError<T extends { error: unknown }>(
+//
+// The HTTP status rides along on the thrown error, because the Postgres code
+// alone cannot tell an unauthenticated request from a refused one.
+interface UploadError {
+  code?: string;
+  status?: number;
+}
+
+async function throwOnError<T extends { error: unknown; status?: number }>(
   builder: PromiseLike<T>,
 ): Promise<void> {
-  const { error } = await builder;
-  if (error) throw error;
+  const { error, status } = await builder;
+  if (error) throw Object.assign(error as object, { status });
 }

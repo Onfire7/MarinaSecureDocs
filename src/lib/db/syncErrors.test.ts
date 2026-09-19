@@ -32,6 +32,23 @@ describe("isConfigurationError", () => {
     expect(isConfigurationError(REAL.missingAudience)).toBe(true);
   });
 
+  it("treats PSYNC_S2103 as transient", () => {
+    // Captured from a guard's phone. A token expiring while the app was
+    // suspended heals itself on reconnect; replacing the whole app with a
+    // setup-error screen for it is wrong, and hides unsaved work.
+    expect(
+      isConfigurationError(
+        'HTTPS : {"error":{"code":"PSYNC_S2103","status":401,"description":"JWT has expired","name":"AuthorizationError"}}',
+      ),
+    ).toBe(false);
+  });
+
+  it("treats PGRST303 as transient", () => {
+    expect(
+      isConfigurationError('401 {"code":"PGRST303","message":"JWT expired"}'),
+    ).toBe(false);
+  });
+
   it("treats a bare HTTP refusal as configuration", () => {
     expect(isConfigurationError("401 Unauthorized")).toBe(true);
     expect(isConfigurationError("Request failed with status 403")).toBe(true);

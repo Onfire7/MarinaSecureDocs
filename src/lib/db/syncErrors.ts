@@ -28,6 +28,15 @@
 const SERVER_ANSWERED = /PSYNC_[SE]\d{4}|\bHTTP\b|\b[45]\d\d\b|Unauthorized|Forbidden/i;
 
 /**
+ * An expired token is the one server refusal that IS routine. Clerk's tokens
+ * live 60 seconds; a phone that was locked for a few minutes wakes holding a
+ * stale one, is refused once, fetches a fresh one and reconnects on its own.
+ * PowerSync says PSYNC_S2103, PostgREST says PGRST303. Showing the setup-error
+ * screen for it replaced the whole app every time a guard unlocked the phone.
+ */
+const TOKEN_EXPIRED = /PSYNC_S2103|PGRST303/;
+
+/**
  * True when the reason is something no amount of signal will fix, and the user
  * should be shown it verbatim.
  *
@@ -40,7 +49,7 @@ const SERVER_ANSWERED = /PSYNC_[SE]\d{4}|\bHTTP\b|\b[45]\d\d\b|Unauthorized|Forb
  * way.
  */
 export function isConfigurationError(message: string): boolean {
-  return SERVER_ANSWERED.test(message);
+  return SERVER_ANSWERED.test(message) && !TOKEN_EXPIRED.test(message);
 }
 
 /**

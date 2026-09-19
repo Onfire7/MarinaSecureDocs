@@ -177,6 +177,16 @@ Screenshots or it didn't happen.
   is-this-a-refusal test, and left the app advising the user to find signal
   while the console said exactly what was wrong. Read `.message` off the
   object; never narrow on the prototype.
+- **A 401 is never a reason to discard a queued write.** Clerk's `getToken()`
+  returns `null` once a device has been offline past the token's 60-second
+  life. The upload then went out with no identity, Postgres answered
+  `401 / 42501`, the connector read 42501 as "RLS refused this, permanently"
+  and deleted the write, and the next sync erased it from the phone — a night
+  of checklist answers, gone from both ends with one `console.error`. The
+  Postgres code cannot tell "who are you?" from "you may not"; the HTTP status
+  can. `uploadData` now refuses to send without a token and never treats a 401
+  as fatal. The repro that found it: tap offline, swap the token source in
+  `clerkToken.ts` for `async () => null`, go back online.
 - **A `LEFT JOIN` on anything but `id` is a full scan.** PowerSync's local
   tables are views over a JSON blob, so `id` is the only real column — every
   other one is `CAST(json_extract(data, '$.x'))`, and every index you declare
