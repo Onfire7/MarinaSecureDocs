@@ -170,6 +170,7 @@ const boats = new Table(
     model: column.text,
     registration_number: column.text,
     is_resident: column.integer,
+    created_at: column.text,
   },
 );
 
@@ -602,6 +603,7 @@ const leases = new Table(
     variances_and_conditions: column.text,
     is_current: column.integer,
     required_permission: column.text,
+    created_at: column.text,
   },
   {
     indexes: {
@@ -790,6 +792,7 @@ const reservations = new Table(
     deposit: column.real,
     balance: column.real,
     is_current: column.integer,
+    created_at: column.text,
   },
   {
     indexes: {
@@ -1050,6 +1053,7 @@ const vehicles = new Table(
     description: column.text,
     plate_number: column.text,
     is_resident: column.integer,
+    created_at: column.text,
   },
 );
 

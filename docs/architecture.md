@@ -65,7 +65,7 @@ Three scoping shapes, and every entity uses one:
 | Shape | Applies to | Rule |
 |---|---|---|
 | **Always resident** | Locations, checkpoints, tours, location types, checklist templates, incident types, roles, marina settings, users, assets | Marina configuration. Small, changes rarely, needed everywhere. |
-| **Occupancy-scoped** | Contacts, boats, vehicles, leases, reservations | Attached to an active lease or current reservation, **plus a 30-day trailing window** so an incident follow-up on last week's departed guest still works offline. |
+| **Occupancy-scoped** | Contacts, boats, vehicles, leases, reservations | Attached to an active lease or current reservation, **plus a 30-day trailing window** so an incident follow-up on last week's departed guest still works offline. **A row created in the last 30 days is also in scope, whatever its occupancy** — otherwise a contact typed in before their lease exists uploads, falls out of scope, and is deleted from the phone that created it (migration `20260920000100`). |
 | **Age-scoped** | Check-ins, activity log, shifts, checklist instances, incidents, tickets, calls, SMS, chat | A recent window only. Never fully resident. |
 
 > **How this is actually expressed.** Not as a query predicate. A PowerSync

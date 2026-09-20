@@ -21,6 +21,12 @@ insert into contacts (id, name) values
 insert into contact_details (contact_id, phone) values
   ('aaaa0000-0000-4000-8000-000000000001','5550000001');
 
+-- These contacts are long-standing. A contact made in the last 30 days is in
+-- scope whatever its occupancy (065_new_rows_stay_in_scope.sql), so a fixture
+-- created "now" would be resident for that reason and prove nothing here.
+update contacts set created_at = now() - interval '2 years'
+ where id::text like 'aaaa0000-0000-4000-8000-00000000000_';
+
 insert into leases (id, location_id, start_date, end_date) values
   ('aaaa0000-0000-4000-8000-00000000000a','aaaa0000-0000-4000-8000-00000000006b',
    now() - interval '2 years', now() + interval '1 year');
@@ -32,6 +38,11 @@ insert into reservations (id, status, contact_id, location_id, expected_checkin,
    'aaaa0000-0000-4000-8000-00000000006b', now() - interval '10 days', now() - interval '7 days'),
   ('aaaa0000-0000-4000-8000-00000000000c','checked_out','aaaa0000-0000-4000-8000-000000000003',
    'aaaa0000-0000-4000-8000-00000000006b', now() - interval '400 days', now() - interval '395 days');
+
+-- Entered when they happened, not today — a booking typed in today is in
+-- scope for being new, whatever its dates.
+update reservations set created_at = expected_checkin
+ where id in ('aaaa0000-0000-4000-8000-00000000000b','aaaa0000-0000-4000-8000-00000000000c');
 
 insert into check_ins (id, checkpoint_id, user_id, timestamp, method)
 select 'aaaa0000-0000-4000-8000-00000000000d', null,
