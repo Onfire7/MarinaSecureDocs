@@ -122,6 +122,15 @@ lives in `architecture.md`, `permissions.md`, `data-model.md` and
       +228 sections, +118 activity entries, +63 check-ins, +12 shifts, +6
       incidents.
 
+- [ ] **Confirm on the Pixel, on a real shift.** Three fixes are live on
+      `beta2` and verified by driven sessions, but not yet on the phone that
+      found them: checks made in a dead spot survive a long absence (c96f233);
+      beta-written NFC tags open in-app, and scanning starts on open once NFC
+      is allowed (43f0efa); the save indicator reads "N changes saved on this
+      phone" offline and "All changes sent" after (c6a844c). If answers still
+      vanish, or the indicator ever shows red, that is a second cause — the
+      indicator's panel has the reason verbatim.
+
 - [ ] **Decide what the marina's tags point at after cutover.** Every NFC tag
       carries `https://beta.marinasecure.com/checkin/<guid>`. Inside the app
       that no longer matters — the scanner matches on the path, and starts on
