@@ -122,6 +122,14 @@ lives in `architecture.md`, `permissions.md`, `data-model.md` and
       +228 sections, +118 activity entries, +63 check-ins, +12 shifts, +6
       incidents.
 
+- [ ] **Decide what the marina's tags point at after cutover.** Every NFC tag
+      carries `https://beta.marinasecure.com/checkin/<guid>`. Inside the app
+      that no longer matters — the scanner matches on the path, and starts on
+      open once NFC is allowed. But a tag tapped with the app CLOSED is opened
+      by Android at the URL written on it, which is the old InstantDB build.
+      No code on `beta2` can change that. At cutover either `beta.` is
+      repointed at the new app, or the tags are rewritten.
+
 - [ ] **Decide what happens to tickets with no attachment target.** The reload
       dropped exactly one real row — "Door left unlocked: Water Storage Door" —
       because the schema requires a ticket to point at exactly one subject and

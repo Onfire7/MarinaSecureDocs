@@ -112,7 +112,7 @@ export function AppShell() {
           <span>{activeSection?.label ?? "MarinaSecure"}</span>
           <span className="row" style={{ gap: 6 }}>
             <UpdateButton />
-            <NfcScanToggle onScan={setScannedGuid} />
+            <NfcScanToggle onScan={setScannedGuid} autoStart />
           </span>
         </header>
         <main className="main">

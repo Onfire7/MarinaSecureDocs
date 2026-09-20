@@ -73,7 +73,7 @@ permissions, checklist rule resolution, contact merging, shift windows — live 
 | `appUpdate.ts` | Service worker registration and the waiting-worker lifecycle |
 | `pwaInstall.ts` | `beforeinstallprompt` |
 | `theme.ts` | `matchMedia`, `localStorage` |
-| `nfc.ts` | `NDEFReader` (Web NFC) |
+| `nfc.ts` | `NDEFReader` (Web NFC) — the reader and writer only. `checkpointGuidFromUrl` and `nfcPermissionGranted` are pure and covered by `nfc.test.ts`. |
 | `config.ts` | `import.meta.env` — build-time values with no logic beyond a missing-key list |
 
 Each needs jsdom plus hand-written mocks, and what the test would then verify
