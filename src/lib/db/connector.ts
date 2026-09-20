@@ -7,6 +7,7 @@ import {
 import { POWERSYNC_URL } from "../config";
 import { getClerkToken } from "../auth/clerkToken";
 import { setSyncConfigError } from "../auth/syncStatus";
+import { recordRejectedWrite } from "./rejectedWrites";
 import { supabase } from "./supabase";
 
 // The two halves of the connection to the marina's database.
@@ -107,6 +108,14 @@ export class SupabaseConnector implements PowerSyncBackendConnector {
           lastOp,
           error,
         );
+        // Discarding is right; discarding silently is how work vanishes with
+        // nobody the wiser. The save indicator shows this until dismissed.
+        recordRejectedWrite({
+          table: lastOp?.table ?? "unknown",
+          op: lastOp?.op ?? "unknown",
+          code,
+          message: (error as { message?: string } | null)?.message ?? "",
+        });
         await transaction.complete();
         return;
       }

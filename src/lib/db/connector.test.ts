@@ -19,6 +19,10 @@ vi.mock("../auth/clerkToken", () => ({
   getClerkToken: async () => token.value,
 }));
 vi.mock("../auth/syncStatus", () => ({ setSyncConfigError: () => {} }));
+const recorded = vi.hoisted(() => ({ writes: [] as unknown[] }));
+vi.mock("./rejectedWrites", () => ({
+  recordRejectedWrite: (w: unknown) => void recorded.writes.push(w),
+}));
 vi.mock("./supabase", () => ({
   supabase: {
     from: () => {
@@ -57,6 +61,7 @@ describe("SupabaseConnector.uploadData", () => {
     token.value = "jwt";
     reply.value = { error: null, status: 204 };
     calls.update = 0;
+    recorded.writes = [];
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -100,6 +105,23 @@ describe("SupabaseConnector.uploadData", () => {
     const { database, complete } = queueOf(CHECK);
     await new SupabaseConnector().uploadData(database);
     expect(complete).toHaveBeenCalledOnce();
+  });
+
+  it("records a discarded write", async () => {
+    // The discard is right; doing it silently is how work vanishes unnoticed.
+    reply.value = { status: 409, error: { code: "23505", message: "duplicate key" } };
+    const { database } = queueOf(CHECK);
+    await new SupabaseConnector().uploadData(database);
+    expect(recorded.writes).toEqual([
+      { table: "checklist_instance_items", op: "PATCH", code: "23505", message: "duplicate key" },
+    ]);
+  });
+
+  it("records nothing for a write that is merely deferred", async () => {
+    reply.value = { status: 401, error: { code: "42501", message: "permission denied" } };
+    const { database } = queueOf(CHECK);
+    await expect(new SupabaseConnector().uploadData(database)).rejects.toBeTruthy();
+    expect(recorded.writes).toEqual([]);
   });
 
   it("still discards a constraint violation (23505)", async () => {

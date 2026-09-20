@@ -11,6 +11,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { ADMIN_SECTIONS } from "../pages/admin/adminSections";
 import { InstallAppButton } from "./InstallAppButton";
 import { UpdateButton } from "./UpdateButton";
+import { SaveIndicator } from "./SaveIndicator";
 import { NfcScanToggle } from "./NfcScanToggle";
 
 // Responsive shell: persistent left sidenav on desktop, app bar + bottom tab
@@ -93,6 +94,7 @@ export function AppShell() {
             >
               Switch user
             </button>
+            <SaveIndicator />
             <InstallAppButton />
             <UpdateButton />
             <NfcScanToggle onScan={setScannedGuid} />
@@ -111,6 +113,7 @@ export function AppShell() {
         <header className="appbar">
           <span>{activeSection?.label ?? "MarinaSecure"}</span>
           <span className="row" style={{ gap: 6 }}>
+            <SaveIndicator />
             <UpdateButton />
             <NfcScanToggle onScan={setScannedGuid} autoStart />
           </span>

@@ -1600,3 +1600,29 @@ h3 {
 .section-collapse[open] > summary::after {
   content: "▾";
 }
+
+/* Save indicator — src/layout/SaveIndicator.spec.md. Quiet when all is well,
+   so that amber and red mean something on the night they appear. */
+.save-indicator {
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--mute);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.save-indicator.save-amber {
+  color: var(--warn);
+  background: var(--warn-bg);
+  border-color: var(--warn);
+}
+.save-indicator.save-danger {
+  color: var(--bad);
+  background: var(--bad-bg);
+  border-color: var(--bad);
+  font-weight: 600;
+}

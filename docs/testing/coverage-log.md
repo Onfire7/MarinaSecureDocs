@@ -44,6 +44,7 @@ specification for the `effective_permissions` SQL view that replaces it (see
 | `data/settings.ts` | Marina settings and phone lines. |
 | `data/setup.ts` | The Setup Wizard's chunked plan runner. |
 | `data/shifts.ts` | Shifts. |
+| `data/sync.ts` | One `count(*)` on the upload queue, polled. What the indicator SAYS about it is `saveState.ts`, which is covered. |
 | `data/tickets.ts` | Tickets. |
 | `data/users.ts` | Users and roles. |
 
