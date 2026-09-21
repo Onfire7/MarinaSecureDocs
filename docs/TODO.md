@@ -122,6 +122,23 @@ lives in `architecture.md`, `permissions.md`, `data-model.md` and
       +228 sections, +118 activity entries, +63 check-ins, +12 shifts, +6
       incidents.
 
+- [ ] **Backfill what submit failed to create, 10–21 Sep.** While checklist
+      answers were being stored double-encoded, submit could not read them and
+      created nothing from them. The answers are repaired and still carry the
+      work: on submitted checklists, **6 mileage readings and 1 incident**
+      were never written, and the Security Car's recorded mileage is behind
+      by the same amount. Find them with `result ? 'pendingReading'` /
+      `'pendingIncident'` on items of `complete` instances since 2026-09-10.
+      Needs a decision, not just a script: the readings are facts, but an
+      incident raised eleven days late may be noise.
+
+- [ ] **Fix hide-until for a late start.** A section with a reveal time that
+      has already passed when the checklist is created is hidden until
+      TOMORROW — a whole shift. Hit on 19 Sep (shift began 10:33 PM; 7, 8 and
+      9 PM sections hidden all night) and patched by hand in production.
+      Proposed: a reveal that passed within the last 12 hours shows at once.
+      Tests proposed, awaiting a yes.
+
 - [ ] **Confirm on the Pixel, on a real shift.** Three fixes are live on
       `beta2` and verified by driven sessions, but not yet on the phone that
       found them: checks made in a dead spot survive a long absence (c96f233);
