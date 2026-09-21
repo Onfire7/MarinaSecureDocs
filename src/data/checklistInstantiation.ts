@@ -16,6 +16,8 @@ import { stamp } from "../lib/db";
 import {
   eligibleToday,
   resolveDueBy,
+  expectedStartAnchor,
+  hideUntilFromAnchor,
   resolveHideUntil,
   sectionEnabledByStatus,
   type DueByRule,
@@ -59,6 +61,8 @@ export interface InstantiableTemplate {
   /** Absent reads as false: the instance belongs to the role pool. */
   assigned_to_user?: number | null;
   hide_until_rule?: string | null;
+  /** "HH:MM"; see expectedStartAnchor(). */
+  expected_start?: string | null;
   dueBy?: DueByRule | null;
   assigned_role_id?: string | null;
   sections: InstantiableSection[];
@@ -133,9 +137,13 @@ export async function insertSectionInstance(
   instanceId: string,
   section: InstantiableSection,
   now: Date = new Date(),
+  /** The checklist's expected_start_at, when its template has one. */
+  anchor: Date | null = null,
 ): Promise<string> {
   const sid = sectionInstanceId(instanceId, section.id);
-  const hideUntil = resolveHideUntil(section.hide_until_rule, now);
+  const hideUntil = anchor
+    ? hideUntilFromAnchor(section.hide_until_rule, anchor)
+    : resolveHideUntil(section.hide_until_rule, now);
   const dueBy = resolveDueBy(section.dueBy, now);
 
   await insertIfAbsent(tx, "checklist_instance_sections", sid, {
@@ -181,7 +189,13 @@ export async function insertInstance(
 ): Promise<string> {
   const { template, instanceId, userId } = opts;
   const now = opts.now ?? new Date();
-  const hideUntil = resolveHideUntil(template.hide_until_rule, now);
+  // Resolved once, here, and stored: sections added hours from now must date
+  // their reveals from the same evening this checklist belongs to.
+  const anchored = expectedStartAnchor(template.expected_start, now);
+  const anchor = anchored.getTime() === now.getTime() ? null : anchored;
+  const hideUntil = anchor
+    ? hideUntilFromAnchor(template.hide_until_rule, anchor)
+    : resolveHideUntil(template.hide_until_rule, now);
   const dueBy = resolveDueBy(template.dueBy, now);
   const assignToUser = template.assigned_to_user === 1 || !template.assigned_role_id;
 
@@ -190,11 +204,12 @@ export async function insertInstance(
     assigned_to_id: assignToUser ? userId : null,
     status: "not_started",
     hide_until: hideUntil == null ? null : stamp(hideUntil),
+    expected_start_at: anchor ? stamp(anchor.getTime()) : null,
     due_by: dueBy == null ? null : stamp(dueBy),
   });
 
   for (const section of sectionsEligibleAtCreation(template.sections, now)) {
-    await insertSectionInstance(tx, instanceId, section, now);
+    await insertSectionInstance(tx, instanceId, section, now, anchor);
   }
   return instanceId;
 }

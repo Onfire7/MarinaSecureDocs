@@ -183,6 +183,7 @@ once visible, nothing ever re-hides.
 | assigned_role_id | → roles not null | Every template belongs to exactly one role; its members work the instances. |
 | assigned_to_user | boolean not null default false | True: assigned to whoever triggered it. False: unclaimed, for any holder of the role. |
 | hide_until_rule | text | `"HH:MM"`, resolved to `instance.hide_until` at creation. |
+| expected_start | text | `"HH:MM"`, nullable — when this checklist is normally started. It is what gives every `hide_until_rule` in the template (its own and its sections') a **date**: at creation it resolves to `instance.expected_start_at`, the occurrence nearest the creation time (±12h, a tie going to the past), and each hide-until becomes the first occurrence of its clock time at or after that anchor — which may be in the past, meaning "already visible". Without it a hide-until rolls forward from the creation time, which hides a section for a whole shift whenever the checklist is started after the reveal time, and after midnight resolves to the wrong calendar date entirely. Lives on the template, not the shift or the marina's settings, so nothing about who clocked in when can move it. |
 | due_by | jsonb | `{kind:"time",time}` or `{kind:"offset",minutes}`, resolved at creation. |
 | creator_id | → users | |
 
@@ -227,7 +228,7 @@ pointer: the live version is whichever row the section points at.
 #### `checklist_instances` — Tier 0 · sync: **age**
 
 `template_id`, `assigned_to_id → users`, `status` (`not_started` /
-`in_progress` / `complete`), `started_at`, `completed_at`, `hide_until`
+`in_progress` / `complete`), `started_at`, `completed_at`, `hide_until`, `expected_start_at` (the template's `expected_start` resolved once, at creation — stored because sections are added to a live checklist hours later, by which time "the nearest 5 PM" is a different evening)
 (absent or past = visible), `due_by`, `parent_item_id → checklist_instance_items`
 (set only on nested instances spawned by a `location_check` item — the
 checklist list shows instances where this is null, so sub-checklists don't

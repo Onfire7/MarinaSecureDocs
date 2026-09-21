@@ -358,6 +358,7 @@ const checklist_instances = new Table(
     due_by: column.text,
     parent_item_id: column.text,
     is_recent: column.integer,
+    expected_start_at: column.text,
   },
   {
     indexes: {
@@ -416,6 +417,7 @@ const checklist_templates = new Table(
     hide_until_rule: column.text,
     due_by: column.text,
     creator_id: column.text,
+    expected_start: column.text,
   },
   {
     indexes: {

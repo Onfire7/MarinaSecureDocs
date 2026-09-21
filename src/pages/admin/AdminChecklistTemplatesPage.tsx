@@ -120,6 +120,7 @@ export function AdminChecklistTemplatesPage() {
       triggerConfig: templateTriggerConfig(t),
       assignedToUser: t.assigned_to_user === 1,
       hideUntilRule: t.hide_until_rule ?? undefined,
+      expectedStart: t.expected_start ?? undefined,
       dueBy: dueByRule(t) ?? undefined,
       assignedRole: t.assigned_role_id
         ? (roleById.get(t.assigned_role_id) ?? null)
@@ -290,6 +291,7 @@ type TemplateRow = {
   triggerConfig?: TriggerConfig;
   assignedToUser?: boolean;
   hideUntilRule?: string;
+  expectedStart?: string;
   dueBy?: DueByRule;
   assignedRole?: { id: string; name: string } | null;
   viewerRoles?: { id: string; name: string }[];
@@ -970,6 +972,10 @@ function TemplateCard({
                 onDueBy={(dueBy) => update({ dueBy: dueBy ?? null })}
                 level="template"
                 triggerType={template.triggerType}
+                expectedStart={template.expectedStart}
+                onExpectedStart={(expectedStart) =>
+                  update({ expectedStart: expectedStart || null })
+                }
               />
               </>
               )}
@@ -992,6 +998,7 @@ function TemplateCard({
                 renderItem={(section) => (
                   <SectionEditor
                     section={section}
+                    expectedStart={template.expectedStart}
                     defaultOpen={section.id === openedSectionId}
                     locations={locations}
                     allCheckpoints={allCheckpoints}
@@ -1056,12 +1063,15 @@ function TemplateCard({
 
 function SectionEditor({
   section,
+  expectedStart,
   defaultOpen = false,
   locations,
   allCheckpoints,
   allAssets,
 }: {
   section: SectionRow & { items: TemplateItemRow[] };
+  /** The parent template's — it is what dates this section's hide-until. */
+  expectedStart?: string;
   /** Just created — mount expanded rather than making you open it again. */
   defaultOpen?: boolean;
   locations: {
@@ -1474,6 +1484,7 @@ function SectionEditor({
             onDueBy={(dueBy) => update({ dueBy: dueBy ?? null })}
             level="section"
             triggerType={section.triggerType}
+            expectedStart={expectedStart}
           />
 
           <div className="field-inline">
@@ -1698,6 +1709,8 @@ function RuleFields({
   onDueBy,
   level,
   triggerType,
+  expectedStart,
+  onExpectedStart,
 }: {
   hideUntilRule: string | undefined;
   dueBy: DueByRule | undefined;
@@ -1707,14 +1720,48 @@ function RuleFields({
   level: "template" | "section";
   /** What creates this row, which decides whether a hide-until is safe. */
   triggerType: string;
+  /** The TEMPLATE's expected start — it dates every hide-until beneath it. */
+  expectedStart: string | undefined;
+  /** Present at template level only: that is where the value lives. */
+  onExpectedStart?: (time: string) => void;
 }) {
   const kind = dueBy?.kind ?? "";
   // Only worth saying once the rule exists — an empty field hides nothing.
   const hideWarning = hideUntilRule
-    ? hideUntilWarning(level, triggerType)
+    ? hideUntilWarning(level, triggerType, expectedStart)
     : undefined;
   return (
     <>
+      {onExpectedStart && (
+        <>
+          <div className="field-inline">
+            <span className="field-label">Normally started at</span>
+            <div className="row field-control">
+              <DraftInput
+                type="time"
+                className="input select-inline"
+                aria-label="Time this checklist is normally started"
+                value={expectedStart ?? ""}
+                onCommit={onExpectedStart}
+              />
+              {expectedStart && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-quiet"
+                  onClick={() => onExpectedStart("")}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="muted small" style={{ marginTop: -2, marginBottom: 8 }}>
+            Every “Hide until” in this checklist counts from here — so a
+            checklist started late, even after midnight, still shows what
+            should already be showing.
+          </p>
+        </>
+      )}
       <div className="field-inline">
         <span className="field-label">Hide until</span>
         <div className="row field-control">

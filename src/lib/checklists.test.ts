@@ -4,6 +4,9 @@ import {
   isVisibleNow,
   recurrenceMatchesDay,
   resolveDueBy,
+  expectedStartAnchor,
+  hideUntilFromAnchor,
+  hideUntilWarning,
   resolveHideUntil,
   sectionCompletionTime,
   sectionEnabledByStatus,
@@ -157,5 +160,152 @@ describe("sectionCompletionTime", () => {
         { completed_at: new Date(later).toISOString() },
       ]),
     ).toBe(later);
+  });
+});
+
+// ── Expected start ─────────────────────────────────────────────────────────
+//
+// A hide-until is a clock time, and a clock time needs a date. The date used
+// to come from the moment the checklist was created, rolling FORWARD to the
+// next occurrence — which is only right if the checklist is created before
+// every reveal inside it. A guard who clocked in at 10:33 PM had the 7, 8 and
+// 9 PM sections hidden until the following evening. One who starts after
+// midnight has it differently and no better: 8 PM resolves to later that same
+// calendar date, nineteen hours away, when the right answer is 8 PM on the
+// PREVIOUS date — a moment the old code could not produce, because it never
+// looked back.
+//
+// All dates here are built in local time, as the code computes them, so these
+// hold in any timezone.
+const at = (d: number, h: number, m = 0, month = 8) => new Date(2026, month, d, h, m, 0, 0);
+
+describe("expectedStartAnchor", () => {
+  it("anchors on the nearest occurrence of the expected start", () => {
+    expect(expectedStartAnchor("17:00", at(19, 22, 33))).toEqual(at(19, 17)); // late
+    expect(expectedStartAnchor("17:00", at(19, 16, 50))).toEqual(at(19, 17)); // early
+    expect(expectedStartAnchor("17:00", at(19, 17, 0))).toEqual(at(19, 17)); // on time
+  });
+
+  it("created after midnight, the anchor is the previous evening", () => {
+    expect(expectedStartAnchor("17:00", at(20, 0, 30))).toEqual(at(19, 17));
+    expect(expectedStartAnchor("17:00", at(20, 4, 59))).toEqual(at(19, 17));
+  });
+
+  it("an exact 12-hour tie resolves to the past", () => {
+    expect(expectedStartAnchor("17:00", at(20, 5, 0))).toEqual(at(19, 17));
+    expect(expectedStartAnchor("17:00", at(20, 5, 1))).toEqual(at(20, 17));
+  });
+
+  it("with no expected start, the anchor is the creation time", () => {
+    expect(expectedStartAnchor(null, at(19, 22, 33))).toEqual(at(19, 22, 33));
+    expect(expectedStartAnchor("  ", at(19, 22, 33))).toEqual(at(19, 22, 33));
+  });
+
+  it("a malformed expected start is ignored, not fatal", () => {
+    expect(expectedStartAnchor("five-ish", at(19, 22, 33))).toEqual(at(19, 22, 33));
+    expect(expectedStartAnchor("25:00", at(19, 22, 33))).toEqual(at(19, 22, 33));
+  });
+
+  it("holds across a month boundary", () => {
+    expect(expectedStartAnchor("17:00", at(1, 0, 30, 9))).toEqual(at(30, 17, 0, 8));
+  });
+});
+
+describe("resolveHideUntil with an expected start", () => {
+  const reveal = (rule: string, created: Date, expected: string | null = "17:00") =>
+    new Date(resolveHideUntil(rule, created, expected)!);
+
+  it("a reveal that already passed since the expected start shows at once", () => {
+    // 19 September, as it happened.
+    const created = at(19, 22, 33);
+    for (const rule of ["19:00", "20:00", "21:00"]) {
+      expect(reveal(rule, created).getTime()).toBeLessThan(created.getTime());
+    }
+    expect(reveal("20:00", created)).toEqual(at(19, 20));
+  });
+
+  it("a reveal still ahead hides until then", () => {
+    expect(reveal("20:00", at(19, 17, 10))).toEqual(at(19, 20));
+    expect(reveal("20:00", at(19, 16, 50))).toEqual(at(19, 20)); // started early
+  });
+
+  it("created after midnight, an evening reveal is already past", () => {
+    const created = at(20, 0, 30);
+    expect(reveal("20:00", created)).toEqual(at(19, 20)); // YESTERDAY's date
+    expect(reveal("20:00", created).getTime()).toBeLessThan(created.getTime());
+  });
+
+  it("created after midnight, a small-hours reveal is still ahead", () => {
+    expect(reveal("02:00", at(20, 0, 30))).toEqual(at(20, 2));
+  });
+
+  it("created after midnight, a reveal earlier in the small hours has passed", () => {
+    const created = at(20, 3, 0);
+    expect(reveal("02:00", created)).toEqual(at(20, 2));
+    expect(reveal("02:00", created).getTime()).toBeLessThan(created.getTime());
+  });
+
+  it("a reveal earlier in the day than the expected start means the next day", () => {
+    expect(reveal("02:00", at(19, 17, 10))).toEqual(at(20, 2));
+  });
+
+  it("a reveal at the expected start itself is not pushed a day out", () => {
+    expect(reveal("17:00", at(19, 17, 5))).toEqual(at(19, 17));
+  });
+
+  it("a reveal never lands more than 24 hours from the anchor", () => {
+    // Every hour of creation, every hour of rule: nothing is ever hidden for
+    // more than a day past the expected start, and nothing resolves before it.
+    for (let h = 0; h < 24; h++) {
+      const created = at(19, h, 15);
+      const anchor = expectedStartAnchor("17:00", created).getTime();
+      for (let r = 0; r < 24; r++) {
+        const t = reveal(`${String(r).padStart(2, "0")}:00`, created).getTime();
+        expect(t).toBeGreaterThanOrEqual(anchor);
+        expect(t - anchor).toBeLessThan(24 * 3_600_000);
+      }
+    }
+  });
+
+  it("holds across a DST change", () => {
+    // US clocks fall back on 1 Nov 2026. Where the zone has no such change the
+    // same assertions hold trivially.
+    const created = new Date(2026, 10, 1, 0, 30);
+    expect(reveal("20:00", created)).toEqual(new Date(2026, 9, 31, 20, 0));
+    expect(reveal("03:00", created)).toEqual(new Date(2026, 10, 1, 3, 0));
+  });
+
+  it("with no expected start, behaves exactly as before", () => {
+    expect(reveal("20:00", at(19, 22, 33), null)).toEqual(at(20, 20));
+    expect(new Date(resolveHideUntil("20:00", at(19, 22, 33))!)).toEqual(at(20, 20));
+  });
+
+  it("the late-start warning clears once an expected start is set", () => {
+    expect(hideUntilWarning("template", "manual")).toBeTruthy();
+    expect(hideUntilWarning("template", "manual", "17:00")).toBeUndefined();
+    expect(hideUntilWarning("section", "checkpoint", "17:00")).toBeUndefined();
+    // Clock-in was assumed always punctual, and had no warning. It wasn't.
+    expect(hideUntilWarning("template", "clock_in")).toBeTruthy();
+    expect(hideUntilWarning("template", "clock_in", "17:00")).toBeUndefined();
+  });
+});
+
+describe("hideUntilFromAnchor", () => {
+  it("a section added long after the checklist began keeps the checklist's anchor", () => {
+    // A checkpoint scanned at 6 AM adds its section to a checklist due at 5 PM
+    // the evening before. Six in the morning is NEARER to tonight's 5 PM than
+    // to last night's, so re-deriving the anchor at scan time would hide an
+    // 8 PM section for another fourteen hours. The anchor is resolved once,
+    // when the checklist is created, and stored on it.
+    const anchor = at(19, 17);
+    const scannedAt = at(20, 6);
+    expect(expectedStartAnchor("17:00", scannedAt)).toEqual(at(20, 17)); // the trap
+    expect(new Date(hideUntilFromAnchor("20:00", anchor)!)).toEqual(at(19, 20));
+    expect(hideUntilFromAnchor("20:00", anchor)!).toBeLessThan(scannedAt.getTime());
+  });
+
+  it("treats blank and malformed rules as visible", () => {
+    expect(hideUntilFromAnchor(null, at(19, 17))).toBeNull();
+    expect(hideUntilFromAnchor("soon", at(19, 17))).toBeNull();
   });
 });

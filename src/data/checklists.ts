@@ -43,6 +43,8 @@ export interface TemplateRow {
   assigned_role_id: string | null;
   assigned_to_user: number;
   hide_until_rule: string | null;
+  /** "HH:MM" — when this checklist is normally started. Dates every hide-until in it. */
+  expected_start: string | null;
   due_by: string | null;
   creator_id: string | null;
   assigned_role_name: string | null;
@@ -596,6 +598,7 @@ export interface TemplateInput {
   assignedRoleId?: string | null;
   assignedToUser?: boolean;
   hideUntilRule?: string | null;
+  expectedStart?: string | null;
   dueBy?: DueByRule | null;
   creatorId?: string | null;
 }
@@ -610,6 +613,7 @@ function templateColumns(input: Partial<TemplateInput>) {
     assigned_to_user:
       input.assignedToUser === undefined ? undefined : input.assignedToUser ? 1 : 0,
     hide_until_rule: input.hideUntilRule === undefined ? undefined : input.hideUntilRule,
+    expected_start: input.expectedStart === undefined ? undefined : input.expectedStart,
     due_by: input.dueBy === undefined ? undefined : JSON.stringify(input.dueBy),
     creator_id: input.creatorId === undefined ? undefined : input.creatorId,
   };
@@ -684,6 +688,7 @@ export async function duplicateTemplate(
       assigned_role_id: source.assigned_role_id,
       assigned_to_user: source.assigned_to_user,
       hide_until_rule: source.hide_until_rule,
+      expected_start: source.expected_start,
       due_by: source.due_by,
       creator_id: source.creator_id,
     });
@@ -991,6 +996,7 @@ function assembleTemplate(
     triggerConfig: templateTriggerConfig(t),
     assigned_to_user: t.assigned_to_user,
     hide_until_rule: t.hide_until_rule,
+    expected_start: t.expected_start,
     dueBy: dueByRule(t),
     assigned_role_id: t.assigned_role_id,
     sections: sections
@@ -1086,5 +1092,14 @@ export function addSectionToInstance(
   section: InstantiableSection,
   now?: Date,
 ): Promise<string> {
-  return transact((tx) => insertSectionInstance(tx, instanceId, section, now));
+  return transact(async (tx) => {
+    // The checklist's own anchor, resolved when it was created. Re-deriving it
+    // now would be wrong: hours into a shift, "the nearest 5 PM" is tonight's.
+    const instance = await tx.getOptional<{ expected_start_at: string | null }>(
+      "SELECT expected_start_at FROM checklist_instances WHERE id = ?",
+      [instanceId],
+    );
+    const anchor = instance?.expected_start_at ? new Date(instance.expected_start_at) : null;
+    return insertSectionInstance(tx, instanceId, section, now, anchor);
+  });
 }

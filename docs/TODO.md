@@ -132,12 +132,10 @@ lives in `architecture.md`, `permissions.md`, `data-model.md` and
       Needs a decision, not just a script: the readings are facts, but an
       incident raised eleven days late may be noise.
 
-- [ ] **Fix hide-until for a late start.** A section with a reveal time that
-      has already passed when the checklist is created is hidden until
-      TOMORROW — a whole shift. Hit on 19 Sep (shift began 10:33 PM; 7, 8 and
-      9 PM sections hidden all night) and patched by hand in production.
-      Proposed: a reveal that passed within the last 12 hours shows at once.
-      Tests proposed, awaiting a yes.
+- [ ] **Set "Normally started at" on the Security Checklist.** Admin →
+      Checklist Templates → expand settings → 5:00 PM. The late-start fix is
+      live but does nothing until a template says when it is due: with the
+      field empty, hide-until behaves exactly as before. One field, one time.
 
 - [ ] **Confirm on the Pixel, on a real shift.** Three fixes are live on
       `beta2` and verified by driven sessions, but not yet on the phone that
