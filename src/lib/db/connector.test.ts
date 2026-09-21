@@ -19,6 +19,10 @@ vi.mock("../auth/clerkToken", () => ({
   getClerkToken: async () => token.value,
 }));
 vi.mock("../auth/syncStatus", () => ({ setSyncConfigError: () => {} }));
+const sent = vi.hoisted(() => ({ rows: [] as unknown[] }));
+vi.mock("./schema", () => ({
+  STRUCTURED_COLUMNS: { checklist_instance_items: ["result"] },
+}));
 const recorded = vi.hoisted(() => ({ writes: [] as unknown[] }));
 vi.mock("./rejectedWrites", () => ({
   recordRejectedWrite: (w: unknown) => void recorded.writes.push(w),
@@ -32,7 +36,10 @@ vi.mock("./supabase", () => ({
       };
       return {
         upsert: send,
-        update: () => ({ eq: send }),
+        update: (row: unknown) => {
+          sent.rows.push(row);
+          return { eq: send };
+        },
         delete: () => ({ eq: send }),
       };
     },
@@ -62,6 +69,7 @@ describe("SupabaseConnector.uploadData", () => {
     reply.value = { error: null, status: 204 };
     calls.update = 0;
     recorded.writes = [];
+    sent.rows = [];
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -69,6 +77,15 @@ describe("SupabaseConnector.uploadData", () => {
     const { database, complete } = queueOf(CHECK);
     await new SupabaseConnector().uploadData(database);
     expect(complete).toHaveBeenCalledOnce();
+  });
+
+  it("sends a checklist answer as an object, not as text", async () => {
+    // As text, Postgres stored a JSON string in the jsonb column, and the
+    // answer stopped being an object the moment it synced back.
+    const answer = { type: "meter_reading", value: 123057 };
+    const { database } = queueOf({ ...CHECK, opData: { result: JSON.stringify(answer) } });
+    await new SupabaseConnector().uploadData(database);
+    expect(sent.rows).toEqual([{ result: answer }]);
   });
 
   it("doesn't send a write when there is no Clerk token", async () => {

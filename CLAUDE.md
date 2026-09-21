@@ -168,7 +168,9 @@ Screenshots or it didn't happen.
   fine. It's drift that kills, not allocation.
 - **Don't trust a React error number second-hand.** #185 is "Maximum update
   depth exceeded"; #310 is the Rules-of-Hooks one. Get the real message —
-  that's what `DEBUG_BUILD` in `vite.config.ts` is for — before theorizing.
+  build with `REACT_DEV_BUILD=1` (see `vite.config.ts`) — before theorizing.
+  That switch is OFF by default and must never reach a marina: left on, it
+  made every checklist tap take ~750ms instead of ~105ms.
 - **A sync error is not an `Error`.** PowerSync raises them inside a Web
   Worker, so they reach the main thread by structured clone: `name`, `message`
   and `stack` survive, the prototype does not. `err instanceof Error` is false
@@ -177,6 +179,18 @@ Screenshots or it didn't happen.
   is-this-a-refusal test, and left the app advising the user to find signal
   while the console said exactly what was wrong. Read `.message` off the
   object; never narrow on the prototype.
+- **jsonb and array columns must be uploaded as objects, not text.** They are
+  TEXT in the device's SQLite, so the data layer `JSON.stringify()`s them —
+  and sent up like that, a jsonb column stores a JSON *string*
+  (`"{\"type\":…}"`) and an array column refuses the write. Nothing fails:
+  the device keeps its own good copy until the row syncs back, and only then
+  does an answer stop being an object. It showed as "Recorded undefined" on a
+  mileage card; what it had actually broken was checklist submit, which reads
+  answers to decide what else to create, so meter readings, incidents and
+  tickets silently stopped being written for eleven days. The connector now
+  reshapes every write through `uploadShape.ts` using `STRUCTURED_COLUMNS`,
+  generated from Postgres into `schema.ts`. To find damage:
+  `where jsonb_typeof(col) = 'string'`.
 - **A 401 is never a reason to discard a queued write.** Clerk's `getToken()`
   returns `null` once a device has been offline past the token's 60-second
   life. The upload then went out with no identity, Postgres answered

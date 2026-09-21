@@ -1192,3 +1192,21 @@ export const TABLE_NAMES = [
   "vehicle_owners",
   "vehicles",
 ] as const;
+
+/**
+ * Columns that are jsonb or an array in Postgres and therefore TEXT here.
+ * The upload connector parses these back into objects before sending them —
+ * sent as text, a jsonb column stores a JSON *string* and an array column
+ * refuses the write. See src/lib/db/uploadShape.ts.
+ */
+export const STRUCTURED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
+  checklist_instance_items: ["result"],
+  checklist_template_items: ["config"],
+  checklist_template_sections: ["trigger_config", "due_by"],
+  checklist_templates: ["trigger_config", "due_by"],
+  location_map_placements: ["placement"],
+  marina_settings: ["shift_report_recipients"],
+  phone_lines: ["routing"],
+  roles: ["allow", "deny"],
+  users: ["dashboard_layout"],
+};

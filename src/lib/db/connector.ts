@@ -8,7 +8,9 @@ import { POWERSYNC_URL } from "../config";
 import { getClerkToken } from "../auth/clerkToken";
 import { setSyncConfigError } from "../auth/syncStatus";
 import { recordRejectedWrite } from "./rejectedWrites";
+import { STRUCTURED_COLUMNS } from "./schema";
 import { supabase } from "./supabase";
+import { toUploadRow } from "./uploadShape";
 
 // The two halves of the connection to the marina's database.
 //
@@ -78,6 +80,9 @@ export class SupabaseConnector implements PowerSyncBackendConnector {
       for (const op of transaction.crud) {
         lastOp = { op: op.op, table: op.table, id: op.id };
         const table = supabase.from(op.table);
+        // jsonb and array columns are text on the device and must not be
+        // uploaded as text — see uploadShape.ts.
+        const data = toUploadRow(op.table, op.opData, STRUCTURED_COLUMNS);
 
         switch (op.op) {
           case UpdateType.PUT:
@@ -85,10 +90,10 @@ export class SupabaseConnector implements PowerSyncBackendConnector {
             // start after a failed drain, so the same insert can arrive twice
             // after a flaky reconnect. The id is client-generated, so the
             // second one is the same row.
-            await throwOnError(table.upsert({ ...op.opData, id: op.id }));
+            await throwOnError(table.upsert({ ...data, id: op.id }));
             break;
           case UpdateType.PATCH:
-            await throwOnError(table.update(op.opData!).eq("id", op.id));
+            await throwOnError(table.update(data).eq("id", op.id));
             break;
           case UpdateType.DELETE:
             await throwOnError(table.delete().eq("id", op.id));

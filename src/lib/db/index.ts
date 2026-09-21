@@ -95,12 +95,4 @@ export function jsonArray(value: string | null | undefined): string[] {
   }
 }
 
-/** A jsonb column, which arrives as text, as its parsed value. */
-export function json<T>(value: string | null | undefined, fallback: T): T {
-  if (!value) return fallback;
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
-  }
-}
+export { json } from "./json";

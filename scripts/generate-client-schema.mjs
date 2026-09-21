@@ -111,6 +111,16 @@ for (const row of [...fks, ...uniques]) {
 
 const tableNames = [...byTable.keys()].sort();
 
+// jsonb and arrays: TEXT on the device, structured in Postgres.
+const structured = new Map();
+for (const row of columns) {
+  if (row.kind === "array" || row.pg_type === "jsonb" || row.pg_type === "json") {
+    if (!structured.has(row.table_name)) structured.set(row.table_name, []);
+    structured.get(row.table_name).push(row.column_name);
+  }
+}
+const structuredTables = [...structured.keys()].sort();
+
 const parts = [];
 parts.push(`// GENERATED FILE — do not edit.
 //
@@ -159,6 +169,16 @@ export type Database = (typeof AppSchema)["types"];
 export const TABLE_NAMES = [
 ${tableNames.map((n) => `  "${n}",`).join("\n")}
 ] as const;
+
+/**
+ * Columns that are jsonb or an array in Postgres and therefore TEXT here.
+ * The upload connector parses these back into objects before sending them —
+ * sent as text, a jsonb column stores a JSON *string* and an array column
+ * refuses the write. See src/lib/db/uploadShape.ts.
+ */
+export const STRUCTURED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
+${structuredTables.map((t) => `  ${t}: [${structured.get(t).map((c) => `"${c}"`).join(", ")}],`).join("\n")}
+};
 `);
 
 const generated = parts.join("\n");
