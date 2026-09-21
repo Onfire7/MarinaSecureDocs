@@ -113,20 +113,30 @@ export function useCurrentUser(): CurrentUser {
     [permissionRows],
   );
 
-  const neverSynced = signedIn && !hasSynced;
+  // Only these two booleans are read from PowerSync's status, and only they
+  // may be dependencies below. The status OBJECT changes a dozen or more times
+  // in every upload-and-sync cycle — uploading, downloading, progress,
+  // lastSyncedAt — and this hook's result is the app-wide context value.
+  // Returned as a fresh object per status change, it re-rendered every
+  // useCurrent() caller each time: on a checklist that is every item on the
+  // page, ~100ms a pass on a phone, twenty passes per tap. A guard's tap took
+  // most of a second to register, and the list shifted under the next one.
+  const connected = status.connected;
 
-  return {
-    user,
-    // Note the asymmetry with `needsFirstSync`: a device that has never synced
-    // and has no connection is not loading, it is stuck, and saying so is the
-    // difference between a spinner that ends and one that does not.
-    isLoading:
-      !isLoaded || (signedIn && (usersLoading || (neverSynced && status.connected))),
-    unprovisioned: signedIn && hasSynced && !usersLoading && !user,
-    needsFirstSync: neverSynced && !status.connected,
-    permissions,
-    can: (p) => permissions.has(p),
-    isAdmin: [...permissions].some((p) => p.startsWith("manage_")),
-    roleNames: roleRows.map((r) => r.name),
-  };
+  return useMemo<CurrentUser>(() => {
+    const neverSynced = signedIn && !hasSynced;
+    return {
+      user,
+      // Note the asymmetry with `needsFirstSync`: a device that has never
+      // synced and has no connection is not loading, it is stuck, and saying
+      // so is the difference between a spinner that ends and one that does not.
+      isLoading: !isLoaded || (signedIn && (usersLoading || (neverSynced && connected))),
+      unprovisioned: signedIn && hasSynced && !usersLoading && !user,
+      needsFirstSync: neverSynced && !connected,
+      permissions,
+      can: (p) => permissions.has(p),
+      isAdmin: [...permissions].some((p) => p.startsWith("manage_")),
+      roleNames: roleRows.map((r) => r.name),
+    };
+  }, [user, isLoaded, signedIn, usersLoading, hasSynced, connected, permissions, roleRows]);
 }

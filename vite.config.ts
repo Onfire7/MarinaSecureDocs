@@ -9,19 +9,25 @@ import { VitePWA } from 'vite-plugin-pwa'
  * production bundle emits. React picks its build off `process.env.NODE_ENV`,
  * which Vite otherwise hardcodes to "production" for any `vite build`.
  *
- * This is deliberately ON for the beta deployment, which is this project's
- * debugging environment — the tradeoff is a noticeably larger, slower bundle,
- * and every other library that branches on NODE_ENV (Clerk, InstantDB) takes
- * its dev path too. Set REACT_DEV_BUILD=0 to build a real production bundle;
- * flip DEBUG_BUILD's default to false once the check-in error is pinned down.
+ * OFF by default, and it must stay that way for anything a guard uses. It was
+ * ON for every deploy for months — left over from chasing one check-in error —
+ * and the cost turned out to be far more than "noticeably slower": the dev
+ * build captures a stack for every element it creates, so re-rendering a
+ * 74-item checklist took ~750ms on a phone against ~105ms in production. A
+ * tap took most of a second to register and the list moved under the next
+ * one. The bundle was also 3.15MB instead of 1.17MB.
+ *
+ * To debug a minified React error, build with REACT_DEV_BUILD=1, deploy that
+ * somewhere that is not the marina's working app, read the message, and turn
+ * it off again.
  */
-const DEBUG_BUILD = process.env.REACT_DEV_BUILD !== '0'
+const DEBUG_BUILD = process.env.REACT_DEV_BUILD === '1'
 
 if (DEBUG_BUILD) {
   console.warn(
     '\n[vite] DEBUG BUILD: bundling React\'s development build, unminified.\n' +
       '       Bigger and slower on purpose — see vite.config.ts.\n' +
-      '       Build with REACT_DEV_BUILD=0 for a production bundle.\n',
+      '       Never deploy this to a marina — unset REACT_DEV_BUILD.\n',
   )
 }
 
