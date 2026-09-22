@@ -41,12 +41,12 @@ Verify each task against the deployment before moving on.
 
 The code is on `beta2`; the remote still needs, in this order:
 
-- [ ] **Push the migrations** (`supabase db push`), then `pnpm run schema:check`
-      against the remote to confirm `schema.ts` matches.
-- [ ] **Re-apply the PowerSync sync rules** — `powersync/config/sync-config.yaml`
-      gained the services, amenities and audit tables and an `audits` stream.
-      A dashboard field: `scripts/finish-powersync-cutover.sh`'s sync-rules
-      stage covers it.
+- [x] **Push the migrations** — done 2026-09-22. `schema:check` cannot reach
+      the remote from here (IPv6-only host); table count matched via
+      `supabase db query --linked`.
+- [x] **Re-apply the PowerSync sync rules** — done 2026-09-22 with the CLI;
+      the command is in `powersync/README.md` and stage 5 of the cutover
+      script.
 - [ ] **Grant `manage_audits`** to whichever role launches audits (Admin, at
       least), in Roles & Permissions. No seeded role holds it; without it the
       Audits section shows only assigned targets and Admin hides the

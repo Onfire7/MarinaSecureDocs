@@ -52,9 +52,26 @@ slot that no longer means anything.
 - **`default` must be declared** in the `networks:` block once any other
   network is present, or compose fails with `missing networks: default`.
 
+## Deploying the rules to the cloud instance
+
+The cloud instance keeps its own copy of `sync-config.yaml`; nothing here
+pushes it. The PowerSync CLI does, from a folder that holds **only** the sync
+config — it refuses `config/` because `service.yaml` there is
+`_type: self-hosted`:
+
+```
+npx powersync@0.10.1 login                     # once per machine
+mkdir -p /tmp/ps-cloud && cp powersync/config/sync-config.yaml /tmp/ps-cloud/
+npx powersync@0.10.1 validate --instance-id <id> --directory /tmp/ps-cloud --validate-only sync-config
+npx powersync@0.10.1 deploy sync-config --instance-id <id> --directory /tmp/ps-cloud
+```
+
+`<id>` is the first label of `VITE_POWERSYNC_URL`. Deploy validates, then
+waits for the instance to report healthy. Devices re-download their buckets
+on next connect.
+
 ## Sync rules status
 
-Only the **always resident** tier is implemented — marina configuration. The
-occupancy and age tiers described in
-[docs/architecture.md](../docs/architecture.md) are the next task, and are the
-ones with real design in them.
+All three tiers in [docs/architecture.md](../docs/architecture.md) — always,
+occupancy, age — plus the `audits` stream (in scope while open or closed and
+30 days after finalize).
