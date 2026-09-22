@@ -122,15 +122,11 @@ lives in `architecture.md`, `permissions.md`, `data-model.md` and
       +228 sections, +118 activity entries, +63 check-ins, +12 shifts, +6
       incidents.
 
-- [ ] **Backfill what submit failed to create, 10–21 Sep.** While checklist
-      answers were being stored double-encoded, submit could not read them and
-      created nothing from them. The answers are repaired and still carry the
-      work: on submitted checklists, **6 mileage readings and 1 incident**
-      were never written, and the Security Car's recorded mileage is behind
-      by the same amount. Find them with `result ? 'pendingReading'` /
-      `'pendingIncident'` on items of `complete` instances since 2026-09-10.
-      Needs a decision, not just a script: the readings are facts, but an
-      incident raised eleven days late may be noise.
+- [x] **Backfill what submit failed to create, 10–21 Sep.** Done 2026-09-21
+      on the owner's instruction: 6 mileage readings inserted, the Security
+      Car's recorded mileage moved to 123,057, and the one missing incident
+      (Water Storage Door, 17 Sep) created. Ids came from the phones' own
+      pending records, so a re-run cannot duplicate anything.
 
 - [ ] **Set "Normally started at" on the Security Checklist.** Admin →
       Checklist Templates → expand settings → 5:00 PM. The late-start fix is
