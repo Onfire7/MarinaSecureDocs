@@ -1755,11 +1755,6 @@ function RuleFields({
               )}
             </div>
           </div>
-          <p className="muted small" style={{ marginTop: -2, marginBottom: 8 }}>
-            Every “Hide until” in this checklist counts from here — so a
-            checklist started late, even after midnight, still shows what
-            should already be showing.
-          </p>
         </>
       )}
       <div className="field-inline">
