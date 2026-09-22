@@ -17,9 +17,20 @@ Verify each task against the deployment before moving on.
       and nothing else. Retiring beta is a decision about the marina's daily
       use, not a deployment step.
 
-- [ ] **Push `main`.** `beta` has been merged in cleanly (no conflicts; the
-      trees are identical). The merge commit is local and unpushed —
-      `git push origin main` moves the repo's default branch.
+- [ ] **Archive `beta`.** The InstantDB build's deployed tip is tagged
+      `archive/beta` (pushed 2026-09-22), so the branch can go whenever the
+      site does. In order, once beta.marinasecure.com is retired:
+      1. Repoint or accept the NFC tags — they carry `beta.marinasecure.com`
+         URLs and open the old site when the app is closed.
+      2. Delete or disable the `marinasecure` Netlify site, or change its
+         production branch; otherwise deleting the branch breaks its build.
+      3. `git push origin --delete beta` and `git branch -D beta`. The local
+         branch is 16 commits past the tag; all of them are in `beta2`.
+      4. Remove the `beta` half of the two-site explanation in
+         `netlify.toml` and the "Work on `beta2`" note in `CLAUDE.md`.
+- [x] **Push `main`.** Done 2026-09-22: `beta2` merged with `--no-ff`, no
+      conflicts, tree identical to `beta2`. `main` and `beta2` now hold the
+      rewrite; `marinasecure2` still deploys from `beta2`.
 - [ ] **Turn off GitHub Pages.** Repo settings. The docs are Markdown now;
       Pages would serve them as raw files.
 - [ ] **Rotate `CLERK_SECRET_KEY`.** `.env.local` records that it was exposed
