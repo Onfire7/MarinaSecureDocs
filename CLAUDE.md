@@ -145,6 +145,15 @@ Screenshots or it didn't happen.
 
 ## Learnings — read before debugging anything
 
+- **What a migration may drop.** Owner's decision, 2026-09-22. Two kinds of
+  data come out of InstantDB. *User-submitted, time-based* rows — tickets,
+  check-ins, incidents, shifts, checklist answers — are test data: if a row
+  does not conform to the new schema, drop it and say so. *Structural* rows —
+  locations, checkpoints, checklist templates, roles, settings — are preserved
+  where reasonable, and may be dropped only when re-creating them is easier
+  than migrating them. So a constraint is never relaxed to admit bad test
+  data (the unattached-ticket case), and the loader's "dropped N rows the new
+  schema rejects" report is the correct behaviour, not a bug to fix.
 - **Silent failures are the house specialty.** Three multi-hour spirals came
   from swallowed errors: a render throw unmounting the tree (blank page),
   `signInWithIdToken` failures logged as `console.warn` and surfaced as a

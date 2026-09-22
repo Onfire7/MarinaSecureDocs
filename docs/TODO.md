@@ -143,14 +143,13 @@ lives in `architecture.md`, `permissions.md`, `data-model.md` and
       only matters with the app closed. Owner's decision 2026-09-22: leave it.
       Revisit only if `beta.` is ever retired without being repointed.
 
-- [ ] **Decide what happens to tickets with no attachment target.** The reload
-      dropped exactly one real row — "Door left unlocked: Water Storage Door" —
-      because the schema requires a ticket to point at exactly one subject and
-      that one points at none. The loader reported it rather than failing,
-      which is right for a seed and wrong for a cutover: at real cutover this
-      is silent data loss unless it is either fixed in InstantDB first or the
-      constraint is relaxed. One row today, but it is a class, not an incident.
-      *Owner asked to be reminded of this one (2026-09-22).*
+- [x] **Decide what happens to tickets with no attachment target.** Decided
+      2026-09-22: drop them. The constraint stays. See "What a migration may
+      drop" in CLAUDE.md — user-submitted, time-based rows in InstantDB
+      (tickets, check-ins, incidents, shifts…) are test data and may be
+      dropped when they don't conform; structural data (locations, checklist
+      templates, roles, settings) is preserved where reasonable. The loader
+      already reports every dropped row, which is the right behaviour.
 
 - [x] **Rotate the Supabase `postgres` password.** Done 2026-09-22. If the
       old one is still in `.env.local` as `SUPABASE_DB_PASSWORD`, the seed and
