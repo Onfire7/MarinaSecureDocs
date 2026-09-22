@@ -59,6 +59,14 @@ The code is on `beta2`; the remote still needs, in this order:
 
 ## Small things found in use
 
+- [x] **Attachment bytes never left InstantDB.** The `attachments` rows came
+      across in the migration; the files did not, and the bucket they point at
+      did not exist. Migration 000600 creates the bucket; the two marina map
+      images were copied by hand on 2026-09-22 (`export-instant.mjs` for fresh
+      signed URLs, then `supabase storage cp --experimental --linked`). Those
+      were the only files the marina had. If more appear in the export later,
+      the same two commands move them.
+
 - [ ] **No screen creates a Location Status.** `location_statuses` is a
       lookup table the admin is meant to extend, but nothing in Admin adds a
       row (`saveStatus` in `src/data/lookups.ts` has no caller). The marina's
