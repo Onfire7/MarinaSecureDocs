@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { placementStyle, type PlacementShape } from "../../lib/locations";
+import { DEFAULT_PLACEMENT_STYLE, placementStyle, type PlacementShape } from "../../lib/locations";
 import { placementOf, useLocations, useMarinaMaps, usePlacements } from "../../data/locations";
 import { attachmentUrl } from "../../data/files";
 
@@ -11,6 +11,11 @@ import { attachmentUrl } from "../../data/files";
 //
 // A location plotted on no map offers the map of its nearest ancestor that
 // has one, so a slip added in the field can be placed on its dock's map.
+//
+// The label can be adjusted too — font size, padding, rotation, the same
+// four sliders the admin map editor has — so "placed correctly" can be made
+// true from the field rather than only reported false. Any adjustment is
+// part of the same move_placement Proposal.
 
 export interface ProposedPlacement {
   map_id: string;
@@ -61,12 +66,20 @@ export function PlacementCheck({
     return <div className="muted small">No marina map is uploaded, so placement cannot be checked here.</div>;
   }
 
+  const startAdjusting = () => {
+    onPropose({ map_id: map.id, placement: { ...(ownShape ?? { cx: 50, cy: 50, rotation: 0 }) } });
+  };
+  const adjust = (patch: Partial<PlacementShape>) => {
+    if (!proposed) return;
+    onPropose({ ...proposed, placement: { ...proposed.placement, ...patch } });
+  };
+
   const tap = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!moving || !editable || !imgRef.current) return;
     const r = imgRef.current.getBoundingClientRect();
     const cx = Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width) * 100));
     const cy = Math.max(0, Math.min(100, ((e.clientY - r.top) / r.height) * 100));
-    onPropose({ map_id: map.id, placement: { ...(ownShape ?? { rotation: 0 }), cx: +cx.toFixed(2), cy: +cy.toFixed(2) } });
+    onPropose({ map_id: map.id, placement: { ...(proposed?.placement ?? ownShape ?? { rotation: 0 }), cx: +cx.toFixed(2), cy: +cy.toFixed(2) } });
     setMoving(false);
   };
 
@@ -141,15 +154,55 @@ export function PlacementCheck({
           ) : proposed ? (
             <>
               <span className="badge badge-warn">New placement proposed - waits for approval</span>
+              <button type="button" className="btn btn-sm" onClick={() => setMoving(true)}>
+                Move again
+              </button>
               <button type="button" className="btn btn-sm btn-bare" onClick={() => onPropose(null)}>
                 discard
               </button>
             </>
           ) : (
-            <button type="button" className="btn btn-sm" onClick={() => setMoving(true)}>
-              {own ? "Move it on the map" : "Place it on the map"}
-            </button>
+            <>
+              <button type="button" className="btn btn-sm" onClick={() => setMoving(true)}>
+                {own ? "Move it on the map" : "Place it on the map"}
+              </button>
+              {own && (
+                <button type="button" className="btn btn-sm" onClick={startAdjusting}>
+                  Adjust the label
+                </button>
+              )}
+            </>
           )}
+        </div>
+      )}
+      {editable && proposed && proposed.map_id === map.id && (
+        <div className="card" style={{ marginTop: 8, padding: "8px 12px" }}>
+          <div className="card-kicker">
+            <span>Label</span>
+          </div>
+          {(
+            [
+              ["fontSize", "Font size (px)", 8, 32, DEFAULT_PLACEMENT_STYLE.fontSize],
+              ["paddingX", "Padding, left/right (px)", 0, 24, DEFAULT_PLACEMENT_STYLE.paddingX],
+              ["paddingY", "Padding, top/bottom (px)", 0, 24, DEFAULT_PLACEMENT_STYLE.paddingY],
+              ["rotation", "Rotation °", -180, 180, 0],
+            ] as const
+          ).map(([key, label, min, max, fallback]) => (
+            <div className="field" key={key} style={{ marginBottom: 4 }}>
+              <span className="field-label">
+                {label} · {proposed.placement[key] ?? fallback}
+              </span>
+              <input
+                type="range"
+                min={min}
+                max={max}
+                value={proposed.placement[key] ?? fallback}
+                onChange={(e) => adjust({ [key]: Number(e.target.value) } as Partial<PlacementShape>)}
+                style={{ width: "100%" }}
+                aria-label={label}
+              />
+            </div>
+          ))}
         </div>
       )}
     </div>

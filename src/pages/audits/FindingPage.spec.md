@@ -30,4 +30,7 @@ itself commits to.
   location is plotted on with its rectangle highlighted and the rest muted, or
   its nearest ancestor's map when it is plotted nowhere. *Move it on the map*
   (or *Place it*) arms a tap on the image; the tap becomes a `move_placement`
-  Proposal drawn in amber, and answers the question No.
+  Proposal drawn in amber, and answers the question No. *Adjust the label*
+  opens the same four sliders the admin map editor has (font size, padding,
+  rotation) on the proposed placement, and *Move again* re-arms the tap, so a
+  wrong label can be put right from the field, not only reported.
