@@ -189,8 +189,10 @@ Fixed per kind. A template cannot switch them off.
 1. For each Service valid for the type: present? working? note.
 2. For each Amenity valid for the type: present? note.
 3. *Is this Location clearly marked?* Yes/No.
-4. *Is this Location placed correctly on the map?* Yes/No; No opens the
-   map for a re-placement, recorded as a Proposal.
+4. *Is this Location placed correctly on the map?* The map it is plotted on
+   is shown with its rectangle highlighted (its nearest ancestor's map when
+   it is plotted nowhere); tapping a new spot is a `move_placement` Proposal
+   and answers No.
 
 **Both kinds**: the **GPS prompt**, shown only when the Location has no
 coordinates, or the device is farther from them than the marina's *audit
@@ -390,11 +392,8 @@ Built 2026-09-22 on `beta2`. Where the code lives:
 - `scripts/e2e/audits.mjs` drives tests 35–42 of the approved list against
   a running app.
 
-Two things this spec describes that the first build does **not** do yet:
+One thing in this spec is satisfied differently from how it reads:
 
-- *Is it placed correctly on the map? → No* records the answer but does not
-  open the map or create a `move_placement` Proposal. The finalize function
-  applies such a Proposal if one exists; nothing creates one yet.
 - The **displaced** flag lives on the target (`audit_targets.displaced_note`),
   not on a placeholder Finding, so that writing it never marks the target
   audited. The spec's "or a placeholder if none yet" is satisfied that way.

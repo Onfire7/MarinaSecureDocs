@@ -26,4 +26,8 @@ itself commits to.
   readings for metered services. It then returns to the audit.
 - **Read only** when the audit is not open, or the finding belongs to someone
   else. A colleague who disagrees uses *+ Note*.
-- **Not yet:** *placed correctly? → No* records the answer only.
+- **The map is shown** under *placed correctly on the map?*: the map the
+  location is plotted on with its rectangle highlighted and the rest muted, or
+  its nearest ancestor's map when it is plotted nowhere. *Move it on the map*
+  (or *Place it*) arms a tap on the image; the tap becomes a `move_placement`
+  Proposal drawn in amber, and answers the question No.

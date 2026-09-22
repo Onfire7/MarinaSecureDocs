@@ -5,7 +5,7 @@
 -- passes every denial test (CLAUDE.md).
 create extension if not exists pgtap;
 begin;
-select plan(26);
+select plan(28);
 
 -- Rows affected by an UPDATE run as the current role, so RLS is exercised
 -- from the caller's side. A data-modifying CTE cannot sit inside is().
@@ -116,6 +116,27 @@ reset role;
 select set_config('request.jwt.claims', '{"sub":"user_bob"}', true);
 set local role authenticated;
 select is(pg_temp.upd_count($u$update audit_findings set occupied = false where id = 'ffff0000-0000-4000-8000-0000000000f3'$u$), 1, 'the author edits their own finding while the audit is open');
+reset role;
+
+-- ── the last finding's parts arrive after the audit auto-closed ─────────
+insert into audits (id, name, kind, launched_by_id) values
+  ('eeee0000-0000-4000-8000-0000000000a3','Fixture Audit Three','status','11111111-0000-4000-8000-000000000001');
+insert into audit_targets (id, audit_id, location_id, location_name, position) values
+  ('eeee1111-0000-4000-8000-000000000007','eeee0000-0000-4000-8000-0000000000a3','dddd0000-0000-4000-8000-000000000083','AF-S3',0);
+select set_config('request.jwt.claims', '{"sub":"user_bob"}', true);
+set local role authenticated;
+insert into audit_findings (id, audit_id, target_id, recorded_by_id) values
+  ('ffff0000-0000-4000-8000-0000000000f5','eeee0000-0000-4000-8000-0000000000a3',
+   'eeee1111-0000-4000-8000-000000000007','11111111-0000-4000-8000-000000000002');
+reset role;
+select is((select status::text from audits where id = 'eeee0000-0000-4000-8000-0000000000a3'), 'closed',
+  'a finding on the only pending target closes the audit');
+select set_config('request.jwt.claims', '{"sub":"user_bob"}', true);
+set local role authenticated;
+select lives_ok(
+  $$insert into audit_proposals (finding_id, kind, payload) values
+      ('ffff0000-0000-4000-8000-0000000000f5','set_gps','{"lat":1,"lng":2,"accuracy":5}')$$,
+  'the author still writes that finding''s proposal after the audit closed under it');
 reset role;
 
 -- ── closing early, and a closed audit refuses findings ──────────────────

@@ -40,6 +40,7 @@ import { createTicket } from "../../data/tickets";
 import type { AttachmentTarget } from "../../data/attachments";
 import { LocationPicker } from "../shared/LocationPicker";
 import { NoteDialog } from "../shared/NoteDialog";
+import { PlacementCheck, type ProposedPlacement } from "./PlacementCheck";
 
 // The Finding form (docs/audits.md § Field work). One screen for one target:
 // the built-in questions of the audit's kind, the target's own questions,
@@ -128,6 +129,7 @@ function FindingForm({
   const [amen, setAmen] = useState<Record<string, { present: boolean; note: string }>>({});
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [gpsCapture, setGpsCapture] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
+  const [placement, setPlacement] = useState<ProposedPlacement | null>(null);
   const [retire, setRetire] = useState(false);
   const [rename, setRename] = useState("");
   const [showChanges, setShowChanges] = useState(false);
@@ -191,6 +193,7 @@ function FindingForm({
         if (p.kind === "retire_location") setRetire(true);
         if (p.kind === "rename") setRename(String(pl.name ?? ""));
         if (p.kind === "set_gps") setGpsCapture({ lat: Number(pl.lat), lng: Number(pl.lng), accuracy: Number(pl.accuracy) });
+        if (p.kind === "move_placement") setPlacement({ map_id: String(pl.map_id), placement: pl.placement as ProposedPlacement["placement"] });
         if (p.kind === "create_location") {
           setName(String(pl.name ?? ""));
           setTypeId(String(pl.location_type_id ?? ""));
@@ -247,6 +250,7 @@ function FindingForm({
         });
       } else {
         if (gpsCapture) proposals.push({ kind: "set_gps", payload: gpsCapture });
+        if (placement) proposals.push({ kind: "move_placement", payload: { map_id: placement.map_id, placement: placement.placement } });
         if (retire) proposals.push({ kind: "retire_location", payload: {} });
         if (rename.trim() && rename.trim() !== target.location_name) proposals.push({ kind: "rename", payload: { name: rename.trim() } });
         if (typeId && typeId !== target.location_type_id) proposals.push({ kind: "retype", payload: { location_type_id: typeId } });
@@ -441,6 +445,20 @@ function FindingForm({
           </div>
           <div className="field">
             <span className="field-label">Is it placed correctly on the map?</span>
+            {target.location_id && (
+              <div style={{ marginBottom: 8 }}>
+                <PlacementCheck
+                  locationId={target.location_id}
+                  locationName={target.location_name}
+                  editable={editable}
+                  proposed={placement}
+                  onPropose={(p) => {
+                    setPlacement(p);
+                    if (p) setMappedCorrectly(false);
+                  }}
+                />
+              </div>
+            )}
             {yesNo(mappedCorrectly, setMappedCorrectly)}
           </div>
         </div>
