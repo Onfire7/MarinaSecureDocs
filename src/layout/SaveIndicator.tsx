@@ -70,13 +70,13 @@ export function SaveIndicator() {
             <div className="card-title">{state.label}</div>
             <p className="muted small" style={{ marginTop: 8 }}>
               {state.kind === "sent"
-                ? "Everything done on this phone has reached the office."
+                ? "Everything done on this device has reached the office."
                 : state.kind === "waiting"
-                  ? "Your work is saved on this phone and will send by itself when there's a connection. Nothing is lost by waiting."
+                  ? "Your work is saved on this device and will send by itself when there's a connection. Nothing is lost by waiting."
                   : state.kind === "sending"
-                    ? "Saved on this phone; sending to the office now."
+                    ? "Saved on this device; sending to the office now."
                     : state.kind === "stuck"
-                      ? "Your work is saved on this phone, but it isn't reaching the office. Keep the app installed and signed in, and show this to whoever maintains it:"
+                      ? "Your work is saved on this device, but it isn't reaching the office. Keep the app installed and signed in, and show this to whoever maintains it:"
                       : "The office refused these changes for good, so they were not saved there. Anything listed here may need doing again."}
             </p>
             {state.kind === "stuck" && state.detail && (

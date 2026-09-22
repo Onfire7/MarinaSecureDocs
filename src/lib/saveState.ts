@@ -1,7 +1,7 @@
 // What the save indicator says, decided in one pure place.
 //
 // See src/layout/SaveIndicator.spec.md for the states and, more to the point,
-// for why "saved on this phone" and "reached the office" must never again look
+// for why "saved here" and "reached the office" must never again look
 // the same.
 
 export interface SaveInputs {
@@ -51,7 +51,7 @@ export function saveState(i: SaveInputs): SaveState {
     return {
       kind: "waiting",
       tone: "amber",
-      label: `${changes(i.queued)} saved on this phone`,
+      label: `${changes(i.queued)} saved here`,
       detail: "Will send when there's a connection.",
     };
   }

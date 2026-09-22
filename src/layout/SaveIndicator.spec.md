@@ -31,12 +31,13 @@ Checked in this order; the first that applies wins.
 | rejected | any rejected write not yet dismissed | `N change(s) rejected by the office` | danger |
 | stuck | queue not empty, connected, and the queue has not shrunk for 60s (5 min if the only error is an expired token) | `N change(s) not sending` | danger |
 | sending | queue not empty and connected | `Sending N change(s)…` | quiet |
-| waiting | queue not empty and not connected | `N change(s) saved on this phone` | amber |
+| waiting | queue not empty and not connected | `N change(s) saved here` | amber |
 | sent | queue empty | `✓ All changes sent` | quiet |
 
 **Waiting is not an error.** It is the normal condition of a guard in a dead
 spot and must never read as alarming — the wording says the work is *saved*,
-because it is.
+because it is. "Here" rather than "on this phone": the same indicator sits in
+a desktop sidebar, where the pill is narrow and the device is not a phone.
 
 **An expired token is not stuck.** Tokens live 60 seconds; a phone waking from
 sleep is refused once and recovers by itself. Only if that persists for five

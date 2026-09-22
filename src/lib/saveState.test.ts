@@ -15,11 +15,11 @@ describe("saveState", () => {
     expect(saveState(base)).toMatchObject({ kind: "sent", label: "✓ All changes sent" });
   });
 
-  it("queued while offline reads as saved on this phone", () => {
+  it("queued while offline reads as saved here", () => {
     // The normal condition of a guard in a dead spot. Never alarming, however
     // long it lasts: the work IS saved.
     const s = saveState({ ...base, queued: 3, connected: false, unchangedForMs: 3_600_000 });
-    expect(s).toMatchObject({ kind: "waiting", tone: "amber", label: "3 changes saved on this phone" });
+    expect(s).toMatchObject({ kind: "waiting", tone: "amber", label: "3 changes saved here" });
   });
 
   it("uploading reads as sending, with the count", () => {
