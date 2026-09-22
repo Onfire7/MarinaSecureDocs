@@ -1,8 +1,17 @@
 import { useMemo, useState } from "react";
-import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { computeEffectivePermissions, computeManagementFlags } from "../../lib/permissions";
-import { activityTx } from "../../lib/activityLog";
+import { computeEffectivePermissions } from "../../lib/permissions";
+import {
+  createUser,
+  roleNames,
+  saveUser,
+  setUserActive,
+  splitIds,
+  useRoles,
+  useUsers,
+  type Role,
+  type UserWithRoles,
+} from "../../data/users";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
 
@@ -16,18 +25,6 @@ export function AdminUsersPage() {
   );
 }
 
-type UserRow = {
-  id: string;
-  name: string;
-  email?: string;
-  phone?: string;
-  active: boolean;
-  clerkUserId?: string;
-  roles?: RoleRef[];
-};
-
-type RoleRef = { id: string; name: string; allow?: string[]; deny?: string[] };
-
 function Users() {
   const current = useCurrent();
   const [search, setSearch] = useState("");
@@ -35,16 +32,18 @@ function Users() {
   const [editing, setEditing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const { data } = db.useQuery({ users: { roles: {} }, roles: {} });
+  // Deactivated users are included: this is the screen where they get
+  // reactivated, and hiding them would make that impossible.
+  const { data: allUsers } = useUsers(true);
+  const { roles: allRoles } = useRoles();
   const users = useMemo(
     () =>
-      [...((data?.users ?? []) as UserRow[])].sort((a, b) => {
-        if (a.active !== b.active) return a.active ? -1 : 1;
+      [...allUsers].sort((a, b) => {
+        if (a.active !== b.active) return a.active === 1 ? -1 : 1;
         return a.name.localeCompare(b.name);
       }),
-    [data],
+    [allUsers],
   );
-  const allRoles = data?.roles ?? [];
 
   const q = search.trim().toLowerCase();
   const filtered = users.filter(
@@ -59,14 +58,19 @@ function Users() {
    * warned about — computed the same way effective permissions are, so a
    * user holding it through any role counts.
    */
-  const wouldOrphanUserManagement = (target: UserRow): boolean => {
-    const remaining = users.filter((u) => u.active && u.id !== target.id);
+  const rolesOf = (u: UserWithRoles): Role[] => {
+    const ids = splitIds(u.role_ids);
+    return allRoles.filter((r) => ids.includes(r.id));
+  };
+
+  const wouldOrphanUserManagement = (target: UserWithRoles): boolean => {
+    const remaining = users.filter((u) => u.active === 1 && u.id !== target.id);
     return !remaining.some((u) =>
-      computeEffectivePermissions(u.roles ?? []).has("manage_users"),
+      computeEffectivePermissions(rolesOf(u)).has("manage_users"),
     );
   };
 
-  const setActive = (user: UserRow, active: boolean) => {
+  const setActive = (user: UserWithRoles, active: boolean) => {
     setError(null);
     if (!active && wouldOrphanUserManagement(user)) {
       setError(
@@ -74,16 +78,7 @@ function Users() {
       );
       return;
     }
-    void db.transact([
-      db.tx.users[user.id].update({ active }),
-      activityTx({
-        eventType: active ? "user.reactivated" : "user.deactivated",
-        summary: `${user.name} ${active ? "reactivated" : "deactivated"}`,
-        subjectType: "users",
-        subjectId: user.id,
-        actorId: current.user?.id,
-      }),
-    ]);
+    void setUserActive(user.id, active, user.name, current.user?.id ?? null);
   };
 
   return (
@@ -116,19 +111,19 @@ function Users() {
 
       <div className="stack" style={{ gap: 8 }}>
         {filtered.map((u) => (
-          <div key={u.id} className={"card" + (u.active ? "" : " card-hidden")}>
+          <div key={u.id} className={"card" + (u.active === 1 ? "" : " card-hidden")}>
             <div className="spread" style={{ flexWrap: "wrap" }}>
               <div>
                 <div className="card-title">
                   {u.name}
-                  {!u.active && (
+                  {u.active === 0 && (
                     <span className="badge" style={{ marginLeft: 8 }}>
                       Deactivated
                     </span>
                   )}
                   {/* No clerkUserId yet means they've been provisioned here
                       but haven't completed a first sign-in. */}
-                  {u.active && !u.clerkUserId && (
+                  {u.active === 1 && !u.clerk_user_id && (
                     <span className="badge badge-warn" style={{ marginLeft: 8 }}>
                       Hasn't signed in yet
                     </span>
@@ -136,12 +131,12 @@ function Users() {
                 </div>
                 <div className="card-meta">
                   {[u.email, u.phone].filter(Boolean).join(" · ") || "No contact info"}
-                  {(u.roles ?? []).length > 0 && (
+                  {roleNames(u).length > 0 && (
                     <>
                       {" · "}
-                      {(u.roles ?? []).map((r) => (
-                        <span key={r.id} className="badge" style={{ marginRight: 4 }}>
-                          {r.name}
+                      {roleNames(u).map((name) => (
+                        <span key={name} className="badge" style={{ marginRight: 4 }}>
+                          {name}
                         </span>
                       ))}
                     </>
@@ -158,10 +153,12 @@ function Users() {
                 </button>
                 <button
                   type="button"
-                  className={"btn btn-sm " + (u.active ? "btn-danger" : "btn-quiet")}
-                  onClick={() => setActive(u, !u.active)}
+                  className={
+                    "btn btn-sm " + (u.active === 1 ? "btn-danger" : "btn-quiet")
+                  }
+                  onClick={() => setActive(u, u.active !== 1)}
                 >
-                  {u.active ? "Deactivate" : "Reactivate"}
+                  {u.active === 1 ? "Deactivate" : "Reactivate"}
                 </button>
               </div>
             </div>
@@ -188,8 +185,8 @@ function EditUser({
   allRoles,
   onDone,
 }: {
-  user: UserRow;
-  allRoles: RoleRef[];
+  user: UserWithRoles;
+  allRoles: Role[];
   onDone: () => void;
 }) {
   const current = useCurrent();
@@ -198,30 +195,23 @@ function EditUser({
     email: user.email ?? "",
     phone: user.phone ?? "",
   });
-  const [roleIds, setRoleIds] = useState((user.roles ?? []).map((r) => r.id));
-  const original = (user.roles ?? []).map((r) => r.id);
+  const [roleIds, setRoleIds] = useState(splitIds(user.role_ids));
 
+  // Saving no longer writes anything about what this user MAY DO. Their
+  // effective permissions are recomputed by a database trigger off the role
+  // links — there is no permission cache on the user row for a client to get
+  // wrong, which is how ADR 0002's escalation vector closes.
   const save = async () => {
-    const added = roleIds.filter((r) => !original.includes(r));
-    const removed = original.filter((r) => !roleIds.includes(r));
-    const newRoles = allRoles.filter((r) => roleIds.includes(r.id));
-    await db.transact([
-      db.tx.users[user.id].update({
+    await saveUser(
+      user.id,
+      {
         name: form.name.trim(),
-        email: form.email.trim() || undefined,
-        phone: form.phone.trim() || undefined,
-        ...computeManagementFlags(newRoles),
-      }),
-      ...(added.length > 0 ? [db.tx.users[user.id].link({ roles: added })] : []),
-      ...(removed.length > 0 ? [db.tx.users[user.id].unlink({ roles: removed })] : []),
-      activityTx({
-        eventType: "user.updated",
-        summary: `${form.name.trim()} updated`,
-        subjectType: "users",
-        subjectId: user.id,
-        actorId: current.user?.id,
-      }),
-    ]);
+        email: form.email.trim() || null,
+        phone: form.phone.trim() || null,
+        roleIds,
+      },
+      current.user?.id ?? null,
+    );
     onDone();
   };
 
@@ -293,22 +283,18 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
 
   const invite = async () => {
-    const userId = id();
-    await db.transact([
-      db.tx.users[userId].update({
+    // Provisioned with no Clerk identity: it is bound on their first sign-in by
+    // claim_marina_user(), against the email they verify. Nothing here can set
+    // it — this device has no way to learn someone else's Clerk id.
+    await createUser(
+      {
         name: form.name.trim(),
-        email: form.email.trim() || undefined,
-        phone: form.phone.trim() || undefined,
-        active: true,
-      }),
-      activityTx({
-        eventType: "user.invited",
-        summary: `${form.name.trim()} provisioned`,
-        subjectType: "users",
-        subjectId: userId,
-        actorId: current.user?.id,
-      }),
-    ]);
+        email: form.email.trim() || null,
+        phone: form.phone.trim() || null,
+        roleIds: [],
+      },
+      current.user?.id ?? null,
+    );
     onClose();
   };
 

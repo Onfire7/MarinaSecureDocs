@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   checkpointGuidFromUrl,
   nfcErrorMessage,
+  nfcPermissionGranted,
   nfcReadSupported,
   scanNfcUrls,
   vibrateScanAck,
@@ -16,8 +17,18 @@ import {
  *
  * One "start" click is enough: scan() keeps delivering every subsequent tag
  * read until stopped, it isn't a one-shot request.
+ *
+ * With `autoStart`, not even that: if NFC is already allowed, scanning begins
+ * on open. Only ONE mounted toggle may carry it — AppShell renders two, and
+ * two readers would acknowledge every tag twice.
  */
-export function NfcScanToggle({ onScan }: { onScan: (checkpointGuid: string) => void }) {
+export function NfcScanToggle({
+  onScan,
+  autoStart = false,
+}: {
+  onScan: (checkpointGuid: string) => void;
+  autoStart?: boolean;
+}) {
   const supported = nfcReadSupported();
   const [active, setActive] = useState(false);
   const [error, setError] = useState("");
@@ -27,6 +38,20 @@ export function NfcScanToggle({ onScan }: { onScan: (checkpointGuid: string) => 
   // is alive for the whole session — but a stray listener outliving its
   // component would be a real leak, not a hypothetical one).
   useEffect(() => () => controllerRef.current?.abort(), []);
+
+  // Declared before the early return below, as hooks must be. `start` is read
+  // through a ref because it is recreated each render and this runs once.
+  const startRef = useRef<() => Promise<void>>(async () => {});
+  useEffect(() => {
+    if (!autoStart || !supported) return;
+    let cancelled = false;
+    void nfcPermissionGranted().then((granted) => {
+      if (granted && !cancelled && !controllerRef.current) void startRef.current();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [autoStart, supported]);
 
   if (!supported) return null;
 
@@ -57,6 +82,8 @@ export function NfcScanToggle({ onScan }: { onScan: (checkpointGuid: string) => 
       setError(nfcErrorMessage(err));
     }
   };
+
+  startRef.current = start;
 
   const stop = () => {
     controllerRef.current?.abort();

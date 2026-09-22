@@ -1,7 +1,13 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
+import { compareNames } from "../../lib/locations";
+import {
+  createBoat,
+  createVehicle,
+  useBoats,
+  useVehicles,
+} from "../../data/boats";
 
 // Boats & Vehicles — Boat List / Vehicle List (see docs/pages/boat-list.html,
 // docs/pages/vehicle-list.html). One nav section, two tabs. Record visibility
@@ -15,57 +21,42 @@ export function BoatListPage() {
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
 
-  const { data } = db.useQuery({
-    boats: { owners: {}, currentSlip: {} },
-    vehicles: { owners: {}, currentLocation: {} },
-  });
-
-  const boats = useMemo(
-    () =>
-      [...(data?.boats ?? [])].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { numeric: true }),
-      ),
-    [data],
-  );
-  const vehicles = useMemo(
-    () =>
-      [...(data?.vehicles ?? [])].sort((a, b) =>
-        a.description.localeCompare(b.description, undefined, { numeric: true }),
-      ),
-    [data],
-  );
+  // owner_names is the boat's owners joined in succession order, so the search
+  // below matches on any of them without a second query per row.
+  const { data: boats } = useBoats();
+  const { data: vehicles } = useVehicles();
 
   const q = search.trim().toLowerCase();
   const matches = (...parts: (string | null | undefined)[]) =>
     !q || parts.some((p) => p?.toLowerCase().includes(q));
 
-  const filteredBoats = boats.filter((b) =>
-    matches(
-      b.name,
-      b.make,
-      b.model,
-      b.currentSlip?.name,
-      ...(canViewOwner ? (b.owners ?? []).map((o) => o.name) : []),
-    ),
-  );
-  const filteredVehicles = vehicles.filter((v) =>
-    matches(
-      v.description,
-      v.plateNumber,
-      v.currentLocation?.name,
-      ...(canViewOwner ? (v.owners ?? []).map((o) => o.name) : []),
-    ),
-  );
+  const filteredBoats = boats
+    .filter((b) =>
+      matches(
+        b.name,
+        b.make,
+        b.model,
+        b.location_name,
+        canViewOwner ? b.owner_names : null,
+      ),
+    )
+    .sort((a, b) => compareNames(a.name, b.name));
+  const filteredVehicles = vehicles
+    .filter((v) =>
+      matches(
+        v.description,
+        v.plate_number,
+        v.location_name,
+        canViewOwner ? v.owner_names : null,
+      ),
+    )
+    .sort((a, b) => compareNames(a.description, b.description));
 
-  // First owner in succession order (ownerOrder ids, falling back to link order).
-  const firstOwner = (
-    owners: { id: string; name?: string | null }[] | undefined,
-    order: string[] | undefined,
-  ) => {
-    const list = owners ?? [];
-    if (!order || order.length === 0) return list[0];
-    return list.find((o) => o.id === order[0]) ?? list[0];
-  };
+  // The first name in owner_names is the primary owner: boat_owners.position
+  // is what orders that join, so succession is a database fact now rather
+  // than a json array the client had to keep in step with the links.
+  const firstOwner = (ownerNames: string | null) =>
+    ownerNames?.split(", ")[0] || null;
 
   return (
     <div>
@@ -105,7 +96,7 @@ export function BoatListPage() {
       {tab === "boats" ? (
         <div className="stack" style={{ gap: 8 }}>
           {filteredBoats.map((b) => {
-            const owner = firstOwner(b.owners, b.ownerOrder);
+            const owner = firstOwner(b.owner_names);
             return (
               <Link
                 key={b.id}
@@ -122,11 +113,11 @@ export function BoatListPage() {
                   </div>
                 </div>
                 <div className="muted small" style={{ textAlign: "right" }}>
-                  {b.currentSlip ? b.currentSlip.name : "No slip"}
+                  {b.location_name ?? "No slip"}
                   {canViewOwner && owner && (
                     <>
                       <br />
-                      {owner.name ?? "Unnamed contact"}
+                      {owner}
                     </>
                   )}
                 </div>
@@ -142,7 +133,7 @@ export function BoatListPage() {
       ) : (
         <div className="stack" style={{ gap: 8 }}>
           {filteredVehicles.map((v) => {
-            const owner = firstOwner(v.owners, v.ownerOrder);
+            const owner = firstOwner(v.owner_names);
             return (
               <Link
                 key={v.id}
@@ -152,14 +143,14 @@ export function BoatListPage() {
               >
                 <div>
                   <div className="card-title">{v.description}</div>
-                  <div className="card-meta">Plate: {v.plateNumber ?? "—"}</div>
+                  <div className="card-meta">Plate: {v.plate_number ?? "—"}</div>
                 </div>
                 <div className="muted small" style={{ textAlign: "right" }}>
-                  {v.currentLocation ? v.currentLocation.name : "No location"}
+                  {v.location_name ?? "No location"}
                   {canViewOwner && owner && (
                     <>
                       <br />
-                      {owner.name ?? "Unnamed contact"}
+                      {owner}
                     </>
                   )}
                 </div>
@@ -189,19 +180,12 @@ function AddDialog({ kind, onClose }: { kind: "boat" | "vehicle"; onClose: () =>
 
   const save = async () => {
     if (kind === "boat") {
-      await db.transact(
-        db.tx.boats[id()].update({
-          name: primary.trim(),
-          description: secondary.trim() || undefined,
-        }),
-      );
+      await createBoat({ name: primary.trim(), description: secondary.trim() || null });
     } else {
-      await db.transact(
-        db.tx.vehicles[id()].update({
-          description: primary.trim(),
-          plateNumber: secondary.trim() || undefined,
-        }),
-      );
+      await createVehicle({
+        description: primary.trim(),
+        plateNumber: secondary.trim() || null,
+      });
     }
     onClose();
   };

@@ -6,6 +6,26 @@ function nfcSupported(): boolean {
   return typeof window !== "undefined" && "NDEFReader" in window;
 }
 
+/**
+ * Whether a scan can start WITHOUT a tap.
+ *
+ * Chrome wants a user gesture only to show the permission prompt. Once a guard
+ * has allowed NFC on this origin, scan() may be called on open — which is what
+ * makes a tag tapped a second after unlocking the phone land in the app rather
+ * than in a new browser tab. Anything short of "granted" is false: prompting
+ * unasked is not possible, and would not be welcome.
+ */
+export async function nfcPermissionGranted(): Promise<boolean> {
+  try {
+    const status = await navigator.permissions.query({
+      name: "nfc" as PermissionName,
+    });
+    return status.state === "granted";
+  } catch {
+    return false;
+  }
+}
+
 export const nfcWriteSupported = nfcSupported;
 export const nfcReadSupported = nfcSupported;
 
@@ -55,9 +75,16 @@ export async function scanNfcUrls(
 }
 
 /**
- * If `url` is this app's checkpoint check-in link, returns the checkpoint's
- * guidUrl; otherwise null (a tag encoding something else, scanned
- * incidentally, is silently ignored rather than acted on).
+ * If `url` is a checkpoint check-in link, returns the checkpoint's guidUrl;
+ * otherwise null (a tag encoding something else, scanned incidentally, is
+ * silently ignored rather than acted on).
+ *
+ * The origin is deliberately NOT compared. It used to be, and the effect was
+ * that every tag in the marina — all written by the deployment at another
+ * hostname — went dead the day the app moved. The origin protects nothing:
+ * the guid is looked up in this marina's own database, so a tag from anywhere
+ * else resolves to "unknown tag" and no further. A marina's tags outlive the
+ * hostname that wrote them, and must.
  */
 export function checkpointGuidFromUrl(url: string): string | null {
   let parsed: URL;
@@ -66,7 +93,6 @@ export function checkpointGuidFromUrl(url: string): string | null {
   } catch {
     return null;
   }
-  if (parsed.origin !== window.location.origin) return null;
   const match = parsed.pathname.match(/^\/checkin\/([^/]+)$/);
   return match ? match[1] : null;
 }

@@ -1,14 +1,10 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { statusLabel } from "../../lib/locations";
-import {
-  ATTACHMENT_LINKS_QUERY,
-  attachmentOf,
-  targetPath,
-} from "../../lib/attachments";
+import { attachmentOf, targetPath } from "../../data/attachments";
 import { incidentStatusBadgeClass } from "../../lib/workItems";
+import { useIncidents } from "../../data/incidents";
+import { useIncidentTypes } from "../../data/lookups";
 
 // Incidents — Incident List (see pages/incident-list.html).
 // The one entity whose visibility itself is a hard gate: without
@@ -19,30 +15,13 @@ export function IncidentListPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
 
-  const { data } = db.useQuery(
-    canView
-      ? {
-          incidents: {
-            type: {},
-            author: {},
-            assignedTo: {},
-            ...ATTACHMENT_LINKS_QUERY,
-          },
-          incidentTypes: {},
-        }
-      : null,
-  );
-
-  const incidents = useMemo(
-    () =>
-      [...(data?.incidents ?? [])].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      ),
-    [data],
-  );
-  const types = data?.incidentTypes ?? [];
+  // No canView branch on the query itself: without view_incidents the incidents
+  // table on this device is empty, because the sync stream never delivered a
+  // row. The check below is for the nav, not for the data.
+  const { data: incidents } = useIncidents();
+  const { types } = useIncidentTypes();
   const statuses = useMemo(
-    () => [...new Set(incidents.map((i) => i.status))],
+    () => [...new Set(incidents.map((i) => i.status_name))],
     [incidents],
   );
 
@@ -57,8 +36,8 @@ export function IncidentListPage() {
 
   const filtered = incidents.filter(
     (i) =>
-      (!statusFilter || i.status === statusFilter) &&
-      (!typeFilter || i.type?.id === typeFilter),
+      (!statusFilter || i.status_name === statusFilter) &&
+      (!typeFilter || i.incident_type_id === typeFilter),
   );
 
   return (
@@ -81,7 +60,7 @@ export function IncidentListPage() {
           <option value="">All statuses</option>
           {statuses.map((s) => (
             <option key={s} value={s}>
-              {statusLabel(s)}
+              {s}
             </option>
           ))}
         </select>
@@ -117,12 +96,10 @@ export function IncidentListPage() {
                     {i.title}
                   </Link>
                   <div className="card-meta">
-                    <span className={incidentStatusBadgeClass(i.status)}>
-                      {i.status === "custom"
-                        ? (i.customStatus ?? "Custom")
-                        : statusLabel(i.status)}
+                    <span className={incidentStatusBadgeClass(i.status_name)}>
+                      {i.status_name}
                     </span>
-                    {i.type && ` · ${i.type.name}`}
+                    {i.type_name && ` · ${i.type_name}`}
                     {target && (
                       <>
                         {" · "}
@@ -132,17 +109,17 @@ export function IncidentListPage() {
                   </div>
                 </div>
                 <div className="muted small" style={{ textAlign: "right" }}>
-                  {i.author?.name ?? "—"}
+                  {i.author_name ?? "—"}
                   <br />
-                  {new Date(i.createdAt).toLocaleString(undefined, {
+                  {new Date(i.created_at).toLocaleString(undefined, {
                     month: "short",
                     day: "numeric",
                     hour: "numeric",
                     minute: "2-digit",
                   })}
-                  {i.assignedTo && (
+                  {i.assignee_name && (
                     <>
-                      <br />→ {i.assignedTo.name}
+                      <br />→ {i.assignee_name}
                     </>
                   )}
                 </div>

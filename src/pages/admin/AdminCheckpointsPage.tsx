@@ -1,6 +1,16 @@
 import { useMemo, useState } from "react";
-import { db, id } from "../../lib/db";
 import { matchesTerms, queryTerms } from "../../lib/search";
+import {
+  addTourCheckpoints,
+  createCheckpointsAt,
+  deleteCheckpoint,
+  deleteCheckpoints,
+  saveCheckpoint,
+  useCheckpointsWithUsage,
+  useTours,
+  type CheckpointUsageRow,
+} from "../../data/checkpoints";
+import { useLocations } from "../../data/locations";
 import { groupByLocation, locationPathResolver } from "../../lib/checkpoints";
 import { MultiSelectDialog } from "../shared/MultiSelectDialog";
 import { NfcWriteDialog } from "../shared/NfcWriteDialog";
@@ -26,20 +36,6 @@ export function AdminCheckpointsPage() {
   );
 }
 
-type CheckpointRow = {
-  id: string;
-  name: string;
-  guidUrl: string;
-  gpsLat?: number;
-  gpsLng?: number;
-  gpsValidationRadius?: number;
-  location?: { id: string; name: string; parent?: { id: string } | null } | null;
-  tours?: { id: string; name: string }[];
-  // Checkpoint use by checklists is now through template sections — the
-  // section carries the template it belongs to.
-  checklistTemplateSections?: { id: string; name: string; template?: { id: string; name: string } | null }[];
-};
-
 function Checkpoints() {
   const [filter, setFilter] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -47,16 +43,12 @@ function Checkpoints() {
   const [assigningTour, setAssigningTour] = useState(false);
   const [onlyUnused, setOnlyUnused] = useState(false);
 
-  const { data } = db.useQuery({
-    checkpoints: { location: { parent: {} }, tours: {}, checklistTemplateSections: { template: {} } },
-    locations: { parent: {}, checkpoints: {} },
-    tours: { checkpoints: {} },
-  });
-
-  // Memoized because `?? []` mints a fresh array on every render, which
-  // would rebuild the path cache below each time.
-  const locations = useMemo(() => data?.locations ?? [], [data]);
-  const tours = data?.tours ?? [];
+  // tour_names and template_names come back on the row as group_concat, so
+  // "unused" is one predicate over one result set rather than two joins that
+  // would each multiply the checkpoints.
+  const { data: allCheckpoints } = useCheckpointsWithUsage();
+  const { data: locations } = useLocations();
+  const { data: tours } = useTours();
 
   // Full ancestor path per location — "Slip 14" is meaningless on its own
   // when every dock has one, and the path is what the filter searches and
@@ -64,28 +56,22 @@ function Checkpoints() {
   const pathOf = useMemo(() => locationPathResolver(locations), [locations]);
 
   const checkpoints = useMemo(() => {
-    const all = (data?.checkpoints ?? []) as CheckpointRow[];
     const terms = queryTerms(filter);
-    return all
+    return allCheckpoints
       .filter((c) => {
-        const path = c.location ? pathOf(c.location.id) : "";
+        const path = c.location_id ? pathOf(c.location_id) : "";
         return matchesTerms([c.name, path], terms);
       })
-      .filter((c) =>
-        onlyUnused
-          ? (c.tours ?? []).length === 0 &&
-            (c.checklistTemplateSections ?? []).length === 0
-          : true,
-      )
+      .filter((c) => (onlyUnused ? !c.tour_names && !c.template_names : true))
       .sort((a, b) => {
-        const pa = a.location ? pathOf(a.location.id) : "";
-        const pb = b.location ? pathOf(b.location.id) : "";
+        const pa = a.location_id ? pathOf(a.location_id) : "";
+        const pb = b.location_id ? pathOf(b.location_id) : "";
         return (
           pa.localeCompare(pb, undefined, { numeric: true }) ||
           a.name.localeCompare(b.name, undefined, { numeric: true })
         );
       });
-  }, [data, filter, onlyUnused, pathOf]);
+  }, [allCheckpoints, filter, onlyUnused, pathOf]);
 
   // Grouped under their location, so the row itself only has to carry the
   // checkpoint's own name.
@@ -108,44 +94,19 @@ function Checkpoints() {
   const createAt = (locationIds: string[]) => {
     if (locationIds.length === 0) return;
     const byId = new Map(locations.map((l) => [l.id, l]));
-    void db.transact(
-      locationIds.map((locationId) => {
-        const existing = byId.get(locationId)?.checkpoints?.length ?? 0;
-        const base = byId.get(locationId)?.name ?? "Checkpoint";
-        return db.tx.checkpoints[id()]
-          .update({
-            name: existing === 0 ? base : `${base} ${existing + 1}`,
-            // Auto-generated, never user-entered — this is the value the
-            // physical NFC tag / QR code encodes.
-            guidUrl: crypto.randomUUID(),
-          })
-          .link({ location: locationId });
-      }),
+    void createCheckpointsAt(
+      locationIds.map((locationId) => ({
+        id: locationId,
+        name: byId.get(locationId)?.name ?? "Checkpoint",
+      })),
     );
   };
 
   const addSelectedToTour = (tourId: string) => {
-    const tour = tours.find((t) => t.id === tourId);
-    if (!tour) return;
-    const already = new Set((tour.checkpoints ?? []).map((c) => c.id));
-    const adding = [...selected].filter((cid) => !already.has(cid));
-    if (adding.length === 0) return;
-    void db.transact(
-      db.tx.tours[tourId]
-        .link({ checkpoints: adding })
-        .update(
-          // Linear tours carry an explicit sequence; new members land at the
-          // end, where they can be dragged into place on the Tours screen.
-          tour.mode === "linear"
-            ? {
-                checkpointOrder: [
-                  ...(tour.checkpointOrder ?? (tour.checkpoints ?? []).map((c) => c.id)),
-                  ...adding,
-                ],
-              }
-            : {},
-        ),
-    );
+    // New members land at the end of the tour, where they can be dragged into
+    // place on the Tours screen. Position is a column, so there is no separate
+    // order to keep in step — and no branch on whether the tour is linear.
+    void addTourCheckpoints(tourId, [...selected]);
     setSelected(new Set());
   };
 
@@ -158,11 +119,11 @@ function Checkpoints() {
       )
     )
       return;
-    void db.transact([...selected].map((cid) => db.tx.checkpoints[cid].delete()));
+    void deleteCheckpoints([...selected]);
     setSelected(new Set());
   };
 
-  const total = (data?.checkpoints ?? []).length;
+  const total = allCheckpoints.length;
 
   return (
     <div>
@@ -298,11 +259,13 @@ function Checkpoints() {
               pathOf(a.id).localeCompare(pathOf(b.id), undefined, { numeric: true }),
             )
             .map((l) => {
-              const existing = l.checkpoints?.length ?? 0;
+              const existing = allCheckpoints.filter(
+                (c) => c.location_id === l.id,
+              ).length;
               return {
                 id: l.id,
                 name: existing > 0 ? `${l.name} · has ${existing}` : l.name,
-                group: l.parent?.id ? pathOf(l.parent.id) : "Top level",
+                group: l.parent_id ? pathOf(l.parent_id) : "Top level",
               };
             })}
           onConfirm={createAt}
@@ -329,17 +292,17 @@ function CheckpointCard({
   selected,
   onToggleSelect,
 }: {
-  checkpoint: CheckpointRow;
+  checkpoint: CheckpointUsageRow;
   selected: boolean;
   onToggleSelect: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(false);
   const [writingTag, setWritingTag] = useState(false);
-  const url = `${window.location.origin}/checkin/${checkpoint.guidUrl}`;
+  const url = `${window.location.origin}/checkin/${checkpoint.guid_url}`;
 
-  const update = (fields: Record<string, unknown>) =>
-    void db.transact(db.tx.checkpoints[checkpoint.id].update(fields));
+  const update = (fields: Parameters<typeof saveCheckpoint>[1]) =>
+    void saveCheckpoint(checkpoint.id, fields);
 
   const copy = async () => {
     await navigator.clipboard.writeText(url);
@@ -347,14 +310,10 @@ function CheckpointCard({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const tourNames = (checkpoint.tours ?? []).map((t) => t.name);
-  const templateNames = [
-    ...new Set(
-      (checkpoint.checklistTemplateSections ?? [])
-        .map((s) => s.template?.name)
-        .filter((n): n is string => Boolean(n)),
-    ),
-  ];
+  const tourNames = checkpoint.tour_names ? checkpoint.tour_names.split(", ") : [];
+  const templateNames = checkpoint.template_names
+    ? [...new Set(checkpoint.template_names.split(", "))]
+    : [];
   const unused = tourNames.length === 0 && templateNames.length === 0;
 
   return (
@@ -416,7 +375,7 @@ function CheckpointCard({
               style={{ width: 120 }}
               placeholder="lat"
               aria-label="Latitude"
-              value={checkpoint.gpsLat}
+              value={checkpoint.gps_lat}
               onCommit={(gpsLat) => update({ gpsLat })}
             />
             <DraftNumberInput
@@ -424,7 +383,7 @@ function CheckpointCard({
               style={{ width: 120 }}
               placeholder="lng"
               aria-label="Longitude"
-              value={checkpoint.gpsLng}
+              value={checkpoint.gps_lng}
               onCommit={(gpsLng) => update({ gpsLng })}
             />
             <span className="small muted">radius (m)</span>
@@ -433,7 +392,7 @@ function CheckpointCard({
               style={{ width: 110 }}
               placeholder="marina default"
               aria-label="GPS radius override"
-              value={checkpoint.gpsValidationRadius}
+              value={checkpoint.gps_validation_radius}
               onCommit={(gpsValidationRadius) => update({ gpsValidationRadius })}
             />
           </div>
@@ -461,7 +420,7 @@ function CheckpointCard({
                   )
                 )
                   return;
-                void db.transact(db.tx.checkpoints[checkpoint.id].delete());
+                void deleteCheckpoint(checkpoint.id);
               }}
             >
               Delete checkpoint

@@ -18,8 +18,8 @@ function matchesTerms(path: string[], terms: string[]): boolean {
 export interface PickerLocation {
   id: string;
   name: string;
-  parent?: { id: string } | null;
-  type?: { name: string } | null;
+  parent_id?: string | null;
+  type_name?: string | null;
 }
 
 /**
@@ -72,7 +72,7 @@ export function LocationPicker({
     const resolve = (l: PickerLocation): { path: string[]; depth: number } => {
       const cached = out.get(l.id);
       if (cached) return cached;
-      const parent = l.parent?.id ? byId.get(l.parent.id) : undefined;
+      const parent = l.parent_id ? byId.get(l.parent_id) : undefined;
       const parentMeta = parent
         ? resolve(parent)
         : { path: [] as string[], depth: -1 };
@@ -95,7 +95,7 @@ export function LocationPicker({
     while (grew) {
       grew = false;
       for (const l of locations) {
-        if (!out.has(l.id) && l.parent?.id && out.has(l.parent.id)) {
+        if (!out.has(l.id) && l.parent_id && out.has(l.parent_id)) {
           out.add(l.id);
           grew = true;
         }
@@ -210,9 +210,9 @@ export function LocationPicker({
                     · {path.slice(0, -1).join(" → ")}
                   </span>
                 )}
-                {l.type?.name && (
+                {l.type_name && (
                   <span className="badge" style={{ marginLeft: 6 }}>
-                    {l.type.name}
+                    {l.type_name}
                   </span>
                 )}
               </button>

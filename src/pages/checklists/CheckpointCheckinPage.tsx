@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import type { AttachmentTarget } from "../../lib/attachments";
+import type { AttachmentTarget } from "../../data/attachments";
+import { useCheckpointByGuid, type CheckpointRow } from "../../data/checkpoints";
 import { NoteDialog } from "../shared/NoteDialog";
 import { useCheckpointVisit } from "./useCheckpointVisit";
 import { ChecklistItemsPanel } from "./ActiveChecklistPage";
@@ -27,10 +27,7 @@ export function CheckpointCheckinPage() {
   const resumeCheckInId = searchParams.get("checkin") ?? undefined;
   const [showNoteDialog, setShowNoteDialog] = useState(false);
 
-  const { data, isLoading: cpLoading } = db.useQuery(
-    guidUrl ? { checkpoints: { $: { where: { guidUrl } }, location: {} } } : null,
-  );
-  const checkpoint = data?.checkpoints?.[0];
+  const { checkpoint, isLoading: cpLoading } = useCheckpointByGuid(guidUrl);
 
   const visit = useCheckpointVisit(
     checkpoint?.id,
@@ -109,7 +106,7 @@ export function CheckpointCheckinView({
   onNote,
   onIncident,
 }: {
-  checkpoint: { id: string; name: string; location?: { name: string } | null };
+  checkpoint: CheckpointRow;
   visit: ReturnType<typeof useCheckpointVisit>;
   canCreateIncidents: boolean;
   onNote: () => void;
@@ -121,7 +118,7 @@ export function CheckpointCheckinView({
         <h1 className="page-title">{checkpoint.name}</h1>
         <GpsPill status={visit.gpsStatus} />
       </div>
-      <div className="page-sub">{checkpoint.location?.name}</div>
+      <div className="page-sub">{checkpoint.location_name}</div>
 
       <div className="section-title" style={{ marginTop: 16 }}>
         Applicable now

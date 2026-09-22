@@ -1,10 +1,15 @@
 import { useState } from "react";
-import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { statusLabel } from "../../lib/locations";
 import { DEFAULT_POST_RETURN_STATUS } from "../../lib/assets";
 import { displayName } from "../../lib/contacts";
-import { activityTx } from "../../lib/activityLog";
+import { useContacts } from "../../data/contacts";
+import {
+  checkInAsset,
+  checkOutAsset,
+  type AssetRow,
+  type CheckoutRow,
+} from "../../data/assets";
+import { resolveStatusByName, useAssetStatuses } from "../../data/lookups";
 
 // Assets — Checkout / Return Dialog (see docs/pages/asset-checkout-dialog.html).
 // One dialog, two modes: an asset with an open checkout can only be returned,
@@ -15,59 +20,41 @@ export function CheckoutDialog({
   openCheckout,
   onClose,
 }: {
-  asset: { id: string; name: string; postReturnStatus?: string | null };
-  openCheckout: { id: string; timeOut: string | number } | undefined;
+  asset: AssetRow;
+  openCheckout: CheckoutRow | null;
   onClose: () => void;
 }) {
   const current = useCurrent();
   const mode = openCheckout ? "return" : "checkout";
-  const [personId, setPersonId] = useState(current.user?.contact?.id ?? "");
+  // The signed-in user's own contact record, where they have one — most
+  // checkouts are to the person standing there holding the radio.
+  const [personId, setPersonId] = useState(current.user?.contact_id ?? "");
   const [when, setWhen] = useState(() => localDateTime(new Date()));
 
-  const { data } = db.useQuery({ contacts: { mergedInto: {} } });
-  const contacts = [...(data?.contacts ?? [])]
-    .filter((c) => !c.mergedInto)
+  const { data: allContacts } = useContacts();
+  const { statuses } = useAssetStatuses();
+  const contacts = allContacts
+    .filter((c) => !c.merged_into_id)
     .sort((a, b) => displayName(a).localeCompare(displayName(b)));
 
+  // Where the asset lands on return: its own post-return status if set,
+  // otherwise whichever of the marina's statuses is called "Available". A
+  // marina that has neither gets a return with no status change, which is
+  // better than inventing a status row that does not exist.
+  const postReturnStatus =
+    statuses.find((st) => st.id === asset.post_return_status_id) ??
+    resolveStatusByName(statuses, DEFAULT_POST_RETURN_STATUS);
+
   const submit = async () => {
-    const ts = new Date(when).getTime();
+    const actorId = current.user?.id ?? null;
+    // `when` is the editable backfill time, not "now" — see the field below.
+    const at = new Date(when);
     if (mode === "checkout") {
       const person = contacts.find((c) => c.id === personId);
-      await db.transact([
-        db.tx.assetCheckouts[id()]
-          .update({ timeOut: ts })
-          .link({
-            asset: asset.id,
-            ...(current.user ? { checkedOutBy: current.user.id } : {}),
-            ...(personId ? { person: personId } : {}),
-          }),
-        activityTx({
-          eventType: "asset.checked_out",
-          summary: `${asset.name} checked out to ${person ? displayName(person) : "someone"}`,
-          subjectType: "assets",
-          subjectId: asset.id,
-          actorId: current.user?.id,
-        }),
-      ]);
+      if (!person) return;
+      await checkOutAsset(asset, person, at, actorId);
     } else {
-      const postStatus = asset.postReturnStatus ?? DEFAULT_POST_RETURN_STATUS;
-      await db.transact([
-        db.tx.assetCheckouts[openCheckout!.id].update({ timeIn: ts }),
-        db.tx.assets[asset.id].update({ currentStatus: postStatus }),
-        db.tx.assetStatusLogs[id()]
-          .update({ status: postStatus, timestamp: ts, note: "Returned from checkout" })
-          .link({
-            asset: asset.id,
-            ...(current.user ? { loggedBy: current.user.id } : {}),
-          }),
-        activityTx({
-          eventType: "asset.returned",
-          summary: `${asset.name} returned — set to ${statusLabel(postStatus)}`,
-          subjectType: "assets",
-          subjectId: asset.id,
-          actorId: current.user?.id,
-        }),
-      ]);
+      await checkInAsset(asset, openCheckout!.id, postReturnStatus, at, actorId);
     }
     onClose();
   };
@@ -100,7 +87,7 @@ export function CheckoutDialog({
           </div>
         ) : (
           <p className="muted small">
-            Out since {new Date(openCheckout!.timeOut).toLocaleString()}.
+            Out since {new Date(openCheckout!.time_out).toLocaleString()}.
           </p>
         )}
 
@@ -118,8 +105,9 @@ export function CheckoutDialog({
 
         {mode === "return" && (
           <p className="muted small">
-            {asset.name} will be marked{" "}
-            {statusLabel(asset.postReturnStatus ?? DEFAULT_POST_RETURN_STATUS)}.
+            {postReturnStatus
+              ? `${asset.name} will be marked ${postReturnStatus.name}.`
+              : `${asset.name}'s status won't change — no post-return status is set.`}
           </p>
         )}
 

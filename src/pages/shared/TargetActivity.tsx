@@ -2,44 +2,33 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { statusLabel } from "../../lib/locations";
-import type { AttachmentTarget } from "../../lib/attachments";
+import { targetColumn, type AttachmentTarget } from "../../data/attachments";
+import { useNotesForTarget } from "../../data/notes";
+import { useTicketsForTarget } from "../../data/tickets";
+import { useIncidentsForTarget } from "../../data/incidents";
 import { NoteDialog } from "./NoteDialog";
 
-interface NoteRow {
-  id: string;
-  body: string;
-  createdAt: string | number;
-  author?: { name: string } | null;
-}
-interface IncidentRow {
-  id: string;
-  title: string;
-  status: string;
-}
-interface TicketRow {
-  id: string;
-  title: string;
-  priority: string;
-  status: string;
-}
-
-// The attached notes/incidents/tickets lists + create actions every
-// attachment target's detail page shares (locations, boats, vehicles, …).
-// Incidents render only with view_incidents; notes and tickets always.
-export function TargetActivity({
-  target,
-  notes,
-  incidents,
-  tickets,
-}: {
-  target: AttachmentTarget;
-  notes: NoteRow[];
-  incidents: IncidentRow[];
-  tickets: TicketRow[];
-}) {
+// The attached notes/incidents/tickets lists + create actions every attachment
+// target's detail page shares — locations, boats, vehicles, contacts, assets,
+// checkpoints.
+//
+// It fetches its own three lists rather than taking them as props. Six detail
+// pages used to each carry the same query fragments and pass the results down;
+// the target itself is enough to derive all of it, and pushing that here is
+// what keeps those pages free of the query.
+//
+// Incidents render only with view_incidents. On a device without it the query
+// also returns nothing — the rows were never synced — so the permission check
+// here is about the empty-state text, not about withholding data.
+export function TargetActivity({ target }: { target: AttachmentTarget }) {
   const current = useCurrent();
   const navigate = useNavigate();
   const [showNote, setShowNote] = useState(false);
+  const column = targetColumn(target.type);
+
+  const { data: notes } = useNotesForTarget(column, target.id);
+  const { data: incidents } = useIncidentsForTarget(column, target.id);
+  const { data: tickets } = useTicketsForTarget(column, target.id);
 
   return (
     <div className="stack">
@@ -68,22 +57,20 @@ export function TargetActivity({
       <div>
         <div className="section-title">Notes ({notes.length})</div>
         <div className="stack" style={{ gap: 6 }}>
-          {[...notes]
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-            .map((n) => (
-              <div key={n.id} className="card">
-                <div className="small" style={{ whiteSpace: "pre-wrap" }}>{n.body}</div>
-                <div className="card-meta">
-                  {n.author?.name ?? "—"} ·{" "}
-                  {new Date(n.createdAt).toLocaleString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
-                </div>
+          {notes.map((n) => (
+            <div key={n.id} className="card">
+              <div className="small" style={{ whiteSpace: "pre-wrap" }}>{n.body}</div>
+              <div className="card-meta">
+                {n.author_name ?? "—"} ·{" "}
+                {new Date(n.created_at).toLocaleString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
               </div>
-            ))}
+            </div>
+          ))}
           {notes.length === 0 && <span className="muted small">No notes yet.</span>}
         </div>
       </div>
@@ -100,7 +87,7 @@ export function TargetActivity({
                 style={{ textDecoration: "none", color: "inherit" }}
               >
                 <span>{i.title}</span>
-                <span className="badge">{statusLabel(i.status)}</span>
+                <span className="badge">{i.status_name}</span>
               </Link>
             ))}
             {incidents.length === 0 && <span className="muted small">No incidents.</span>}

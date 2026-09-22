@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useClerk } from "@clerk/clerk-react";
 import { useCurrent } from "../lib/auth/CurrentUserContext";
-import { db } from "../lib/db";
+import { useMarinaName } from "../data/settings";
 import { visibleSections, MOBILE_TAB_COUNT } from "../routes/nav";
 import { ActiveCallPanel } from "../pages/comms/ActiveCallPanel";
 import { MissedCommsBadge } from "../pages/comms/MissedCommsBadge";
@@ -11,6 +11,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { ADMIN_SECTIONS } from "../pages/admin/adminSections";
 import { InstallAppButton } from "./InstallAppButton";
 import { UpdateButton } from "./UpdateButton";
+import { SaveIndicator } from "./SaveIndicator";
 import { NfcScanToggle } from "./NfcScanToggle";
 
 // Responsive shell: persistent left sidenav on desktop, app bar + bottom tab
@@ -93,6 +94,7 @@ export function AppShell() {
             >
               Switch user
             </button>
+            <SaveIndicator />
             <InstallAppButton />
             <UpdateButton />
             <NfcScanToggle onScan={setScannedGuid} />
@@ -111,8 +113,9 @@ export function AppShell() {
         <header className="appbar">
           <span>{activeSection?.label ?? "MarinaSecure"}</span>
           <span className="row" style={{ gap: 6 }}>
+            <SaveIndicator />
             <UpdateButton />
-            <NfcScanToggle onScan={setScannedGuid} />
+            <NfcScanToggle onScan={setScannedGuid} autoStart />
           </span>
         </header>
         <main className="main">
@@ -153,9 +156,4 @@ export function AppShell() {
       </nav>
     </div>
   );
-}
-
-function useMarinaName(): string {
-  const { data } = db.useQuery({ marinaSettings: {} });
-  return data?.marinaSettings?.[0]?.marinaName ?? "Marina";
 }

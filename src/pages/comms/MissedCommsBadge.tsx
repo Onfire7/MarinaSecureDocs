@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
+import { useMissedCalls, useSmsThreads } from "../../data/comms";
 
 // The floating Missed Comms Badge (see docs/pages/dashboard.html and
 // missed-comms-detail.html): an always-visible count of missed calls plus
@@ -15,20 +15,17 @@ export function MissedCommsBadge() {
   const canCalls = current.can("view_calls");
   const canSms = current.can("view_sms");
 
-  const { data } = db.useQuery(
-    canCalls || canSms
-      ? {
-          calls: { $: { where: { missed: true } } },
-          smsThreads: { $: { where: { unread: true } } },
-        }
-      : null,
-  );
+  // Both queries run regardless of permission, and both come back empty
+  // without it: the rows were never synced to this device. The `can` checks
+  // below are about not rendering a zero badge, not about hiding data.
+  const { data: missedCalls } = useMissedCalls();
+  const { data: threads } = useSmsThreads();
 
   if (!canCalls && !canSms) return null;
 
   const count =
-    (canCalls ? (data?.calls?.length ?? 0) : 0) +
-    (canSms ? (data?.smsThreads?.length ?? 0) : 0);
+    (canCalls ? missedCalls.length : 0) +
+    (canSms ? threads.filter((t) => t.unread === 1).length : 0);
 
   // Nothing outstanding, or already looking at the worklist.
   if (count === 0 || location.pathname === "/comms/missed") return null;

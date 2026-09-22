@@ -1,5 +1,11 @@
-import { useMemo, useState } from "react";
-import { db, id } from "../../lib/db";
+import { useState } from "react";
+import {
+  createIncidentType,
+  deleteIncidentType,
+  mergeIncidentTypes,
+  renameIncidentType,
+  useIncidentTypes,
+} from "../../data/lookups";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
 
@@ -22,43 +28,30 @@ function IncidentTypes() {
   const [mergeSource, setMergeSource] = useState<string | null>(null);
   const [mergeTarget, setMergeTarget] = useState("");
 
-  const { data } = db.useQuery({ incidentTypes: { incidents: {} } });
-  const types = useMemo(
-    () =>
-      [...(data?.incidentTypes ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
-    [data],
-  );
+  const { types } = useIncidentTypes();
 
   const add = async () => {
     if (!newName.trim()) return;
-    await db.transact(db.tx.incidentTypes[id()].update({ name: newName.trim() }));
+    await createIncidentType(newName.trim());
     setNewName("");
   };
 
   const rename = async (typeId: string) => {
     if (!renameValue.trim()) return;
     // A live reference, so existing incidents show the new name automatically.
-    await db.transact(db.tx.incidentTypes[typeId].update({ name: renameValue.trim() }));
+    await renameIncidentType(typeId, renameValue.trim());
     setRenaming(null);
   };
 
   // Re-point every incident on the source type to the target, then remove the
-  // source — the safe path to removing a type that's still in use.
+  // source — the safe path to removing a type that's still in use. The
+  // re-point happens in the database rather than one write per incident,
+  // which also means it covers incidents this device does not hold.
   const merge = async (sourceId: string) => {
     if (!mergeTarget) return;
-    const source = types.find((t) => t.id === sourceId);
-    await db.transact([
-      ...(source?.incidents ?? []).map((i) =>
-        db.tx.incidents[i.id].link({ type: mergeTarget }),
-      ),
-      db.tx.incidentTypes[sourceId].delete(),
-    ]);
+    await mergeIncidentTypes(sourceId, mergeTarget);
     setMergeSource(null);
     setMergeTarget("");
-  };
-
-  const remove = async (typeId: string) => {
-    await db.transact(db.tx.incidentTypes[typeId].delete());
   };
 
   return (
@@ -85,7 +78,7 @@ function IncidentTypes() {
 
       <div className="stack" style={{ gap: 8 }}>
         {types.map((t) => {
-          const usage = (t.incidents ?? []).length;
+          const usage = t.usage;
           const inUse = usage > 0;
           return (
             <div key={t.id} className="card">
@@ -151,7 +144,7 @@ function IncidentTypes() {
                       // incidents; merge is the offered path instead.
                       disabled={inUse}
                       title={inUse ? "In use — merge it instead" : undefined}
-                      onClick={() => void remove(t.id)}
+                      onClick={() => void deleteIncidentType(t.id)}
                     >
                       Delete
                     </button>

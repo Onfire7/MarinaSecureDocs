@@ -1,5 +1,8 @@
 import { useMemo, useState } from "react";
-import { db, id } from "../../lib/db";
+import { runSetupPlan } from "../../data/setup";
+import { useLocations, useLocationTypes } from "../../data/locations";
+import { useTemplates, useTemplateSections } from "../../data/checklists";
+import { resolveStatusByName, useLocationStatuses } from "../../data/lookups";
 import {
   DEFAULT_GENERATOR,
   generateNames,
@@ -50,16 +53,6 @@ interface RowConfig {
 
 type Step = 1 | 2 | 3;
 
-/** A transaction chunk from any of the namespaces this wizard writes. */
-type TxOp =
-  | ReturnType<(typeof db.tx.locations)[string]["update"]>
-  | ReturnType<(typeof db.tx.checkpoints)[string]["update"]>
-  | ReturnType<(typeof db.tx.checklistTemplateSections)[string]["update"]>
-  | ReturnType<(typeof db.tx.tours)[string]["update"]>
-  | ReturnType<(typeof db.tx.checklistTemplates)[string]["link"]>;
-
-const CHUNK = 150;
-
 /**
  * Pluralizes an admin-defined type name. These are arbitrary strings
  * ("Slip", "Place", "Boathouse"), so the naive `+ "ren"` for children read
@@ -97,20 +90,17 @@ function SetupWizard() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
-  const { data } = db.useQuery({
-    locations: { parent: {}, type: {}, checkpoints: {} },
-    locationTypes: {},
-    checklistTemplates: { $: { where: { triggerType: "checkpoint" } }, sections: {} },
-  });
-
-  const locations = useMemo(() => data?.locations ?? [], [data]);
-  const types = useMemo(() => data?.locationTypes ?? [], [data]);
-  const templates = data?.checklistTemplates ?? [];
+  const { data: locations } = useLocations();
+  const { data: types } = useLocationTypes();
+  const { data: allTemplates } = useTemplates();
+  const { data: allSections } = useTemplateSections();
+  const { statuses: locationStatuses } = useLocationStatuses();
+  const templates = allTemplates.filter((t) => t.trigger_type === "checkpoint");
 
   const childrenOf = useMemo(() => {
     const m = new Map<string, typeof locations>();
     for (const l of locations) {
-      const key = l.parent?.id ?? "";
+      const key = l.parent_id ?? "";
       const list = m.get(key) ?? [];
       list.push(l);
       m.set(key, list);
@@ -123,7 +113,7 @@ function SetupWizard() {
   const existingContainers = useMemo(() => {
     if (!anchorId) return [];
     return (childrenOf.get(anchorId) ?? []).filter((l) =>
-      containerTypeId ? l.type?.id === containerTypeId : true,
+      containerTypeId ? l.location_type_id === containerTypeId : true,
     );
   }, [anchorId, containerTypeId, childrenOf]);
 
@@ -227,119 +217,34 @@ function SetupWizard() {
     setCommitting(true);
     setError(null);
     try {
-      const containerTracks = Boolean(
-        types.find((t) => t.id === containerTypeId)?.tracksStatus,
+      // A new location starts in whichever status the marina calls vacant, if
+      // it has one and its type tracks status at all. No status is a valid
+      // answer, and better than one that matches no row.
+      const vacant = resolveStatusByName(locationStatuses, "Vacant");
+      const tracks = (typeId: string) =>
+        types.find((t) => t.id === typeId)?.tracks_status === 1;
+
+      await runSetupPlan(
+        {
+          anchorId: anchorId || null,
+          containerTypeId,
+          childTypeId,
+          containerStatusId: tracks(containerTypeId) ? (vacant?.id ?? null) : null,
+          childStatusId: tracks(childTypeId) ? (vacant?.id ?? null) : null,
+          childCheckpoints,
+          containers: plan.map((p) => ({
+            existingId: p.row.existingId,
+            name: p.row.name,
+            checkpoint: p.row.checkpoint,
+            children: p.fresh,
+          })),
+          tour: tourName.trim() ? { name: tourName.trim(), mode: tourMode } : null,
+          templateId: templateId || null,
+          templateSectionStart: allSections.filter((x) => x.template_id === templateId)
+            .length,
+        },
+        (written, total) => setProgress(`Writing ${written} of ${total}…`),
       );
-      const childTracks = Boolean(
-        types.find((t) => t.id === childTypeId)?.tracksStatus,
-      );
-
-      // Ordered so anything linked-to is created in an earlier chunk than
-      // the thing linking to it — chunking is what keeps a 900-slip marina
-      // from going out as one enormous transaction.
-      const containerOps: TxOp[] = [];
-      const childOps: TxOp[] = [];
-      const checkpointOps: TxOp[] = [];
-      // Location rides along per checkpoint: checklist attachment is now via
-      // template sections, and a section belongs to exactly one location.
-      const newCheckpoints: { id: string; locationId: string; locationName: string }[] = [];
-
-      for (const p of plan) {
-        const containerId = p.row.existingId ?? id();
-        if (!p.row.existingId) {
-          containerOps.push(
-            db.tx.locations[containerId]
-              .update({
-                name: p.row.name,
-                reservationEnabled: false,
-                ...(containerTracks ? { status: "vacant" } : {}),
-              })
-              .link({
-                type: containerTypeId,
-                ...(anchorId ? { parent: anchorId } : {}),
-              }),
-          );
-        }
-
-        if (p.row.checkpoint) {
-          const cpId = id();
-          newCheckpoints.push({ id: cpId, locationId: containerId, locationName: p.row.name });
-          checkpointOps.push(
-            db.tx.checkpoints[cpId]
-              .update({ name: p.row.name, guidUrl: crypto.randomUUID() })
-              .link({ location: containerId }),
-          );
-        }
-
-        for (const childName of p.fresh) {
-          const childId = id();
-          childOps.push(
-            db.tx.locations[childId]
-              .update({
-                name: childName,
-                reservationEnabled: false,
-                ...(childTracks ? { status: "vacant" } : {}),
-              })
-              .link({ type: childTypeId, parent: containerId }),
-          );
-          if (childCheckpoints) {
-            const cpId = id();
-            newCheckpoints.push({ id: cpId, locationId: childId, locationName: childName });
-            checkpointOps.push(
-              db.tx.checkpoints[cpId]
-                .update({ name: childName, guidUrl: crypto.randomUUID() })
-                .link({ location: childId }),
-            );
-          }
-        }
-      }
-      const newCheckpointIds = newCheckpoints.map((c) => c.id);
-
-      const tailOps: TxOp[] = [];
-      if (tourName.trim() && newCheckpointIds.length > 0) {
-        tailOps.push(
-          db.tx.tours[id()]
-            .update({
-              name: tourName.trim(),
-              mode: tourMode,
-              ...(tourMode === "linear" ? { checkpointOrder: newCheckpointIds } : {}),
-            })
-            .link({ checkpoints: newCheckpointIds }),
-        );
-      }
-      if (templateId && newCheckpoints.length > 0) {
-        // Checkpoint attachment lives on template sections now, and a
-        // section has exactly one location — so the batch becomes one
-        // checkpoint-triggered section per location, named after it.
-        const template = templates.find((t) => t.id === templateId);
-        let order = template?.sections?.length ?? 0;
-        const byLocation = new Map<string, { name: string; cpIds: string[] }>();
-        for (const cp of newCheckpoints) {
-          const group = byLocation.get(cp.locationId) ?? { name: cp.locationName, cpIds: [] };
-          group.cpIds.push(cp.id);
-          byLocation.set(cp.locationId, group);
-        }
-        for (const [locationId, group] of byLocation) {
-          tailOps.push(
-            db.tx.checklistTemplateSections[id()]
-              .update({
-                name: group.name,
-                order: order++,
-                isActive: true,
-                triggerType: "checkpoint",
-              })
-              .link({ template: templateId, location: locationId, checkpoints: group.cpIds }),
-          );
-        }
-      }
-
-      const ordered = [...containerOps, ...childOps, ...checkpointOps, ...tailOps];
-      for (let i = 0; i < ordered.length; i += CHUNK) {
-        setProgress(
-          `Writing ${Math.min(i + CHUNK, ordered.length)} of ${ordered.length}…`,
-        );
-        await db.transact(ordered.slice(i, i + CHUNK));
-      }
 
       setDone(
         `Created ${plural(totals.newContainerCount, containerTypeName || "container")}, ` +

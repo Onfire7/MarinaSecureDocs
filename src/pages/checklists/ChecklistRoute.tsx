@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { db } from "../../lib/db";
+import { useInstance } from "../../data/checklists";
 import { ActiveChecklistPage } from "./ActiveChecklistPage";
 import { ChecklistDetailPage } from "./ChecklistDetailPage";
 
@@ -8,10 +8,8 @@ import { ChecklistDetailPage } from "./ChecklistDetailPage";
 // read-only Checklist Detail (see pages/checklist-list.html — Actions).
 export function ChecklistRoute() {
   const { id } = useParams();
-  const { data, isLoading } = db.useQuery(
-    id ? { checklistInstances: { $: { where: { id } } } } : null,
-  );
-  const status = data?.checklistInstances?.[0]?.status;
+  const { instance, isLoading } = useInstance(id);
+  const status = instance?.status;
 
   if (isLoading) {
     return (

@@ -1,10 +1,17 @@
 import { useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
-import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { displayName, isNameless } from "../../lib/contacts";
 import { TargetActivity } from "../shared/TargetActivity";
 import { NamelessContactDialog } from "./NamelessContactDialog";
+import {
+  saveContact,
+  useContact,
+  useMergedContacts,
+  type ContactRow,
+} from "../../data/contacts";
+import { useContactCraft } from "../../data/boats";
+import { useLeasesForContact } from "../../data/leases";
 
 // Owners & Contacts — Contact Detail (see docs/pages/contact-detail.html).
 // Assumes a named contact: a nameless one routes into the name/merge prompt
@@ -19,24 +26,10 @@ export function ContactDetailPage() {
   const [editing, setEditing] = useState(false);
   const [dismissedPrompt, setDismissedPrompt] = useState(false);
 
-  const { data } = db.useQuery(
-    canView && contactId
-      ? {
-          contacts: {
-            $: { where: { id: contactId } },
-            mergedInto: {},
-            mergedFrom: {},
-            ownedBoats: {},
-            authorizedBoats: {},
-            leases: { location: {} },
-            notes: { author: {} },
-            incidents: {},
-            tickets: {},
-          },
-        }
-      : null,
-  );
-  const contact = data?.contacts?.[0];
+  const { contact } = useContact(contactId);
+  const { data: craft } = useContactCraft(contactId);
+  const { data: leases } = useLeasesForContact(contactId);
+  const { data: mergedFrom } = useMergedContacts(contactId);
 
   if (!canView) {
     return (
@@ -54,8 +47,8 @@ export function ContactDetailPage() {
   }
 
   // Viewing a merged-away record shows the canonical person instead.
-  if (contact.mergedInto) {
-    return <Navigate to={`/contacts/${contact.mergedInto.id}`} replace />;
+  if (contact.merged_into_id) {
+    return <Navigate to={`/contacts/${contact.merged_into_id}`} replace />;
   }
 
   if (isNameless(contact) && !dismissedPrompt) {
@@ -70,7 +63,10 @@ export function ContactDetailPage() {
     );
   }
 
-  const leases = contact.leases ?? [];
+  const ownedBoats = craft.filter((c) => c.kind === "boat" && c.role === "Owner");
+  const authorizedBoats = craft.filter(
+    (c) => c.kind === "boat" && c.role === "Authorized",
+  );
 
   return (
     <div>
@@ -107,36 +103,36 @@ export function ContactDetailPage() {
         <div className="stack">
           {editing && <EditContact contact={contact} onDone={() => setEditing(false)} />}
 
-          {(contact.ownedBoats ?? []).length > 0 && (
+          {ownedBoats.length > 0 && (
             <div>
               <div className="section-title">Boats owned</div>
               <div className="stack" style={{ gap: 6 }}>
-                {(contact.ownedBoats ?? []).map((b) => (
+                {ownedBoats.map((b) => (
                   <Link
                     key={b.id}
                     to={`/boats/${b.id}`}
                     className="card"
                     style={{ textDecoration: "none", color: "inherit", display: "block" }}
                   >
-                    {b.name}
+                    {b.label}
                   </Link>
                 ))}
               </div>
             </div>
           )}
 
-          {(contact.authorizedBoats ?? []).length > 0 && (
+          {authorizedBoats.length > 0 && (
             <div>
               <div className="section-title">Authorized on</div>
               <div className="stack" style={{ gap: 6 }}>
-                {(contact.authorizedBoats ?? []).map((b) => (
+                {authorizedBoats.map((b) => (
                   <Link
                     key={b.id}
                     to={`/boats/${b.id}`}
                     className="card"
                     style={{ textDecoration: "none", color: "inherit", display: "block" }}
                   >
-                    {b.name}
+                    {b.label}
                   </Link>
                 ))}
               </div>
@@ -154,10 +150,10 @@ export function ContactDetailPage() {
                     className="card spread"
                     style={{ textDecoration: "none", color: "inherit" }}
                   >
-                    <span>{l.location?.name ?? "Lease"}</span>
+                    <span>{l.location_name ?? "Lease"}</span>
                     <span className="muted small">
-                      {l.endDate
-                        ? `through ${new Date(l.endDate).toLocaleDateString()}`
+                      {l.end_date
+                        ? `through ${new Date(l.end_date).toLocaleDateString()}`
                         : "open-ended"}
                     </span>
                   </Link>
@@ -166,20 +162,17 @@ export function ContactDetailPage() {
             </div>
           )}
 
-          {(contact.mergedFrom ?? []).length > 0 && canEdit && (
+          {mergedFrom.length > 0 && canEdit && (
             <p className="muted small">
-              {(contact.mergedFrom ?? []).length} other record
-              {(contact.mergedFrom ?? []).length === 1 ? " has" : "s have"} been merged
-              into this contact.
+              {mergedFrom.length} other record
+              {mergedFrom.length === 1 ? " has" : "s have"} been merged into this
+              contact.
             </p>
           )}
         </div>
 
         <TargetActivity
           target={{ type: "contact", id: contact.id, label: displayName(contact) }}
-          notes={contact.notes ?? []}
-          incidents={contact.incidents ?? []}
-          tickets={contact.tickets ?? []}
         />
       </div>
     </div>
@@ -190,9 +183,10 @@ function EditContact({
   contact,
   onDone,
 }: {
-  contact: { id: string; name?: string | null; phone?: string | null; email?: string | null };
+  contact: ContactRow;
   onDone: () => void;
 }) {
+  const current = useCurrent();
   const [form, setForm] = useState({
     name: contact.name ?? "",
     phone: contact.phone ?? "",
@@ -200,12 +194,14 @@ function EditContact({
   });
 
   const save = async () => {
-    await db.transact(
-      db.tx.contacts[contact.id].update({
+    await saveContact(
+      contact,
+      {
         name: form.name.trim(),
-        phone: form.phone.trim() || undefined,
-        email: form.email.trim() || undefined,
-      }),
+        phone: form.phone.trim() || null,
+        email: form.email.trim() || null,
+      },
+      current.user?.id ?? null,
     );
     onDone();
   };

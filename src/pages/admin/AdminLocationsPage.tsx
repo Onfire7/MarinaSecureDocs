@@ -1,16 +1,52 @@
 import { useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { db, id } from "../../lib/db";
 import {
   compareNames,
-  statusLabel,
-  STANDARD_STATUSES,
-  DEFAULT_POST_RESERVATION_STATUS,
   DEFAULT_PLACEMENT_STYLE,
   placementStyle,
   type PlacementShape,
 } from "../../lib/locations";
+import {
+  bulkUpdateLocations,
+  createPlacement,
+  deleteLocationType,
+  deleteMarinaMap,
+  deletePlacement,
+  placementOf,
+  saveLocation,
+  saveLocationType,
+  saveMarinaMap,
+  savePlacement,
+  setTypeParents,
+  deleteLocationWithPlacements,
+  useLocationDependencies,
+  useLocations,
+  useLocationTypeParents,
+  useLocationTypes,
+  useMarinaMaps,
+  usePlacements,
+  type LocationInput,
+  type LocationRow,
+  type LocationTypeRow,
+  type MarinaMapRow,
+} from "../../data/locations";
+import {
+  DEFAULT_POST_RESERVATION_STATUS,
+  resolveStatusByName,
+  useLocationStatuses,
+} from "../../data/lookups";
+import {
+  createCheckpoint,
+  deleteCheckpoint,
+  saveCheckpoint,
+  useCheckpoints,
+  type CheckpointRow,
+} from "../../data/checkpoints";
+import { useLeases } from "../../data/leases";
+import { attachmentUrl, captureAttachment } from "../../data/files";
 import { LocationPicker, type PickerLocation } from "../shared/LocationPicker";
+import { runSetupPlan } from "../../data/setup";
+import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { NfcWriteDialog } from "../shared/NfcWriteDialog";
 import { NameGeneratorDialog } from "./NameGeneratorDialog";
 import { AdminGate } from "./AdminGate";
@@ -118,21 +154,21 @@ function BulkEditTab() {
   const [postStatus, setPostStatus] = useState("");
   const [result, setResult] = useState<string | null>(null);
 
-  const { data } = db.useQuery({
-    locations: { type: {}, parent: {}, leases: {} },
-    locationTypes: {},
-  });
+  const { data: allLocations } = useLocations();
+  const { data: types } = useLocationTypes();
+  const { data: leases } = useLeases();
+  const { statuses } = useLocationStatuses();
   const locations = useMemo(
-    () => [...(data?.locations ?? [])].sort((a, b) => compareNames(a.name, b.name)),
-    [data],
+    () => [...allLocations].sort((a, b) => compareNames(a.name, b.name)),
+    [allLocations],
   );
-  const types = data?.locationTypes ?? [];
   const pathOf = useMemo(() => locationPathResolver(locations), [locations]);
+  const typeOf = (l: LocationRow) => types.find((t) => t.id === l.location_type_id);
 
   const shown = useMemo(() => {
     const q = filter.trim().toLowerCase();
     return locations.filter((l) => {
-      if (typeFilter && l.type?.id !== typeFilter) return false;
+      if (typeFilter && l.location_type_id !== typeFilter) return false;
       if (!q) return true;
       return (l.name + " " + pathOf(l.id)).toLowerCase().includes(q);
     });
@@ -152,25 +188,25 @@ function BulkEditTab() {
 
   const apply = (
     what: string,
-    build: (l: (typeof locations)[number]) => Record<string, unknown> | null,
+    build: (l: LocationRow) => Partial<LocationInput> | null,
   ) => {
-    const txns = [];
+    const edits: { id: string; changes: Partial<LocationInput> }[] = [];
     let skipped = 0;
     for (const l of chosen) {
-      const fields = build(l);
-      if (!fields) {
+      const changes = build(l);
+      if (!changes) {
         skipped++;
         continue;
       }
-      txns.push(db.tx.locations[l.id].update(fields));
+      edits.push({ id: l.id, changes });
     }
-    if (txns.length === 0) {
+    if (edits.length === 0) {
       setResult(`Nothing to do — ${what} applies to none of the ${chosen.length} selected.`);
       return;
     }
-    void db.transact(txns);
+    void bulkUpdateLocations(edits);
     setResult(
-      `${what} on ${txns.length} location${txns.length === 1 ? "" : "s"}` +
+      `${what} on ${edits.length} location${edits.length === 1 ? "" : "s"}` +
         (skipped > 0 ? ` · ${skipped} skipped — their type doesn't allow it` : ""),
     );
   };
@@ -179,10 +215,11 @@ function BulkEditTab() {
   // and worth saying out loud rather than asking two hundred times.
   const now = Date.now();
   const leasedAndChosen = chosen.filter((l) =>
-    (l.leases ?? []).some(
+    leases.some(
       (x) =>
-        (!x.startDate || new Date(x.startDate).getTime() <= now) &&
-        (!x.endDate || new Date(x.endDate).getTime() >= now),
+        x.location_id === l.id &&
+        (!x.start_date || new Date(x.start_date).getTime() <= now) &&
+        (!x.end_date || new Date(x.end_date).getTime() >= now),
     ),
   ).length;
 
@@ -244,12 +281,18 @@ function BulkEditTab() {
                 className="btn btn-sm"
                 onClick={() =>
                   apply("Reservations enabled", (l) =>
-                    l.type?.allowsReservations
+                    typeOf(l)?.allows_reservations === 1
                       ? {
                           reservationEnabled: true,
-                          ...(l.postReservationStatus
-                            ? {}
-                            : { postReservationStatus: DEFAULT_POST_RESERVATION_STATUS }),
+                          // Only where the location has no post-checkout status
+                          // of its own, and only if the marina has defined one
+                          // by that name — a null here means "unchanged".
+                          postReservationStatusId: l.post_reservation_status_id
+                            ? undefined
+                            : (resolveStatusByName(
+                                statuses,
+                                DEFAULT_POST_RESERVATION_STATUS,
+                              )?.id ?? undefined),
                         }
                       : null,
                   )
@@ -262,7 +305,9 @@ function BulkEditTab() {
                 className="btn btn-sm"
                 onClick={() =>
                   apply("Reservations disabled", (l) =>
-                    l.type?.allowsReservations ? { reservationEnabled: false } : null,
+                    typeOf(l)?.allows_reservations === 1
+                      ? { reservationEnabled: false }
+                      : null,
                   )
                 }
               >
@@ -279,7 +324,7 @@ function BulkEditTab() {
                 className="btn btn-sm"
                 onClick={() =>
                   apply("Leases enabled", (l) =>
-                    l.type?.allowsLeases ? { leaseEnabled: true } : null,
+                    typeOf(l)?.allows_leases === 1 ? { leaseEnabled: true } : null,
                   )
                 }
               >
@@ -290,7 +335,7 @@ function BulkEditTab() {
                 className="btn btn-sm"
                 onClick={() =>
                   apply("Leases disabled", (l) =>
-                    l.type?.allowsLeases ? { leaseEnabled: false } : null,
+                    typeOf(l)?.allows_leases === 1 ? { leaseEnabled: false } : null,
                   )
                 }
               >
@@ -308,9 +353,9 @@ function BulkEditTab() {
                 onChange={(e) => setStatus(e.target.value)}
               >
                 <option value="">Pick a status…</option>
-                {STANDARD_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {statusLabel(s)}
+                {statuses.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
                   </option>
                 ))}
               </select>
@@ -319,8 +364,9 @@ function BulkEditTab() {
                 className="btn btn-sm"
                 disabled={!status}
                 onClick={() =>
-                  apply(`Status set to ${statusLabel(status)}`, (l) =>
-                    l.type?.tracksStatus ? { status } : null,
+                  apply(
+                    `Status set to ${statuses.find((s) => s.id === status)?.name ?? "—"}`,
+                    (l) => (typeOf(l)?.tracks_status === 1 ? { statusId: status } : null),
                   )
                 }
               >
@@ -338,9 +384,9 @@ function BulkEditTab() {
                 onChange={(e) => setPostStatus(e.target.value)}
               >
                 <option value="">Pick a status…</option>
-                {STANDARD_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {statusLabel(s)}
+                {statuses.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
                   </option>
                 ))}
               </select>
@@ -349,10 +395,14 @@ function BulkEditTab() {
                 className="btn btn-sm"
                 disabled={!postStatus}
                 onClick={() =>
-                  apply(`Post-checkout status set to ${statusLabel(postStatus)}`, (l) =>
-                    l.type?.allowsReservations
-                      ? { postReservationStatus: postStatus }
-                      : null,
+                  apply(
+                    `Post-checkout status set to ${
+                      statuses.find((s) => s.id === postStatus)?.name ?? "—"
+                    }`,
+                    (l) =>
+                      typeOf(l)?.allows_reservations === 1
+                        ? { postReservationStatusId: postStatus }
+                        : null,
                   )
                 }
               >
@@ -387,19 +437,19 @@ function BulkEditTab() {
             <span style={{ minWidth: 0, flex: 1 }}>
               <span className="card-title">{l.name}</span>
               <span className="card-meta" style={{ display: "block" }}>
-                {pathOf(l.id)} · {l.type?.name ?? "no type"}
-                {l.type?.tracksStatus && ` · ${statusLabel(l.status)}`}
+                {pathOf(l.id)} · {l.type_name ?? "no type"}
+                {l.tracks_status === 1 && ` · ${l.status_name ?? "—"}`}
               </span>
             </span>
             <span className="row" style={{ gap: 4, flex: "none" }}>
-              {l.type?.allowsReservations && (
-                <span className={l.reservationEnabled ? "badge badge-good" : "badge"}>
-                  {l.reservationEnabled ? "Reservable" : "Not reservable"}
+              {typeOf(l)?.allows_reservations === 1 && (
+                <span className={l.reservation_enabled === 1 ? "badge badge-good" : "badge"}>
+                  {l.reservation_enabled === 1 ? "Reservable" : "Not reservable"}
                 </span>
               )}
-              {l.type?.allowsLeases && (
-                <span className={l.leaseEnabled ? "badge badge-good" : "badge"}>
-                  {l.leaseEnabled ? "Leasable" : "Not leasable"}
+              {typeOf(l)?.allows_leases === 1 && (
+                <span className={l.lease_enabled === 1 ? "badge badge-good" : "badge"}>
+                  {l.lease_enabled === 1 ? "Leasable" : "Not leasable"}
                 </span>
               )}
             </span>
@@ -417,25 +467,20 @@ function BulkEditTab() {
 
 function TypesTab() {
   const [name, setName] = useState("");
-  const { data } = db.useQuery({
-    locationTypes: { validParentTypes: {}, locations: {} },
-  });
-  const types = useMemo(
-    () => [...(data?.locationTypes ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
-    [data],
-  );
+  const { data: types } = useLocationTypes();
+  const { data: locations } = useLocations();
+  const { data: typeParents } = useLocationTypeParents();
 
   const add = async () => {
     if (!name.trim()) return;
-    await db.transact(
-      db.tx.locationTypes[id()].update({
-        name: name.trim(),
-        allowsReservations: false,
-        hasBoat: false,
-        hasVehicle: false,
-        tracksStatus: false,
-      }),
-    );
+    await saveLocationType({
+      name: name.trim(),
+      allowsReservations: false,
+      allowsLeases: false,
+      hasBoat: false,
+      hasVehicle: false,
+      tracksStatus: false,
+    });
     setName("");
   };
 
@@ -461,10 +506,19 @@ function TypesTab() {
 
       <div className="stack" style={{ gap: 8 }}>
         {types.map((t) => {
-          const inUse = (t.locations ?? []).length;
-          const update = (fields: Record<string, unknown>) =>
-            void db.transact(db.tx.locationTypes[t.id].update(fields));
-          const parentIds = (t.validParentTypes ?? []).map((p) => p.id);
+          const inUse = locations.filter((l) => l.location_type_id === t.id).length;
+          const flags = {
+            tracksStatus: t.tracks_status === 1,
+            allowsReservations: t.allows_reservations === 1,
+            allowsLeases: t.allows_leases === 1,
+            hasBoat: t.has_boat === 1,
+            hasVehicle: t.has_vehicle === 1,
+          };
+          const update = (changes: Partial<typeof flags> & { name?: string }) =>
+            void saveLocationType({ id: t.id, name: t.name, ...flags, ...changes });
+          const parentIds = typeParents
+            .filter((p) => p.child_type_id === t.id)
+            .map((p) => p.parent_type_id);
 
           return (
             <div key={t.id} className="card">
@@ -488,7 +542,7 @@ function TypesTab() {
                   // them, so it's blocked until they're reassigned.
                   disabled={inUse > 0}
                   title={inUse > 0 ? "Reassign its locations first" : undefined}
-                  onClick={() => void db.transact(db.tx.locationTypes[t.id].delete())}
+                  onClick={() => void deleteLocationType(t.id)}
                 >
                   Delete
                 </button>
@@ -507,7 +561,7 @@ function TypesTab() {
                   <label key={key} className="row" style={{ cursor: "pointer" }}>
                     <input
                       type="checkbox"
-                      checked={Boolean(t[key])}
+                      checked={flags[key]}
                       onChange={(e) => update({ [key]: e.target.checked })}
                     />
                     <span className="small">{label}</span>
@@ -526,10 +580,11 @@ function TypesTab() {
                           type="checkbox"
                           checked={parentIds.includes(o.id)}
                           onChange={(e) =>
-                            void db.transact(
+                            void setTypeParents(
+                              t.id,
                               e.target.checked
-                                ? db.tx.locationTypes[t.id].link({ validParentTypes: o.id })
-                                : db.tx.locationTypes[t.id].unlink({ validParentTypes: o.id }),
+                                ? [...parentIds, o.id]
+                                : parentIds.filter((x) => x !== o.id),
                             )
                           }
                         />
@@ -575,20 +630,18 @@ function LocationsTab() {
     }
   });
 
-  const { data } = db.useQuery({
-    locations: { type: {}, parent: {}, checkpoints: {} },
-    locationTypes: {},
-  });
+  const { data: allLocations } = useLocations();
+  const { data: types } = useLocationTypes();
+  const { data: checkpoints } = useCheckpoints();
   const locations = useMemo(
-    () => [...(data?.locations ?? [])].sort((a, b) => compareNames(a.name, b.name)),
-    [data],
+    () => [...allLocations].sort((a, b) => compareNames(a.name, b.name)),
+    [allLocations],
   );
-  const types = data?.locationTypes ?? [];
 
   const childrenOf = useMemo(() => {
     const m = new Map<string | null, typeof locations>();
     for (const l of locations) {
-      const key = l.parent?.id ?? null;
+      const key = l.parent_id ?? null;
       const list = m.get(key) ?? [];
       list.push(l);
       m.set(key, list);
@@ -632,11 +685,11 @@ function LocationsTab() {
     );
     const visible = new Set<string>(matches);
     for (const mid of matches) {
-      let cursor = byId.get(mid)?.parent?.id;
+      let cursor = byId.get(mid)?.parent_id ?? undefined;
       let guard = 0;
       while (cursor && guard++ < 30) {
         visible.add(cursor);
-        cursor = byId.get(cursor)?.parent?.id;
+        cursor = byId.get(cursor)?.parent_id ?? undefined;
       }
     }
     return { visibleIds: visible, matchIds: matches };
@@ -674,6 +727,7 @@ function LocationsTab() {
           location={l}
           types={types}
           allLocations={locations}
+          checkpoints={checkpoints.filter((c) => c.location_id === l.id)}
           depth={depth}
           childCount={descendantCount.get(l.id) ?? 0}
           hasChildren={kids.length > 0}
@@ -728,7 +782,7 @@ function LocationsTab() {
           can't be scoped yet.
         </span>
       )}
-      {locations.filter((l) => !l.parent).length === 0 && locations.length === 0 && (
+      {locations.filter((l) => !l.parent_id).length === 0 && locations.length === 0 && (
         <span className="badge badge-warn">
           No root location yet — one is required before an overview map can be
           uploaded.
@@ -760,31 +814,11 @@ function LocationsTab() {
   );
 }
 
-type LocationRowType = {
-  id: string;
-  name: string;
-  status?: string;
-  reservationEnabled: boolean;
-  leaseEnabled?: boolean;
-  reservationVisibility?: string | null;
-  postReservationStatus?: string | null;
-  gpsLat?: number;
-  gpsLng?: number;
-  type?: {
-    id: string;
-    name: string;
-    allowsReservations?: boolean;
-    allowsLeases?: boolean;
-    tracksStatus?: boolean;
-  } | null;
-  parent?: { id: string; name: string } | null;
-  checkpoints?: { id: string; name: string; guidUrl: string; gpsValidationRadius?: number }[];
-};
-
 function LocationRow({
   location,
   types,
   allLocations,
+  checkpoints,
   depth,
   childCount,
   hasChildren,
@@ -793,15 +827,11 @@ function LocationRow({
   expanded,
   onSelect,
 }: {
-  location: LocationRowType;
-  types: {
-    id: string;
-    name: string;
-    allowsReservations?: boolean;
-    allowsLeases?: boolean;
-    tracksStatus?: boolean;
-  }[];
+  location: LocationRow;
+  types: LocationTypeRow[];
   allLocations: PickerLocation[];
+  /** This location's own checkpoints. */
+  checkpoints: CheckpointRow[];
   depth: number;
   childCount: number;
   hasChildren: boolean;
@@ -810,34 +840,32 @@ function LocationRow({
   expanded: boolean;
   onSelect: () => void;
 }) {
-  const update = (fields: Record<string, unknown>) =>
-    void db.transact(db.tx.locations[location.id].update(fields));
+  const { statuses } = useLocationStatuses();
+  const update = (changes: Partial<LocationInput>) =>
+    void saveLocation(location.id, changes);
 
-  const locationType = types.find((t) => t.id === location.type?.id);
-  const typeAllowsReservations = locationType?.allowsReservations;
-  const typeAllowsLeases = locationType?.allowsLeases;
-  const tracksStatus = Boolean(locationType?.tracksStatus ?? location.type?.tracksStatus);
+  const locationType = types.find((t) => t.id === location.location_type_id);
+  const typeAllowsReservations = locationType?.allows_reservations === 1;
+  const typeAllowsLeases = locationType?.allows_leases === 1;
+  const tracksStatus = location.tracks_status === 1;
 
   // Named after its location and renamed inline on the row below if that's
   // wrong — which it rarely is, since a checkpoint is nearly always "the
   // checkpoint at <this location>". Prompting first made every one of them a
   // modal round-trip for a name the admin had just typed.
   const addCheckpoint = async () => {
-    const existing = (location.checkpoints ?? []).length;
-    await db.transact(
-      db.tx.checkpoints[id()]
-        .update({
-          name: existing === 0 ? location.name : `${location.name} ${existing + 1}`,
-          // Auto-generated, never user-entered — this is the value the
-          // physical NFC tag / QR code encodes.
-          guidUrl: crypto.randomUUID(),
-          // Defaults from the location; per-checkpoint GPS radius falls back
-          // to the marina default until overridden.
-          ...(location.gpsLat != null ? { gpsLat: location.gpsLat } : {}),
-          ...(location.gpsLng != null ? { gpsLng: location.gpsLng } : {}),
-        })
-        .link({ location: location.id }),
-    );
+    const existing = checkpoints.length;
+    await createCheckpoint({
+      name: existing === 0 ? location.name : `${location.name} ${existing + 1}`,
+      // Auto-generated, never user-entered — this is the value the physical
+      // NFC tag or QR code encodes.
+      guidUrl: crypto.randomUUID(),
+      locationId: location.id,
+      // Defaults from the location; per-checkpoint GPS radius falls back to
+      // the marina default until overridden.
+      gpsLat: location.gps_lat,
+      gpsLng: location.gps_lng,
+    });
   };
 
   return (
@@ -854,12 +882,11 @@ function LocationRow({
           <span style={{ minWidth: 0 }}>
             <span className="card-title">{location.name}</span>
             <span className="card-meta" style={{ display: "block" }}>
-              {location.type?.name ?? "No type"}
-              {tracksStatus && ` · ${statusLabel(location.status)}`}
+              {location.type_name ?? "No type"}
+              {tracksStatus && ` · ${location.status_name ?? "—"}`}
               {/* Say what's inside before you open it. */}
               {hasChildren && ` · ${childCount} inside`}
-              {(location.checkpoints ?? []).length > 0 &&
-                ` · ${(location.checkpoints ?? []).length} checkpoint(s)`}
+              {checkpoints.length > 0 && ` · ${checkpoints.length} checkpoint(s)`}
             </span>
           </span>
         </span>
@@ -884,14 +911,13 @@ function LocationRow({
                   <span className="field-label">Status</span>
                   <select
                     className="select select-inline"
-                    value={location.status ?? "vacant"}
-                    onChange={(e) => update({ status: e.target.value })}
+                    value={location.status_id ?? ""}
+                    onChange={(e) => update({ statusId: e.target.value || null })}
                   >
-                    {[
-                      ...new Set([...STANDARD_STATUSES, location.status ?? "vacant"]),
-                    ].map((s) => (
-                      <option key={s} value={s}>
-                        {statusLabel(s)}
+                    <option value="">—</option>
+                    {statuses.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
                       </option>
                     ))}
                   </select>
@@ -902,19 +928,9 @@ function LocationRow({
                 <span className="field-label">Parent</span>
                 <LocationPicker
                   locations={allLocations}
-                  value={location.parent?.id ?? ""}
+                  value={location.parent_id ?? ""}
                   excludeId={location.id}
-                  onChange={(parentId) =>
-                    void db.transact(
-                      parentId
-                        ? db.tx.locations[location.id].link({ parent: parentId })
-                        : location.parent
-                          ? db.tx.locations[location.id].unlink({
-                              parent: location.parent.id,
-                            })
-                          : db.tx.locations[location.id].update({}),
-                    )
-                  }
+                  onChange={(parentId) => update({ parentId: parentId || null })}
                 />
               </div>
               <div className="field">
@@ -924,14 +940,14 @@ function LocationRow({
                     className="input select-inline"
                     placeholder="lat"
                     aria-label="Latitude"
-                    value={location.gpsLat}
+                    value={location.gps_lat}
                     onCommit={(gpsLat) => update({ gpsLat })}
                   />
                   <DraftNumberInput
                     className="input select-inline"
                     placeholder="lng"
                     aria-label="Longitude"
-                    value={location.gpsLng}
+                    value={location.gps_lng}
                     onCommit={(gpsLng) => update({ gpsLng })}
                   />
                 </div>
@@ -943,7 +959,7 @@ function LocationRow({
                   <label className="row" style={{ cursor: "pointer" }}>
                     <input
                       type="checkbox"
-                      checked={Boolean(location.leaseEnabled)}
+                      checked={location.lease_enabled === 1}
                       onChange={(e) => update({ leaseEnabled: e.target.checked })}
                     />
                     <span className="small">Can be leased</span>
@@ -957,23 +973,30 @@ function LocationRow({
                   <label className="row" style={{ cursor: "pointer" }}>
                     <input
                       type="checkbox"
-                      checked={location.reservationEnabled}
+                      checked={location.reservation_enabled === 1}
                       onChange={(e) =>
                         update({
                           reservationEnabled: e.target.checked,
-                          ...(e.target.checked && !location.postReservationStatus
-                            ? { postReservationStatus: DEFAULT_POST_RESERVATION_STATUS }
-                            : {}),
+                          // Seed the post-checkout status only when the
+                          // location has none, and only if the marina has
+                          // defined one by that name.
+                          postReservationStatusId:
+                            e.target.checked && !location.post_reservation_status_id
+                              ? (resolveStatusByName(
+                                  statuses,
+                                  DEFAULT_POST_RESERVATION_STATUS,
+                                )?.id ?? undefined)
+                              : undefined,
                         })
                       }
                     />
                     <span className="small">Accepts reservations</span>
                   </label>
-                  {location.reservationEnabled && (
+                  {location.reservation_enabled === 1 && (
                     <div className="row" style={{ marginTop: 6, flexWrap: "wrap" }}>
                       <select
                         className="select select-inline"
-                        value={location.reservationVisibility ?? "public"}
+                        value={location.reservation_visibility}
                         onChange={(e) =>
                           update({ reservationVisibility: e.target.value })
                         }
@@ -984,23 +1007,15 @@ function LocationRow({
                       <span className="small muted">after check-out becomes</span>
                       <select
                         className="select select-inline"
-                        value={
-                          location.postReservationStatus ??
-                          DEFAULT_POST_RESERVATION_STATUS
-                        }
+                        value={location.post_reservation_status_id ?? ""}
                         onChange={(e) =>
-                          update({ postReservationStatus: e.target.value })
+                          update({ postReservationStatusId: e.target.value || null })
                         }
                       >
-                        {[
-                          ...new Set([
-                            ...STANDARD_STATUSES,
-                            location.postReservationStatus ??
-                              DEFAULT_POST_RESERVATION_STATUS,
-                          ]),
-                        ].map((s) => (
-                          <option key={s} value={s}>
-                            {statusLabel(s)}
+                        <option value="">— unchanged</option>
+                        {statuses.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
                           </option>
                         ))}
                       </select>
@@ -1022,10 +1037,10 @@ function LocationRow({
                 </button>
               </div>
               <div className="stack" style={{ gap: 6 }}>
-                {(location.checkpoints ?? []).map((cp) => (
-                  <CheckpointRow key={cp.id} checkpoint={cp} />
+                {checkpoints.map((cp) => (
+                  <CheckpointEditor key={cp.id} checkpoint={cp} />
                 ))}
-                {(location.checkpoints ?? []).length === 0 && (
+                {checkpoints.length === 0 && (
                   <span className="muted small">None here.</span>
                 )}
               </div>
@@ -1057,55 +1072,34 @@ function DeleteLocationControl({
   locationId: string;
   name: string;
 }) {
-  const { data, isLoading } = db.useQuery({
-    locations: {
-      $: { where: { id: locationId } },
-      children: {},
-      checkpoints: {},
-      currentBoat: {},
-      currentVehicle: {},
-      maps: {},
-      mapPlacements: {},
-      notes: {},
-      incidents: {},
-      tickets: {},
-      reservations: {},
-      leases: {},
-    },
-  });
-
-  const l = data?.locations?.[0];
+  const { dependencies, isLoading } = useLocationDependencies(locationId);
 
   const blockers: string[] = [];
-  if (l) {
-    const count = (rows?: unknown[]) => rows?.length ?? 0;
+  if (dependencies) {
     const add = (n: number, singular: string, plural = `${singular}s`) => {
       if (n > 0) blockers.push(`${n} ${n === 1 ? singular : plural}`);
     };
-    add(count(l.children), "child location", "child locations");
-    add(count(l.checkpoints), "checkpoint");
-    add(count(l.maps), "map scoped to it", "maps scoped to it");
-    add(count(l.leases), "lease");
-    add(count(l.reservations), "reservation");
-    add(count(l.incidents), "incident");
-    add(count(l.tickets), "ticket");
-    add(count(l.notes), "note");
-    if (l.currentBoat) blockers.push("a boat berthed here");
-    if (l.currentVehicle) blockers.push("a vehicle parked here");
+    add(dependencies.children, "child location", "child locations");
+    add(dependencies.checkpoints, "checkpoint");
+    add(dependencies.maps, "map scoped to it", "maps scoped to it");
+    add(dependencies.leases, "lease");
+    add(dependencies.reservations, "reservation");
+    add(dependencies.incidents, "incident");
+    add(dependencies.tickets, "ticket");
+    add(dependencies.notes, "note");
+    if (dependencies.has_boat > 0) blockers.push("a boat berthed here");
+    if (dependencies.has_vehicle > 0) blockers.push("a vehicle parked here");
   }
 
-  const placements = l?.mapPlacements ?? [];
+  const placements = dependencies?.placements ?? 0;
 
   const remove = async () => {
     const extra =
-      placements.length > 0
-        ? ` It's plotted on ${placements.length} map${placements.length === 1 ? "" : "s"}; those placements go too.`
+      placements > 0
+        ? ` It's plotted on ${placements} map${placements === 1 ? "" : "s"}; those placements go too.`
         : "";
     if (!window.confirm(`Delete "${name}"?${extra} This can't be undone.`)) return;
-    await db.transact([
-      db.tx.locations[locationId].delete(),
-      ...placements.map((p) => db.tx.locationMapPlacements[p.id].delete()),
-    ]);
+    await deleteLocationWithPlacements(locationId);
   };
 
   if (isLoading) return null;
@@ -1135,14 +1129,14 @@ function DeleteLocationControl({
   );
 }
 
-function CheckpointRow({
+function CheckpointEditor({
   checkpoint,
 }: {
-  checkpoint: { id: string; name: string; guidUrl: string; gpsValidationRadius?: number };
+  checkpoint: CheckpointRow;
 }) {
   const [copied, setCopied] = useState(false);
   const [writingTag, setWritingTag] = useState(false);
-  const url = `${window.location.origin}/checkin/${checkpoint.guidUrl}`;
+  const url = `${window.location.origin}/checkin/${checkpoint.guid_url}`;
 
   const copy = async () => {
     await navigator.clipboard.writeText(url);
@@ -1157,9 +1151,7 @@ function CheckpointRow({
           className="input select-inline"
           aria-label="Checkpoint name"
           value={checkpoint.name}
-          onCommit={(name) =>
-            void db.transact(db.tx.checkpoints[checkpoint.id].update({ name }))
-          }
+          onCommit={(name) => void saveCheckpoint(checkpoint.id, { name })}
         />
         <div className="row">
           {/* The only place the GUID URL is exposed — deliberately not on
@@ -1173,7 +1165,7 @@ function CheckpointRow({
           <button
             type="button"
             className="btn btn-sm btn-danger"
-            onClick={() => void db.transact(db.tx.checkpoints[checkpoint.id].delete())}
+            onClick={() => void deleteCheckpoint(checkpoint.id)}
           >
             Delete
           </button>
@@ -1186,11 +1178,9 @@ function CheckpointRow({
           style={{ width: 100 }}
           placeholder="marina default"
           aria-label="GPS radius override"
-          value={checkpoint.gpsValidationRadius}
+          value={checkpoint.gps_validation_radius}
           onCommit={(gpsValidationRadius) =>
-            void db.transact(
-              db.tx.checkpoints[checkpoint.id].update({ gpsValidationRadius }),
-            )
+            void saveCheckpoint(checkpoint.id, { gpsValidationRadius })
           }
         />
       </div>
@@ -1214,10 +1204,11 @@ function CreateLocationDialog({
   locations,
   onClose,
 }: {
-  types: { id: string; name: string; tracksStatus?: boolean }[];
-  locations: PickerLocation[];
+  types: LocationTypeRow[];
+  locations: LocationRow[];
   onClose: () => void;
 }) {
+  const { statuses } = useLocationStatuses();
   // Setting up a marina means creating the same shape over and over, so the
   // dialog reopens with whatever you used last rather than blank.
   const remembered = readLastUsed();
@@ -1255,7 +1246,7 @@ function CreateLocationDialog({
     () =>
       new Set(
         locations
-          .filter((l) => (l.parent?.id ?? "") === parentId)
+          .filter((l) => (l.parent_id ?? "") === parentId)
           .map((l) => l.name.toLowerCase()),
       ),
     [locations, parentId],
@@ -1265,31 +1256,31 @@ function CreateLocationDialog({
   const create = async () => {
     if (parsedNames.length === 0 || !typeId) return;
     setSaving(true);
-    // Only types that track status get one — a container with a "Vacant"
-    // label is exactly the confusion this avoids.
-    const tracksStatus = Boolean(types.find((t) => t.id === typeId)?.tracksStatus);
-    await db.transact(
-      parsedNames.flatMap((name) => {
-        const locationId = id();
-        return [
-          db.tx.locations[locationId]
-            .update({
-              name,
-              reservationEnabled: false,
-              ...(tracksStatus ? { status: "vacant" } : {}),
-            })
-            .link({ type: typeId, ...(parentId ? { parent: parentId } : {}) }),
-          // guidUrl is auto-generated, never user-entered — it's the value
-          // the physical NFC tag / QR code encodes.
-          ...(withCheckpoints
-            ? [
-                db.tx.checkpoints[id()]
-                  .update({ name, guidUrl: crypto.randomUUID() })
-                  .link({ location: locationId }),
-              ]
-            : []),
-        ];
-      }),
+    // Only types that track status get one — a container labelled "Vacant" is
+    // exactly the confusion this avoids — and only if the marina has a status
+    // by that name at all.
+    const tracksStatus = types.find((t) => t.id === typeId)?.tracks_status === 1;
+    const vacant = tracksStatus
+      ? resolveStatusByName(statuses, "Vacant")?.id ?? null
+      : null;
+    await runSetupPlan(
+      {
+        anchorId: parentId || null,
+        containerTypeId: typeId,
+        childTypeId: typeId,
+        containerStatusId: vacant,
+        childStatusId: vacant,
+        childCheckpoints: false,
+        containers: parsedNames.map((name) => ({
+          name,
+          checkpoint: withCheckpoints,
+          children: [],
+        })),
+        tour: null,
+        templateId: null,
+        templateSectionStart: 0,
+      },
+      () => {},
     );
     writeLastUsed({ typeId, parentId });
     onClose();
@@ -1422,23 +1413,30 @@ function CreateLocationDialog({
 
 const UPLOAD_TIMEOUT_MS = 45_000;
 
-// db.storage.uploadFile doesn't expose an AbortSignal, so the browser
-// fetch() underneath it has no timeout of its own — a stalled connection
-// (as opposed to a rejected response, which the SDK does surface) would
-// otherwise hang indefinitely. Racing it against a timeout guarantees the
-// caller's spinner always resolves to an error. Shared by both new-map
-// upload and replace-image so there's one upload path, not two.
-async function uploadFileWithTimeout(path: string, file: File): Promise<string> {
-  const result = await Promise.race([
-    db.storage.uploadFile(path, file),
+// Supabase Storage's upload doesn't expose an AbortSignal, so the fetch()
+// underneath has no timeout of its own — a stalled connection (as opposed to a
+// rejected response, which is surfaced) would otherwise hang indefinitely.
+// Racing it against a timeout guarantees the caller's spinner always resolves
+// to an error. Shared by new-map upload and replace-image so there is one
+// upload path, not two.
+async function uploadFileWithTimeout(
+  file: File,
+  actorId: string | null,
+): Promise<string> {
+  return Promise.race([
+    captureAttachment(file, actorId),
     new Promise<never>((_, reject) =>
       setTimeout(
-        () => reject(new Error("Upload timed out after 45s — check your connection and try again.")),
+        () =>
+          reject(
+            new Error(
+              "Upload timed out after 45s — check your connection and try again.",
+            ),
+          ),
         UPLOAD_TIMEOUT_MS,
       ),
     ),
   ]);
-  return result.data.id;
 }
 
 function MapsTab() {
@@ -1452,17 +1450,18 @@ function MapsTab() {
   const [replaceError, setReplaceError] = useState<string | null>(null);
   const replaceFileRef = useRef<HTMLInputElement>(null);
 
-  const { data } = db.useQuery({
-    marinaMaps: { scope: {}, image: {}, placements: { location: {} } },
-    locations: { parent: {}, type: {} },
-  });
-  const maps = data?.marinaMaps ?? [];
+  const current = useCurrent();
+  const { data: maps } = useMarinaMaps();
+  const { data: allPlacements } = usePlacements();
+  const { data: allLocations } = useLocations();
   const locations = useMemo(
-    () => [...(data?.locations ?? [])].sort((a, b) => compareNames(a.name, b.name)),
-    [data],
+    () => [...allLocations].sort((a, b) => compareNames(a.name, b.name)),
+    [allLocations],
   );
-  const roots = locations.filter((l) => !l.parent);
+  const roots = locations.filter((l) => !l.parent_id);
   const active = maps.find((m) => m.id === selectedMap) ?? maps[0];
+  const placementsOf = (mapId: string) =>
+    allPlacements.filter((p) => p.map_id === mapId);
 
   const upload = async (file: File) => {
     // Scope is required before the upload completes — there's no way to
@@ -1471,14 +1470,12 @@ function MapsTab() {
     setUploading(true);
     setUploadError(null);
     try {
-      const path = `marina-maps/${Date.now()}-${file.name}`;
-      const fileId = await uploadFileWithTimeout(path, file);
-      const mapId = id();
-      await db.transact(
-        db.tx.marinaMaps[mapId]
-          .update({ name: mapName.trim() || file.name })
-          .link({ scope: scopeId, image: fileId }),
-      );
+      const attachmentId = await uploadFileWithTimeout(file, current.user?.id ?? null);
+      const mapId = await saveMarinaMap({
+        name: mapName.trim() || file.name,
+        scopeId,
+        imageAttachmentId: attachmentId,
+      });
       setSelectedMap(mapId);
       setMapName("");
       setScopeId("");
@@ -1489,19 +1486,21 @@ function MapsTab() {
     }
   };
 
-  // $files has no update perm (instant.perms.ts:89), so "replacing" an
-  // image is upload-new → relink → delete-old, not an overwrite.
+  // Replacing an image is upload-new → relink, not an overwrite: the old
+  // attachment row is left in place rather than deleted, because a placement
+  // edit made against the old image is still a real edit and deleting the
+  // bytes out from under an in-flight render is worse than an orphan.
   const replaceImage = async (map: NonNullable<typeof active>, file: File) => {
     setReplacing(true);
     setReplaceError(null);
     try {
-      const path = `marina-maps/${Date.now()}-${file.name}`;
-      const newFileId = await uploadFileWithTimeout(path, file);
-      const oldImageId = map.image?.id;
-      await db.transact([
-        db.tx.marinaMaps[map.id].link({ image: newFileId }),
-        ...(oldImageId ? [db.tx.$files[oldImageId].delete()] : []),
-      ]);
+      const attachmentId = await uploadFileWithTimeout(file, current.user?.id ?? null);
+      await saveMarinaMap({
+        id: map.id,
+        name: map.name,
+        scopeId: map.scope_id,
+        imageAttachmentId: attachmentId,
+      });
     } catch (err) {
       setReplaceError(err instanceof Error ? err.message : "Replace failed.");
     } finally {
@@ -1510,21 +1509,18 @@ function MapsTab() {
   };
 
   const deleteMap = async (map: NonNullable<typeof active>) => {
-    const placementCount = map.placements?.length ?? 0;
+    const placementCount = placementsOf(map.id).length;
     const confirmed = window.confirm(
-      `Delete "${map.scope?.name ?? map.name}"? This removes the map image` +
+      `Delete "${map.scope_name ?? map.name}"? This removes the map image` +
         (placementCount > 0
           ? ` and unplots ${placementCount} location${placementCount === 1 ? "" : "s"} from it — those placements can't be recovered`
           : "") +
         `.`,
     );
     if (!confirmed) return;
-    const imageId = map.image?.id;
-    await db.transact([
-      db.tx.marinaMaps[map.id].delete(),
-      ...(imageId ? [db.tx.$files[imageId].delete()] : []),
-      ...(map.placements ?? []).map((p) => db.tx.locationMapPlacements[p.id].delete()),
-    ]);
+    // The placements cascade with the map — they describe a position ON it and
+    // mean nothing without it.
+    await deleteMarinaMap(map.id);
     setSelectedMap(null);
   };
 
@@ -1596,7 +1592,7 @@ function MapsTab() {
                 className={"chip" + (active?.id === m.id ? " active" : "")}
                 onClick={() => setSelectedMap(m.id)}
               >
-                {m.scope?.name ?? m.name}
+                {m.scope_name ?? m.name}
               </button>
             ))}
           </div>
@@ -1648,16 +1644,7 @@ function MapPlotter({
   map,
   locations,
 }: {
-  map: {
-    id: string;
-    name: string;
-    image?: { url: string } | null;
-    placements?: {
-      id: string;
-      placement: PlacementShape;
-      location?: { id: string; name: string } | null;
-    }[];
-  };
+  map: MarinaMapRow;
   locations: PickerLocation[];
 }) {
   const [selected, setSelected] = useState<string | null>(null);
@@ -1665,30 +1652,24 @@ function MapPlotter({
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
 
-  const placements = map.placements ?? [];
-  const plottedIds = new Set(
-    placements.map((p) => p.location?.id).filter(Boolean) as string[],
-  );
+  const { data: rows } = usePlacements(map.id);
+  // The stored shape is jsonb, so it arrives as text; parsed once per row here
+  // rather than at each of the half-dozen places that read a coordinate.
+  const placements = rows.map((p) => ({ ...p, shape: placementOf(p) }));
+  const plottedIds = new Set(placements.map((p) => p.location_id));
+  const imageUrl = attachmentUrl(map.image_path);
 
   const addPlacement = () => {
     if (!addLocationId) return;
-    void db.transact(
-      db.tx.locationMapPlacements[id()]
-        // Dropped mid-canvas at the default text size; drag to position.
-        .update({ placement: { cx: 50, cy: 50, rotation: 0 } })
-        .link({ map: map.id, location: addLocationId }),
-    );
+    // Dropped mid-canvas at the default text size; drag to position.
+    void createPlacement(map.id, addLocationId, { cx: 50, cy: 50, rotation: 0 });
     setAddLocationId("");
   };
 
   const updatePlacement = (placementId: string, patch: Partial<PlacementShape>) => {
     const existing = placements.find((p) => p.id === placementId);
     if (!existing) return;
-    void db.transact(
-      db.tx.locationMapPlacements[placementId].update({
-        placement: { ...existing.placement, ...patch },
-      }),
-    );
+    void savePlacement(placementId, { ...existing.shape, ...patch });
   };
 
   // Percentages of the rendered image, so a placement survives any display size.
@@ -1708,8 +1689,8 @@ function MapPlotter({
     setSelected(p.id);
     dragRef.current = {
       id: p.id,
-      offsetX: pt.x - p.placement.cx,
-      offsetY: pt.y - p.placement.cy,
+      offsetX: pt.x - p.shape.cx,
+      offsetY: pt.y - p.shape.cy,
     };
     (e.target as Element).setPointerCapture(e.pointerId);
   };
@@ -1741,8 +1722,8 @@ function MapPlotter({
           onPointerUp={onPointerUp}
           style={{ touchAction: "none" }}
         >
-          {map.image?.url && (
-            <img src={map.image.url} alt={map.name} className="map-image" draggable={false} />
+          {imageUrl && (
+            <img src={imageUrl} alt={map.name} className="map-image" draggable={false} />
           )}
           {placements.map((p) => (
             <button
@@ -1750,7 +1731,7 @@ function MapPlotter({
               type="button"
               className="map-rect"
               style={{
-                ...placementStyle(p.placement),
+                ...placementStyle(p.shape),
                 background: "var(--accent-soft)",
                 color: "var(--accent)",
                 borderColor: selected === p.id ? "var(--accent)" : "var(--line)",
@@ -1759,7 +1740,7 @@ function MapPlotter({
               }}
               onPointerDown={(e) => onPointerDown(e, p)}
             >
-              {p.location?.name}
+              {p.location_name}
             </button>
           ))}
         </div>
@@ -1795,7 +1776,7 @@ function MapPlotter({
 
         {activePlacement ? (
           <div className="card">
-            <div className="card-title">{activePlacement.location?.name}</div>
+            <div className="card-title">{activePlacement.location_name}</div>
             {(
               [
                 ["fontSize", "Font size (px)", 8, 32, DEFAULT_PLACEMENT_STYLE.fontSize],
@@ -1810,7 +1791,7 @@ function MapPlotter({
                   type="range"
                   min={min}
                   max={max}
-                  value={activePlacement.placement[key] ?? fallback}
+                  value={activePlacement.shape[key] ?? fallback}
                   onChange={(e) =>
                     updatePlacement(activePlacement.id, {
                       [key]: Number(e.target.value),
@@ -1819,7 +1800,7 @@ function MapPlotter({
                   style={{ width: "100%" }}
                 />
                 <span className="muted small">
-                  {activePlacement.placement[key] ?? fallback}
+                  {activePlacement.shape[key] ?? fallback}
                 </span>
               </div>
             ))}
@@ -1829,9 +1810,7 @@ function MapPlotter({
               onClick={() => {
                 // Removes just this one placement — the same location stays
                 // plotted on any other map.
-                void db.transact(
-                  db.tx.locationMapPlacements[activePlacement.id].delete(),
-                );
+                void deletePlacement(activePlacement.id);
                 setSelected(null);
               }}
             >

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { db } from "../../lib/db";
 import { distanceMeters } from "../../lib/geo";
+import { useCheckpoints } from "../../data/checkpoints";
 import { useCheckpointVisit } from "./useCheckpointVisit";
 import { CheckpointCheckinView } from "./CheckpointCheckinPage";
 import { NoteDialog } from "../shared/NoteDialog";
@@ -28,8 +28,6 @@ export function ManualCheckinDialog({
   const [submitted, setSubmitted] = useState(false);
   const [showNote, setShowNote] = useState(false);
 
-  const { data } = db.useQuery({ checkpoints: { location: {} } });
-
   // Nearest first when the device will say where it is — this dialog gets
   // used in the field, standing at the checkpoint whose tag won't scan.
   const [here, setHere] = useState<{ lat: number; lng: number } | null>(null);
@@ -43,22 +41,24 @@ export function ManualCheckinDialog({
     );
   }, []);
 
+  const { data: allCheckpoints } = useCheckpoints();
+
   const checkpoints = useMemo(() => {
-    const all = [...(data?.checkpoints ?? [])];
+    const all = [...allCheckpoints];
     if (!here) {
       return all.sort((a, b) =>
         a.name.localeCompare(b.name, undefined, { numeric: true }),
       );
     }
     const distanceOf = (cp: (typeof all)[number]) =>
-      cp.gpsLat != null && cp.gpsLng != null
-        ? distanceMeters(here.lat, here.lng, cp.gpsLat, cp.gpsLng)
+      cp.gps_lat != null && cp.gps_lng != null
+        ? distanceMeters(here.lat, here.lng, cp.gps_lat, cp.gps_lng)
         : Number.POSITIVE_INFINITY;
     return all
       .map((cp) => ({ cp, d: distanceOf(cp) }))
       .sort((a, b) => a.d - b.d || a.cp.name.localeCompare(b.cp.name))
       .map(({ cp, d }) => ({ ...cp, distance: d }));
-  }, [data, here]);
+  }, [allCheckpoints, here]);
 
   const options = useMemo(
     () =>
@@ -68,7 +68,7 @@ export function ManualCheckinDialog({
           d != null && Number.isFinite(d)
             ? `${d < 1000 ? `${Math.round(d)} m` : `${(d / 1000).toFixed(1)} km`} away`
             : "";
-        const hint = [cp.location?.name, near].filter(Boolean).join(" · ");
+        const hint = [cp.location_name, near].filter(Boolean).join(" · ");
         return { id: cp.id, name: cp.name, hint: hint || undefined };
       }),
     [checkpoints],

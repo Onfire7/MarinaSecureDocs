@@ -148,6 +148,21 @@ export interface MeterReadingConfig {
   assetId?: string;
 }
 
+/**
+ * Whatever a template item's `config` holds, whichever type it is.
+ *
+ * A union rather than an intersection: the item's `type` decides which member
+ * applies, and reading the wrong one is a bug the type system can catch at the
+ * point where `type` is narrowed.
+ */
+export type ItemConfig =
+  | VerifyTaskConfig
+  | DoorCheckConfig
+  | LocationCheckConfig
+  | QuestionConfig
+  | MeterReadingConfig
+  | Record<string, never>;
+
 // ---- Deferred side effects ----
 
 /**
@@ -434,13 +449,13 @@ export interface TriggerConfig {
   recurrenceRule?: string;
 }
 
-/** The parts of a ChecklistTemplateItem every consumer here relies on. */
+/** The parts of a checklist_template_items row every consumer here relies on. */
 export interface TemplateItemLike {
   id: string;
   type: string;
   label: string;
-  order: number;
-  config?: Record<string, unknown>;
+  position: number;
+  config?: Record<string, unknown> | null;
 }
 
 // ---- Rule resolution (template rules → instance timestamps) ----
@@ -464,6 +479,9 @@ function nextOccurrenceOf(time: string, from: Date): Date | null {
  * instantiation, or null for visible-immediately. Malformed rules resolve to
  * visible — an admin typo must never hide assigned work.
  *
+ * With an `expectedStart` the reveal is dated from when the checklist was DUE
+ * (see expectedStartAnchor) and everything below is moot. Without one:
+ *
  * The rule is simply the next occurrence of that clock time: a checklist is
  * assumed to be created before any hide-until inside it. That assumption is
  * what makes a clock time mean anything at all here — the alternative is
@@ -482,9 +500,89 @@ function nextOccurrenceOf(time: string, from: Date): Date | null {
 export function resolveHideUntil(
   rule: string | null | undefined,
   createdAt: Date = new Date(),
+  expectedStart?: string | null,
 ): number | null {
   if (!rule?.trim()) return null;
-  return nextOccurrenceOf(rule, createdAt)?.getTime() ?? null;
+  if (!parseClock(expectedStart)) {
+    return nextOccurrenceOf(rule, createdAt)?.getTime() ?? null;
+  }
+  return hideUntilFromAnchor(rule, expectedStartAnchor(expectedStart, createdAt));
+}
+
+/**
+ * The first occurrence of `rule` AT OR AFTER the anchor — the moment the
+ * checklist was due to start. It may well be in the past, and that is the
+ * point: a reveal that has already gone by since then is simply visible.
+ *
+ * Takes the anchor rather than deriving it, because a section can be added to
+ * a checklist many hours after it began (a checkpoint scan, a location visit)
+ * and "nearest occurrence to now" is by then a different evening. The anchor
+ * is resolved once, at creation, and stored as
+ * checklist_instances.expected_start_at.
+ */
+export function hideUntilFromAnchor(
+  rule: string | null | undefined,
+  anchor: Date,
+): number | null {
+  const clock = parseClock(rule);
+  if (!clock) return null;
+  const at = new Date(anchor);
+  at.setHours(clock.h, clock.m, 0, 0);
+  if (at.getTime() < anchor.getTime()) at.setDate(at.getDate() + 1);
+  return at.getTime();
+}
+
+function parseClock(time: string | null | undefined): { h: number; m: number } | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(time?.trim() ?? "");
+  if (!match) return null;
+  const h = Number(match[1]);
+  const m = Number(match[2]);
+  return h < 24 && m < 60 ? { h, m } : null;
+}
+
+/**
+ * When a checklist was DUE to start, as opposed to when someone got round to
+ * starting it: the occurrence of the template's expected start ("HH:MM")
+ * nearest to the creation time, up to twelve hours either side.
+ *
+ * This is what gives a hide-until its date. The creation time cannot: a guard
+ * who clocks in at 10:33 PM, or at half past midnight, for a checklist due at
+ * 5 PM means the 8 PM section to be 8 PM on the evening the shift belongs to —
+ * which after midnight is the PREVIOUS calendar date, a moment that rolling
+ * forward from "now" can never produce. It lives on the template, beside the
+ * hide-until rules it gives meaning to, so nothing about shifts, settings or
+ * who clocked in when can move it.
+ *
+ * "Nearest" is the one assumption left, and it is unavoidable — a clock time
+ * has to be tied to a date somehow. Nearest is the only choice that favours
+ * neither an early start nor a late one. An exact twelve-hour tie goes to the
+ * past: a checklist is likelier to be started very late than very early.
+ *
+ * Unset or malformed, the anchor is the creation time and everything behaves
+ * as it did before the field existed. An admin typo must never hide work.
+ */
+export function expectedStartAnchor(
+  expectedStart: string | null | undefined,
+  createdAt: Date,
+): Date {
+  const clock = parseClock(expectedStart);
+  if (!clock) return createdAt;
+  let best: Date | null = null;
+  // Earliest first, so that `<` rather than `<=` sends a tie to the past.
+  for (const dayOffset of [-1, 0, 1]) {
+    const candidate = new Date(createdAt);
+    // setDate, not ±24h: a day is 23 or 25 hours long twice a year.
+    candidate.setDate(candidate.getDate() + dayOffset);
+    candidate.setHours(clock.h, clock.m, 0, 0);
+    if (
+      !best ||
+      Math.abs(candidate.getTime() - createdAt.getTime()) <
+        Math.abs(best.getTime() - createdAt.getTime())
+    ) {
+      best = candidate;
+    }
+  }
+  return best!;
 }
 
 /**
@@ -502,8 +600,14 @@ export function resolveHideUntil(
 export function hideUntilWarning(
   level: "template" | "section",
   triggerType: string,
+  expectedStart?: string | null,
 ): string | undefined {
+  // With an expected start the reveal is dated from when the checklist was
+  // due, not from when it happened to be created, and none of this can occur.
+  if (parseClock(expectedStart)) return undefined;
   if (level === "template") {
+    if (triggerType === "clock_in")
+      return "A shift that starts late — after this time, or after midnight — hides the row until the same time the next day. Set \u201cNormally started at\u201d on the checklist to prevent that.";
     if (triggerType === "manual")
       return "Manual checklists start whenever someone taps Start, so one begun after this time hides the row until the same time tomorrow.";
     if (triggerType === "checkpoint")
@@ -573,10 +677,10 @@ export function recurrenceMatchesDay(
  * No rule means eligible whenever the creating event happens.
  */
 export function eligibleToday(
-  row: { triggerType: string; triggerConfig?: Record<string, unknown> | null },
+  row: { trigger_type: string; triggerConfig?: TriggerConfig | null },
   day: Date = new Date(),
 ): boolean {
-  return recurrenceMatchesDay((row.triggerConfig as TriggerConfig | null)?.recurrenceRule, day);
+  return recurrenceMatchesDay(row.triggerConfig?.recurrenceRule, day);
 }
 
 // ---- Instance visibility & derived completion ----
@@ -587,11 +691,11 @@ export function eligibleToday(
  * Once now passes hideUntil the row is permanently visible — nothing re-hides.
  */
 export function isVisibleNow(
-  row: { hideUntil?: number | string | null },
+  row: { hide_until?: number | string | null },
   now: number = Date.now(),
 ): boolean {
-  if (row.hideUntil == null) return true;
-  return now >= new Date(row.hideUntil).getTime();
+  if (row.hide_until == null) return true;
+  return now >= new Date(row.hide_until).getTime();
 }
 
 /**
@@ -600,13 +704,13 @@ export function isVisibleNow(
  * extra write on every item completion just to keep a summary in sync.
  */
 export function sectionCompletionTime(
-  items: { completedAt?: number | string | null }[],
+  items: { completed_at?: number | string | null }[],
 ): number | null {
   if (items.length === 0) return null;
   let latest = 0;
   for (const it of items) {
-    if (it.completedAt == null) return null;
-    latest = Math.max(latest, new Date(it.completedAt).getTime());
+    if (it.completed_at == null) return null;
+    latest = Math.max(latest, new Date(it.completed_at).getTime());
   }
   return latest;
 }

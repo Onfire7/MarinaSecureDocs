@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { displayName, isNameless, normalizePhone } from "../../lib/contacts";
+import { createContact, useContacts } from "../../data/contacts";
+import { useContactCraft } from "../../data/boats";
 
 // Owners & Contacts — Contact List (see docs/pages/contact-list.html).
 // A Contact isn't necessarily a User; most entries never sign in. Names
@@ -15,23 +16,16 @@ export function ContactListPage() {
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
 
-  const { data } = db.useQuery(
-    canView
-      ? {
-          contacts: {
-            mergedInto: {},
-            ownedBoats: {},
-            authorizedBoats: {},
-          },
-        }
-      : null,
-  );
+  // No permission branch on the query: without view_owner the contacts table on
+  // this device is empty, because the sync stream never delivered a row. The
+  // check below is about the nav, not about withholding data.
+  const { data: allContacts } = useContacts();
 
   // Merged-away records never appear; only the canonical target does.
   const contacts = useMemo(
     () =>
-      [...(data?.contacts ?? [])]
-        .filter((c) => !c.mergedInto)
+      allContacts
+        .filter((c) => !c.merged_into_id)
         .sort((a, b) => {
           // Nameless first — they're the ones needing a decision.
           if (isNameless(a) !== isNameless(b)) return isNameless(a) ? -1 : 1;
@@ -39,7 +33,7 @@ export function ContactListPage() {
             numeric: true,
           });
         }),
-    [data],
+    [allContacts],
   );
 
   if (!canView) {
@@ -85,39 +79,9 @@ export function ContactListPage() {
       </div>
 
       <div className="stack" style={{ gap: 8 }}>
-        {filtered.map((c) => {
-          const boatCount =
-            (c.ownedBoats ?? []).length + (c.authorizedBoats ?? []).length;
-          return (
-            <Link
-              key={c.id}
-              to={`/contacts/${c.id}`}
-              className="card spread"
-              style={{ textDecoration: "none", color: "inherit", flexWrap: "wrap" }}
-            >
-              <div>
-                <div className="card-title">
-                  {displayName(c)}
-                  {isNameless(c) && (
-                    <span className="badge badge-warn" style={{ marginLeft: 8 }}>
-                      Needs a name
-                    </span>
-                  )}
-                </div>
-                {canContact && (
-                  <div className="card-meta">
-                    {[c.phone, c.email].filter(Boolean).join(" · ") || "No contact info"}
-                  </div>
-                )}
-              </div>
-              {boatCount > 0 && (
-                <span className="badge">
-                  {boatCount} boat{boatCount === 1 ? "" : "s"}
-                </span>
-              )}
-            </Link>
-          );
-        })}
+        {filtered.map((c) => (
+          <ContactCard key={c.id} contact={c} canContact={canContact} />
+        ))}
         {filtered.length === 0 && (
           <div className="placeholder">
             <div className="big">
@@ -132,16 +96,63 @@ export function ContactListPage() {
   );
 }
 
+function ContactCard({
+  contact,
+  canContact,
+}: {
+  contact: ReturnType<typeof useContacts>["data"][number];
+  canContact: boolean;
+}) {
+  // The boat count is its own query per row rather than a join, because a
+  // contact reaches boats three ways (owner, authorized user, vehicle owner)
+  // and a three-way UNION on the list query would multiply every row.
+  const { data: craft } = useContactCraft(contact.id);
+  const boatCount = craft.filter((c) => c.kind === "boat").length;
+
+  return (
+    <Link
+      to={`/contacts/${contact.id}`}
+      className="card spread"
+      style={{ textDecoration: "none", color: "inherit", flexWrap: "wrap" }}
+    >
+      <div>
+        <div className="card-title">
+          {displayName(contact)}
+          {isNameless(contact) && (
+            <span className="badge badge-warn" style={{ marginLeft: 8 }}>
+              Needs a name
+            </span>
+          )}
+        </div>
+        {canContact && (
+          <div className="card-meta">
+            {[contact.phone, contact.email].filter(Boolean).join(" · ") ||
+              "No contact info"}
+          </div>
+        )}
+      </div>
+      {boatCount > 0 && (
+        <span className="badge">
+          {boatCount} boat{boatCount === 1 ? "" : "s"}
+        </span>
+      )}
+    </Link>
+  );
+}
+
 function AddContactDialog({ onClose }: { onClose: () => void }) {
   const [form, setForm] = useState({ name: "", phone: "", email: "" });
 
+  const current = useCurrent();
+
   const save = async () => {
-    await db.transact(
-      db.tx.contacts[id()].update({
+    await createContact(
+      {
         name: form.name.trim(),
-        phone: form.phone.trim() || undefined,
-        email: form.email.trim() || undefined,
-      }),
+        phone: form.phone.trim() || null,
+        email: form.email.trim() || null,
+      },
+      current.user?.id ?? null,
     );
     onClose();
   };

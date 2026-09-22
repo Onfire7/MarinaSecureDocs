@@ -1,9 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import type { InstaQLEntity } from "@instantdb/react";
-import { db, type AppSchema } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { DEFAULT_POST_RESERVATION_STATUS, statusLabel } from "../../lib/locations";
+import { compareNames, statusKey, statusLabel } from "../../lib/locations";
 import {
   RESERVATION_STATUSES,
   isBillable,
@@ -11,29 +9,15 @@ import {
   reservationStatusBadgeClass,
   reservationTargetOf,
 } from "../../lib/reservations";
-import {
-  SchematicMapView,
-  type RectStyle,
-} from "../shared/SchematicMapView";
+import { SchematicMapView, type RectStyle } from "../shared/SchematicMapView";
+import { useReservations, type ReservationRow } from "../../data/reservations";
+import { useLocations, type LocationRow } from "../../data/locations";
+import { DEFAULT_POST_RESERVATION_STATUS } from "../../data/lookups";
 
 // Reservations — Calendar / List (see docs/pages/reservation-list.html).
 // One screen for every reservable target, Location or Asset alike. Browsing
 // is unrestricted; only creating/editing needs manage_reservations.
 type ViewMode = "list" | "calendar" | "week" | "map";
-
-const RESERVATION_QUERY = {
-  reservations: {
-    contact: {},
-    location: { type: {} },
-    asset: {},
-  },
-  marinaMaps: {
-    scope: { parent: {} },
-    image: {},
-    placements: { location: {} },
-  },
-  locations: {},
-} as const;
 
 export function ReservationListPage() {
   const current = useCurrent();
@@ -43,29 +27,17 @@ export function ReservationListPage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
-  const { data } = db.useQuery(RESERVATION_QUERY);
-  const maps = data?.marinaMaps ?? [];
-  const locationsById = useMemo(
-    () => new Map((data?.locations ?? []).map((l) => [l.id, l])),
-    [data],
-  );
-
-  const reservations = useMemo(
-    () =>
-      [...(data?.reservations ?? [])].sort((a, b) => {
-        const at = a.expectedCheckin ? new Date(a.expectedCheckin).getTime() : Infinity;
-        const bt = b.expectedCheckin ? new Date(b.expectedCheckin).getTime() : Infinity;
-        return at - bt;
-      }),
-    [data],
-  );
+  // Already ordered by expected check-in; the map and week views need every
+  // location, not only the filtered set, so they read it separately.
+  const { data: reservations } = useReservations();
+  const { data: locations } = useLocations();
 
   const filtered = reservations.filter((r) => {
     const target = reservationTargetOf(r);
     if (statusFilter && r.status !== statusFilter) return false;
     if (kindFilter && target?.kind !== kindFilter) return false;
-    const start = r.expectedCheckin ? new Date(r.expectedCheckin).getTime() : null;
-    const end = r.expectedCheckout ? new Date(r.expectedCheckout).getTime() : start;
+    const start = r.expected_checkin ? new Date(r.expected_checkin).getTime() : null;
+    const end = r.expected_checkout ? new Date(r.expected_checkout).getTime() : start;
     if (fromDate && end != null && end < new Date(fromDate).getTime()) return false;
     if (toDate && start != null && start > new Date(toDate).getTime() + 24 * 3600_000)
       return false;
@@ -142,27 +114,17 @@ export function ReservationListPage() {
       {view === "week" && (
         <WeekView
           reservations={filtered}
-          locations={(data?.locations ?? []).filter((l) => l.reservationEnabled)}
+          locations={locations.filter((l) => l.reservation_enabled === 1)}
         />
       )}
       {view === "map" && (
-        <ReservationMap
-          maps={maps}
-          reservations={reservations}
-          locationsById={locationsById}
-        />
+        <ReservationMap reservations={reservations} locations={locations} />
       )}
     </div>
   );
 }
 
 // ---------------------------------------------------------------- List
-
-type ReservationRow = InstaQLEntity<
-  AppSchema,
-  "reservations",
-  { contact: object; location: { type: object }; asset: object }
->;
 
 function ListView({ reservations }: { reservations: ReservationRow[] }) {
   const current = useCurrent();
@@ -190,9 +152,9 @@ function ListView({ reservations }: { reservations: ReservationRow[] }) {
                 <span className="muted small"> · {target?.typeLabel}</span>
               </div>
               <div className="card-meta">
-                {r.contact?.name ?? "No contact"}
-                {current.can("view_contact") && r.contact?.phone
-                  ? ` · ${r.contact.phone}`
+                {r.contact_name ?? "No contact"}
+                {current.can("view_contact") && r.contact_phone
+                  ? ` · ${r.contact_phone}`
                   : ""}
                 {isBillable(r, target) && r.rate != null && ` · $${r.rate}`}
                 {isBillable(r, target) && r.balance != null && ` · balance $${r.balance}`}
@@ -202,7 +164,9 @@ function ListView({ reservations }: { reservations: ReservationRow[] }) {
               <span className={reservationStatusBadgeClass(r.status)}>
                 {statusLabel(r.status)}
               </span>
-              <div className="muted small">{formatRange(r.expectedCheckin, r.expectedCheckout)}</div>
+              <div className="muted small">
+                {formatRange(r.expected_checkin, r.expected_checkout)}
+              </div>
             </div>
           </Link>
         );
@@ -244,10 +208,10 @@ function CalendarView({ reservations }: { reservations: ReservationRow[] }) {
 
   const coverage = (dayTs: number) =>
     reservations.filter((r) => {
-      if (r.status === "cancelled" || !r.expectedCheckin) return false;
-      const start = new Date(r.expectedCheckin).getTime();
-      const end = r.expectedCheckout
-        ? new Date(r.expectedCheckout).getTime()
+      if (r.status === "cancelled" || !r.expected_checkin) return false;
+      const start = new Date(r.expected_checkin).getTime();
+      const end = r.expected_checkout
+        ? new Date(r.expected_checkout).getTime()
         : start + 24 * 3600_000;
       return rangesOverlap(dayTs, dayTs + 24 * 3600_000, start, end);
     });
@@ -292,7 +256,7 @@ function CalendarView({ reservations }: { reservations: ReservationRow[] }) {
                     key={r.id}
                     type="button"
                     className={"cal-chip " + reservationStatusBadgeClass(r.status)}
-                    title={`${target?.name} — ${r.contact?.name ?? ""}`}
+                    title={`${target?.name} — ${r.contact_name ?? ""}`}
                     onClick={() => navigate(`/reservations/${r.id}`)}
                   >
                     {target?.name}
@@ -312,22 +276,20 @@ function CalendarView({ reservations }: { reservations: ReservationRow[] }) {
 
 // ---------------------------------------------------------------- Week
 
-type WeekLocation = {
-  id: string;
-  name: string;
-  status?: string;
-  postReservationStatus?: string | null;
-};
-
-// One row per reservable Location, one column per day, stays spanning the
-// days they cover. Row tint: green when Available (Vacant) — deliberately
+// One row per reservable location, one column per day, stays spanning the days
+// they cover. Row tint: green when available (Vacant) — deliberately
 // outranking orange, so a pavilion whose post-reservation status is Vacant
-// reads green — orange when sitting in its own post-reservation status
-// (e.g. Needs Cleaning), red for every other status.
-function rowTint(l: WeekLocation): string {
-  if (l.status === "vacant" || l.status === "available") return "var(--good-bg)";
-  const postStatus = l.postReservationStatus ?? DEFAULT_POST_RESERVATION_STATUS;
-  if (l.status === postStatus) return "var(--warn-bg)";
+// reads green — orange when sitting in its own post-reservation status (e.g.
+// Needs Cleaning), red for every other status.
+//
+// Compared on the normalised status NAME rather than the id, because the
+// post-reservation default is a name in code and a marina may not have created
+// a status by that name at all.
+function rowTint(l: LocationRow, postStatusName: string | null): string {
+  const key = statusKey(l.status_name);
+  if (key === "vacant" || key === "available") return "var(--good-bg)";
+  const post = statusKey(postStatusName ?? DEFAULT_POST_RESERVATION_STATUS);
+  if (key && key === post) return "var(--warn-bg)";
   return "var(--bad-bg)";
 }
 
@@ -336,7 +298,7 @@ function WeekView({
   locations,
 }: {
   reservations: ReservationRow[];
-  locations: WeekLocation[];
+  locations: LocationRow[];
 }) {
   const navigate = useNavigate();
   const [weekStart, setWeekStart] = useState(() => {
@@ -358,17 +320,19 @@ function WeekView({
     return d;
   });
 
-  const sorted = [...locations].sort((a, b) =>
-    a.name.localeCompare(b.name, undefined, { numeric: true }),
-  );
+  const sorted = [...locations].sort((a, b) => compareNames(a.name, b.name));
 
   const staysFor = (locationId: string, dayTs: number) =>
     reservations.filter((r) => {
-      if (r.location?.id !== locationId || r.status === "cancelled" || !r.expectedCheckin)
+      if (
+        r.location_id !== locationId ||
+        r.status === "cancelled" ||
+        !r.expected_checkin
+      )
         return false;
-      const start = new Date(r.expectedCheckin).getTime();
-      const end = r.expectedCheckout
-        ? new Date(r.expectedCheckout).getTime()
+      const start = new Date(r.expected_checkin).getTime();
+      const end = r.expected_checkout
+        ? new Date(r.expected_checkout).getTime()
         : start + 24 * 3600_000;
       return rangesOverlap(dayTs, dayTs + 24 * 3600_000, start, end);
     });
@@ -413,11 +377,11 @@ function WeekView({
             <tbody>
               {sorted.map((l) => (
                 <tr key={l.id}>
-                  <td style={{ background: rowTint(l) }}>
+                  <td style={{ background: rowTint(l, null) }}>
                     <Link to={`/locations/${l.id}`} style={{ fontWeight: 650 }}>
                       {l.name}
                     </Link>
-                    <div className="muted small">{statusLabel(l.status)}</div>
+                    <div className="muted small">{l.status_name ?? "—"}</div>
                   </td>
                   {days.map((d) => {
                     const stays = staysFor(l.id, d.getTime());
@@ -428,10 +392,10 @@ function WeekView({
                             key={r.id}
                             type="button"
                             className={"cal-chip " + reservationStatusBadgeClass(r.status)}
-                            title={`${r.contact?.name ?? ""} — ${statusLabel(r.status)}`}
+                            title={`${r.contact_name ?? ""} — ${statusLabel(r.status)}`}
                             onClick={() => navigate(`/reservations/${r.id}`)}
                           >
-                            {r.contact?.name ?? statusLabel(r.status)}
+                            {r.contact_name ?? statusLabel(r.status)}
                           </button>
                         ))}
                       </td>
@@ -457,20 +421,22 @@ function WeekView({
 // state instead of occupancy. Asset-target reservations have no rectangle and
 // appear only in list/calendar.
 function ReservationMap({
-  maps,
   reservations,
-  locationsById,
+  locations,
 }: {
-  maps: Parameters<typeof SchematicMapView>[0]["maps"];
   reservations: ReservationRow[];
-  locationsById: Map<string, { reservationEnabled: boolean }>;
+  locations: LocationRow[];
 }) {
   const navigate = useNavigate();
   const now = Date.now();
+  const reservable = useMemo(
+    () => new Set(locations.filter((l) => l.reservation_enabled === 1).map((l) => l.id)),
+    [locations],
+  );
 
   const stateFor = (locationId: string): RectStyle => {
     const forLocation = reservations.filter(
-      (r) => r.location?.id === locationId && r.status !== "cancelled",
+      (r) => r.location_id === locationId && r.status !== "cancelled",
     );
     if (forLocation.some((r) => r.status === "checked_in")) {
       return { background: "var(--bad-bg)", border: "var(--bad)", text: "var(--bad)" };
@@ -478,8 +444,8 @@ function ReservationMap({
     const upcoming = forLocation.some(
       (r) =>
         (r.status === "confirmed" || r.status === "requested") &&
-        r.expectedCheckin &&
-        new Date(r.expectedCheckin).getTime() > now - 24 * 3600_000,
+        r.expected_checkin &&
+        new Date(r.expected_checkin).getTime() > now - 24 * 3600_000,
     );
     if (upcoming)
       return { background: "var(--warn-bg)", border: "var(--warn)", text: "var(--warn)" };
@@ -490,25 +456,24 @@ function ReservationMap({
     // Tapping a rectangle opens its soonest active/upcoming reservation, or
     // the location itself when nothing is booked.
     const forLocation = reservations
-      .filter((r) => r.location?.id === locationId && r.status !== "cancelled")
+      .filter((r) => r.location_id === locationId && r.status !== "cancelled")
       .sort((a, b) => {
-        const at = a.expectedCheckin ? new Date(a.expectedCheckin).getTime() : Infinity;
-        const bt = b.expectedCheckin ? new Date(b.expectedCheckin).getTime() : Infinity;
+        const at = a.expected_checkin ? new Date(a.expected_checkin).getTime() : Infinity;
+        const bt = b.expected_checkin ? new Date(b.expected_checkin).getTime() : Infinity;
         return at - bt;
       });
     const active =
       forLocation.find((r) => r.status === "checked_in") ??
       forLocation.find(
-        (r) => r.expectedCheckout && new Date(r.expectedCheckout).getTime() > now,
+        (r) => r.expected_checkout && new Date(r.expected_checkout).getTime() > now,
       );
     navigate(active ? `/reservations/${active.id}` : `/locations/${locationId}`);
   };
 
   return (
     <SchematicMapView
-      maps={maps}
       colorFor={stateFor}
-      include={(locationId) => locationsById.get(locationId)?.reservationEnabled ?? false}
+      include={(locationId) => reservable.has(locationId)}
       onOpen={openLocation}
       footnote="Green: available. Amber: upcoming reservation. Red: checked in now. Only reservation-enabled locations are shown; asset reservations appear in list/calendar only."
     />

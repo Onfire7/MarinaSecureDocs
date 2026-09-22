@@ -35,54 +35,58 @@ export interface ReservationTarget {
   postStatus?: string | null;
 }
 
-// A reservation's own billingType governs its billing fields; rows created
+// A reservation's own billing_type governs its billing fields; rows created
 // before the field existed fall back to the target's default.
 export function isBillable(
-  r: { billingType?: string | null },
+  r: { billing_type?: string | null },
   target: ReservationTarget | null,
 ): boolean {
-  if (r.billingType) return r.billingType === "billable";
+  if (r.billing_type) return r.billing_type === "billable";
   return target?.defaultBillable ?? false;
 }
 
-type ReservationWithTargets = {
-  location?: {
-    id: string;
-    name: string;
-    reservationVisibility?: string | null;
-    postReservationStatus?: string | null;
-    type?: { name: string } | null;
-  } | null;
-  asset?: {
-    id: string;
-    name: string;
-    category?: string | null;
-    reservationVisibility?: string | null;
-    postReturnStatus?: string | null;
-  } | null;
-};
+/**
+ * The columns a reservation query selects about its two possible targets.
+ *
+ * A reservation points at a location OR an asset — `num_nonnulls(...) = 1`
+ * holds the "exactly one" down — and the two carry the same three facts under
+ * different column names. Resolving that here rather than at each call site is
+ * why every reservation view can treat its target as one thing.
+ */
+export interface ReservationTargetColumns {
+  location_id?: string | null;
+  location_name?: string | null;
+  location_type_name?: string | null;
+  location_visibility?: string | null;
+  post_reservation_status_name?: string | null;
+  asset_id?: string | null;
+  asset_name?: string | null;
+  asset_category?: string | null;
+  asset_visibility?: string | null;
+  post_return_status_name?: string | null;
+}
 
 export function reservationTargetOf(
-  r: ReservationWithTargets,
+  r: ReservationTargetColumns,
 ): ReservationTarget | null {
-  if (r.location) {
+  if (r.location_id) {
     return {
       kind: "location",
-      id: r.location.id,
-      name: r.location.name,
-      typeLabel: r.location.type?.name ?? "Location",
-      defaultBillable: r.location.reservationVisibility === "public",
-      postStatus: r.location.postReservationStatus,
+      id: r.location_id,
+      name: r.location_name ?? "Location",
+      typeLabel: r.location_type_name ?? "Location",
+      defaultBillable: r.location_visibility === "public",
+      postStatus: r.post_reservation_status_name,
     };
   }
-  if (r.asset) {
+  if (r.asset_id) {
     return {
       kind: "asset",
-      id: r.asset.id,
-      name: r.asset.name,
-      typeLabel: r.asset.category ?? "Asset",
-      defaultBillable: r.asset.reservationVisibility === "public",
-      postStatus: r.asset.postReturnStatus,
+      id: r.asset_id,
+      name: r.asset_name ?? "Asset",
+      typeLabel: r.asset_category ?? "Asset",
+      defaultBillable: r.asset_visibility === "public",
+      postStatus: r.post_return_status_name,
     };
   }
   return null;

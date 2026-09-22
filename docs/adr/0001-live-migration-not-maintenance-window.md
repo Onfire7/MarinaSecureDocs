@@ -1,5 +1,14 @@
 # Schema migrations run live, not behind a maintenance window
 
+> **Largely moot under [ADR 0005](0005-supabase-and-powersync-replace-instantdb.md).**
+> This machinery exists because
+> an InstantDB schema push deletes removed attributes *and their data*
+> immediately, which made expand/sweep/contract the only safe shape. Postgres
+> migrations have no such property. The two conclusions worth carrying
+> forward are unchanged and unrelated to the backing store: there is no
+> moment at which every PWA client runs the current bundle, and a client
+> offline across a destructive change loses its queued writes silently.
+
 InstantDB is local-first and the app is an installable PWA with a
 prompt-to-update service worker, so there is no moment at which every client
 is running the current bundle. Rather than pretend otherwise, migrations make

@@ -1,10 +1,15 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { attachmentLink, type AttachmentTarget } from "../../lib/attachments";
+import type { AttachmentTarget } from "../../data/attachments";
 import { AttachmentTargetPicker } from "../shared/AttachmentTargetPicker";
-import { activityTx } from "../../lib/activityLog";
+import { createIncident } from "../../data/incidents";
+import {
+  createIncidentType,
+  useIncidentStatuses,
+  useIncidentTypes,
+} from "../../data/lookups";
+import { useUsers } from "../../data/users";
 import type { NewTicketState } from "../tickets/NewTicketPage";
 
 export interface NewIncidentState {
@@ -30,12 +35,12 @@ export function NewIncidentPage() {
   const [raiseTicketAfter, setRaiseTicketAfter] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const { data } = db.useQuery({
-    incidentTypes: {},
-    users: { $: { where: { active: true } } },
-  });
-  const types = data?.incidentTypes ?? [];
-  const users = data?.users ?? [];
+  const { types } = useIncidentTypes();
+  const { data: users } = useUsers();
+  // The first non-terminal status the marina defines. A marina that renamed
+  // "Open" to "Reported" gets an incident in it without a code change.
+  const { statuses } = useIncidentStatuses();
+  const openStatus = statuses.find((s) => s.is_terminal === 0) ?? statuses[0];
 
   if (!current.can("create_incidents")) {
     return (
@@ -47,39 +52,25 @@ export function NewIncidentPage() {
 
   const addType = async () => {
     if (!newTypeName.trim()) return;
-    const newId = id();
-    await db.transact(db.tx.incidentTypes[newId].update({ name: newTypeName.trim() }));
-    setTypeId(newId);
+    setTypeId(await createIncidentType(newTypeName.trim()));
     setNewTypeName("");
     setAddingType(false);
   };
 
   const submit = async () => {
-    if (!title.trim() || !target) return;
+    if (!title.trim() || !target || !openStatus) return;
     setSaving(true);
-    const incidentId = id();
-    await db.transact([
-      db.tx.incidents[incidentId]
-        .update({
-          title: title.trim(),
-          status: "open",
-          details: details.trim() || undefined,
-          createdAt: Date.now(),
-        })
-        .link({
-          ...attachmentLink(target),
-          ...(current.user ? { author: current.user.id } : {}),
-          ...(typeId ? { type: typeId } : {}),
-          ...(assigneeId ? { assignedTo: assigneeId } : {}),
-        }),
-      activityTx({
-        eventType: "incident.created",
-        summary: `Incident "${title.trim()}" logged on ${target.label}`,
-        subjectType: "incidents",
-        subjectId: incidentId,
-        actorId: current.user?.id,
-      }),
-    ]);
+    const incidentId = await createIncident(
+      {
+        title: title.trim(),
+        details: details.trim(),
+        typeId,
+        statusId: openStatus.id,
+        assigneeId,
+        target,
+      },
+      current.user?.id ?? null,
+    );
     if (raiseTicketAfter) {
       navigate("/tickets/new", {
         replace: true,
@@ -222,7 +213,7 @@ export function NewIncidentPage() {
         <button
           type="button"
           className="btn btn-primary"
-          disabled={!title.trim() || !target || saving}
+          disabled={!title.trim() || !target || !openStatus || saving}
           onClick={() => void submit()}
         >
           Log Incident

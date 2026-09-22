@@ -1,13 +1,15 @@
-import { useMemo, useState } from "react";
-import { db, id } from "../../lib/db";
+import { useState } from "react";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import { PERMISSIONS, type Permission } from "../../lib/permissions";
 import {
-  PERMISSIONS,
-  computeManagementFlags,
-  type Permission,
-} from "../../lib/permissions";
-import { activityTx } from "../../lib/activityLog";
+  deleteRole as removeRole,
+  renameRole,
+  saveRole,
+  useRoleHolderCounts,
+  useRoles,
+  type Role,
+} from "../../data/users";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
 import { useTextPrompt } from "../shared/TextPromptDialog";
@@ -25,15 +27,11 @@ export function AdminRolesPage() {
   );
 }
 
-type RoleRef = { id: string; name: string; allow?: string[]; deny?: string[] };
-
-type RoleRow = RoleRef & {
-  // Every user currently holding this role, each with their *entire* set of
-  // roles (not just this one) — needed to recompute their cached
-  // canManageRoles/canManageUsers across all of a user's roles whenever
-  // this role's grants change.
-  users?: { id: string; roles?: RoleRef[] }[];
-};
+// A role edit used to have to walk every user holding it, recomputing their
+// cached canManageRoles/canManageUsers. That cache is gone: `user_permissions`
+// is recomputed by a database trigger on user_roles and roles, so editing a
+// role's grants is one write to one row and every holder's effective
+// permissions follow.
 
 type CellValue = "allow" | "deny" | undefined;
 
@@ -63,15 +61,12 @@ function Roles() {
   const [askText, promptNode] = useTextPrompt();
   const [warning, setWarning] = useState<string | null>(null);
 
-  const { data } = db.useQuery({ roles: { users: { roles: {} } } });
-  const roles = useMemo(
-    () => [...((data?.roles ?? []) as RoleRow[])].sort((a, b) => a.name.localeCompare(b.name)),
-    [data],
-  );
+  const { roles } = useRoles();
+  const holderCounts = useRoleHolderCounts();
 
-  const setCell = (role: RoleRow, permission: Permission, value: CellValue) => {
-    const allow = new Set(role.allow ?? []);
-    const deny = new Set(role.deny ?? []);
+  const setCell = (role: Role, permission: Permission, value: CellValue) => {
+    const allow = new Set<string>(role.allow);
+    const deny = new Set<string>(role.deny);
     allow.delete(permission);
     deny.delete(permission);
     if (value === "allow") allow.add(permission);
@@ -84,10 +79,12 @@ function Roles() {
     // effective-permission rule: any Allow grants, any Deny cancels it.
     if (permission === "manage_roles" && value !== "allow") {
       const after = roles.map((r) =>
-        r.id === role.id ? { ...r, allow: nextAllow, deny: nextDeny } : r,
+        r.id === role.id
+          ? { ...r, allow: nextAllow as Permission[], deny: nextDeny as Permission[] }
+          : r,
       );
-      const anyAllows = after.some((r) => r.allow?.includes("manage_roles"));
-      const anyDenies = after.some((r) => r.deny?.includes("manage_roles"));
+      const anyAllows = after.some((r) => r.allow.includes("manage_roles"));
+      const anyDenies = after.some((r) => r.deny.includes("manage_roles"));
       const stillGranted = anyAllows && !anyDenies;
       if (!stillGranted) {
         const ok = window.confirm(
@@ -98,91 +95,52 @@ function Roles() {
     }
 
     setWarning(null);
-    const txns = [];
-    txns.push(db.tx.roles[role.id].update({ allow: nextAllow, deny: nextDeny }));
-    for (const u of role.users ?? []) {
-      const updatedRoles = (u.roles ?? []).map((r) =>
-        r.id === role.id ? { ...r, allow: nextAllow, deny: nextDeny } : r,
-      );
-      txns.push(db.tx.users[u.id].update(computeManagementFlags(updatedRoles)));
-    }
-    txns.push(
-      activityTx({
-        eventType: "role.permission_changed",
-        summary: `${role.name}: ${permission} set to ${value ?? "undefined"}`,
-        subjectType: "roles",
-        subjectId: role.id,
-        actorId: current.user?.id,
-      }),
+    void saveRole(
+      {
+        id: role.id,
+        name: role.name,
+        allow: nextAllow as Permission[],
+        deny: nextDeny as Permission[],
+      },
+      current.user?.id ?? null,
     );
-    void db.transact(txns);
   };
 
-  const addRole = async (from?: RoleRow) => {
+  const addRole = async (from?: Role) => {
     const name = await askText(
       from ? `Name for the copy of ${from.name}:` : "New role name:",
       from ? `${from.name} copy` : "",
     );
     if (!name?.trim()) return;
-    const roleId = id();
-    await db.transact([
-      db.tx.roles[roleId].update({
+    // A fresh role starts with everything Undefined; a duplicate copies its
+    // source's grants.
+    await saveRole(
+      {
         name: name.trim(),
-        // A fresh role starts with everything Undefined.
         allow: from?.allow ?? [],
         deny: from?.deny ?? [],
-      }),
-      activityTx({
-        eventType: "role.created",
-        summary: from
-          ? `Role "${name.trim()}" duplicated from "${from.name}"`
-          : `Role "${name.trim()}" created`,
-        subjectType: "roles",
-        subjectId: roleId,
-        actorId: current.user?.id,
-      }),
-    ]);
+      },
+      current.user?.id ?? null,
+    );
   };
 
-  const renameRole = async (role: RoleRow) => {
+  const rename = async (role: Role) => {
     const name = await askText("Rename role:", role.name);
     if (!name?.trim() || name.trim() === role.name) return;
-    await db.transact([
-      db.tx.roles[role.id].update({ name: name.trim() }),
-      activityTx({
-        eventType: "role.renamed",
-        summary: `Role "${role.name}" renamed to "${name.trim()}"`,
-        subjectType: "roles",
-        subjectId: role.id,
-        actorId: current.user?.id,
-      }),
-    ]);
+    await renameRole(role.id, role.name, name.trim(), current.user?.id ?? null);
   };
 
-  const deleteRole = async (role: RoleRow) => {
-    const holders = (role.users ?? []).length;
+  const deleteRole = async (role: Role) => {
+    const holders = holderCounts.get(role.id) ?? 0;
     const ok = window.confirm(
       holders > 0
         ? `${holders} user${holders === 1 ? "" : "s"} hold "${role.name}". They'll lose whatever it granted — and all role-gated access if it was their only role. Delete it?`
         : `Delete "${role.name}"?`,
     );
     if (!ok) return;
-    const txns = [];
-    txns.push(db.tx.roles[role.id].delete());
-    for (const u of role.users ?? []) {
-      const remainingRoles = (u.roles ?? []).filter((r) => r.id !== role.id);
-      txns.push(db.tx.users[u.id].update(computeManagementFlags(remainingRoles)));
-    }
-    txns.push(
-      activityTx({
-        eventType: "role.deleted",
-        summary: `Role "${role.name}" deleted`,
-        subjectType: "roles",
-        subjectId: role.id,
-        actorId: current.user?.id,
-      }),
-    );
-    await db.transact(txns);
+    // user_roles cascades, and the trigger on it recomputes every affected
+    // user's permissions — nothing here has to walk the holders.
+    await removeRole(role.id, role.name, current.user?.id ?? null);
   };
 
   const active = roles.find((r) => r.id === selectedRole) ?? roles[0];
@@ -238,7 +196,7 @@ function Roles() {
                 <button
                   type="button"
                   className="btn btn-sm btn-quiet"
-                  onClick={() => void renameRole(active)}
+                  onClick={() => void rename(active)}
                 >
                   Rename
                 </button>
@@ -293,7 +251,7 @@ function Roles() {
                         type="button"
                         className="btn btn-sm btn-quiet"
                         title="Rename"
-                        onClick={() => void renameRole(r)}
+                        onClick={() => void rename(r)}
                       >
                         ✎
                       </button>

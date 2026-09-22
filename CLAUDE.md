@@ -11,6 +11,26 @@ A Vite + React 19 + TypeScript PWA at the repo root, backed by InstantDB
 marina is a fully independent deployment: its own site, its own Instant app,
 its own Twilio account. Nothing is shared between marinas.
 
+> **Migrating.** InstantDB retires 2027-08-31. The target is Supabase Postgres
+> + PowerSync, keeping Clerk. Read
+> [ADR 0005](docs/adr/0005-supabase-and-powersync-replace-instantdb.md) before
+> touching the data layer — the design is in `docs/architecture.md`,
+> `docs/permissions.md`, `docs/data-model.md` and `docs/api-structure.md`.
+>
+> **The rewrite is done, on the `beta2` branch** (renamed from
+> `rewrite/powersync` on 2026-09-10), deployed to
+> https://beta2.marinasecure.com by its own Netlify site, `marinasecure2`
+> (`marinasecure2.netlify.app`).
+> `beta` still
+> deploys the InstantDB build and still works; nothing in `src/` on the branch
+> imports InstantDB. It compiles, boots, and opens its own SQLite database, and
+> has not yet been exercised against synced rows — see `docs/TODO.md` for the
+> one dashboard change blocking that. Rules below marked *(InstantDB only)*
+> already do not apply on the branch, and some are actively wrong there.
+>
+> **Feature work and schema growth stay frozen until cutover**; ~80% of the
+> codebase touches the database.
+
 Reference docs are in `docs/`. They exist **for agents**, not for a
 published site — write them accordingly.
 
@@ -36,7 +56,15 @@ spec-approval time and expensive afterward.
 
 ## Conventions
 
-- **Work on `beta`.** It deploys to https://beta.marinasecure.com in ~45s.
+- **Work on `beta2`.** It deploys to https://beta2.marinasecure.com in ~45s,
+  from its own Netlify site (`marinasecure2`) with its own environment
+  variables. `beta` is the old InstantDB build on the `marinasecure` site and
+  is left alone; the two share a repo and nothing else.
+- **Pages never touch the database.** *(On `beta2`.)* Queries and
+  writes live in per-domain modules under `src/data/`; **no page file contains
+  SQL**. `src/lib/db/schema.ts` is generated from the live database by
+  `pnpm run schema:gen` — never hand-edited, and `pnpm run schema:check` fails
+  when it drifts.
 - **Behavior changes update the spec and the code together.** Page specs are
   co-located: `src/pages/x/ThingPage.spec.md` beside `ThingPage.tsx`.
   Migration in progress — most components still name a `docs/pages/*.html`
@@ -44,18 +72,42 @@ spec-approval time and expensive afterward.
   folding in its wireframe, and delete the HTML pair.
 - **Commit messages** are multi-paragraph and explain the *why*. Trailer:
   `Co-Authored-By: <model> <noreply@anthropic.com>`.
-- **Schema changes are additive only.** Removing an attribute deletes its
-  data immediately and irreversibly. Deprecation has a lifecycle — see
-  `docs/` and `docs/adr/`.
-- **Never roll back the schema.** To undo a migration, stop it and revert
-  the client bundle. Added attributes are harmless; deleting them is not.
+- **Schema changes are additive only.** *(InstantDB only.)* Removing an
+  attribute deletes its data immediately and irreversibly. This is a property
+  of Instant's schema push, not a general rule — Postgres migrations do not
+  behave this way, and carrying the habit across would be cargo-culting.
+- **Never roll back the schema.** *(InstantDB only.)* To undo a migration,
+  stop it and revert the client bundle. Added attributes are harmless;
+  deleting them is not.
 - **Don't weaken permission rules casually.** `instant.perms.ts` documents
   the full history and rationale inline.
 
 ## Verification
 
-Before any commit: `npx tsc -b` · `npx oxlint` · `npm run build` then
-`rm -rf dist` (dist is gitignored; never commit it).
+Before any commit: `pnpm run test` · `pnpm exec tsc -b` · `pnpm exec oxlint` ·
+`pnpm run build` then `rm -rf dist` (dist is gitignored; never commit it).
+
+Database work has its own suite: `pnpm run test:db` runs pgTAP against the
+local Supabase stack (`supabase start`, then `supabase db reset` to apply
+migrations). `pnpm run seed` loads the real exported configuration plus a
+simulated year of occupancy; `pnpm run ps:up` starts a local PowerSync against
+that database so sync rules can be developed without touching a marina's real
+one — see `powersync/README.md`, including the podman-specific traps. It covers the permission model, RLS, and the constraints that
+moved out of application code. `supabase db advisors --local --type security`
+is a second, independent check and should report nothing.
+
+The unit suite covers the pure half of `src/lib` only — deliberately, since
+tests written against the database client would be discarded with it. Which
+files are uncovered, and why each one is a decision rather than an oversight,
+is in `docs/testing/coverage-log.md`; `pnpm run coverage:check` fails on any
+zero-coverage file missing from it. There is no coverage threshold, and
+`docs/ROADMAP.md` records why.
+
+This repo uses **pnpm**, pinned exactly in `package.json`'s `packageManager`
+field. Its strict `node_modules` means a transitive dependency is not
+importable unless it's declared — if a build fails to resolve a module you
+never imported directly, declare it rather than reaching for
+`--shamefully-hoist`.
 
 Nothing is verified until a real signed-in session has exercised it.
 Screenshots or it didn't happen.
@@ -67,6 +119,17 @@ Screenshots or it didn't happen.
   deployment, saves Playwright state to `/tmp/pw-test/state.json` and
   screenshots to `/tmp/pw-test/screenshots/`. Reuse the state:
   `browser.newContext({ storageState: '/tmp/pw-test/state.json' })`.
+- **Ad-hoc Playwright scripts must live in the repo root**, not in
+  `/tmp/pw-test/`. ESM resolves `playwright` from the script's own directory,
+  so a script under `/tmp` dies with `ERR_MODULE_NOT_FOUND` before it opens a
+  browser. Write it to the repo root, run it, delete it. Keep the *state* and
+  *screenshots* in `/tmp/pw-test/`.
+- **Export the whole database**: `node scripts/agent-login.mjs` then
+  `node scripts/export-instant.mjs` → `migration/instant-export/` (gitignored;
+  regenerate rather than share — it contains guest contact details). Reads
+  entities and links from `instant.schema.ts`, so it can't miss a namespace.
+  It runs through a signed-in session, so it sees only what the permission
+  rules allow; with an admin token, `instant-admin.mjs` is authoritative.
 - **Direct DB access**: `node scripts/instant-admin.mjs query '<json>'`.
   Add `--as <email>` or `--guest` to route through the permission rules —
   this is the honest way to test them.
@@ -82,6 +145,15 @@ Screenshots or it didn't happen.
 
 ## Learnings — read before debugging anything
 
+- **What a migration may drop.** Owner's decision, 2026-09-22. Two kinds of
+  data come out of InstantDB. *User-submitted, time-based* rows — tickets,
+  check-ins, incidents, shifts, checklist answers — are test data: if a row
+  does not conform to the new schema, drop it and say so. *Structural* rows —
+  locations, checkpoints, checklist templates, roles, settings — are preserved
+  where reasonable, and may be dropped only when re-creating them is easier
+  than migrating them. So a constraint is never relaxed to admit bad test
+  data (the unattached-ticket case), and the loader's "dropped N rows the new
+  schema rejects" report is the correct behaviour, not a bug to fix.
 - **Silent failures are the house specialty.** Three multi-hour spirals came
   from swallowed errors: a render throw unmounting the tree (blank page),
   `signInWithIdToken` failures logged as `console.warn` and surfaced as a
@@ -105,8 +177,76 @@ Screenshots or it didn't happen.
   fine. It's drift that kills, not allocation.
 - **Don't trust a React error number second-hand.** #185 is "Maximum update
   depth exceeded"; #310 is the Rules-of-Hooks one. Get the real message —
-  that's what `DEBUG_BUILD` in `vite.config.ts` is for — before theorizing.
-- **Instant gotchas**, each of which cost real downtime: browser origins
+  build with `REACT_DEV_BUILD=1` (see `vite.config.ts`) — before theorizing.
+  That switch is OFF by default and must never reach a marina: left on, it
+  made every checklist tap take ~750ms instead of ~105ms.
+- **A sync error is not an `Error`.** PowerSync raises them inside a Web
+  Worker, so they reach the main thread by structured clone: `name`, `message`
+  and `stack` survive, the prototype does not. `err instanceof Error` is false
+  and `String(err)` is `"[object Object]"`. This already bit once — a
+  PSYNC_S2105 rejection was recorded as "[object Object]", failed the
+  is-this-a-refusal test, and left the app advising the user to find signal
+  while the console said exactly what was wrong. Read `.message` off the
+  object; never narrow on the prototype.
+- **jsonb and array columns must be uploaded as objects, not text.** They are
+  TEXT in the device's SQLite, so the data layer `JSON.stringify()`s them —
+  and sent up like that, a jsonb column stores a JSON *string*
+  (`"{\"type\":…}"`) and an array column refuses the write. Nothing fails:
+  the device keeps its own good copy until the row syncs back, and only then
+  does an answer stop being an object. It showed as "Recorded undefined" on a
+  mileage card; what it had actually broken was checklist submit, which reads
+  answers to decide what else to create, so meter readings, incidents and
+  tickets silently stopped being written for eleven days. The connector now
+  reshapes every write through `uploadShape.ts` using `STRUCTURED_COLUMNS`,
+  generated from Postgres into `schema.ts`. To find damage:
+  `where jsonb_typeof(col) = 'string'`.
+- **A 401 is never a reason to discard a queued write.** Clerk's `getToken()`
+  returns `null` once a device has been offline past the token's 60-second
+  life. The upload then went out with no identity, Postgres answered
+  `401 / 42501`, the connector read 42501 as "RLS refused this, permanently"
+  and deleted the write, and the next sync erased it from the phone — a night
+  of checklist answers, gone from both ends with one `console.error`. The
+  Postgres code cannot tell "who are you?" from "you may not"; the HTTP status
+  can. `uploadData` now refuses to send without a token and never treats a 401
+  as fatal. The repro that found it: tap offline, swap the token source in
+  `clerkToken.ts` for `async () => null`, go back online.
+- **A `LEFT JOIN` on anything but `id` is a full scan.** PowerSync's local
+  tables are views over a JSON blob, so `id` is the only real column — every
+  other one is `CAST(json_extract(data, '$.x'))`, and every index you declare
+  is an *expression* index. SQLite uses those to satisfy a WHERE constraint but
+  **not a JOIN constraint**, so `LEFT JOIN t ON t.fk = outer.id` scans all of
+  `t` once per outer row, and `EXPLAIN QUERY PLAN` says `SCAN … LEFT-JOIN`
+  rather than `SEARCH`. The contact list paid 5,461ms for 1,929 rows this way;
+  the same rows as correlated scalar subqueries took 59ms. `ANALYZE` does not
+  help and neither does wrapping the inner side in a subquery — SQLite flattens
+  it. Join on `id` freely; correlate on anything else. `src/data/assets.ts`
+  still carries one (`asset_checkouts` on `asset_id`), left alone only because
+  that table is tiny.
+- **Anything that is a file locally and a dashboard field remotely will be
+  forgotten.** Four things bit in sequence, each revealed only by fixing the
+  last: the Clerk `aud` claim, PowerSync's JWKS URI, PowerSync's *sync rules*,
+  and Netlify's `VITE_SUPABASE_URL` (pasted with `/rest/v1/` on the end, so
+  supabase-js built `/rest/v1/rest/v1/rpc/...` and every RPC 404'd). The local
+  stack hides all four: `powersync/config/service.yaml` and `sync-config.yaml`
+  are bind-mounted from the repo, and `.env.local` is read directly. Local
+  success proves nothing about any of them. `scripts/finish-powersync-cutover.sh`
+  now covers all four; add to it rather than rediscovering.
+- **A freshly seeded database has no sync scopes.** `is_resident`, `is_current`
+  and `is_recent` are computed by `refresh_sync_scopes_all()` on an hourly
+  `pg_cron` job, and default to values that are wrong until it first runs — so
+  a correct seed against a correct instance still syncs an empty occupancy
+  stream, which reads exactly like a broken permission gate. Run
+  `select refresh_sync_scopes_all()` after seeding. Note the `_all`: plain
+  `refresh_sync_scopes()` skips `refresh_child_sync_scopes()`, which is what
+  scopes `contact_details`, and half-running it is harder to spot than not
+  running it.
+- **The auth trap survives the migration, in a new place.** Instant fails
+  the Clerk token exchange on an unallowlisted browser origin. Supabase's
+  equivalent is the third-party auth provider config: without it every policy
+  evaluates against a null identity and every query returns empty — which
+  looks exactly like an unprovisioned account, the same misleading-error
+  failure mode this codebase has already lost hours to.
+- **Instant gotchas** *(InstantDB only)*, each of which cost real downtime: browser origins
   must be allowlisted in the Instant dashboard or the token exchange fails;
   the `$users` row is created *through* the permission rules on first
   sign-in, so `create: "false"` breaks every new sign-in; schema pushes

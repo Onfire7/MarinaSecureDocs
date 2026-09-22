@@ -1,9 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { displayName } from "../../lib/contacts";
 import { twilioRequest } from "../../lib/comms";
+import {
+  createSmsTemplate,
+  deleteSmsTemplate,
+  markThreadRead,
+  useSmsMessages,
+  useSmsTemplates,
+  useSmsThread,
+  type SmsTemplateRow,
+} from "../../data/comms";
 
 // Comms — SMS Thread (see docs/pages/sms-thread.html).
 // Reaching this screen needs view_sms; sending is a separate gate
@@ -19,39 +26,15 @@ export function SmsThreadPage() {
   const canView = current.can("view_sms");
   const canSend = current.can("place_calls");
 
-  const { data } = db.useQuery(
-    canView && threadId
-      ? {
-          smsThreads: {
-            $: { where: { id: threadId } },
-            contact: {},
-            messages: { sentBy: {} },
-          },
-          smsTemplates: { owner: {} },
-        }
-      : null,
-  );
-  const thread = data?.smsThreads?.[0];
+  const thread = useSmsThread(threadId);
+  const { data: messages } = useSmsMessages(threadId);
+  const { data: templates } = useSmsTemplates(current.user?.id);
 
   // Opening a thread marks it read — one-way, there's no "mark unread".
+  const unread = thread?.unread === 1;
   useEffect(() => {
-    if (thread?.unread) {
-      void db.transact(db.tx.smsThreads[thread.id].update({ unread: false }));
-    }
-  }, [thread?.id, thread?.unread]);
-
-  const messages = useMemo(
-    () =>
-      [...(thread?.messages ?? [])].sort(
-        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-      ),
-    [thread],
-  );
-
-  // Global templates are marina-wide; personal ones belong to their owner.
-  const templates = (data?.smsTemplates ?? []).filter(
-    (t) => t.scope === "global" || t.owner?.id === current.user?.id,
-  );
+    if (threadId && unread) void markThreadRead(threadId);
+  }, [threadId, unread]);
 
   if (!canView) {
     return (
@@ -77,7 +60,7 @@ export function SmsThreadPage() {
       // — the frontend never writes Twilio-sourced data.
       await twilioRequest("/sms/send", {
         threadId: thread.id,
-        contactId: thread.contact?.id,
+        contactId: thread.contact_id,
         line: thread.line,
         body: body.trim(),
       });
@@ -94,11 +77,11 @@ export function SmsThreadPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">
-            {thread.contact ? displayName(thread.contact) : "Unknown contact"}
+            {thread.contact_name ?? "Unknown contact"}
           </h1>
           <div className="page-sub">
-            {current.can("view_contact") && thread.contact?.phone
-              ? `${thread.contact.phone} · `
+            {current.can("view_contact") && thread.contact_phone
+              ? `${thread.contact_phone} · `
               : ""}
             {thread.line ? `via ${thread.line} · ` : ""}
             <Link to="/comms">← Comms</Link>
@@ -114,8 +97,8 @@ export function SmsThreadPage() {
           >
             <div className="chat-meta">
               {m.direction === "outbound"
-                ? (m.sentBy?.name ?? "Marina")
-                : (thread.contact ? displayName(thread.contact) : "Them")}{" "}
+                ? (m.sent_by_name ?? "Marina")
+                : (thread.contact_name ?? "Them")}{" "}
               ·{" "}
               {new Date(m.timestamp).toLocaleString(undefined, {
                 month: "short",
@@ -202,11 +185,7 @@ export function SmsThreadPage() {
   );
 }
 
-function PersonalTemplates({
-  templates,
-}: {
-  templates: { id: string; label: string; body: string; scope: string; owner?: { id: string } | null }[];
-}) {
+function PersonalTemplates({ templates }: { templates: SmsTemplateRow[] }) {
   const current = useCurrent();
   const [label, setLabel] = useState("");
   const [body, setBody] = useState("");
@@ -214,11 +193,12 @@ function PersonalTemplates({
 
   const add = async () => {
     if (!label.trim() || !body.trim() || !current.user) return;
-    await db.transact(
-      db.tx.smsTemplates[id()]
-        .update({ label: label.trim(), body: body.trim(), scope: "personal" })
-        .link({ owner: current.user.id }),
-    );
+    await createSmsTemplate({
+      label: label.trim(),
+      body: body.trim(),
+      scope: "personal",
+      ownerId: current.user.id,
+    });
     setLabel("");
     setBody("");
   };
@@ -234,7 +214,7 @@ function PersonalTemplates({
             <button
               type="button"
               className="btn btn-sm btn-quiet"
-              onClick={() => void db.transact(db.tx.smsTemplates[t.id].delete())}
+              onClick={() => void deleteSmsTemplate(t.id)}
             >
               Remove
             </button>

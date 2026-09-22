@@ -1,7 +1,15 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { db } from "../../lib/db";
+import { compareNames } from "../../lib/locations";
 import { formatNumber, meterTypeLabel, meterUnit } from "../../lib/assets";
+import {
+  deleteMaintenanceRule,
+  renameAssetCategory,
+  saveMaintenanceRule,
+  useAssets,
+  useMaintenanceRules,
+  type MaintenanceRuleRow,
+} from "../../data/assets";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
 
@@ -17,20 +25,16 @@ export function AdminAssetsPage() {
   );
 }
 
-type MaintenanceRule = { kind: "meter" | "time"; every: number; label?: string };
-
 function AssetsAdmin() {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const { data } = db.useQuery({ assets: {} });
+  const { data: allAssets } = useAssets();
+  const { data: allRules } = useMaintenanceRules();
   const assets = useMemo(
-    () =>
-      [...(data?.assets ?? [])].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { numeric: true }),
-      ),
-    [data],
+    () => [...allAssets].sort((a, b) => compareNames(a.name, b.name)),
+    [allAssets],
   );
 
   const categories = useMemo(() => {
@@ -44,16 +48,11 @@ function AssetsAdmin() {
   const renameCategory = async (from: string) => {
     const to = renameValue.trim();
     if (!to) return;
-    await db.transact(
-      assets
-        .filter((a) => a.category === from)
-        .map((a) => db.tx.assets[a.id].update({ category: to })),
-    );
+    // Rewritten in the database, which also covers assets this device does
+    // not hold — an asset outside the sync window still gets the new label.
+    await renameAssetCategory(from, to);
     setRenaming(null);
   };
-
-  const setRules = (assetId: string, rules: MaintenanceRule[]) =>
-    void db.transact(db.tx.assets[assetId].update({ maintenanceRules: rules }));
 
   return (
     <div>
@@ -127,7 +126,7 @@ function AssetsAdmin() {
           <div className="section-title">Maintenance rules, per asset</div>
           <div className="stack" style={{ gap: 6 }}>
             {assets.map((a) => {
-              const rules = (a.maintenanceRules ?? []) as MaintenanceRule[];
+              const rules = allRules.filter((r) => r.asset_id === a.id);
               const open = expanded === a.id;
               return (
                 <div key={a.id} className="card">
@@ -138,8 +137,8 @@ function AssetsAdmin() {
                       </Link>
                       <div className="card-meta">
                         {rules.length} rule{rules.length === 1 ? "" : "s"} ·{" "}
-                        {a.hasMeter
-                          ? `${meterTypeLabel(a.meterType).toLowerCase()} meter`
+                        {a.has_meter === 1
+                          ? `${meterTypeLabel(a.meter_type).toLowerCase()} meter`
                           : "meterless"}
                       </div>
                     </div>
@@ -154,10 +153,10 @@ function AssetsAdmin() {
 
                   {open && (
                     <RuleEditor
-                      hasMeter={a.hasMeter}
-                      meterType={a.meterType}
+                      assetId={a.id}
+                      hasMeter={a.has_meter === 1}
+                      meterType={a.meter_type}
                       rules={rules}
-                      onChange={(next) => setRules(a.id, next)}
                     />
                   )}
                 </div>
@@ -174,15 +173,15 @@ function AssetsAdmin() {
 }
 
 function RuleEditor({
+  assetId,
   hasMeter,
   meterType,
   rules,
-  onChange,
 }: {
+  assetId: string;
   hasMeter: boolean;
   meterType?: string | null;
-  rules: MaintenanceRule[];
-  onChange: (rules: MaintenanceRule[]) => void;
+  rules: MaintenanceRuleRow[];
 }) {
   // A meterless asset can only carry time-based rules — meter-based isn't
   // offered at all rather than offered and rejected.
@@ -192,10 +191,18 @@ function RuleEditor({
 
   const unit = kind === "time" ? "days" : meterUnit(meterType);
 
-  const add = () => {
+  // A rule is a row now, not an entry in a json array on the asset, so adding
+  // one writes one row instead of rewriting the whole list — and two people
+  // adding rules at once no longer overwrite each other.
+  const add = async () => {
     const n = Number(every);
     if (!n || n <= 0) return;
-    onChange([...rules, { kind, every: n, label: label.trim() || undefined }]);
+    await saveMaintenanceRule({
+      assetId,
+      kind,
+      every: n,
+      label: label.trim() || null,
+    });
     setEvery("");
     setLabel("");
   };
@@ -203,8 +210,8 @@ function RuleEditor({
   return (
     <div style={{ marginTop: 10 }}>
       <div className="stack" style={{ gap: 4, marginBottom: 8 }}>
-        {rules.map((r, i) => (
-          <div key={i} className="card spread small">
+        {rules.map((r) => (
+          <div key={r.id} className="card spread small">
             <span>
               {r.label ? `${r.label} — ` : ""}
               every {formatNumber(r.every)}{" "}
@@ -214,7 +221,7 @@ function RuleEditor({
             <button
               type="button"
               className="btn btn-sm btn-quiet"
-              onClick={() => onChange(rules.filter((_, x) => x !== i))}
+              onClick={() => void deleteMaintenanceRule(r.id)}
             >
               Remove
             </button>
@@ -255,7 +262,7 @@ function RuleEditor({
           type="button"
           className="btn btn-sm"
           disabled={!Number(every)}
-          onClick={add}
+          onClick={() => void add()}
         >
           Add rule
         </button>

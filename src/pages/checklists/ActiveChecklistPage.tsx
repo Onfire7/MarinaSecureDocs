@@ -2,7 +2,6 @@ import { useRef, useState } from "react";
 import { useEffect } from "react";
 import type { ComponentType, ReactNode } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
-import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import {
@@ -12,12 +11,26 @@ import {
   type DoorCheckConfig,
   type ItemType,
 } from "../../lib/checklists";
-import { activityTx } from "../../lib/activityLog";
 import { ReorderableList } from "../shared/ReorderableList";
 import {
-  buildPendingEffectTxns,
+  checkMaintenance,
   collectPendingEffects,
-} from "../../lib/checklistSubmit";
+} from "../../data/checklistSubmit";
+import {
+  itemConfig,
+  itemResult,
+  reorderInstanceItems,
+  startAndClaimInstance,
+  submitInstance,
+  useInstance,
+  useInstanceItems,
+  useInstanceSections,
+  useShiftEndedBy,
+} from "../../data/checklists";
+import { useIncidentStatuses, useTicketStatuses } from "../../data/lookups";
+import { useLocations } from "../../data/locations";
+import { useRoleIdsFor } from "../../data/users";
+import { useInstances } from "../../data/checklists";
 import {
   DoorCheckItem,
   LockCheckItem,
@@ -30,8 +43,8 @@ import {
 } from "./checklistItems";
 
 // Checklists & Tours — Active Checklist (see pages/active-checklist.html).
-// Item-by-item completion of an in-progress instance; every write here is
-// local-first InstantDB, so it works fully offline. An instance is fully
+// Item-by-item completion of an in-progress instance; every write here goes to
+// the device's own database, so it works fully offline. An instance is fully
 // materialized rows — sections and items exist in the database from the
 // moment they were assigned — so this page renders exactly what's stored:
 // no template resolution, no activation windows, just rows, with sections
@@ -103,33 +116,27 @@ export function ChecklistItemsPanel({
   // Arms the second tap that submits with work outstanding.
   const [confirmingPartial, setConfirmingPartial] = useState(false);
 
-  const { data } = db.useQuery({
-    checklistInstances: {
-      $: { where: { id: checklistId } },
-      template: { assignedRole: {} },
-      sections: {
-        location: {},
-        items: { template: {}, completedBy: {} },
-      },
-      assignedTo: {},
-      endedShift: {},
-      parentItem: {},
-    },
-  });
-  const checklist = data?.checklistInstances?.[0];
+  const { instance: checklist } = useInstance(checklistId);
+  const { data: sectionRows } = useInstanceSections(checklistId);
+  const { data: itemRows } = useInstanceItems(checklistId);
+  const endedShift = useShiftEndedBy(checklistId);
+  const roleIds = useRoleIdsFor(current.user?.id);
+  const { data: allLocations } = useLocations();
+  const { data: allInstances } = useInstances();
+  const { statuses: incidentStatuses } = useIncidentStatuses();
+  const { statuses: ticketStatuses } = useTicketStatuses();
 
   // Who may work this checklist: its assignee, any holder of the template's
   // assignedRole, or anyone at all if the template somehow has no role (the
   // orphan guard). viewerRoles members and other onlookers get a read-only
   // rendering — client-side only until the permissions overhaul.
-  const roleIds = (current.user?.roles ?? []).map((r) => r.id);
   const userId = current.user?.id;
   const canAct = Boolean(
     checklist &&
       userId &&
-      (checklist.assignedTo?.id === userId ||
-        !checklist.template?.assignedRole ||
-        roleIds.includes(checklist.template.assignedRole.id)),
+      (checklist.assigned_to_id === userId ||
+        !checklist.assigned_role_id ||
+        roleIds.includes(checklist.assigned_role_id)),
   );
 
   // Opening a Not Started checklist starts it — and, for a role-assigned
@@ -145,79 +152,48 @@ export function ChecklistItemsPanel({
     // nightly checklist for them, only deliberate opens do that.
     if (sectionId) return;
     const needsStart = checklist.status === "not_started";
-    const needsClaim = !checklist.assignedTo && Boolean(current.user);
+    const needsClaim = !checklist.assigned_to_id && Boolean(userId);
     if (!needsStart && !needsClaim) return;
     started.current = checklist.id;
-    let update = db.tx.checklistInstances[checklist.id].update({
-      ...(needsStart ? { status: "in_progress", startedAt: Date.now() } : {}),
-    });
-    if (needsClaim) update = update.link({ assignedTo: current.user!.id });
-    void db.transact(update);
-  }, [checklist, current.user, canAct, sectionId]);
+    void startAndClaimInstance(
+      checklist.id,
+      checklist.template_name ?? "Checklist",
+      { start: needsStart, claim: needsClaim },
+      userId!,
+    );
+  }, [checklist, userId, canAct, sectionId]);
 
-  const byOrder = (a: { order: number }, b: { order: number }) => a.order - b.order;
-  // All hooks below must run on every render regardless of load state —
-  // computed off optional chaining so the shape is stable while loading.
-  const allSections = (checklist?.sections ?? []).slice().sort(byOrder);
-  // Sections still inside their hideUntil exist but aren't anyone's work
-  // yet. Their items still count toward "remaining" below — a checklist
-  // can't be submitted before a section has even revealed itself.
+  // Both lists arrive ordered from their own queries. Sections still inside
+  // their hide_until exist but aren't anyone's work yet — their items still
+  // count toward "remaining" below, because a checklist can't be submitted
+  // before a section has even revealed itself.
+  const allSections = sectionRows;
   const hiddenSections = allSections.filter((s) => !isVisibleNow(s));
   const visibleSections = allSections
     .filter((s) => isVisibleNow(s))
     .filter((s) => (sectionId ? s.id === sectionId : true))
     .map((s) => ({
       ...s,
-      items: (s.items ?? []).slice().sort(byOrder),
+      items: itemRows.filter((i) => i.section_id === s.id),
     }));
 
-  const allItems = allSections.flatMap((s) => s.items ?? []);
-
-  const locationCheckNestedIds = allItems
-    .filter((i) => i.template?.type === "location_check")
-    .map((i) => (i.result as { nestedChecklistId?: string } | undefined)?.nestedChecklistId)
-    .filter((v): v is string => Boolean(v));
-
-  const { data: nestedData } = db.useQuery(
-    locationCheckNestedIds.length > 0
-      ? {
-          checklistInstances: {
-            $: { where: { id: { $in: locationCheckNestedIds } } },
-          },
-        }
-      : null,
-  );
-  const nestedStatusById = new Map(
-    (nestedData?.checklistInstances ?? []).map((c) => [c.id, c.status]),
-  );
+  const allItems = itemRows;
 
   type ItemRow = (typeof allItems)[number];
+  // A location check spawns a whole sub-checklist; it counts as done only when
+  // that sub-checklist is, which is why every instance is in scope here.
+  const nestedStatusById = new Map(allInstances.map((c) => [c.id, c.status]));
+
   const itemLocationId = (item: ItemRow): string | undefined =>
-    item.template && isStateCheck(item.template.type)
-      ? (item.template.config as DoorCheckConfig | undefined)?.locationId
+    isStateCheck(item.type)
+      ? (itemConfig(item) as DoorCheckConfig | undefined)?.locationId
       : undefined;
 
   // A door/lock check away from its section's own location gets a small
   // header naming where it is — "Front Door" at one building shouldn't read
   // as the same card as "Front Door" at another. A section without a
   // location has no baseline, so every bound location headers there.
-  const offSiteLocationIds = [
-    ...new Set(
-      allSections.flatMap((s) =>
-        (s.items ?? [])
-          .map(itemLocationId)
-          .filter((id): id is string => Boolean(id) && id !== s.location?.id),
-      ),
-    ),
-  ];
-  const { data: offSiteLocationsData } = db.useQuery(
-    offSiteLocationIds.length > 0
-      ? { locations: { $: { where: { id: { $in: offSiteLocationIds } } } } }
-      : null,
-  );
-  const offSiteLocationNameById = new Map(
-    (offSiteLocationsData?.locations ?? []).map((l) => [l.id, l.name]),
-  );
+  const offSiteLocationNameById = new Map(allLocations.map((l) => [l.id, l.name]));
 
   if (!checklist) {
     return (
@@ -231,7 +207,7 @@ export function ChecklistItemsPanel({
     if (compact) {
       return (
         <div className="card card-done">
-          <div className="card-title">{checklist.template?.name ?? "Checklist"}</div>
+          <div className="card-title">{checklist.template_name ?? "Checklist"}</div>
           <div className="card-meta">Complete</div>
         </div>
       );
@@ -242,8 +218,9 @@ export function ChecklistItemsPanel({
 
   const isDone = (item: ItemRow) => {
     if (item.result == null) return false;
-    if (item.template?.type === "location_check") {
-      const nestedId = (item.result as { nestedChecklistId?: string })?.nestedChecklistId;
+    if (item.type === "location_check") {
+      const nestedId = (itemResult(item) as { nestedChecklistId?: string } | null)
+        ?.nestedChecklistId;
       return nestedId ? nestedStatusById.get(nestedId) === "complete" : false;
     }
     return true;
@@ -273,53 +250,32 @@ export function ChecklistItemsPanel({
   };
 
   const runSubmit = async () => {
-    const templateName = checklist.template?.name ?? "Checklist";
+    const templateName = checklist.template_name ?? "Checklist";
     // Everything the items described while the guard worked — incidents,
-    // tickets, meter readings — is written here, in the same transaction
-    // that completes the checklist. Until this point an item could still be
-    // reopened and changed, which is only safe because none of it existed.
-    const collected = collectPendingEffects(allItems);
-    const effectTxns = await buildPendingEffectTxns(collected, current.user?.id);
-    await db.transact([
-      ...effectTxns,
-      // Link each raised ticket back to the item that raised it.
-      ...[...collected.ticketByResultId].map(([itemRowId, ticketId]) =>
-        db.tx.checklistInstanceItems[itemRowId].link({ linkedTicket: ticketId }),
-      ),
-      db.tx.checklistInstances[checklist.id].update({
-        status: "complete",
-        completedAt: Date.now(),
-      }),
-      // A nested location-check instance completes its spawning item too, so
-      // the parent's section completion time reflects when the sub-checklist
-      // actually finished.
-      ...(checklist.parentItem
-        ? [
-            db.tx.checklistInstanceItems[checklist.parentItem.id]
-              .update({ completedAt: Date.now() })
-              .link(current.user ? { completedBy: current.user.id } : {}),
-          ]
-        : []),
-      activityTx({
-        eventType: "checklist.completed",
-        summary: `"${templateName}" completed`,
-        subjectType: "checklistInstances",
-        subjectId: checklist.id,
-        actorId: current.user?.id,
-      }),
-      ...(checklist.endedShift
-        ? [
-            db.tx.shifts[checklist.endedShift.id].update({ endedAt: Date.now() }),
-            activityTx({
-              eventType: "shift.ended",
-              summary: `Shift ended by end-of-shift checklist "${templateName}"`,
-              subjectType: "shifts",
-              subjectId: checklist.endedShift.id,
-              actorId: current.user?.id,
-            }),
-          ]
-        : []),
-    ]);
+    // tickets, meter readings — is written in the same transaction that
+    // completes the checklist. Until this point an item could still be reopened
+    // and changed, which is only safe because none of it existed.
+    const collected = collectPendingEffects(
+      allItems.map((i) => ({ id: i.id, result: itemResult(i) })),
+    );
+    // Maintenance is evaluated BEFORE the transaction opens, against live
+    // history, so a rule someone else already ticketed is not ticketed twice.
+    const maintenance = await checkMaintenance(collected);
+    await submitInstance({
+      instanceId: checklist.id,
+      templateName,
+      parentItemId: checklist.parent_item_id,
+      endedShift: endedShift
+        ? { id: endedShift.id, guardName: current.user?.name ?? "a guard" }
+        : null,
+      collected,
+      maintenance,
+      statusIds: {
+        incidentOpen: incidentStatuses.find((st) => st.is_terminal === 0)?.id ?? null,
+        ticketOpen: ticketStatuses.find((st) => st.is_terminal === 0)?.id ?? null,
+      },
+      actorId: current.user?.id ?? null,
+    });
     onSubmitted?.();
   };
 
@@ -348,14 +304,9 @@ export function ChecklistItemsPanel({
   // guard's own working order from then on (it started as the template's).
   // One write per drop, and the row order becomes the user's own working
   // order from then on — it started as the template's.
-  const reorderItems = (orderedIds: string[]) =>
-    void db.transact(
-      orderedIds.map((itemId, i) =>
-        db.tx.checklistInstanceItems[itemId].update({ order: i }),
-      ),
-    );
+  const reorderItems = (orderedIds: string[]) => void reorderInstanceItems(orderedIds);
 
-  const title = checklist.template?.name ?? "Checklist";
+  const title = checklist.template_name ?? "Checklist";
   const sectionLabel = sectionId
     ? allSections.find((s) => s.id === sectionId)?.label
     : undefined;
@@ -389,7 +340,7 @@ export function ChecklistItemsPanel({
             {shownItems.length > 0 && (
               <div className="page-sub">
                 {shownItems.length - remainingShown} of {shownItems.length} complete
-                {checklist.dueBy && ` · due ${dueText(checklist.dueBy)}`}
+                {checklist.due_by && ` · due ${dueText(checklist.due_by)}`}
               </div>
             )}
           </div>
@@ -398,8 +349,7 @@ export function ChecklistItemsPanel({
 
       {!canAct && (
         <p className="muted small" style={{ marginTop: 4 }}>
-          Read-only — this checklist belongs to{" "}
-          {checklist.template?.assignedRole?.name ?? "another role"}.
+          Read-only — this checklist belongs to another role.
         </p>
       )}
 
@@ -491,8 +441,11 @@ export function ChecklistItemsPanel({
                     )}
                     <span style={{ minWidth: 0 }}>
                       {showSectionHeadings ? section.label : ""}
-                      {showSectionHeadings && section.dueBy && (
-                        <span className="muted small"> · due {dueText(section.dueBy)}</span>
+                      {showSectionHeadings && section.due_by && (
+                        <span className="muted small">
+                          {" "}
+                          · due {dueText(section.due_by)}
+                        </span>
                       )}
                       {collapsed && (
                         <span className="muted small">
@@ -515,14 +468,16 @@ export function ChecklistItemsPanel({
             // after returning to it, only once the run is actually broken by a
             // different location. Reset per section so a run can't straddle a
             // section boundary.
-            let previousLocationId = section.location?.id;
+            let previousLocationId = section.location_id ?? undefined;
             // A location heading breaks the flow, so items are collected into
             // runs between headings — dragging is only meaningful within one.
             const runs: { items: typeof section.items }[] = [{ items: [] }];
             for (const item of section.items) {
-              if (!item.template) continue;
-              const locationId = itemLocationId(item) ?? section.location?.id;
-              if (locationId !== section.location?.id && locationId !== previousLocationId) {
+              const locationId = itemLocationId(item) ?? section.location_id ?? undefined;
+              if (
+                locationId !== (section.location_id ?? undefined) &&
+                locationId !== previousLocationId
+              ) {
                 const name = offSiteLocationNameById.get(locationId!);
                 if (name) {
                   nodes.push(
@@ -556,11 +511,10 @@ export function ChecklistItemsPanel({
                     enabled={canAct && !compact && section.items.length > 1}
                     onReorder={reorderItems}
                     renderItem={(item: (typeof run.items)[number]) => {
-                      const Component = componentFor(item.template!.type);
+                      const Component = componentFor(item.type);
                       return (
                         <Component
-                          item={item.template!}
-                          existing={item}
+                          item={item}
                           checklistId={checklist.id}
                           onSaved={() => {}}
                           editable={canAct}
@@ -592,7 +546,7 @@ export function ChecklistItemsPanel({
       {hiddenSections.length > 0 && !sectionId && (
         <p className="muted small" style={{ marginTop: 10 }}>
           {hiddenSections.length === 1
-            ? `1 more section unlocks at ${dueText(hiddenSections[0].hideUntil) ?? "a later time"}.`
+            ? `1 more section unlocks at ${dueText(hiddenSections[0].hide_until) ?? "a later time"}.`
             : `${hiddenSections.length} more sections unlock later.`}
         </p>
       )}

@@ -1,8 +1,23 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { displayName } from "../../lib/contacts";
+import { compareNames } from "../../lib/locations";
+import {
+  addLeaseComment,
+  addLeaseDocument,
+  createLease,
+  saveLease,
+  setLessees,
+  useLease,
+  useLeaseComments,
+  useLeaseDocuments,
+  useLeaseLessees,
+  type LeaseRow,
+} from "../../data/leases";
+import { useContacts } from "../../data/contacts";
+import { useLocations } from "../../data/locations";
+import { attachmentUrl, captureAttachment } from "../../data/files";
 
 export interface NewLeaseState {
   locationId?: string;
@@ -22,20 +37,10 @@ export function LeaseDetailPage({ mode }: { mode?: "create" }) {
   const [comment, setComment] = useState("");
   const [editing, setEditing] = useState(mode === "create");
 
-  const { data } = db.useQuery(
-    canView && leaseId
-      ? {
-          leases: {
-            $: { where: { id: leaseId } },
-            location: {},
-            lessees: {},
-            documents: {},
-            comments: { author: {} },
-          },
-        }
-      : null,
-  );
-  const lease = data?.leases?.[0];
+  const { lease } = useLease(leaseId);
+  const { data: lessees } = useLeaseLessees(leaseId);
+  const { data: documents } = useLeaseDocuments(leaseId);
+  const { data: comments } = useLeaseComments(leaseId);
 
   if (!canView) {
     return (
@@ -58,32 +63,26 @@ export function LeaseDetailPage({ mode }: { mode?: "create" }) {
   }
 
   const now = Date.now();
-  const expired = lease.endDate != null && new Date(lease.endDate).getTime() < now;
+  const expired = lease.end_date != null && new Date(lease.end_date).getTime() < now;
 
   const addComment = async () => {
     if (!comment.trim() || !current.user) return;
-    await db.transact(
-      db.tx.leaseComments[id()]
-        .update({ body: comment.trim(), createdAt: Date.now() })
-        .link({ lease: lease.id, author: current.user.id }),
-    );
+    await addLeaseComment(lease.id, comment.trim(), current.user.id);
     setComment("");
   };
-
-  const comments = [...(lease.comments ?? [])].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-  );
 
   return (
     <div>
       <div className="page-head">
         <div>
           <h1 className="page-title">
-            Lease — {lease.location?.name ?? "Unassigned location"}
+            Lease — {lease.location_name ?? "Unassigned location"}
           </h1>
           <div className="page-sub">
-            {lease.startDate ? new Date(lease.startDate).toLocaleDateString() : "—"} –{" "}
-            {lease.endDate ? new Date(lease.endDate).toLocaleDateString() : "open-ended"}
+            {lease.start_date ? new Date(lease.start_date).toLocaleDateString() : "—"} –{" "}
+            {lease.end_date
+              ? new Date(lease.end_date).toLocaleDateString()
+              : "open-ended"}
             {expired && (
               <span className="badge badge-warn" style={{ marginLeft: 8 }}>
                 Expired
@@ -101,15 +100,19 @@ export function LeaseDetailPage({ mode }: { mode?: "create" }) {
       <div className="grid-2">
         <div className="stack">
           {editing ? (
-            <EditLease lease={lease} onDone={() => setEditing(false)} />
+            <EditLease
+              lease={lease}
+              lesseeIds={lessees.map((l) => l.contact_id)}
+              onDone={() => setEditing(false)}
+            />
           ) : (
             <>
-              {lease.location && (
+              {lease.location_id && (
                 <div className="field">
                   <span className="field-label">Location</span>
                   <div className="field-value">
-                    <Link to={`/locations/${lease.location.id}`}>
-                      {lease.location.name}
+                    <Link to={`/locations/${lease.location_id}`}>
+                      {lease.location_name}
                     </Link>
                   </div>
                 </div>
@@ -118,17 +121,14 @@ export function LeaseDetailPage({ mode }: { mode?: "create" }) {
               <div className="field">
                 <span className="field-label">Lessees</span>
                 <div className="field-value">
-                  {(lease.lessees ?? []).length === 0 ? (
+                  {lessees.length === 0 ? (
                     <span className="muted">None recorded</span>
                   ) : (
-                    (lease.lessees ?? []).map((c) => (
-                      <div key={c.id}>
-                        <Link to={`/contacts/${c.id}`}>{displayName(c)}</Link>
-                        {current.can("view_contact") && (
-                          <span className="muted small">
-                            {c.phone ? ` · ${c.phone}` : ""}
-                            {c.email ? ` · ${c.email}` : ""}
-                          </span>
+                    lessees.map((c) => (
+                      <div key={c.link_id}>
+                        <Link to={`/contacts/${c.contact_id}`}>{displayName(c)}</Link>
+                        {current.can("view_contact") && c.phone && (
+                          <span className="muted small">{` · ${c.phone}`}</span>
                         )}
                       </div>
                     ))
@@ -136,12 +136,12 @@ export function LeaseDetailPage({ mode }: { mode?: "create" }) {
                 </div>
               </div>
 
-              {lease.variancesAndConditions && (
+              {lease.variances_and_conditions && (
                 <div className="field">
                   <span className="field-label">Variances & conditions</span>
                   <div className="card">
                     <div className="small" style={{ whiteSpace: "pre-wrap" }}>
-                      {lease.variancesAndConditions}
+                      {lease.variances_and_conditions}
                     </div>
                   </div>
                 </div>
@@ -152,19 +152,27 @@ export function LeaseDetailPage({ mode }: { mode?: "create" }) {
           <div>
             <div className="section-title">Documents</div>
             <div className="stack" style={{ gap: 6 }}>
-              {(lease.documents ?? []).map((f) => (
-                <a
-                  key={f.id}
-                  href={f.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="card"
-                  style={{ textDecoration: "none", color: "inherit", display: "block" }}
-                >
-                  {f.path.split("/").pop()}
-                </a>
-              ))}
-              {(lease.documents ?? []).length === 0 && (
+              {documents.map((f) => {
+                const url = attachmentUrl(f.storage_path);
+                const name = f.storage_path?.split("/").pop() ?? "document";
+                return url && f.upload_state === "uploaded" ? (
+                  <a
+                    key={f.id}
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="card"
+                    style={{ textDecoration: "none", color: "inherit", display: "block" }}
+                  >
+                    {name}
+                  </a>
+                ) : (
+                  <div key={f.id} className="card muted small">
+                    {name} — uploading
+                  </div>
+                );
+              })}
+              {documents.length === 0 && (
                 <span className="muted small">No documents uploaded.</span>
               )}
               {canManage && <UploadDocument leaseId={lease.id} />}
@@ -179,8 +187,8 @@ export function LeaseDetailPage({ mode }: { mode?: "create" }) {
               <div key={c.id} className="card">
                 <div className="small" style={{ whiteSpace: "pre-wrap" }}>{c.body}</div>
                 <div className="card-meta">
-                  {c.author?.name ?? "—"} ·{" "}
-                  {new Date(c.createdAt).toLocaleString(undefined, {
+                  {c.author_name ?? "—"} ·{" "}
+                  {new Date(c.created_at).toLocaleString(undefined, {
                     month: "short",
                     day: "numeric",
                     hour: "numeric",
@@ -238,12 +246,13 @@ function CreateLease({
   const [lesseeIds, setLesseeIds] = useState<string[]>([]);
   const [variances, setVariances] = useState("");
 
-  const { data } = db.useQuery({ locations: { type: {} }, contacts: {} });
+  const { data: allLocations } = useLocations();
+  const { data: allContacts } = useContacts();
   // Only somewhere that's actually leasable — the picker used to offer every
-  // location, root properties and grouping docks included, so the first
-  // guard against leasing "the marina" was whoever was reading the list.
-  const locations = (data?.locations ?? []).filter((l) => l.leaseEnabled);
-  const contacts = (data?.contacts ?? []).filter((c) => c.name);
+  // location, root properties and grouping docks included, so the first guard
+  // against leasing "the marina" was whoever was reading the list.
+  const locations = allLocations.filter((l) => l.lease_enabled === 1);
+  const contacts = allContacts.filter((c) => c.name);
   const location = locations.find((l) => l.id === selectedLocation);
 
   if (!current.can("manage_lease")) {
@@ -256,24 +265,22 @@ function CreateLease({
 
   const create = async () => {
     if (!selectedLocation) return;
-    if (location?.reservationEnabled) {
+    if (location?.reservation_enabled === 1) {
       const ok = window.confirm(
         `${location.name} currently accepts reservations. Creating a lease alongside that is allowed but unusual — continue?`,
       );
       if (!ok) return;
     }
-    const leaseId = id();
-    await db.transact(
-      db.tx.leases[leaseId]
-        .update({
-          startDate: startDate ? new Date(startDate).getTime() : undefined,
-          endDate: endDate ? new Date(endDate).getTime() : undefined,
-          variancesAndConditions: variances.trim() || undefined,
-        })
-        .link({
-          location: selectedLocation,
-          ...(lesseeIds.length > 0 ? { lessees: lesseeIds } : {}),
-        }),
+    const leaseId = await createLease(
+      {
+        locationId: selectedLocation,
+        startDate: startDate ? new Date(startDate).toISOString() : null,
+        endDate: endDate ? new Date(endDate).toISOString() : null,
+        variancesAndConditions: variances.trim() || null,
+      },
+      lesseeIds,
+      location?.name ?? "a location",
+      current.user?.id ?? null,
     );
     navigate(`/contacts/leases/${leaseId}`, { replace: true });
   };
@@ -293,7 +300,7 @@ function CreateLease({
         >
           <option value="">Select…</option>
           {[...locations]
-            .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+            .sort((a, b) => compareNames(a.name, b.name))
             .map((l) => (
               <option key={l.id} value={l.id}>
                 {l.name}
@@ -306,7 +313,7 @@ function CreateLease({
             Admin → Location Types &amp; Locations.
           </p>
         )}
-        {location?.reservationEnabled && (
+        {location?.reservation_enabled === 1 && (
           <p className="muted small" style={{ marginTop: 4 }}>
             Note: this location currently accepts reservations.
           </p>
@@ -379,42 +386,36 @@ function CreateLease({
 
 function EditLease({
   lease,
+  lesseeIds: initialLesseeIds,
   onDone,
 }: {
-  lease: {
-    id: string;
-    startDate?: string | number | null;
-    endDate?: string | number | null;
-    variancesAndConditions?: string | null;
-    lessees?: { id: string }[];
-  };
+  lease: LeaseRow;
+  lesseeIds: string[];
   onDone: () => void;
 }) {
+  const current = useCurrent();
   const dateValue = (v: string | number | null | undefined) =>
     v ? new Date(v).toISOString().slice(0, 10) : "";
-  const [startDate, setStartDate] = useState(dateValue(lease.startDate));
-  const [endDate, setEndDate] = useState(dateValue(lease.endDate));
-  const [variances, setVariances] = useState(lease.variancesAndConditions ?? "");
-  const [lesseeIds, setLesseeIds] = useState((lease.lessees ?? []).map((c) => c.id));
+  const [startDate, setStartDate] = useState(dateValue(lease.start_date));
+  const [endDate, setEndDate] = useState(dateValue(lease.end_date));
+  const [variances, setVariances] = useState(lease.variances_and_conditions ?? "");
+  const [lesseeIds, setLesseeIds] = useState(initialLesseeIds);
 
-  const { data } = db.useQuery({ contacts: {} });
-  const contacts = (data?.contacts ?? []).filter((c) => c.name);
-  const original = (lease.lessees ?? []).map((c) => c.id);
+  const { data: allContacts } = useContacts();
+  const contacts = allContacts.filter((c) => c.name);
 
   const save = async () => {
-    const added = lesseeIds.filter((i) => !original.includes(i));
-    const removed = original.filter((i) => !lesseeIds.includes(i));
-    await db.transact([
-      db.tx.leases[lease.id].update({
-        startDate: startDate ? new Date(startDate).getTime() : undefined,
-        endDate: endDate ? new Date(endDate).getTime() : undefined,
-        variancesAndConditions: variances.trim() || undefined,
-      }),
-      ...(added.length > 0 ? [db.tx.leases[lease.id].link({ lessees: added })] : []),
-      ...(removed.length > 0
-        ? [db.tx.leases[lease.id].unlink({ lessees: removed })]
-        : []),
-    ]);
+    await saveLease(
+      lease.id,
+      {
+        startDate: startDate ? new Date(startDate).toISOString() : null,
+        endDate: endDate ? new Date(endDate).toISOString() : null,
+        variancesAndConditions: variances.trim() || null,
+      },
+      lease.location_name ?? "a location",
+      current.user?.id ?? null,
+    );
+    await setLessees(lease.id, lesseeIds);
     onDone();
   };
 
@@ -477,22 +478,28 @@ function EditLease({
 }
 
 function UploadDocument({ leaseId }: { leaseId: string }) {
+  const current = useCurrent();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const upload = async (file: File) => {
     setBusy(true);
+    setError(null);
     try {
-      const path = `leases/${leaseId}/${Date.now()}-${file.name}`;
-      const { data } = await db.storage.uploadFile(path, file);
-      await db.transact(db.tx.leases[leaseId].link({ documents: data.id }));
+      const attachmentId = await captureAttachment(file, current.user?.id ?? null);
+      await addLeaseDocument(leaseId, attachmentId);
+    } catch (err) {
+      // A lease document's bytes need a connection. Saying so beats a button
+      // that appears to work and uploads nothing.
+      setError(err instanceof Error ? err.message : "Upload failed.");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <label className="btn btn-sm" style={{ cursor: "pointer" }}>
-      {busy ? "Uploading…" : "+ Upload document"}
+    <label className="btn btn-sm" style={{ cursor: "pointer" }} title={error ?? undefined}>
+      {busy ? "Uploading…" : error ? "⚠ Upload failed — retry" : "+ Upload document"}
       <input
         type="file"
         style={{ display: "none" }}

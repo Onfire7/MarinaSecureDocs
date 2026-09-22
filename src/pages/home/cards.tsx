@@ -1,15 +1,25 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { ComponentType } from "react";
-import { db, id } from "../../lib/db";
+import { id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import type { CurrentUser } from "../../lib/auth/useCurrentUser";
-import { activityTx } from "../../lib/activityLog";
 import {
-  buildInstanceTx,
+  createInstanceFromTemplate,
   hasWorkAtCreation,
-  TEMPLATE_INSTANTIATION_QUERY,
-} from "../../lib/checklistInstantiation";
+  useInstantiableTemplates,
+} from "../../data/checklists";
+import { useRoleIdsFor } from "../../data/users";
+import {
+  attachEndOfShiftChecklist,
+  endShift,
+  startShift,
+  useActiveShift,
+} from "../../data/shifts";
+import { useTickets } from "../../data/tickets";
+import { useIncidents } from "../../data/incidents";
+import { useMissedCalls, useSmsThreads } from "../../data/comms";
+import { useReservations } from "../../data/reservations";
 
 // Dashboard cards (see pages/dashboard.html — Available cards).
 // A card's availability gate is exactly the permission that governs the data
@@ -134,35 +144,23 @@ function ShiftCard() {
   const navigate = useNavigate();
   const userId = current.user?.id;
 
-  const { data } = db.useQuery(
-    userId
-      ? {
-          shifts: {
-            $: { where: { "guard.id": userId, endedAt: { $isNull: true } } },
-          },
-          checklistTemplates: {
-            $: { where: { triggerType: { $in: ["clock_in", "clock_out"] } } },
-            ...TEMPLATE_INSTANTIATION_QUERY,
-          },
-        }
-      : null,
-  );
+  const { shift: activeShift } = useActiveShift(userId);
+  const roleIds = useRoleIdsFor(userId);
+  const clockTemplates = useInstantiableTemplates(["clock_in", "clock_out"]);
 
-  const activeShift = data?.shifts?.[0];
   // Clock templates are role-scoped like everything else — a maintenance
   // clock-in checklist shouldn't fire for a security guard.
-  const roleIds = (current.user?.roles ?? []).map((r) => r.id);
-  const clockTemplates = (data?.checklistTemplates ?? []).filter(
-    (t) => t.assignedRole && roleIds.includes(t.assignedRole.id),
+  const mine = clockTemplates.filter(
+    (t) => t.assigned_role_id && roleIds.includes(t.assigned_role_id),
   );
   // A template with nothing switched on right now generates nothing — see
   // hasWorkAtCreation. Empty checklists are noise, and with status-gated
   // sections an empty one is an ordinary outcome, not a mistake.
-  const clockInTemplate = clockTemplates.find(
-    (t) => t.triggerType === "clock_in" && hasWorkAtCreation(t),
+  const clockInTemplate = mine.find(
+    (t) => t.trigger_type === "clock_in" && hasWorkAtCreation(t),
   );
-  const clockOutTemplate = clockTemplates.find(
-    (t) => t.triggerType === "clock_out" && hasWorkAtCreation(t),
+  const clockOutTemplate = mine.find(
+    (t) => t.trigger_type === "clock_out" && hasWorkAtCreation(t),
   );
 
   // Re-render each minute so elapsed time stays fresh.
@@ -172,54 +170,25 @@ function ShiftCard() {
     return () => clearInterval(t);
   }, []);
 
-  const startShift = async () => {
-    if (!userId) return;
-    const shiftId = id();
-    const checklistId = clockInTemplate ? id() : null;
-    // Clock In may itself be a checklist trigger — the checklist opens immediately.
-    await db.transact([
-      db.tx.shifts[shiftId]
-        .update({ startedAt: Date.now() })
-        .link({ guard: userId }),
-      activityTx({
-        eventType: "shift.started",
-        summary: `Shift started by ${current.user?.name ?? "a guard"}`,
-        subjectType: "shifts",
-        subjectId: shiftId,
-        actorId: userId,
-      }),
-      ...(clockInTemplate && checklistId
-        ? [
-            ...buildInstanceTx({
-              template: clockInTemplate,
-              instanceId: checklistId,
-              userId,
-            }),
-            activityTx({
-              eventType: "checklist.created",
-              summary: `${clockInTemplate.name} created by clock-in`,
-              subjectType: "checklistInstances",
-              subjectId: checklistId,
-              actorId: userId,
-            }),
-          ]
-        : []),
-    ]);
-    if (checklistId) navigate(`/checklists/${checklistId}`);
+  const begin = async () => {
+    if (!userId || !current.user) return;
+    await startShift({ id: userId, name: current.user.name });
+    // Clock In may itself be a checklist trigger — the checklist opens
+    // immediately, in its own transaction so a failure to build it cannot
+    // roll back the fact that the shift started.
+    if (clockInTemplate) {
+      const checklistId = await createInstanceFromTemplate({
+        template: clockInTemplate,
+        userId,
+        reason: "clock-in",
+      });
+      navigate(`/checklists/${checklistId}`);
+    }
   };
 
   const endShiftManually = async () => {
-    if (!activeShift) return;
-    await db.transact([
-      db.tx.shifts[activeShift.id].update({ endedAt: Date.now() }),
-      activityTx({
-        eventType: "shift.ended",
-        summary: `Shift ended manually by ${current.user?.name ?? "a guard"}`,
-        subjectType: "shifts",
-        subjectId: activeShift.id,
-        actorId: userId,
-      }),
-    ]);
+    if (!activeShift || !userId || !current.user) return;
+    await endShift(activeShift.id, { id: userId, name: current.user.name });
     // TODO: call the shift-report Netlify Function on-demand once the
     // functions layer exists; the scheduled backstop sweep covers it meanwhile.
   };
@@ -227,21 +196,13 @@ function ShiftCard() {
   const startEndOfShiftChecklist = async () => {
     if (!activeShift || !clockOutTemplate || !userId) return;
     const checklistId = id();
-    await db.transact([
-      ...buildInstanceTx({
-        template: clockOutTemplate,
-        instanceId: checklistId,
-        userId,
-      }),
-      db.tx.checklistInstances[checklistId].link({ endedShift: activeShift.id }),
-      activityTx({
-        eventType: "checklist.created",
-        summary: `${clockOutTemplate.name} created by clock-out`,
-        subjectType: "checklistInstances",
-        subjectId: checklistId,
-        actorId: userId,
-      }),
-    ]);
+    await createInstanceFromTemplate({
+      template: clockOutTemplate,
+      userId,
+      instanceId: checklistId,
+      reason: "clock-out",
+    });
+    await attachEndOfShiftChecklist(activeShift.id, checklistId);
     navigate(`/checklists/${checklistId}`);
   };
 
@@ -253,7 +214,7 @@ function ShiftCard() {
           <button
             type="button"
             className="btn btn-primary"
-            onClick={() => void startShift()}
+            onClick={() => void begin()}
           >
             Start Shift
           </button>
@@ -265,10 +226,14 @@ function ShiftCard() {
   return (
     <div>
       <div className="card-title">
-        On shift · {formatElapsed(activeShift.startedAt)}
+        On shift · {formatElapsed(activeShift.started_at)}
       </div>
       <div className="card-meta">
-        Started {new Date(activeShift.startedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+        Started{" "}
+        {new Date(activeShift.started_at).toLocaleTimeString(undefined, {
+          hour: "numeric",
+          minute: "2-digit",
+        })}
       </div>
       <div style={{ marginTop: 10 }}>
         {clockOutTemplate ? (
@@ -304,10 +269,10 @@ function formatElapsed(startedAt: string | number): string {
 // ---------------------------------------------------------------- Tickets
 
 function TicketSummaryCard() {
-  const { data } = db.useQuery({
-    tickets: { $: { where: { status: { $not: "complete" } } } },
-  });
-  const open = data?.tickets ?? [];
+  // "Open" is any status the marina has not flagged terminal, so a marina that
+  // adds "Waiting on parts" gets it counted without a code change.
+  const { data: tickets } = useTickets();
+  const open = tickets.filter((t) => t.status_is_terminal === 0);
   const urgent = open.filter((t) => t.priority === "urgent").length;
   const high = open.filter((t) => t.priority === "high").length;
   return (
@@ -325,13 +290,11 @@ function TicketSummaryCard() {
 // ---------------------------------------------------------------- Incidents
 
 function IncidentSummaryCard() {
-  const { data } = db.useQuery({
-    incidents: {
-      $: { where: { status: { $in: ["open", "under_review"] } } },
-    },
-  });
-  const open = data?.incidents ?? [];
-  const underReview = open.filter((i) => i.status === "under_review").length;
+  const { data: incidents } = useIncidents();
+  const open = incidents.filter((i) => i.status_is_terminal === 0);
+  const underReview = open.filter(
+    (i) => i.status_name.toLowerCase() === "under review",
+  ).length;
   return (
     <Link to="/incidents" style={{ textDecoration: "none", color: "inherit" }}>
       <div className="dash-count">{open.length} open</div>
@@ -350,14 +313,14 @@ function MissedCommsCard() {
   const current = useCurrent();
   const canCalls = current.can("view_calls");
   const canSms = current.can("view_sms");
-  // The badge sums only what this user can see (server-side permission rules
-  // will additionally enforce this once configured).
-  const { data } = db.useQuery({
-    calls: { $: { where: { missed: true } } },
-    smsThreads: { $: { where: { unread: true } } },
-  });
-  const missedCalls = canCalls ? (data?.calls?.length ?? 0) : 0;
-  const unreadSms = canSms ? (data?.smsThreads?.length ?? 0) : 0;
+  // The card sums only what this user can see. It does not have to filter for
+  // that — the rows were never synced to a device without the permission — but
+  // it does have to avoid rendering "0 missed calls" to someone who has no
+  // business having an opinion about calls at all.
+  const { data: calls } = useMissedCalls();
+  const { data: threads } = useSmsThreads();
+  const missedCalls = canCalls ? calls.length : 0;
+  const unreadSms = canSms ? threads.filter((t) => t.unread === 1).length : 0;
   const parts = [
     ...(canCalls ? [`${missedCalls} missed call${missedCalls === 1 ? "" : "s"}`] : []),
     ...(canSms ? [`${unreadSms} unread text${unreadSms === 1 ? "" : "s"}`] : []),
@@ -373,17 +336,14 @@ function MissedCommsCard() {
 // ---------------------------------------------------------------- Reservations
 
 function UpcomingReservationsCard() {
-  const { data } = db.useQuery({
-    reservations: {
-      $: { where: { status: { $in: ["requested", "confirmed"] } } },
-      location: {},
-      asset: {},
-      contact: {},
-    },
-  });
-  const soon = (data?.reservations ?? [])
-    .filter((r) => r.expectedCheckin != null)
-    .map((r) => ({ r, checkin: new Date(r.expectedCheckin!).getTime() }))
+  const { data: reservations } = useReservations();
+  const soon = reservations
+    .filter(
+      (r) =>
+        (r.status === "requested" || r.status === "confirmed") &&
+        r.expected_checkin != null,
+    )
+    .map((r) => ({ r, checkin: new Date(r.expected_checkin!).getTime() }))
     .filter(({ checkin }) => checkin > Date.now() - 24 * 3600_000)
     .sort((a, b) => a.checkin - b.checkin)
     .slice(0, 4);
@@ -400,11 +360,11 @@ function UpcomingReservationsCard() {
           {soon.map(({ r, checkin }) => (
             <div key={r.id} className="spread">
               <span style={{ fontWeight: 650 }}>
-                {r.location?.name ?? r.asset?.name ?? "—"}
+                {r.location_name ?? r.asset_name ?? "—"}
               </span>
               <span className="muted small">
                 {formatCheckin(checkin)}
-                {r.contact?.name ? ` · ${r.contact.name}` : ""}
+                {r.contact_name ? ` · ${r.contact_name}` : ""}
               </span>
             </div>
           ))}

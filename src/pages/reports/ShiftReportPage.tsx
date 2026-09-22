@@ -1,10 +1,14 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
-import { db } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { statusLabel } from "../../lib/locations";
 import { formatDuration, shiftWindowMs, withinWindow } from "../../lib/shiftReport";
+import { useShift } from "../../data/shifts";
+import { useCheckInsInWindow } from "../../data/checkins";
+import { useInstances } from "../../data/checklists";
+import { useIncidents } from "../../data/incidents";
+import { useTickets } from "../../data/tickets";
 
 // Reports — Shift Report (see docs/pages/shift-report.html).
 // Content is compiled live from current data every time it's viewed, so it
@@ -16,20 +20,22 @@ export function ShiftReportPage() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
 
-  const { data } = db.useQuery(
-    shiftId
-      ? {
-          shifts: { $: { where: { id: shiftId } }, guard: {} },
-          // The checkpoint's location comes along so the log can say where
-          // each check-in happened without the name having to carry it.
-          checkIns: { checkpoint: { location: {} }, user: {} },
-          checklistInstances: { template: {}, assignedTo: {} },
-          incidents: { author: {} },
-          tickets: { createdBy: {} },
-        }
-      : null,
+  const { shift } = useShift(shiftId);
+
+  // Association is by timestamp, not reference — and scoped to this guard where
+  // the record carries a person. The window runs to "now" for an open shift, so
+  // viewing mid-shift shows progress so far.
+  const bounds = shift
+    ? shiftWindowMs(shift)
+    : { start: 0, end: 0 };
+  const { data: checkIns } = useCheckInsInWindow(
+    shift?.guard_id,
+    new Date(bounds.start).toISOString(),
+    new Date(bounds.end).toISOString(),
   );
-  const shift = data?.shifts?.[0];
+  const { data: allChecklists } = useInstances();
+  const { data: allIncidents } = useIncidents();
+  const { data: allTickets } = useTickets();
 
   if (!shift) {
     return (
@@ -40,24 +46,17 @@ export function ShiftReportPage() {
   }
 
   const window = shiftWindowMs(shift);
-  const isOwnShift = shift.guard?.id === current.user?.id;
+  const isOwnShift = shift.guard_id === current.user?.id;
   const canResend = isOwnShift || current.can("view_reports");
 
-  // Association is by timestamp, not reference — and scoped to this guard
-  // where the record carries a person.
-  const guardId = shift.guard?.id;
-  const checkIns = (data?.checkIns ?? []).filter(
-    (c) => withinWindow(c.timestamp, window) && (!guardId || c.user?.id === guardId),
-  );
-  const checklists = (data?.checklistInstances ?? []).filter(
+  const guardId = shift.guard_id;
+  const checklists = allChecklists.filter(
     (c) =>
-      withinWindow(c.completedAt ?? c.startedAt, window) &&
-      (!guardId || !c.assignedTo || c.assignedTo.id === guardId),
+      withinWindow(c.completed_at ?? c.started_at, window) &&
+      (!c.assigned_to_id || c.assigned_to_id === guardId),
   );
-  const incidents = (data?.incidents ?? []).filter((i) =>
-    withinWindow(i.createdAt, window),
-  );
-  const tickets = (data?.tickets ?? []).filter((t) => withinWindow(t.createdAt, window));
+  const incidents = allIncidents.filter((i) => withinWindow(i.created_at, window));
+  const tickets = allTickets.filter((t) => withinWindow(t.created_at, window));
 
   const resend = async () => {
     setSending(true);
@@ -86,17 +85,17 @@ export function ShiftReportPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">
-            Shift report — {shift.guard?.name ?? "Unassigned"}
+            Shift report — {shift.guard_name ?? "Unassigned"}
           </h1>
           <div className="page-sub">
-            {new Date(shift.startedAt).toLocaleString()} ·{" "}
-            {shift.endedAt ? formatDuration(window) : "in progress"}
+            {new Date(shift.started_at).toLocaleString()} ·{" "}
+            {shift.ended_at ? formatDuration(window) : "in progress"}
           </div>
         </div>
         <div className="row">
-          <span className={shift.reportSentAt ? "badge badge-good" : "badge badge-warn"}>
-            {shift.reportSentAt
-              ? `Sent ${new Date(shift.reportSentAt).toLocaleString()}`
+          <span className={shift.report_sent_at ? "badge badge-good" : "badge badge-warn"}>
+            {shift.report_sent_at
+              ? `Sent ${new Date(shift.report_sent_at).toLocaleString()}`
               : "Not sent yet"}
           </span>
           {canResend && (
@@ -129,14 +128,14 @@ export function ShiftReportPage() {
             {checkIns.map((c) => (
               <div key={c.id} className="card spread">
                 <span>
-                  {c.checkpoint?.name ?? "Unknown checkpoint"}
-                  {c.checkpoint?.location?.name && (
-                    <span className="muted"> · {c.checkpoint.location.name}</span>
-                  )}
+                  {/* A check-in outlives the checkpoint it was made at —
+                      check_ins.checkpoint_id is ON DELETE SET NULL — so a
+                      missing name means retired, not broken. */}
+                  {c.checkpoint_name ?? "Removed checkpoint"}
                 </span>
                 <span className="muted small">
                   {c.method === "manual" ? "Manual" : "Scanned"}
-                  {c.withinRadius === false && " · outside radius"} ·{" "}
+                  {c.within_radius === 0 && " · outside radius"} ·{" "}
                   {new Date(c.timestamp).toLocaleTimeString(undefined, {
                     hour: "numeric",
                     minute: "2-digit",
@@ -154,7 +153,7 @@ export function ShiftReportPage() {
                 className="card spread"
                 style={{ textDecoration: "none", color: "inherit" }}
               >
-                <span>{c.template?.name ?? "Checklist"}</span>
+                <span>{c.template_name ?? "Checklist"}</span>
                 <span className="badge">{statusLabel(c.status)}</span>
               </Link>
             ))}
@@ -172,7 +171,7 @@ export function ShiftReportPage() {
                   style={{ textDecoration: "none", color: "inherit" }}
                 >
                   <span>{i.title}</span>
-                  <span className="badge">{statusLabel(i.status)}</span>
+                  <span className="badge">{i.status_name}</span>
                 </Link>
               ))}
             </Section>

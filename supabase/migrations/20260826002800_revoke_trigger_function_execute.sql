@@ -1,0 +1,17 @@
+-- Revoke PUBLIC execute on the permissions trigger function.
+--
+-- The same default that migration 20260826002100 was written about: Postgres
+-- grants EXECUTE on every new function to PUBLIC, and anon/authenticated
+-- inherit through it. That migration fixed the functions existing at the time
+-- and explained why; this one was added afterwards and inherited the default
+-- anyway.
+--
+-- Worth noting rather than quietly patching: writing the lesson down did not
+-- prevent repeating it two migrations later. The check that caught it was
+-- `supabase db advisors --linked`, not the memory of having fixed it before —
+-- which is an argument for running the advisor on every push rather than
+-- trusting that a known trap stays avoided.
+--
+-- Nothing should call this directly: it is a trigger body, invoked by the
+-- triggers on user_roles and roles.
+revoke execute on function public.trg_refresh_user_permissions() from public;

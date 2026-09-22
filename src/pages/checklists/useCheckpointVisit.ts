@@ -1,7 +1,7 @@
 // Shared core of the two ways a checkpoint visit is logged — the scanned
 // NFC/QR deep link (CheckpointCheckinPage) and the Manual Check-In dialog —
 // per pages/checkpoint-checkin.html and pages/manual-checkin-dialog.html:
-// create-or-resume the Check-In record, materialize whatever the scan
+// create-or-resume the check-in record, materialize whatever the scan
 // triggers, and capture GPS in the background without blocking either flow.
 //
 // What a scan triggers, in the sectioned model:
@@ -12,50 +12,28 @@
 //  - and the visit screen displays every open instance section for this
 //    place, headed by its parent checklist's name.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { db, id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { deterministicId } from "../../lib/detId";
 import { distanceMeters } from "../../lib/geo";
 import { eligibleToday, isVisibleNow } from "../../lib/checklists";
+import { db, id, stamp } from "../../lib/db";
+import { insert, transact, update } from "../../data/sql";
+import { recordActivity } from "../../data/activity";
 import {
-  buildInstanceTx,
-  buildSectionInstanceTx,
+  insertInstance,
+  insertSectionInstance,
   sectionInstanceId,
-  TEMPLATE_INSTANTIATION_QUERY,
-  type InstantiableSection,
-} from "../../lib/checklistInstantiation";
-import { activityTx } from "../../lib/activityLog";
+} from "../../data/checklistInstantiation";
+import {
+  useSectionsAnchoredAt,
+  useSectionsAtCheckpoint,
+} from "../../data/checklists";
+import { useCheckpoint } from "../../data/checkpoints";
+import { useMarinaSettings } from "../../data/settings";
+import { useRecentCheckIns, type CheckInRow } from "../../data/checkins";
 
 const DEDUPE_WINDOW_MS = 5 * 60_000;
 const GPS_TIMEOUT_MS = 20_000;
-
-// Shared subquery shapes for the two place-match queries below.
-const INSTANCE_SECTION_SHAPE = {
-  checkpoints: {},
-  location: {},
-  items: {},
-  instance: { template: {} },
-};
-const TEMPLATE_SECTION_SHAPE = {
-  checkpoints: {},
-  location: {},
-  assets: {},
-  items: {},
-  template: {
-    ...TEMPLATE_INSTANTIATION_QUERY,
-    instances: {
-      $: { where: { status: { $in: ["not_started", "in_progress"] } } },
-    },
-  },
-};
-
-function mergeById<T extends { id: string }>(
-  a: T[] | undefined,
-  b: T[] | undefined,
-): T[] {
-  const seen = new Set((a ?? []).map((r) => r.id));
-  return [...(a ?? []), ...(b ?? []).filter((r) => !seen.has(r.id))];
-}
 
 export type GpsStatus = "pending" | "clear" | "outside_radius" | "unavailable";
 
@@ -78,118 +56,71 @@ export function useCheckpointVisit(
   const current = useCurrent();
   const userId = current.user?.id;
 
-  const { data: cpData, isLoading: cpLoading } = db.useQuery(
-    checkpointId
-      ? {
-          checkpoints: {
-            $: { where: { id: checkpointId } },
-            location: {},
-          },
-          marinaSettings: {},
-        }
-      : null,
-  );
-  const checkpoint = cpData?.checkpoints?.[0] ?? null;
-  const locationId = checkpoint?.location?.id;
+  const { checkpoint, isLoading: cpLoading } = useCheckpoint(checkpointId);
+  const settings = useMarinaSettings();
+  const locationId = checkpoint?.location_id ?? undefined;
 
-  // Everything this scan could show or create: instance sections already
-  // materialized here, and template sections anchored here (with enough of
-  // their template to instantiate from). Two queries — one matching the
-  // checkpoint itself, one its location (a checkpoint stands in for its
-  // location) — merged below.
-  const { data: cpSecData, isLoading: cpSecLoading } = db.useQuery(
-    checkpoint && checkpointId
-      ? {
-          checklistInstanceSections: {
-            $: { where: { "checkpoints.id": checkpointId } },
-            ...INSTANCE_SECTION_SHAPE,
-          },
-          checklistTemplateSections: {
-            $: { where: { "checkpoints.id": checkpointId } },
-            ...TEMPLATE_SECTION_SHAPE,
-          },
-        }
-      : null,
+  // Everything this scan could show or create. Two queries rather than one:
+  // what is already materialized here, and what is anchored here and would be.
+  const { data: sectionsHere, isLoading: secLoading } = useSectionsAtCheckpoint(
+    checkpointId,
+    locationId,
   );
-  const { data: locSecData, isLoading: locSecLoading } = db.useQuery(
-    checkpoint && locationId
-      ? {
-          checklistInstanceSections: {
-            $: { where: { "location.id": locationId } },
-            ...INSTANCE_SECTION_SHAPE,
-          },
-          checklistTemplateSections: {
-            $: { where: { "location.id": locationId } },
-            ...TEMPLATE_SECTION_SHAPE,
-          },
-        }
-      : null,
-  );
-  const secLoading = cpSecLoading || (locationId != null && locSecLoading);
-  const instanceSections = useMemo(
-    () =>
-      mergeById(
-        cpSecData?.checklistInstanceSections,
-        locSecData?.checklistInstanceSections,
-      ),
-    [cpSecData, locSecData],
-  );
-  const templateSections = useMemo(
-    () =>
-      mergeById(
-        cpSecData?.checklistTemplateSections,
-        locSecData?.checklistTemplateSections,
-      ),
-    [cpSecData, locSecData],
-  );
+  const anchored = useSectionsAnchoredAt(checkpointId, locationId);
 
-  const { data: resumedData, isLoading: resumedLoading } = db.useQuery(
-    resumeCheckInId ? { checkIns: { $: { where: { id: resumeCheckInId } } } } : null,
-  );
   // The dedupe cutoff is pinned to when this visit mounted rather than
-  // recomputed per render. db.useQuery subscribes through
-  // useSyncExternalStore, so a query object that differs every render — and
-  // `Date.now()` differs every millisecond — resubscribes every render,
-  // pushes a fresh snapshot, and re-renders: an infinite loop that React
-  // aborts with "Maximum update depth exceeded". A cutoff that drifts by
-  // milliseconds bought nothing anyway against a 5-minute window.
-  // Pinned once for the lifetime of this visit. Only the create-or-resume
-  // effect below reads it, and that runs once, so it never needs to drift.
-  const [dedupeSince] = useState(() => new Date(Date.now() - DEDUPE_WINDOW_MS));
+  // recomputed per render. A watched query whose parameters differ every render
+  // — and `Date.now()` differs every millisecond — resubscribes every render,
+  // pushes a fresh snapshot, and re-renders: an infinite loop React aborts with
+  // "Maximum update depth exceeded". A cutoff drifting by milliseconds bought
+  // nothing anyway against a five-minute window.
+  const [dedupeSince] = useState(() =>
+    new Date(Date.now() - DEDUPE_WINDOW_MS).toISOString(),
+  );
 
   // Dedupe exists because the scanned screen is reached by re-opening a URL
   // (reload, resumed tab). The manual dialog is opened from inside a running
-  // session and closes on submit, so it needs no dedupe — and applying it
-  // would silently swallow a legitimate second manual check-in at the same
+  // session and closes on submit, so it needs no dedupe — and applying it would
+  // silently swallow a legitimate second manual check-in at the same
   // checkpoint, per the Manual Check-In spec.
-  const { data: recentData, isLoading: recentLoading } = db.useQuery(
-    method === "scanned" && !resumeCheckInId && checkpointId && userId
-      ? {
-          checkIns: {
-            $: {
-              where: {
-                "checkpoint.id": checkpointId,
-                "user.id": userId,
-                timestamp: { $gt: dedupeSince },
-              },
-              order: { timestamp: "desc" },
-            },
-          },
-        }
-      : null,
+  const { data: recent, isLoading: recentLoading } = useRecentCheckIns(
+    method === "scanned" && !resumeCheckInId ? checkpointId : undefined,
+    5,
+  );
+  const dedupeCandidate = recent.find(
+    (c) => c.user_id === userId && c.timestamp > dedupeSince,
   );
 
-  const existingCheckIn =
-    resumedData?.checkIns?.[0] ?? recentData?.checkIns?.[0] ?? null;
+  const [resumed, setResumed] = useState<CheckInRow | null>(null);
+  const [resumedLoading, setResumedLoading] = useState(Boolean(resumeCheckInId));
+  useEffect(() => {
+    if (!resumeCheckInId) return;
+    let cancelled = false;
+    void db
+      .getOptional<CheckInRow>("SELECT * FROM check_ins WHERE id = ?", [
+        resumeCheckInId,
+      ])
+      .then((row) => {
+        if (!cancelled) {
+          setResumed(row);
+          setResumedLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [resumeCheckInId]);
+
+  const existingCheckIn = resumed ?? dedupeCandidate ?? null;
   const dedupeSettled =
     method === "manual" ? true : resumeCheckInId ? !resumedLoading : !recentLoading;
 
   const [createdCheckInId, setCreatedCheckInId] = useState<string | null>(null);
   const creating = useRef(false);
 
-  // Create the Check-In — and materialize what the scan triggers — exactly
-  // once per fresh visit; if an existing check-in resolves via URL/dedupe
-  // first, this never fires (its scan already materialized these rows).
+  // Create the check-in — and materialize what the scan triggers — exactly once
+  // per fresh visit; if an existing check-in resolves via URL or dedupe first,
+  // this never fires, because that scan already materialized these rows.
   useEffect(() => {
     if (!checkpoint || !userId || !dedupeSettled || secLoading) return;
     if (existingCheckIn || createdCheckInId || creating.current) return;
@@ -198,89 +129,72 @@ export function useCheckpointVisit(
 
     const checkInId = id();
     const now = new Date();
+    const existingSectionIds = new Set(sectionsHere.map((s) => s.id));
 
-    // A template section is anchored here when its own trigger names this
-    // checkpoint (checkpoint trigger) or this checkpoint's location
-    // (location trigger). The queries over-fetch — e.g. manual sections that
-    // merely sit in this location — so filter to the genuinely event-anchored.
-    const anchoredHere = templateSections.filter(
-      (s) =>
-        s.isActive &&
-        (s.triggerType === "checkpoint"
-          ? (s.checkpoints ?? []).some((c) => c.id === checkpointId)
-          : s.triggerType === "location" &&
-            locationId != null &&
-            s.location?.id === locationId),
-    );
-    const existingSectionIds = new Set(instanceSections.map((s) => s.id));
-
-    const materializeTxns = [];
-    let generatedInstanceId: string | null = null;
-    const byTemplate = new Map<string, { template: NonNullable<(typeof anchoredHere)[number]["template"]>; sections: typeof anchoredHere }>();
-    for (const s of anchoredHere) {
-      if (!s.template) continue;
-      const entry = byTemplate.get(s.template.id) ?? { template: s.template, sections: [] };
-      entry.sections.push(s);
-      byTemplate.set(s.template.id, entry);
+    // Group by template: a template with an open instance gets its missing
+    // sections added to that instance; one without gets a whole new checklist,
+    // but only if the TEMPLATE itself is checkpoint-triggered. A location
+    // section on a manual template waits for someone to start the checklist.
+    const byTemplate = new Map<string, typeof anchored>();
+    for (const a of anchored) {
+      const list = byTemplate.get(a.template.id) ?? [];
+      list.push(a);
+      byTemplate.set(a.template.id, list);
     }
-    for (const { template, sections } of byTemplate.values()) {
-      const openInstances = template.instances ?? [];
-      if (openInstances.length > 0) {
-        // Lazy sections onto every open instance that doesn't have them yet.
-        for (const inst of openInstances) {
-          for (const s of sections) {
-            if (existingSectionIds.has(sectionInstanceId(inst.id, s.id))) continue;
-            materializeTxns.push(
-              ...buildSectionInstanceTx(inst.id, s as InstantiableSection, now),
-            );
+
+    void transact(async (tx) => {
+      await insert(tx, "check_ins", {
+        id: checkInId,
+        checkpoint_id: checkpoint.id,
+        user_id: userId,
+        timestamp: stamp(now),
+        method,
+        reason: reason ?? null,
+      });
+
+      for (const group of byTemplate.values()) {
+        const { template, openInstanceIds } = group[0];
+        if (openInstanceIds.length > 0) {
+          for (const instanceId of openInstanceIds) {
+            for (const { section } of group) {
+              if (existingSectionIds.has(sectionInstanceId(instanceId, section.id)))
+                continue;
+              await insertSectionInstance(tx, instanceId, section, now);
+            }
           }
-        }
-      } else if (template.triggerType === "checkpoint" && eligibleToday(template)) {
-        // No open instance and the template itself is checkpoint-triggered:
-        // this scan creates the whole checklist, its eager sections, and the
-        // section that brought us here.
-        const instanceId = deterministicId(`checkin-checklist:${checkInId}:${template.id}`);
-        generatedInstanceId ??= instanceId;
-        materializeTxns.push(
-          ...buildInstanceTx({ template, instanceId, userId, now }),
-          ...sections.flatMap((s) =>
-            buildSectionInstanceTx(instanceId, s as InstantiableSection, now),
-          ),
-          activityTx({
+        } else if (
+          template.trigger_type === "checkpoint" &&
+          eligibleToday(template, now)
+        ) {
+          // Derived from the check-in, so a replayed write queue rebuilds the
+          // same checklist rather than a second one.
+          const instanceId = deterministicId(
+            `checkin-checklist:${checkInId}:${template.id}`,
+          );
+          await insertInstance(tx, { template, instanceId, userId, now });
+          for (const { section } of group) {
+            await insertSectionInstance(tx, instanceId, section, now);
+          }
+          await recordActivity(tx, {
             eventType: "checklist.created",
             summary: `${template.name} created by check-in at ${checkpoint.name}`,
-            subjectType: "checklistInstances",
+            subjectType: "checklist_instances",
             subjectId: instanceId,
             actorId: userId,
-          }),
-        );
+          });
+        }
       }
-    }
 
-    void db
-      .transact([
-        db.tx.checkIns[checkInId]
-          .update({
-            timestamp: Date.now(),
-            method,
-            ...(reason ? { reason } : {}),
-          })
-          .link({
-            checkpoint: checkpointId!,
-            user: userId,
-            ...(generatedInstanceId ? { generatedChecklist: generatedInstanceId } : {}),
-          }),
-        ...materializeTxns,
-        activityTx({
-          eventType: method === "manual" ? "checkin.manual" : "checkin.scanned",
-          summary:
-            `${method === "manual" ? "Manual check-in" : "Checked in"} at ` +
-            `${checkpoint.name}${reason ? ` — ${reason}` : ""}`,
-          subjectType: "checkIns",
-          subjectId: checkInId,
-          actorId: userId,
-        }),
-      ])
+      await recordActivity(tx, {
+        eventType: method === "manual" ? "checkin.manual" : "checkin.scanned",
+        summary:
+          `${method === "manual" ? "Manual check-in" : "Checked in"} at ` +
+          `${checkpoint.name}${reason ? ` — ${reason}` : ""}`,
+        subjectType: "check_ins",
+        subjectId: checkInId,
+        actorId: userId,
+      });
+    })
       .then(() => setCreatedCheckInId(checkInId))
       .catch(console.error);
   }, [
@@ -288,64 +202,48 @@ export function useCheckpointVisit(
     userId,
     dedupeSettled,
     secLoading,
-    templateSections,
-    instanceSections,
+    anchored,
+    sectionsHere,
     existingCheckIn,
     createdCheckInId,
     method,
     reason,
-    checkpointId,
-    locationId,
   ]);
 
   const checkInId = existingCheckIn?.id ?? createdCheckInId ?? null;
 
   // What the visit screen shows: every visible section here on an open
-  // instance. A section with checkpoint links belongs to those checkpoints
-  // only; one with just a location belongs to every checkpoint in it. Rows
-  // this same effect just created stream in reactively.
-  const applicableSections: ApplicableSection[] = useMemo(() => {
-    return instanceSections
-      .filter((s) => {
-        const inst = s.instance;
-        if (!inst || (inst.status !== "not_started" && inst.status !== "in_progress"))
-          return false;
-        if (!isVisibleNow(inst) || !isVisibleNow(s)) return false;
-        const cps = s.checkpoints ?? [];
-        return cps.length > 0
-          ? cps.some((c) => c.id === checkpointId)
-          : locationId != null && s.location?.id === locationId;
-      })
-      .map((s) => {
-        const items = s.items ?? [];
-        const done = items.filter((i) => i.completedAt != null).length;
-        return {
+  // instance. Rows this same effect just created stream in reactively, because
+  // the query watching them is watching the device's own database.
+  const applicableSections: ApplicableSection[] = useMemo(
+    () =>
+      sectionsHere
+        .filter(
+          (s) =>
+            isVisibleNow({ hide_until: s.instance_hide_until }) && isVisibleNow(s),
+        )
+        .map((s) => ({
           id: s.id,
           label: s.label,
-          instanceId: s.instance!.id,
-          checklistName: s.instance!.template?.name ?? "Checklist",
-          itemsTotal: items.length,
-          itemsDone: done,
-          complete: items.length > 0 && done === items.length,
-        };
-      })
-      .sort(
-        (a, b) =>
-          a.checklistName.localeCompare(b.checklistName) ||
-          a.label.localeCompare(b.label),
-      );
-  }, [instanceSections, checkpointId, locationId]);
+          instanceId: s.instance_id,
+          checklistName: s.checklist_name ?? "Checklist",
+          itemsTotal: s.items_total,
+          itemsDone: s.items_done,
+          complete: s.items_total > 0 && s.items_done === s.items_total,
+        })),
+    [sectionsHere],
+  );
 
   // GPS capture — deliberately off the critical path (see spec: "GPS as a
-  // background update"). Runs once per resolved Check-In whose GPS is still
+  // background update"). Runs once per resolved check-in whose GPS is still
   // pending.
   const [gpsStatus, setGpsStatus] = useState<GpsStatus>("pending");
   const gpsStarted = useRef<string | null>(null);
   useEffect(() => {
     if (!checkInId || !checkpoint || gpsStarted.current === checkInId) return;
-    const resumed = existingCheckIn?.id === checkInId ? existingCheckIn : null;
-    if (resumed && resumed.withinRadius != null) {
-      setGpsStatus(resumed.withinRadius ? "clear" : "outside_radius");
+    const prior = existingCheckIn?.id === checkInId ? existingCheckIn : null;
+    if (prior && prior.within_radius != null) {
+      setGpsStatus(prior.within_radius === 1 ? "clear" : "outside_radius");
       return;
     }
     if (!("geolocation" in navigator)) {
@@ -359,21 +257,24 @@ export function useCheckpointVisit(
         clearTimeout(timeout);
         const { latitude, longitude } = pos.coords;
         const radius =
-          checkpoint.gpsValidationRadius ??
-          cpData?.marinaSettings?.[0]?.gpsValidationRadiusDefault ??
-          50;
+          checkpoint.gps_validation_radius ?? settings.gpsValidationRadiusDefault;
+        // A checkpoint with no coordinates is never radius-flagged: there is
+        // nothing to be outside of, and reporting a guard as out of position
+        // because an admin never set a pin would be worse than saying nothing.
         const withinRadius =
-          checkpoint.gpsLat != null && checkpoint.gpsLng != null
-            ? distanceMeters(latitude, longitude, checkpoint.gpsLat, checkpoint.gpsLng) <=
-              radius
+          checkpoint.gps_lat != null && checkpoint.gps_lng != null
+            ? distanceMeters(
+                latitude,
+                longitude,
+                checkpoint.gps_lat,
+                checkpoint.gps_lng,
+              ) <= radius
             : true;
-        void db.transact(
-          db.tx.checkIns[checkInId].update({
-            gpsLat: latitude,
-            gpsLng: longitude,
-            withinRadius,
-          }),
-        );
+        void update(db, "check_ins", checkInId, {
+          gps_lat: latitude,
+          gps_lng: longitude,
+          within_radius: withinRadius ? 1 : 0,
+        });
         setGpsStatus(withinRadius ? "clear" : "outside_radius");
       },
       () => {
@@ -383,7 +284,7 @@ export function useCheckpointVisit(
       { timeout: GPS_TIMEOUT_MS, maximumAge: 0 },
     );
     return () => clearTimeout(timeout);
-  }, [checkInId, checkpoint, existingCheckIn, cpData]);
+  }, [checkInId, checkpoint, existingCheckIn, settings.gpsValidationRadiusDefault]);
 
   const allComplete =
     applicableSections.length > 0 && applicableSections.every((s) => s.complete);
