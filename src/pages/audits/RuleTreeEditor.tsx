@@ -3,7 +3,6 @@ import {
   SUBJECT_LABELS,
   VERBS,
   describeRule,
-  isComplete,
   type AuditKind,
   type Condition,
   type Resolution,
@@ -263,7 +262,6 @@ export function ConditionEditor({
           >
             ✕
           </button>
-          {!isComplete(c) && <span className="muted small">(not counted until filled in)</span>}
         </div>
       ))}
       <div>

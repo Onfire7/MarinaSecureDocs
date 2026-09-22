@@ -9,7 +9,8 @@ commitments in code terms.
   breadcrumb that collapses its middle past three levels).
 - A condition row is Subject · Verb · Value; the verb list depends on the
   subject; negation is a verb. Rows after the first begin with the and/or
-  toggle. An incomplete condition is marked "(not counted until filled in)".
+  toggle. An incomplete condition is inert: it changes no count and does not
+  appear in the rule's description, with no label saying so.
 - Location values use `LocationPicker` over the marina's containers.
 - Every rule has a palette colour in tree order: a dot beside its description,
   a coloured left edge, and a dot on each preview row it selected (root rules
