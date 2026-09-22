@@ -32,6 +32,7 @@ export const PERMISSIONS = [
   "manage_locations",
   "manage_reservations",
   "manage_marina_settings",
+  "manage_audits",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];

@@ -32,37 +32,49 @@ export interface LocationRow {
   lease_enabled: number;
   gps_lat: number | null;
   gps_lng: number | null;
-  current_boat_id: string | null;
-  current_vehicle_id: string | null;
+  retired_at: string | null;
   /** Joined for display. */
   type_name: string;
   tracks_status: number;
   status_name: string | null;
+  /**
+   * Occupants. A location holds any number of boats and vehicles (ADR 0006);
+   * `boat_id` is the first by name, `boat_name` every name joined with ", ".
+   */
+  boat_id: string | null;
   boat_name: string | null;
+  boat_count: number;
+  vehicle_id: string | null;
   vehicle_description: string | null;
+  vehicle_count: number;
   child_count: number;
 }
 
+// Occupants are correlated subqueries on boats.location_id rather than a
+// LEFT JOIN: a join on anything but `id` is a full scan per row in PowerSync's
+// SQLite (see CLAUDE.md), and this select runs for every location on the list.
 const LOCATION_SELECT = `
   SELECT l.*,
          t.name AS type_name,
          t.tracks_status,
          s.name AS status_name,
-         b.name AS boat_name,
-         v.description AS vehicle_description,
+         (SELECT b.id   FROM boats b WHERE b.location_id = l.id ORDER BY b.name LIMIT 1) AS boat_id,
+         (SELECT group_concat(b.name, ', ') FROM boats b WHERE b.location_id = l.id) AS boat_name,
+         (SELECT COUNT(*) FROM boats b WHERE b.location_id = l.id) AS boat_count,
+         (SELECT v.id FROM vehicles v WHERE v.location_id = l.id ORDER BY v.description LIMIT 1) AS vehicle_id,
+         (SELECT group_concat(v.description, ', ') FROM vehicles v WHERE v.location_id = l.id) AS vehicle_description,
+         (SELECT COUNT(*) FROM vehicles v WHERE v.location_id = l.id) AS vehicle_count,
          (SELECT COUNT(*) FROM locations c WHERE c.parent_id = l.id) AS child_count
     FROM locations l
     JOIN location_types t ON t.id = l.location_type_id
-    LEFT JOIN location_statuses s ON s.id = l.status_id
-    LEFT JOIN boats b ON b.id = l.current_boat_id
-    LEFT JOIN vehicles v ON v.id = l.current_vehicle_id`;
+    LEFT JOIN location_statuses s ON s.id = l.status_id`;
 
 export function useLocations() {
   return useQuery<LocationRow>(
     // Numeric-aware ordering is a JavaScript concern — SQLite would put Slip 14
     // before Slip 9 — so the list pages sort with compareNames(). This ORDER BY
     // only makes the result stable between renders.
-    `${LOCATION_SELECT} ORDER BY l.name`,
+    `${LOCATION_SELECT} WHERE l.retired_at IS NULL ORDER BY l.name`,
   );
 }
 
@@ -76,7 +88,7 @@ export function useLocation(locationId: string | undefined) {
 
 export function useChildLocations(parentId: string | undefined) {
   return useQuery<LocationRow>(
-    `${LOCATION_SELECT} WHERE l.parent_id = ? ORDER BY l.name`,
+    `${LOCATION_SELECT} WHERE l.parent_id = ? AND l.retired_at IS NULL ORDER BY l.name`,
     [parentId ?? ""],
   );
 }
@@ -91,7 +103,7 @@ export function useChildLocations(parentId: string | undefined) {
 export function useLocationsHolding(what: "boat" | "vehicle") {
   const column = what === "boat" ? "has_boat" : "has_vehicle";
   return useQuery<LocationRow>(
-    `${LOCATION_SELECT} WHERE t.${column} = 1 ORDER BY l.name`,
+    `${LOCATION_SELECT} WHERE t.${column} = 1 AND l.retired_at IS NULL ORDER BY l.name`,
   );
 }
 
@@ -239,8 +251,8 @@ export function useLocationDependencies(locationId: string) {
        (SELECT COUNT(*) FROM tickets WHERE location_id = ?1) AS tickets,
        (SELECT COUNT(*) FROM notes WHERE location_id = ?1) AS notes,
        (SELECT COUNT(*) FROM location_map_placements WHERE location_id = ?1) AS placements,
-       (SELECT COUNT(*) FROM locations WHERE id = ?1 AND current_boat_id IS NOT NULL) AS has_boat,
-       (SELECT COUNT(*) FROM locations WHERE id = ?1 AND current_vehicle_id IS NOT NULL) AS has_vehicle`,
+       (SELECT COUNT(*) FROM boats WHERE location_id = ?1) AS has_boat,
+       (SELECT COUNT(*) FROM vehicles WHERE location_id = ?1) AS has_vehicle`,
     [locationId],
   );
   return { dependencies: data[0] ?? null, isLoading };

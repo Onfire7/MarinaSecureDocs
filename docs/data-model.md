@@ -109,7 +109,7 @@ a table; see [Permissions](permissions.md) for the definition.
 | post_reservation_status_id | → location_statuses | |
 | lease_enabled | boolean not null default false | Per-location lease switch, mirroring `reservation_enabled`. On one dock the front slips may be reservable and the back leasable. |
 | gps_lat / gps_lng | double precision | Set through an approved audit GPS Proposal; none are set today. |
-| retired_at | timestamptz | Set when an Audit's approved removal retires the Location. Retired rows are hidden from pickers, maps and audit targets; history stays. |
+| retired_at | timestamptz | Set when an Audit's approved removal retires the Location. `useLocations`, child and holder queries filter these out; `useLocation` by id still returns one so history pages keep working. |
 
 > **Unwound (2026-09-22).** `current_boat_id` / `current_vehicle_id`, unique
 > FKs meaning "one boat, one slip", are **gone**. Occupancy is
@@ -486,7 +486,8 @@ Field review of Locations against reality. Behaviour in
 | audit_id | → audits, cascade | |
 | parent_rule_id | → audit_rules, cascade | Tree. A child narrows its parent. |
 | position | integer not null | Order among siblings. |
-| predicate | jsonb not null | The selection expression: `{op: "and" \| "or" \| "not", args: [...]}` over leaves `{test: "type_is" \| "under" \| "status_is" \| "is_vacant" \| "name_contains" \| "name_starts" \| "name_ends" \| "has_service" \| "has_amenity" \| "has_lease" \| "has_reservation" \| "last_audited_before", value}`. Evaluated on the client at launch; a `STRUCTURED_COLUMNS` entry. |
+| mode | text not null | `all` (every condition must hold) or `any`. |
+| conditions | jsonb not null | `[{subject, verb, value}]` — the sentence grammar in `audits.md` § Rules, evaluated by `src/lib/auditRules.ts` on the client at launch. Negation is a verb. A `STRUCTURED_COLUMNS` entry. |
 
 #### `audit_questions` — Tier 0 / `manage_audits` · sync: always
 
@@ -520,7 +521,8 @@ Field review of Locations against reality. Behaviour in
 | Column | Type | Notes |
 |---|---|---|
 | audit_id | → audits not null, cascade | |
-| location_id | → locations not null | `unique (audit_id, location_id)`. Fixed at launch. |
+| location_id | → locations, **set null** | `unique (audit_id, location_id)`. Fixed at launch. Null once a no-history location is deleted at finalize; the target and its finding remain as the record. |
+| location_name | text not null | Snapshot at launch, for the same reason. |
 | position | integer not null | Tree order at launch. |
 | state | audit_target_state not null | `pending` / `audited` / `not_audited`. |
 | not_audited_reason | text | `closed early`, `retired by Audit <name>`. |

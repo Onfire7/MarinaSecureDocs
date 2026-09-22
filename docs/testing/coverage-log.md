@@ -15,6 +15,10 @@ Run `pnpm run test:coverage` then `pnpm run coverage:check`.
 `contacts.ts` · `detId.ts` · `geo.ts` · `permissions.ts` · `search.ts` ·
 `shiftReport.ts` · `data/attachments.ts` · `data/sql.ts` — 100%.
 
+`auditRules.ts` and `audits.ts` — the rule evaluator and the Finding
+decisions behind `docs/audits.md`, written test-first; the uncovered lines
+are unreachable verb branches after the `switch` on subject.
+
 `permissions.ts` matters most: its assertions are the executable
 specification for the `effective_permissions` SQL view that replaces it (see
 [Permissions — Enforcement](../permissions.md)).

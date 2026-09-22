@@ -83,6 +83,19 @@ streams:
       - SELECT * FROM phone_lines
       - SELECT * FROM sms_templates
       - SELECT * FROM attachments
+      # Services and amenities: catalogue, validity per type, and what each
+      # location has. Small, and a status audit on a dock reads all of it.
+      - SELECT * FROM services
+      - SELECT * FROM service_location_types
+      - SELECT * FROM amenities
+      - SELECT * FROM amenity_location_types
+      - SELECT * FROM location_services
+      - SELECT * FROM location_amenities
+      # Audit templates and every rule tree, template-owned or copied onto
+      # an audit at launch. Rules are a few rows per audit.
+      - SELECT * FROM audit_templates
+      - SELECT * FROM audit_rules
+      - SELECT * FROM audit_questions
 
   # Own permissions only — the device needs them to render the UI and has no
   # business holding anyone else's.
@@ -163,6 +176,7 @@ streams:
       - SELECT * FROM checklist_instance_sections WHERE is_recent = true
       - SELECT * FROM checklist_instance_items WHERE is_recent = true
       - SELECT * FROM shifts WHERE is_recent = true
+      - SELECT * FROM service_meter_readings WHERE is_recent = true
 
   incidents:
     auto_subscribe: true
@@ -206,6 +220,24 @@ streams:
       - SELECT * FROM chat_room_roles WHERE is_recent = true
       - SELECT * FROM chat_messages WHERE is_recent = true
       - SELECT * FROM chat_message_attachments WHERE is_recent = true
+
+  # ── AUDITS ─────────────────────────────────────────────────────────────
+  # An audit and everything recorded in it, while it is open or closed and
+  # for 30 days after finalize. refresh_audit_sync_scopes() maintains the
+  # flag on every child from the audit's.
+  audits:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM audits WHERE is_current = true
+      - SELECT * FROM audit_assignees WHERE is_current = true
+      - SELECT * FROM audit_targets WHERE is_current = true
+      - SELECT * FROM audit_findings WHERE is_current = true
+      - SELECT * FROM audit_finding_boats WHERE is_current = true
+      - SELECT * FROM audit_finding_vehicles WHERE is_current = true
+      - SELECT * FROM audit_finding_services WHERE is_current = true
+      - SELECT * FROM audit_finding_amenities WHERE is_current = true
+      - SELECT * FROM audit_finding_answers WHERE is_current = true
+      - SELECT * FROM audit_proposals WHERE is_current = true
 
   audit:
     auto_subscribe: true

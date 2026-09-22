@@ -61,8 +61,7 @@ export function generateOccupancy(config) {
         reservation_enabled: typeName !== "Slip",
         reservation_visibility: null,
         lease_enabled: typeName === "Slip",
-        gps_lat: null, gps_lng: null,
-        current_boat_id: null, current_vehicle_id: null,
+        gps_lat: null, gps_lng: null, retired_at: null,
       });
       if (root) deferred.push({ table: "locations", id, set: { parent_id: root.id } });
       rentable[typeName].push(id);
@@ -109,7 +108,7 @@ export function generateOccupancy(config) {
       registration_number: marina.registrationNumber(),
     });
     lessees.forEach((contact_id, pos) => push("boat_owners", { boat_id: boatId, contact_id, position: pos }));
-    deferred.push({ table: "locations", id: locationId, set: { current_boat_id: boatId } });
+    deferred.push({ table: "boats", id: boatId, set: { location_id: locationId } });
   }
 
   // ── reservations: a full year of cabin and camping turnover ─────────────
@@ -144,7 +143,7 @@ export function generateOccupancy(config) {
         plate_number: faker.vehicle.vrm(),
       });
       push("vehicle_owners", { vehicle_id: vid, contact_id, position: 0 });
-      deferred.push({ table: "locations", id: locationId, set: { current_vehicle_id: vid } });
+      deferred.push({ table: "vehicles", id: vid, set: { location_id: locationId } });
     }
   };
 

@@ -187,12 +187,17 @@ export function transform(ex) {
     reservation_enabled: !!r.reservationEnabled,
     reservation_visibility: r.reservationVisibility ?? null,
     lease_enabled: !!r.leaseEnabled,
-    gps_lat: r.gpsLat ?? null, gps_lng: r.gpsLng ?? null,
-    current_boat_id: one(r.currentBoat), current_vehicle_id: one(r.currentVehicle),
+    gps_lat: r.gpsLat ?? null, gps_lng: r.gpsLng ?? null, retired_at: null,
   })));
   for (const r of g("locations")) {
     const p = one(r.parent);
     if (p) deferred.push({ table: "locations", id: r.id, set: { parent_id: p } });
+    // Occupancy lives on the occupant (ADR 0006); Instant recorded it on the
+    // location, so the export is read the other way round.
+    const boat = one(r.currentBoat);
+    if (boat) deferred.push({ table: "boats", id: boat, set: { location_id: r.id } });
+    const vehicle = one(r.currentVehicle);
+    if (vehicle) deferred.push({ table: "vehicles", id: vehicle, set: { location_id: r.id } });
   }
 
   put("marina_maps", g("marinaMaps").map((r) => ({

@@ -26,17 +26,13 @@ export interface BoatRow {
 }
 
 
-// PowerSync's local tables are views over JSON, so every column except `id` is
-// a `CAST(json_extract(data, '$.x'))` expression and every declared index is an
-// expression index. SQLite will use such an index for a WHERE constraint but
-// NOT for a JOIN constraint — a `LEFT JOIN t ON t.fk = outer.id` degrades to a
-// full scan of `t` per outer row. Measured here: 739 boats against 1,184 locations
-// took 1,982ms as a LEFT JOIN and 28ms as the correlated subqueries below, for byte-identical rows. Join on `id` freely; reach for a
-// correlated subquery whenever the inner side is matched on anything else.
+// Where a boat is lives on the boat (boats.location_id, ADR 0006). The
+// location's name is a correlated lookup on `id`, which is the one column
+// PowerSync's SQLite can seek on; the owner names stay correlated for the
+// reason CLAUDE.md records — a LEFT JOIN on anything but `id` is a full scan.
 const BOAT_SELECT = `
   SELECT b.*,
-         (SELECT l.id   FROM locations l WHERE l.current_boat_id = b.id) AS location_id,
-         (SELECT l.name FROM locations l WHERE l.current_boat_id = b.id) AS location_name,
+         (SELECT l.name FROM locations l WHERE l.id = b.location_id) AS location_name,
          (SELECT group_concat(c.name, ', ') FROM boat_owners bo
             JOIN contacts c ON c.id = bo.contact_id
            WHERE bo.boat_id = b.id) AS owner_names
@@ -65,8 +61,7 @@ export interface VehicleRow {
 // Correlated for the same reason BOAT_SELECT is.
 const VEHICLE_SELECT = `
   SELECT v.*,
-         (SELECT l.id   FROM locations l WHERE l.current_vehicle_id = v.id) AS location_id,
-         (SELECT l.name FROM locations l WHERE l.current_vehicle_id = v.id) AS location_name,
+         (SELECT l.name FROM locations l WHERE l.id = v.location_id) AS location_name,
          (SELECT group_concat(c.name, ', ') FROM vehicle_owners vo
             JOIN contacts c ON c.id = vo.contact_id
            WHERE vo.vehicle_id = v.id) AS owner_names
@@ -208,11 +203,10 @@ export function saveVehicle(
 /**
  * Move a boat to a slip, or out of the water entirely.
  *
- * Where a boat is lives on the LOCATION (locations.current_boat_id), not on
- * the boat — so a move is two writes, and the old slip has to be cleared or
- * the same boat appears in two places. The move itself is recorded only in the
- * activity log: there is no boat-location history table, deliberately, because
- * the log is the history and it already outlives the rows it describes.
+ * Where a boat is lives on the boat (boats.location_id) — one write, and a
+ * location may hold several boats (ADR 0006). The move itself is recorded only
+ * in the activity log: there is no boat-location history table, deliberately,
+ * because the log is the history and it already outlives the rows it describes.
  */
 export async function moveBoat(
   boat: { id: string; name: string },
@@ -221,11 +215,7 @@ export async function moveBoat(
   actorId: string | null,
 ): Promise<void> {
   await transact(async (tx) => {
-    await tx.execute(
-      "UPDATE locations SET current_boat_id = NULL WHERE current_boat_id = ?",
-      [boat.id],
-    );
-    if (to) await update(tx, "locations", to.id, { current_boat_id: boat.id });
+    await update(tx, "boats", boat.id, { location_id: to?.id ?? null });
     await recordActivity(tx, {
       eventType: to ? "boat.slip_changed" : "boat.departed",
       summary: to
@@ -253,7 +243,7 @@ export async function haulOutBoat(
   actorId: string | null,
 ): Promise<void> {
   await transact(async (tx) => {
-    await update(tx, "locations", from.id, { current_boat_id: null });
+    await update(tx, "boats", boat.id, { location_id: null });
     await recordActivity(tx, {
       eventType: "boat.hauled_out",
       summary:
@@ -285,11 +275,7 @@ export async function moveVehicle(
   actorId: string | null,
 ): Promise<void> {
   await transact(async (tx) => {
-    await tx.execute(
-      "UPDATE locations SET current_vehicle_id = NULL WHERE current_vehicle_id = ?",
-      [vehicle.id],
-    );
-    if (to) await update(tx, "locations", to.id, { current_vehicle_id: vehicle.id });
+    await update(tx, "vehicles", vehicle.id, { location_id: to?.id ?? null });
     await recordActivity(tx, {
       eventType: to ? "vehicle.location_changed" : "vehicle.departed",
       summary: to

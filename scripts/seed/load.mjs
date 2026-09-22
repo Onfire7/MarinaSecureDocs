@@ -38,9 +38,9 @@ export async function loadAll(client, { tables, deferred }, order, log = () => {
   // Self-referential foreign keys, applied once every row of the table exists.
   // Grouped per table so a location's parent and an item's previous version
   // are each one statement rather than 546.
-  // Grouped by table AND column: a synthetic location defers parent_id,
-  // current_boat_id and current_vehicle_id independently, so keying on table
-  // alone would apply one column's values under another column's name.
+  // Grouped by table AND column: a location defers parent_id while boats and
+  // vehicles defer location_id, so keying on table alone would apply one
+  // column's values under another column's name.
   const byTarget = new Map();
   for (const d of deferred) {
     for (const [col, target] of Object.entries(d.set)) {

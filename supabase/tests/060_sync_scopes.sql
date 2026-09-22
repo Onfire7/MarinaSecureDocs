@@ -8,6 +8,11 @@ create extension if not exists pgtap;
 begin;
 select plan(7);
 
+-- Own fixture user: borrowing "any user" from the table only works on a
+-- database that has been seeded with the marina export, and a bare
+-- `supabase db reset` has none.
+insert into users (id, name, clerk_user_id, active) values
+  ('aaaa0000-0000-4000-8000-00000000006c','Scope Fixture Guard','user_scope_fixture', true);
 insert into location_types (id, name) values ('aaaa0000-0000-4000-8000-00000000006a','Scope Fixture Type');
 insert into locations (id, name, location_type_id) values
   ('aaaa0000-0000-4000-8000-00000000006b','Scope Fixture Slip','aaaa0000-0000-4000-8000-00000000006a');
@@ -46,10 +51,10 @@ update reservations set created_at = expected_checkin
 
 insert into check_ins (id, checkpoint_id, user_id, timestamp, method)
 select 'aaaa0000-0000-4000-8000-00000000000d', null,
-       (select id from users limit 1), now() - interval '1 day', 'scanned';
+       'aaaa0000-0000-4000-8000-00000000006c', now() - interval '1 day', 'scanned';
 insert into check_ins (id, checkpoint_id, user_id, timestamp, method)
 select 'aaaa0000-0000-4000-8000-00000000000e', null,
-       (select id from users limit 1), now() - interval '60 days', 'scanned';
+       'aaaa0000-0000-4000-8000-00000000006c', now() - interval '60 days', 'scanned';
 
 select public.refresh_sync_scopes_all();
 
@@ -76,11 +81,14 @@ select ok(not (select is_recent from check_ins where id='aaaa0000-0000-4000-8000
 
 -- required_permission is what makes the gate compile into a bucket parameter.
 -- A wrong or missing value here means the stream is ungated.
+-- Read from the column DEFAULTS, not from rows: the gate is a property of
+-- the table, and a bare reset has no incidents to union over.
 select is(
-  (select array_agg(distinct required_permission order by required_permission)
-     from (select required_permission from contacts
-            union all select required_permission from contact_details
-            union all select required_permission from incidents) t),
+  (select array_agg(gate order by gate)
+     from (select distinct replace(replace(column_default, '''', ''), '::text', '') as gate
+             from information_schema.columns
+            where table_schema = 'public' and column_name = 'required_permission'
+              and table_name in ('contacts','contact_details','incidents')) g),
   array['view_contact','view_incidents','view_owner'],
   'each gated table demands the permission its stream is parameterised by');
 

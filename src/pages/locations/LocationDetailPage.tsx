@@ -52,10 +52,8 @@ export function LocationDetailPage() {
   const { data: reservations } = useReservationsForTarget("location", locationId);
   const { statuses } = useLocationStatuses();
   // Owners of whichever occupant is here — boat first, then vehicle.
-  const { data: boatOwners } = useBoatOwners(location?.current_boat_id ?? undefined);
-  const { data: vehicleOwners } = useVehicleOwners(
-    location?.current_vehicle_id ?? undefined,
-  );
+  const { data: boatOwners } = useBoatOwners(location?.boat_id ?? undefined);
+  const { data: vehicleOwners } = useVehicleOwners(location?.vehicle_id ?? undefined);
 
   const byId = new Map(
     allLocations.map((l) => [l.id, { name: l.name, parent_id: l.parent_id }]),
@@ -72,9 +70,8 @@ export function LocationDetailPage() {
   const crumbs = breadcrumb(location.parent_id ?? undefined, byId);
   // Presence of the field is driven by the type's flags; an occupant that
   // exists anyway (data predating a flag change) still shows.
-  const carriesBoat = Boolean(location.current_boat_id) || location.boat_name != null;
-  const carriesVehicle =
-    Boolean(location.current_vehicle_id) || location.vehicle_description != null;
+  const carriesBoat = Boolean(location.boat_id) || location.type_name === "Slip";
+  const carriesVehicle = Boolean(location.vehicle_id);
   const owners = [...boatOwners, ...vehicleOwners];
   const now = Date.now();
   const activeLease = leases.find(
@@ -197,10 +194,12 @@ export function LocationDetailPage() {
 
           {carriesBoat && (
             <div className="field">
-              <span className="field-label">Current boat</span>
+              <span className="field-label">
+                {location.boat_count > 1 ? `Boats (${location.boat_count})` : "Current boat"}
+              </span>
               <div className="field-value">
-                {location.current_boat_id ? (
-                  <Link to={`/boats/${location.current_boat_id}`}>
+                {location.boat_id ? (
+                  <Link to={`/boats/${location.boat_id}`}>
                     {location.boat_name}
                   </Link>
                 ) : (
@@ -212,10 +211,12 @@ export function LocationDetailPage() {
 
           {carriesVehicle && (
             <div className="field">
-              <span className="field-label">Current vehicle</span>
+              <span className="field-label">
+                {location.vehicle_count > 1 ? `Vehicles (${location.vehicle_count})` : "Current vehicle"}
+              </span>
               <div className="field-value">
-                {location.current_vehicle_id ? (
-                  <Link to={`/vehicles/${location.current_vehicle_id}`}>
+                {location.vehicle_id ? (
+                  <Link to={`/vehicles/${location.vehicle_id}`}>
                     {location.vehicle_description}
                   </Link>
                 ) : (

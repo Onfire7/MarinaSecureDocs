@@ -31,6 +31,31 @@ const activity_log_entries = new Table(
   },
 );
 
+const amenities = new Table(
+  {
+    name: column.text,
+    position: column.integer,
+  },
+  {
+    indexes: {
+      by_name: ["name"],
+    },
+  },
+);
+
+const amenity_location_types = new Table(
+  {
+    amenity_id: column.text,
+    location_type_id: column.text,
+  },
+  {
+    indexes: {
+      by_amenity_id: ["amenity_id"],
+      by_location_type_id: ["location_type_id"],
+    },
+  },
+);
+
 const asset_checkouts = new Table(
   {
     asset_id: column.text,
@@ -132,6 +157,239 @@ const attachments = new Table(
   },
 );
 
+const audit_assignees = new Table(
+  {
+    audit_id: column.text,
+    user_id: column.text,
+    role_id: column.text,
+    is_current: column.integer,
+  },
+  {
+    indexes: {
+      by_audit_id: ["audit_id"],
+      by_role_id: ["role_id"],
+      by_user_id: ["user_id"],
+    },
+  },
+);
+
+const audit_finding_amenities = new Table(
+  {
+    finding_id: column.text,
+    amenity_id: column.text,
+    present: column.integer,
+    note: column.text,
+    is_current: column.integer,
+  },
+  {
+    indexes: {
+      by_amenity_id: ["amenity_id"],
+      by_finding_id: ["finding_id"],
+    },
+  },
+);
+
+const audit_finding_answers = new Table(
+  {
+    finding_id: column.text,
+    question_id: column.text,
+    value: column.text,
+    ticket_id: column.text,
+    is_current: column.integer,
+  },
+  {
+    indexes: {
+      by_finding_id: ["finding_id"],
+      by_question_id: ["question_id"],
+      by_ticket_id: ["ticket_id"],
+    },
+  },
+);
+
+const audit_finding_boats = new Table(
+  {
+    finding_id: column.text,
+    boat_id: column.text,
+    is_current: column.integer,
+  },
+  {
+    indexes: {
+      by_boat_id: ["boat_id"],
+      by_finding_id: ["finding_id"],
+    },
+  },
+);
+
+const audit_finding_services = new Table(
+  {
+    finding_id: column.text,
+    service_id: column.text,
+    present: column.integer,
+    working: column.integer,
+    note: column.text,
+    is_current: column.integer,
+  },
+  {
+    indexes: {
+      by_finding_id: ["finding_id"],
+      by_service_id: ["service_id"],
+    },
+  },
+);
+
+const audit_finding_vehicles = new Table(
+  {
+    finding_id: column.text,
+    vehicle_id: column.text,
+    is_current: column.integer,
+  },
+  {
+    indexes: {
+      by_finding_id: ["finding_id"],
+      by_vehicle_id: ["vehicle_id"],
+    },
+  },
+);
+
+const audit_findings = new Table(
+  {
+    audit_id: column.text,
+    target_id: column.text,
+    recorded_by_id: column.text,
+    recorded_at: column.text,
+    updated_at: column.text,
+    occupied: column.integer,
+    contact_id: column.text,
+    unexpected_occupancy: column.integer,
+    clearly_marked: column.integer,
+    mapped_correctly: column.integer,
+    displaced_note: column.text,
+    is_current: column.integer,
+  },
+  {
+    indexes: {
+      by_audit_id: ["audit_id"],
+      by_contact_id: ["contact_id"],
+      by_recorded_by_id: ["recorded_by_id"],
+      by_target_id: ["target_id"],
+    },
+  },
+);
+
+const audit_proposals = new Table(
+  {
+    finding_id: column.text,
+    kind: column.text,
+    structural: column.integer,
+    payload: column.text,
+    decision: column.text,
+    decided_by_id: column.text,
+    decided_at: column.text,
+    reason: column.text,
+    applied_location_id: column.text,
+    is_current: column.integer,
+  },
+  {
+    indexes: {
+      by_applied_location_id: ["applied_location_id"],
+      by_decided_by_id: ["decided_by_id"],
+      by_finding_id: ["finding_id"],
+    },
+  },
+);
+
+const audit_questions = new Table(
+  {
+    rule_id: column.text,
+    position: column.integer,
+    prompt: column.text,
+    kind: column.text,
+    choices: column.text, // JSON-encoded
+    ticket_on_no: column.integer,
+    service_id: column.text,
+  },
+  {
+    indexes: {
+      by_rule_id: ["rule_id"],
+      by_service_id: ["service_id"],
+    },
+  },
+);
+
+const audit_rules = new Table(
+  {
+    template_id: column.text,
+    audit_id: column.text,
+    parent_rule_id: column.text,
+    position: column.integer,
+    mode: column.text,
+    conditions: column.text,
+  },
+  {
+    indexes: {
+      by_audit_id: ["audit_id"],
+      by_parent_rule_id: ["parent_rule_id"],
+      by_template_id: ["template_id"],
+    },
+  },
+);
+
+const audit_targets = new Table(
+  {
+    audit_id: column.text,
+    location_id: column.text,
+    location_name: column.text,
+    position: column.integer,
+    state: column.text,
+    not_audited_reason: column.text,
+    is_current: column.integer,
+  },
+  {
+    indexes: {
+      by_audit_id: ["audit_id"],
+      by_location_id: ["location_id"],
+    },
+  },
+);
+
+const audit_templates = new Table(
+  {
+    name: column.text,
+    kind: column.text,
+    created_by_id: column.text,
+    created_at: column.text,
+  },
+  {
+    indexes: {
+      by_created_by_id: ["created_by_id"],
+    },
+  },
+);
+
+const audits = new Table(
+  {
+    name: column.text,
+    kind: column.text,
+    template_id: column.text,
+    status: column.text,
+    launched_by_id: column.text,
+    launched_at: column.text,
+    closed_by_id: column.text,
+    closed_at: column.text,
+    finalized_by_id: column.text,
+    finalized_at: column.text,
+    is_current: column.integer,
+  },
+  {
+    indexes: {
+      by_closed_by_id: ["closed_by_id"],
+      by_finalized_by_id: ["finalized_by_id"],
+      by_launched_by_id: ["launched_by_id"],
+      by_template_id: ["template_id"],
+    },
+  },
+);
+
 const boat_authorized_users = new Table(
   {
     boat_id: column.text,
@@ -171,6 +429,12 @@ const boats = new Table(
     registration_number: column.text,
     is_resident: column.integer,
     created_at: column.text,
+    location_id: column.text,
+  },
+  {
+    indexes: {
+      by_location_id: ["location_id"],
+    },
   },
 );
 
@@ -614,6 +878,20 @@ const leases = new Table(
   },
 );
 
+const location_amenities = new Table(
+  {
+    location_id: column.text,
+    amenity_id: column.text,
+    note: column.text,
+  },
+  {
+    indexes: {
+      by_amenity_id: ["amenity_id"],
+      by_location_id: ["location_id"],
+    },
+  },
+);
+
 const location_map_placements = new Table(
   {
     map_id: column.text,
@@ -624,6 +902,22 @@ const location_map_placements = new Table(
     indexes: {
       by_location_id: ["location_id"],
       by_map_id: ["map_id"],
+    },
+  },
+);
+
+const location_services = new Table(
+  {
+    location_id: column.text,
+    service_id: column.text,
+    working: column.integer,
+    metered: column.integer,
+    note: column.text,
+  },
+  {
+    indexes: {
+      by_location_id: ["location_id"],
+      by_service_id: ["service_id"],
     },
   },
 );
@@ -682,13 +976,10 @@ const locations = new Table(
     lease_enabled: column.integer,
     gps_lat: column.real,
     gps_lng: column.real,
-    current_boat_id: column.text,
-    current_vehicle_id: column.text,
+    retired_at: column.text,
   },
   {
     indexes: {
-      by_current_boat_id: ["current_boat_id"],
-      by_current_vehicle_id: ["current_vehicle_id"],
       by_location_type_id: ["location_type_id"],
       by_parent_id: ["parent_id"],
       by_post_reservation_status_id: ["post_reservation_status_id"],
@@ -735,6 +1026,8 @@ const marina_settings = new Table(
     shift_report_recipients: column.text, // JSON-encoded
     allow_overlapping_reservations: column.integer,
     haul_out_mode: column.text,
+    audit_gps_radius: column.integer,
+    audit_gps_accuracy: column.integer,
   },
 );
 
@@ -810,6 +1103,49 @@ const roles = new Table(
     name: column.text,
     allow: column.text, // JSON-encoded
     deny: column.text, // JSON-encoded
+  },
+);
+
+const service_location_types = new Table(
+  {
+    service_id: column.text,
+    location_type_id: column.text,
+  },
+  {
+    indexes: {
+      by_location_type_id: ["location_type_id"],
+      by_service_id: ["service_id"],
+    },
+  },
+);
+
+const service_meter_readings = new Table(
+  {
+    location_service_id: column.text,
+    value: column.real,
+    read_at: column.text,
+    read_by_id: column.text,
+    reset: column.integer,
+    is_recent: column.integer,
+  },
+  {
+    indexes: {
+      by_location_service_id: ["location_service_id"],
+      by_read_by_id: ["read_by_id"],
+    },
+  },
+);
+
+const services = new Table(
+  {
+    name: column.text,
+    unit: column.text,
+    position: column.integer,
+  },
+  {
+    indexes: {
+      by_name: ["name"],
+    },
   },
 );
 
@@ -950,6 +1286,8 @@ const tickets = new Table(
     contact_id: column.text,
     asset_id: column.text,
     is_recent: column.integer,
+    source_finding_id: column.text,
+    proposal_id: column.text,
   },
   {
     indexes: {
@@ -960,7 +1298,9 @@ const tickets = new Table(
       by_contact_id: ["contact_id"],
       by_created_by_id: ["created_by_id"],
       by_location_id: ["location_id"],
+      by_proposal_id: ["proposal_id"],
       by_source_checklist_item_id: ["source_checklist_item_id"],
+      by_source_finding_id: ["source_finding_id"],
       by_source_incident_id: ["source_incident_id"],
       by_status_id: ["status_id"],
       by_vehicle_id: ["vehicle_id"],
@@ -1056,17 +1396,38 @@ const vehicles = new Table(
     plate_number: column.text,
     is_resident: column.integer,
     created_at: column.text,
+    location_id: column.text,
+  },
+  {
+    indexes: {
+      by_location_id: ["location_id"],
+    },
   },
 );
 
 export const AppSchema = new Schema({
   activity_log_entries,
+  amenities,
+  amenity_location_types,
   asset_checkouts,
   asset_meter_readings,
   asset_status_logs,
   asset_statuses,
   assets,
   attachments,
+  audit_assignees,
+  audit_finding_amenities,
+  audit_finding_answers,
+  audit_finding_boats,
+  audit_finding_services,
+  audit_finding_vehicles,
+  audit_findings,
+  audit_proposals,
+  audit_questions,
+  audit_rules,
+  audit_targets,
+  audit_templates,
+  audits,
   boat_authorized_users,
   boat_owners,
   boats,
@@ -1095,7 +1456,9 @@ export const AppSchema = new Schema({
   lease_documents,
   lease_lessees,
   leases,
+  location_amenities,
   location_map_placements,
+  location_services,
   location_statuses,
   location_type_parents,
   location_types,
@@ -1107,6 +1470,9 @@ export const AppSchema = new Schema({
   phone_lines,
   reservations,
   roles,
+  service_location_types,
+  service_meter_readings,
+  services,
   shifts,
   sms_messages,
   sms_templates,
@@ -1131,12 +1497,27 @@ export type Database = (typeof AppSchema)["types"];
 /** Every table the device can hold, for the upload connector's sanity checks. */
 export const TABLE_NAMES = [
   "activity_log_entries",
+  "amenities",
+  "amenity_location_types",
   "asset_checkouts",
   "asset_meter_readings",
   "asset_status_logs",
   "asset_statuses",
   "assets",
   "attachments",
+  "audit_assignees",
+  "audit_finding_amenities",
+  "audit_finding_answers",
+  "audit_finding_boats",
+  "audit_finding_services",
+  "audit_finding_vehicles",
+  "audit_findings",
+  "audit_proposals",
+  "audit_questions",
+  "audit_rules",
+  "audit_targets",
+  "audit_templates",
+  "audits",
   "boat_authorized_users",
   "boat_owners",
   "boats",
@@ -1165,7 +1546,9 @@ export const TABLE_NAMES = [
   "lease_documents",
   "lease_lessees",
   "leases",
+  "location_amenities",
   "location_map_placements",
+  "location_services",
   "location_statuses",
   "location_type_parents",
   "location_types",
@@ -1177,6 +1560,9 @@ export const TABLE_NAMES = [
   "phone_lines",
   "reservations",
   "roles",
+  "service_location_types",
+  "service_meter_readings",
+  "services",
   "shifts",
   "sms_messages",
   "sms_templates",
@@ -1202,6 +1588,10 @@ export const TABLE_NAMES = [
  * refuses the write. See src/lib/db/uploadShape.ts.
  */
 export const STRUCTURED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
+  audit_finding_answers: ["value"],
+  audit_proposals: ["payload"],
+  audit_questions: ["choices"],
+  audit_rules: ["conditions"],
   checklist_instance_items: ["result"],
   checklist_template_items: ["config"],
   checklist_template_sections: ["trigger_config", "due_by"],
