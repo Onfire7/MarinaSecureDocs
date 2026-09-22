@@ -62,7 +62,8 @@ The full, fixed catalog of permissions. Marinas cannot invent new permissions, b
 | `view_all_chats` | Seeing every chat room, not just ones you're invited to. View-only — does not grant the ability to send messages in a room you aren't actually a participant of. |
 | `manage_chats` | Adding yourself, or another user, as a participant to any chat room — regardless of whether you were originally invited. This is what lets a manager or department head join an in-progress conversation, or place someone else into one. |
 | `manage_assets` | Creating/editing assets, maintenance rules, and checkout records. |
-| `manage_locations` | Creating/editing locations, location types, and checkpoints. |
+| `manage_locations` | Creating/editing locations, location types, checkpoints, and the Services and Amenities catalogue. Also required to finalize an Audit that carries structural Proposals (new, retired, renamed, retyped, reparented or re-placed Locations). |
+| `manage_audits` | Creating Audit Templates, launching and closing Audits, and approving or rejecting non-structural Proposals (Service and Amenity presence, GPS coordinates). See `docs/audits.md`. |
 | `manage_reservations` | Creating/editing reservations and overriding status/dates. |
 | `manage_marina_settings` | Editing the MarinaSettings record: retention policy, GPS defaults, phone lines, recording toggle. |
 
@@ -195,7 +196,7 @@ not just in a query.
 Everything else: `assign_ticket_to_self`, `assign_ticket_to_others`,
 `manage_checklists`, `view_reports`, `view_all_chats`, `manage_chats`,
 `manage_assets`, `manage_locations`, `manage_reservations`,
-`manage_marina_settings`.
+`manage_marina_settings`, `manage_audits`.
 
 These gate what the interface offers, not what the database permits. That is a
 deliberate stopping point rather than an oversight: they govern *marina

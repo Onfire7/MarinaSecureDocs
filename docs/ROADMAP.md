@@ -14,9 +14,11 @@ InstantDB retires 2027-08-31. The app moves to Supabase + PowerSync — see
 [ADR 0005](adr/0005-supabase-and-powersync-replace-instantdb.md). Two
 consequences for this file:
 
-- **Feature work and schema growth are frozen** until cutover. ~80% of the
-  codebase touches the database (66 of 119 files), so building features now
-  builds refactoring debt against a deadline.
+- **Feature work and schema growth were frozen** until cutover. ~80% of the
+  codebase touched the database (66 of 119 files), so building features
+  during the rewrite would have built refactoring debt against a deadline.
+  The cutover completed 2026-09-22 and the freeze is lifted; the first
+  feature through is the location audit system (`docs/audits.md`).
 - **Only transferable tests get written.** `src/lib` is 2,470 lines and only
   five of its 24 files touch the database, so roughly 1,900 lines of pure
   logic are already database-agnostic and their tests survive the migration

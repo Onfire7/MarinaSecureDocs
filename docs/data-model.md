@@ -3,10 +3,11 @@
 Every table, its columns, and how it relates to everything else. Schema-level
 structure and intent — not query code.
 
-> **Status.** Target relational model for Supabase Postgres. The app currently
-> runs on InstantDB's document/link schema (`instant.schema.ts`); see
-> [ADR 0005](adr/0005-supabase-and-powersync-replace-instantdb.md). Where the
-> two differ deliberately, the reason is stated inline under *Unwound*.
+> **Status.** The relational model for Supabase Postgres, live since the
+> 2026-09-22 cutover ([ADR 0005](adr/0005-supabase-and-powersync-replace-instantdb.md)).
+> Where it deliberately differs from the InstantDB schema it replaced, the
+> reason is stated inline under *Unwound*. § *Services & amenities* and
+> § *Audits* are designed, not yet migrated.
 
 ## How to read this
 
@@ -107,9 +108,13 @@ a table; see [Permissions](permissions.md) for the definition.
 | reservation_visibility | text | `public` / `internal`. |
 | post_reservation_status_id | → location_statuses | |
 | lease_enabled | boolean not null default false | Per-location lease switch, mirroring `reservation_enabled`. On one dock the front slips may be reservable and the back leasable. |
-| gps_lat / gps_lng | double precision | |
-| current_boat_id | → boats unique | Exclusive occupancy — one boat, one slip. |
-| current_vehicle_id | → vehicles unique | Mirrors `current_boat_id` for RV sites and parking. |
+| gps_lat / gps_lng | double precision | Set through an approved audit GPS Proposal; none are set today. |
+| retired_at | timestamptz | Set when an Audit's approved removal retires the Location. Retired rows are hidden from pickers, maps and audit targets; history stays. |
+
+> **Unwound (2026-09-22).** `current_boat_id` / `current_vehicle_id`, unique
+> FKs meaning "one boat, one slip", are **gone**. Occupancy is
+> `boats.location_id` / `vehicles.location_id`; a location holds any number
+> of either. [ADR 0006](adr/0006-occupancy-lives-on-the-occupant.md).
 
 #### `location_statuses` — lookup · Tier 0 / `manage_locations` · sync: always
 
@@ -292,6 +297,8 @@ the attachment target.
 | created_at / resolved_at | timestamptz | |
 | created_by_id / assigned_to_id | → users | |
 | source_incident_id | → incidents | |
+| source_finding_id | → audit_findings, `on delete set null` | Raised from an Audit. |
+| proposal_id | → audit_proposals, `on delete set null` | Raised against a proposed new Location. The target is the proposed parent until approval re-targets it. |
 | *attachment target* | | Six columns + constraint. |
 
 Ticket creation is deliberately ungated — every role may raise one. There is
@@ -363,6 +370,57 @@ removed in favour of deriving from it.
 | early_checkin / late_checkout | timestamptz | Ignored when non-billable. |
 | rate / deposit / balance | numeric | |
 
+## Services & amenities
+
+Marina-defined catalogues of what a Location provides. See
+[`audits.md`](audits.md) § *Services and Amenities* and
+[ADR 0007](adr/0007-meters-on-services-not-assets.md).
+
+#### `services` — Tier 0 / `manage_locations` · sync: always
+
+`name text not null unique`, `unit text` (kWh, gallons; used when a
+location's instance is metered), `position integer`.
+`service_location_types` — junction: `service_id`, `location_type_id`. The
+types a service is valid for.
+
+#### `amenities` — Tier 0 / `manage_locations` · sync: always
+
+`name text not null unique`, `position integer`.
+`amenity_location_types` — junction, as above.
+
+#### `location_services` — Tier 0 · sync: always
+
+| Column | Type | Notes |
+|---|---|---|
+| location_id | → locations not null | |
+| service_id | → services not null | `unique (location_id, service_id)`. Row present = service present. |
+| working | boolean not null default true | Applied immediately by an audit Finding. |
+| metered | boolean not null default false | |
+| note | text | Free text; the UI suggests existing notes for this service ordered by use count — a query, not a table. |
+
+Presence (row insert or delete) changes through an approved audit Proposal
+or the admin location editor; never directly from a Finding.
+
+#### `location_amenities` — Tier 0 · sync: always
+
+`location_id`, `amenity_id` (`unique` pair), `note text`. Same rules as
+`location_services`. Recorded on the Location that offers the amenity; a
+parent's amenities are not copied to children.
+
+#### `service_meter_readings` — Tier 0 · sync: **age**
+
+| Column | Type | Notes |
+|---|---|---|
+| location_service_id | → location_services not null, indexed | |
+| value | numeric not null | In the service's `unit`. |
+| read_at | timestamptz not null default now() | |
+| read_by_id | → users | |
+| reset | boolean not null default false | The meter was replaced or zeroed; consumption is never computed across a reset row. |
+| source_finding_id | → audit_findings, set null | |
+
+History only; no rule fires from these. The billed party is derived later
+from the Lease or Reservation active at `read_at`.
+
 ## Boats, owners & leases
 
 #### `contacts` — **Tier 1: `view_owner` / `edit_owner_contact`** · sync: **occupancy**
@@ -385,7 +443,8 @@ Identity only. This is the row that says *who* someone is.
 #### `boats` — Tier 0 · sync: **occupancy**
 
 `name not null`, `description`, `length numeric`, `make`, `model`,
-`registration_number`. Current slip is `locations.current_boat_id`.
+`registration_number`, `location_id → locations` (nullable, indexed — the
+boat's current slip; a boat is in at most one place, a place holds many).
 
 `boat_owners` — junction: `boat_id`, `contact_id`, `position integer not null`
 (order of succession). `boat_authorized_users` — junction, unordered.
@@ -396,7 +455,8 @@ Identity only. This is the row that says *who* someone is.
 #### `vehicles` — Tier 0 · sync: **occupancy**
 
 `description text not null` (the primary label — staff know a vehicle by
-sight), `plate_number indexed`. `vehicle_owners` junction with `position`.
+sight), `plate_number indexed`, `location_id → locations` (nullable,
+indexed). `vehicle_owners` junction with `position`.
 
 #### `leases` — **Tier 1: `view_lease` / `manage_lease`** · sync: **occupancy**
 
@@ -408,7 +468,104 @@ occupancy sync window**), `variances_and_conditions text`.
 
 `lease_id`, `body`, `created_at`, `author_id`.
 
-## Shifts & audit
+## Audits
+
+Field review of Locations against reality. Behaviour in
+[`audits.md`](audits.md); vocabulary in `CONTEXT.md`.
+
+#### `audit_templates` — Tier 0 / `manage_audits` · sync: always
+
+`name text not null`, `kind audit_kind not null` (`occupancy` / `status`),
+`created_by_id → users`.
+
+#### `audit_rules` — Tier 0 / `manage_audits` · sync: always
+
+| Column | Type | Notes |
+|---|---|---|
+| template_id | → audit_templates, cascade | Exactly one of `template_id` / `audit_id` by check constraint. Launch copies a template's rule tree onto the audit so later template edits never reach it. |
+| audit_id | → audits, cascade | |
+| parent_rule_id | → audit_rules, cascade | Tree. A child narrows its parent. |
+| position | integer not null | Order among siblings. |
+| predicate | jsonb not null | The selection expression: `{op: "and" \| "or" \| "not", args: [...]}` over leaves `{test: "type_is" \| "under" \| "status_is" \| "is_vacant" \| "name_contains" \| "name_starts" \| "name_ends" \| "has_service" \| "has_amenity" \| "has_lease" \| "has_reservation" \| "last_audited_before", value}`. Evaluated on the client at launch; a `STRUCTURED_COLUMNS` entry. |
+
+#### `audit_questions` — Tier 0 / `manage_audits` · sync: always
+
+| Column | Type | Notes |
+|---|---|---|
+| rule_id | → audit_rules not null, cascade | Asked only of Locations this rule selects. |
+| position | integer not null | |
+| prompt | text not null | |
+| kind | audit_question_kind not null | `yes_no` / `choice` / `text` / `meter_reading`. Door and lock checks deliberately absent. |
+| choices | text[] | `choice` only. |
+| ticket_on_no | boolean not null default false | `yes_no` only. |
+| service_id | → services | `meter_reading` only: which metered service to read. |
+
+#### `audits` — Tier 0 · sync: **current** (see below)
+
+| Column | Type | Notes |
+|---|---|---|
+| name | text not null | |
+| kind | audit_kind not null | Copied from the template at launch. |
+| template_id | → audit_templates, set null | Provenance only. |
+| status | audit_status not null, indexed | `open` / `closed` / `finalized`. No reopening. |
+| launched_by_id / launched_at | | |
+| closed_by_id / closed_at | | Null `closed_by_id` on an automatic close. |
+| finalized_by_id / finalized_at | | |
+| is_current | boolean not null default true | Sync scope: true while not finalized, and for 30 days after; maintained by `refresh_sync_scopes_all()`. Every child table below inherits the scope through its audit. |
+
+`audit_assignees` — `audit_id`, `user_id` / `role_id` (exactly one).
+
+#### `audit_targets` — Tier 0 · sync: through audit
+
+| Column | Type | Notes |
+|---|---|---|
+| audit_id | → audits not null, cascade | |
+| location_id | → locations not null | `unique (audit_id, location_id)`. Fixed at launch. |
+| position | integer not null | Tree order at launch. |
+| state | audit_target_state not null | `pending` / `audited` / `not_audited`. |
+| not_audited_reason | text | `closed early`, `retired by Audit <name>`. |
+
+#### `audit_findings` — Tier 0 · sync: through audit
+
+One per target; a Finding with no target is a proposed new Location.
+
+| Column | Type | Notes |
+|---|---|---|
+| audit_id | → audits not null | |
+| target_id | → audit_targets unique | Null only for a proposed new Location, whose details live in its `create_location` Proposal. |
+| recorded_by_id | → users not null | Only this user may edit, and only while the audit is open. |
+| recorded_at / updated_at | timestamptz | |
+| occupied | boolean | Occupancy kind. |
+| contact_id | → contacts | Optional occupant. |
+| unexpected_occupancy | boolean not null default false | Derived at save: `occupied` disagrees with the presence of a current Lease or `checked_in` Reservation. |
+| clearly_marked / mapped_correctly | boolean | Status kind. |
+| displaced_note | text | "expected <boat>, found elsewhere", written by another Finding in the same audit that moved the occupant. |
+
+Junctions: `audit_finding_boats`, `audit_finding_vehicles` (occupants
+recorded). `audit_finding_services` (`finding_id`, `service_id`, `present`,
+`working`, `note`) and `audit_finding_amenities` (`present`, `note`) record
+what was observed; `working` and `note` apply at once, `present` becomes a
+Proposal when it differs from the Location's row. `audit_finding_answers`:
+`finding_id`, `question_id`, `value jsonb` (a `STRUCTURED_COLUMNS` entry),
+`ticket_id → tickets`.
+
+#### `audit_proposals` — Tier 0 · sync: through audit
+
+| Column | Type | Notes |
+|---|---|---|
+| finding_id | → audit_findings not null, cascade | |
+| kind | audit_proposal_kind not null | `create_location` / `retire_location` / `rename` / `retype` / `reparent` / `move_placement` / `set_gps` / `set_service` / `set_amenity`. |
+| structural | boolean not null | True for the first six; deciding those needs `manage_locations`. Stored rather than derived so RLS can test it. |
+| payload | jsonb not null | Kind-specific. `create_location`: name, type, parent, gps, services, amenities, status, occupants. `set_gps`: lat, lng, accuracy. `set_service`: service_id, present. A `STRUCTURED_COLUMNS` entry. |
+| decision | audit_decision | Null until decided; `approved` / `rejected`. |
+| decided_by_id / decided_at / reason | | Reason required on reject. |
+| applied_location_id | → locations | For `create_location`, the row created on approval; tickets carrying this proposal re-target to it. |
+
+Decisions save one at a time. The audit can finalize only when no
+proposal's `decision` is null; finalize applies approved proposals in
+`docs/audits.md` § *Finalizing* order.
+
+## Shifts & activity log
 
 #### `shifts` — Tier 0 · sync: **age**
 
@@ -502,6 +659,8 @@ Single row, enforced by `check (id = 1)`.
 |---|---|---|
 | marina_name | text | |
 | gps_validation_radius_default | integer not null | Metres; checkpoints may override. |
+| audit_gps_radius | integer not null default 15 | Metres. An audit prompts to re-capture a Location's coordinates when the device is farther than this from them. Distinct from the checkpoint radius, which is tuned for "did the guard get near enough". |
+| audit_gps_accuracy | integer not null default 10 | Metres. A GPS capture is refused when the device's reported accuracy is worse than this. |
 | activity_log_retention_days | integer not null | Drives the `pg_cron` purge. |
 | call_recording_enabled / call_transcription_enabled | boolean not null | |
 | shift_report_recipients | text[] | |

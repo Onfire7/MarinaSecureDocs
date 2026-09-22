@@ -23,13 +23,14 @@ its own Twilio account. Nothing is shared between marinas.
 > (`marinasecure2.netlify.app`).
 > `beta` still
 > deploys the InstantDB build and still works; nothing in `src/` on the branch
-> imports InstantDB. It compiles, boots, and opens its own SQLite database, and
-> has not yet been exercised against synced rows — see `docs/TODO.md` for the
-> one dashboard change blocking that. Rules below marked *(InstantDB only)*
-> already do not apply on the branch, and some are actively wrong there.
+> imports InstantDB. **The cutover is complete (2026-09-22)**: `beta2` runs
+> against synced rows in the real marina database. Rules below marked
+> *(InstantDB only)* do not apply on the branch, and some are actively wrong
+> there.
 >
-> **Feature work and schema growth stay frozen until cutover**; ~80% of the
-> codebase touches the database.
+> The feature freeze that held during the rewrite is lifted. Schema changes
+> are Postgres migrations under `supabase/migrations/`, followed by
+> `pnpm run schema:gen`.
 
 Reference docs are in `docs/`. They exist **for agents**, not for a
 published site — write them accordingly.
