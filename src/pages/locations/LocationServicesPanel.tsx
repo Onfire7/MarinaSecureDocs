@@ -45,7 +45,7 @@ export function LocationServicesPanel({ locationId, typeId }: { locationId: stri
                       <input type="checkbox" checked={!!row} onChange={(e) => void setLocationServicePresent(locationId, s.id, e.target.checked)} /> {s.name}
                     </label>
                   ) : (
-                    <span className={row ? undefined : "muted"}>{row ? "✓" : "—"} {s.name}</span>
+                    <span className={row ? undefined : "muted"}>{row ? "✓" : "-"} {s.name}</span>
                   )}
                   {row && (
                     <>
@@ -85,7 +85,7 @@ export function LocationServicesPanel({ locationId, typeId }: { locationId: stri
                       <input type="checkbox" checked={!!row} onChange={(e) => void setLocationAmenityPresent(locationId, a.id, e.target.checked)} /> {a.name}
                     </label>
                   ) : (
-                    <span className={row ? undefined : "muted"}>{row ? "✓" : "—"} {a.name}</span>
+                    <span className={row ? undefined : "muted"}>{row ? "✓" : "-"} {a.name}</span>
                   )}
                   {row &&
                     (canEdit ? (

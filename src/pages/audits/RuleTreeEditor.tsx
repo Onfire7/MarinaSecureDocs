@@ -161,7 +161,7 @@ function ValueInput({
   if (!verb?.needsValue) return null;
   const sel = (opts: { id: string; label: string }[]) => (
     <select className="select select-inline" value={c.value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">—</option>
+      <option value="">Choose…</option>
       {opts.map((o) => (
         <option key={o.id} value={o.id}>
           {o.label}
@@ -428,7 +428,7 @@ export function TargetPreview({
             <span style={{ flex: 1, minWidth: 0 }}>
               <b>{loc?.name}</b>{" "}
               <span className="muted small">
-                {loc?.typeName} · {loc?.statusName ?? "—"}
+                {loc?.typeName} · {loc?.statusName ?? "no status"}
               </span>
             </span>
             <span style={{ display: "flex", gap: 2 }}>

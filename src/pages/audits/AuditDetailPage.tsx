@@ -248,13 +248,13 @@ function ProposalsTable({
             )}
             <span className={`badge ${p.structural ? "badge-warn" : ""}`}>{KIND_LABEL[p.kind]}</span>
             <span style={{ flex: 1, minWidth: 160 }}>
-              <b>{p.location_name ?? "—"}</b> <span className="muted small">{describe(p)}</span>
+              <b>{p.location_name ?? "-"}</b> <span className="muted small">{describe(p)}</span>
               <span className="muted small"> · {p.recorded_by_name ?? ""}</span>
             </span>
             {p.decision ? (
               <span className={`badge ${p.decision === "approved" ? "badge-good" : "badge-bad"}`}>
                 {p.decision}
-                {p.reason ? ` — ${p.reason}` : ""}
+                {p.reason ? ` - ${p.reason}` : ""}
               </span>
             ) : (
               <>

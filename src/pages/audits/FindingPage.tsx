@@ -321,7 +321,7 @@ function FindingForm({
           <div className="page-sub">
             <Link to={`/audits/${auditId}`}>← {auditName}</Link>
             {target && ` · ${target.type_name ?? ""}${target.status_name ? ` · ${target.status_name}` : ""}`}
-            {finding && !isAuthor && " · recorded by someone else — read only"}
+            {finding && !isAuthor && " · recorded by someone else - read only"}
             {readOnly && " · audit closed"}
           </div>
         </div>
@@ -363,7 +363,7 @@ function FindingForm({
           <div className="field">
             <span className="field-label">Status</span>
             <select className="select select-inline" value={statusId} disabled={!editable} onChange={(e) => setStatusId(e.target.value)}>
-              <option value="">—</option>
+              <option value="">{target ? "Leave as is" : "None"}</option>
               {statuses.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -469,7 +469,7 @@ function FindingForm({
         <div className="card" style={{ marginBottom: 12 }}>
           <button type="button" className="tree-head" onClick={() => setShowChanges(!showChanges)}>
             <span className="card-title">Propose a change {showChanges ? "▾" : "▸"}</span>
-            <span className="muted small"> — name, type, parent, or retire. Waits for approval.</span>
+            <span className="muted small"> - name, type, parent, or retire. Waits for approval.</span>
           </button>
           {showChanges && (
             <div className="stack" style={{ gap: 8, marginTop: 8 }}>
@@ -492,7 +492,7 @@ function FindingForm({
                 <LocationPicker locations={locations.map((l) => ({ id: l.id, name: l.name, parent_id: l.parent_id }))} value={parentId} onChange={setParentId} excludeId={target.location_id ?? undefined} />
               </div>
               <label>
-                <input type="checkbox" checked={retire} disabled={!editable} onChange={(e) => setRetire(e.target.checked)} /> This location is not here — propose retiring it
+                <input type="checkbox" checked={retire} disabled={!editable} onChange={(e) => setRetire(e.target.checked)} /> This location is not here - propose retiring it
               </label>
             </div>
           )}
@@ -594,7 +594,7 @@ function QuestionField({
       )}
       {q.kind === "choice" && (
         <select className="select select-inline" value={typeof v === "string" ? v : ""} disabled={!editable} onChange={(e) => onChange(e.target.value)}>
-          <option value="">—</option>
+          <option value="">Choose…</option>
           {choices.map((c) => (
             <option key={c} value={c}>
               {c}
@@ -650,7 +650,7 @@ function GpsBlock({
       </div>
       {captured ? (
         <div className="row" style={{ alignItems: "center", gap: 8 }}>
-          <span className="badge badge-good">Coordinates captured (±{Math.round(captured.accuracy)} m) — waits for approval</span>
+          <span className="badge badge-good">Coordinates captured (±{Math.round(captured.accuracy)} m) - waits for approval</span>
           {editable && (
             <button type="button" className="btn btn-sm btn-bare" onClick={() => onCapture(null)}>
               discard
@@ -663,7 +663,7 @@ function GpsBlock({
             {decision.reason === "missing"
               ? `${locationName} has no coordinates yet.`
               : `You are ${Math.round(decision.distanceMeters ?? 0)} m from where ${locationName} is pinned.`}
-            {!decision.captureEnabled && decision.accuracyMeters !== null && ` GPS accuracy ${Math.round(decision.accuracyMeters)} m — move into the open and try again.`}
+            {!decision.captureEnabled && decision.accuracyMeters !== null && ` GPS accuracy ${Math.round(decision.accuracyMeters)} m - move into the open and try again.`}
           </div>
           <label style={{ display: "block", marginBottom: 6 }}>
             <input type="checkbox" checked={standing} disabled={!editable} onChange={(e) => setStanding(e.target.checked)} /> I am standing directly at {locationName}
@@ -776,7 +776,7 @@ function OccupantPicker({
               {offer.updates.map((u) => (
                 <div key={u.field} className="row" style={{ gap: 6, alignItems: "center" }}>
                   <span>
-                    {u.field}: <s>{u.from ?? "—"}</s> → <b>{u.to}</b>
+                    {u.field}: <s>{u.from ?? "(empty)"}</s> → <b>{u.to}</b>
                   </span>
                   <button
                     type="button"

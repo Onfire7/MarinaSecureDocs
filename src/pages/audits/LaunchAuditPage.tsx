@@ -43,7 +43,7 @@ export function LaunchAuditPage() {
     if (!template || edited) return;
     setRoots(stored);
     setKind(template.kind);
-    setName(`${template.name} — ${new Date().toLocaleDateString()}`);
+    setName(`${template.name} - ${new Date().toLocaleDateString()}`);
   }, [template, stored, edited]);
 
   const ctx = useEditorContext(kind, roots);
@@ -126,7 +126,7 @@ export function LaunchAuditPage() {
         </div>
       </div>
 
-      <div className="section-title">Rules — {res.targets.length} target locations</div>
+      <div className="section-title">Rules - {res.targets.length} target locations</div>
       <RuleTreeEditor
         roots={roots}
         onChange={(next) => {
