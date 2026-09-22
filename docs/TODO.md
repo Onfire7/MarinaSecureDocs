@@ -137,22 +137,15 @@ lives in `architecture.md`, `permissions.md`, `data-model.md` and
       live but does nothing until a template says when it is due: with the
       field empty, hide-until behaves exactly as before. One field, one time.
 
-- [ ] **Confirm on the Pixel, on a real shift.** Three fixes are live on
-      `beta2` and verified by driven sessions, but not yet on the phone that
-      found them: checks made in a dead spot survive a long absence (c96f233);
-      beta-written NFC tags open in-app, and scanning starts on open once NFC
-      is allowed (43f0efa); the save indicator reads "N changes saved on this
-      phone" offline and "All changes sent" after (c6a844c). If answers still
-      vanish, or the indicator ever shows red, that is a second cause — the
-      indicator's panel has the reason verbatim.
+- [x] **Confirm on the Pixel, on a real shift.** Done — the owner confirmed
+      on 2026-09-22 that the dead-spot, NFC and save-indicator fixes hold on
+      the phone that found the bugs.
 
-- [ ] **Decide what the marina's tags point at after cutover.** Every NFC tag
-      carries `https://beta.marinasecure.com/checkin/<guid>`. Inside the app
-      that no longer matters — the scanner matches on the path, and starts on
-      open once NFC is allowed. But a tag tapped with the app CLOSED is opened
-      by Android at the URL written on it, which is the old InstantDB build.
-      No code on `beta2` can change that. At cutover either `beta.` is
-      repointed at the new app, or the tags are rewritten.
+- [~] **Tags tapped with the app closed open the old site.** Won't do. Every
+      NFC tag carries `https://beta.marinasecure.com/checkin/<guid>`; inside
+      the app the scanner matches on the path and starts on open, so this
+      only matters with the app closed. Owner's decision 2026-09-22: leave it.
+      Revisit only if `beta.` is ever retired without being repointed.
 
 - [ ] **Decide what happens to tickets with no attachment target.** The reload
       dropped exactly one real row — "Door left unlocked: Water Storage Door" —
@@ -161,12 +154,11 @@ lives in `architecture.md`, `permissions.md`, `data-model.md` and
       which is right for a seed and wrong for a cutover: at real cutover this
       is silent data loss unless it is either fixed in InstantDB first or the
       constraint is relaxed. One row today, but it is a class, not an incident.
+      *Owner asked to be reminded of this one (2026-09-22).*
 
-- [ ] **Rotate the Supabase `postgres` password.** It was handed over in this
-      session to seed through the pooler, and the pooler presents Supabase's
-      own private CA, so that seed ran over TLS that was encrypted but not
-      verified. Neither is a breach; both are reasons not to leave the
-      credential as it is.
+- [x] **Rotate the Supabase `postgres` password.** Done 2026-09-22. If the
+      old one is still in `.env.local` as `SUPABASE_DB_PASSWORD`, the seed and
+      `supabase db push` will fail until it is updated there too.
 
 - [ ] **Fix `VITE_SUPABASE_URL` on the `beta` context too.** It was set to
       `https://<ref>.supabase.co/rest/v1/`, so supabase-js built
