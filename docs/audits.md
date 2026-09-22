@@ -87,18 +87,25 @@ Templates are edited under Admin beside Checklist Templates.
 
 ### Rules
 
-A rule selects Locations. Predicates, combinable with AND, OR and NOT,
-nestable:
+A rule selects Locations with one or more **conditions**, joined by *all
+of* (and) or *any of* (or). A condition is a sentence, **subject · verb ·
+value**, and negation is a verb, never a separate toggle:
 
-| Predicate | Tests |
-|---|---|
-| type is | Location Type |
-| under | any ancestor is the named Location |
-| status is / counts as vacant | Location Status, or its `is_vacancy` flag |
-| name contains / starts with / ends with | the Location's name |
-| has service / has amenity | a present Service or Amenity |
-| has current lease / active reservation | a Lease whose window contains now, or a Reservation in `checked_in` |
-| last audited before | no Finding for this Location in any finalized Audit since the date, counting only Audits of the same kind |
+| Subject | Verbs | Value |
+|---|---|---|
+| Name | contains / starts with / ends with / is / does not contain / does not end with | text |
+| Type | is / is not | a Location Type |
+| Location | is under / is not under | a Location with children (any depth) |
+| Status | is / is not / counts as vacant / does not count as vacant | a Location Status; none for the vacancy verbs, which read `is_vacancy` |
+| Service | includes / does not include | a Service |
+| Amenity | includes / does not include | an Amenity |
+| Lease | is current / is absent | none. A Lease whose window contains now |
+| Reservation | is active / is absent | none. A Reservation in `checked_in` |
+| Last audited | before | a date. No Finding in any finalized Audit of the same kind since it |
+
+A condition whose verb needs a value, and has none yet, is **inert**: it
+does not narrow anything and does not appear in the rule's description.
+Adding a condition never changes a count until it is filled in.
 
 A **child rule narrows its parent**: it selects only from what the parent
 selected. Sibling rules are independent branches. A Location selected by a
@@ -112,6 +119,39 @@ power?" and *name ends with R* asking "Is water present?". Every B Dock slip
 is a target; L slips get one extra question, R slips the other.
 
 Rules are resolved into a fixed target list **at launch** (see below).
+
+### The template editor
+
+Settled by prototype on 2026-09-22 (branch `prototype/audit-rules`; three
+variants driven against real locations at 390 px and 1280 px).
+
+- **Two layouts by width**, one model. Above the mobile breakpoint the whole
+  tree is an **outline**: nested cards, each showing its conditions, its
+  questions, "narrows to 26 of 52", and a *narrow further* button, with the
+  live preview as a sticky right column. Below it, **one rule per screen**:
+  a breadcrumb of chips ("All · 547 › Location is under BH14 · 52 › Name
+  ends with l · 26") is the narrowing story, child rules are rows showing
+  "26 of 52" that open on tap, and the preview sits inline beneath. Past
+  three levels the breadcrumb collapses its middle to "…".
+- **Every rule has a colour**, assigned in tree order so siblings differ,
+  shown as a dot beside its description on its card, chip and row, and as a
+  coloured left edge. **Preview rows carry one dot per rule that selected
+  them**, at every width; a row with two dots is a Location two sibling
+  rules both ask about. Root rules add no dot unless there are several, since
+  one root would mark every row. Labelled pills were tried and rejected on
+  both widths: too wide for a phone, too busy for the desktop column.
+- **Hover, desktop only, in both directions.** Hovering a rule card dims the
+  preview rows it did not select, with a caption naming the rule. Hovering a
+  dot in the preview rings that rule's card in its colour and dims every
+  other branch; the card's ancestors stay lit because the card sits inside
+  them. Phones have no hover and get neither; the dots and the rule list as
+  legend carry the meaning.
+- **Counts always read "n of parent"**, never a bare n. That is what made
+  "a child narrows its parent" legible without explanation in every variant.
+- The **Location** value picker is a search picker, not a native select; a
+  marina has hundreds of containers.
+- A **Miller-columns** variant was the nicest desktop browser and had no
+  phone answer; rejected.
 
 ### Questions
 
