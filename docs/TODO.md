@@ -57,6 +57,16 @@ The code is on `beta2`; the remote still needs, in this order:
 - [ ] **One manual pass on beta2** with screenshots: launch, a finding from a
       phone, close, finalize.
 
+## Small things found in use
+
+- [ ] **No screen creates a Location Status.** `location_statuses` is a
+      lookup table the admin is meant to extend, but nothing in Admin adds a
+      row (`saveStatus` in `src/data/lookups.ts` has no caller). The marina's
+      table held only "Vacant" because the migration derived the list from the
+      statuses its locations actually used. The standard five were inserted by
+      hand on 2026-09-22; a Location Statuses editor under Location Types &
+      Locations is the real fix.
+
 ## Design questions to talk out
 
 - [ ] **Marina Zones.** Nearest-first ordering (manual check-in picker today,
