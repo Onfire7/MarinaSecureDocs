@@ -130,6 +130,78 @@ Location.
 An item that records an Asset's meter value, feeding that Asset's
 maintenance rules.
 
+## Audits
+
+**Audit**:
+A review of a set of Locations, launched by a User with permission to do so,
+worked in the field by the Users and Roles assigned to it, that reconciles
+what the system records with what is actually there. Never used alone for
+the Activity Log.
+_Avoid_: survey, walk, inspection, census
+
+**Occupancy Audit**:
+An Audit of who and what occupies each Location — the boat or vehicle
+present, and whether anyone is there at all.
+
+**Vacancy Audit**:
+An Occupancy Audit whose Audit Rules select only Locations recorded as
+vacant. Not a third kind of Audit.
+
+**Status Audit**:
+An Audit of the Locations themselves rather than their occupants: which
+Services and Amenities are present and working, whether the Location is
+correctly marked and mapped, and whether the marina delivers what it
+promises there.
+
+**Audit Template**:
+The reusable definition of an Audit: its kind (Occupancy or Status), its
+tree of Audit Rules, and the Audit Questions attached to them. Launching
+copies it onto the Audit, so edits made at launch never reach the Template.
+
+**Audit Rule**:
+A node in an Audit Template's tree that selects Locations by their type,
+ancestry, status, name, Services, Amenities, occupancy or audit history.
+A child Rule narrows its parent; the Audit Questions attached to a Rule are
+asked only of the Locations it selects.
+_Avoid_: location group, filter, scope
+
+**Audit Question**:
+A marina-defined question attached to an Audit Rule, answered per Location:
+Yes/No (optionally raising a Ticket on No), Choice, Text, or Meter Reading.
+The built-in questions of an Audit's kind are not Audit Questions.
+
+**Finding**:
+What one User recorded about one Location in one Audit: the built-in
+answers, the Audit Question answers, and any Proposals.
+_Avoid_: result, response, submission
+
+**Proposal**:
+A change recorded in a Finding that waits for approval when the Audit is
+finalized rather than applying at once: a new Location, a removal, a change
+to name, type, parent or map placement, a GPS coordinate, or the presence of
+a Service or Amenity.
+_Avoid_: pending change, request
+
+**Unexpected Occupancy**:
+A Finding that a Location is occupied with no current Lease or active
+Reservation on file, or vacant when one is.
+
+**Retired Location**:
+A Location whose removal an Audit approved. Hidden from pickers, maps and
+Audits; its history and attachments are kept. A Location with no history is
+deleted instead.
+
+**Service**:
+A fixed utility delivered at a Location — power of a given amperage, water,
+sewer — whether metered or not.
+_Avoid_: hookup, utility
+
+**Amenity**:
+An extra a Location offers beyond its Services — WiFi, a fire pit, a grill,
+a picnic table. A parent Location's Amenities apply to its children without
+being recorded on them.
+_Avoid_: feature, facility, extra
+
 ## Incidents, tickets & notes
 
 **Note**:
@@ -235,8 +307,9 @@ The end-of-shift summary compiled when a Shift ends, delivered to a
 marina-configured distribution list.
 
 **Activity Log**:
-The immutable, chronological audit trail generated as a byproduct of nearly
-every change.
+The immutable, chronological record of changes, generated as a byproduct of
+nearly every change.
+_Avoid_: audit trail, audit log (an Audit is a field review, not this)
 
 **Protected**:
 A flag on an Activity Log entry exempting it from the marina's retention

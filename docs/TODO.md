@@ -37,6 +37,16 @@ Verify each task against the deployment before moving on.
       in a chat transcript on 2026-08-07. Intentionally still live; tracked
       here so it stops being invisible.
 
+## Design questions to talk out
+
+- [ ] **Marina Zones.** Nearest-first ordering (manual check-in picker today,
+      audit sections once audits exist) uses straight-line distance, which
+      calls two locations "close" when they are across a channel from each
+      other and a ten-minute walk apart. Talk out a Zone concept — a
+      manager-drawn grouping of Locations that are reachable from one another
+      — so distance sorting is zone-first, then straight-line. Raised
+      2026-09-21 during the location audit design.
+
 ## Migration to Supabase + PowerSync
 
 Sequenced. See [ROADMAP Phase 4](ROADMAP.md) and
