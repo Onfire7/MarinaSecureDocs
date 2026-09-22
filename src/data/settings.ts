@@ -12,6 +12,8 @@ export interface MarinaSettingsRow {
   id: string;
   marina_name: string | null;
   gps_validation_radius_default: number | null;
+  audit_gps_radius: number | null;
+  audit_gps_accuracy: number | null;
   activity_log_retention_days: number | null;
   call_recording_enabled: number;
   call_transcription_enabled: number;
@@ -24,6 +26,10 @@ export interface MarinaSettings {
   id: string;
   marinaName: string;
   gpsValidationRadiusDefault: number;
+  /** Metres. An audit re-asks for coordinates when the device is farther than this. */
+  auditGpsRadius: number;
+  /** Metres. A GPS capture is refused when the device's accuracy is worse. */
+  auditGpsAccuracy: number;
   activityLogRetentionDays: number;
   callRecordingEnabled: boolean;
   callTranscriptionEnabled: boolean;
@@ -35,6 +41,8 @@ export interface MarinaSettings {
 const DEFAULTS: Omit<MarinaSettings, "id"> = {
   marinaName: "Marina",
   gpsValidationRadiusDefault: 50,
+  auditGpsRadius: 15,
+  auditGpsAccuracy: 10,
   activityLogRetentionDays: 30,
   callRecordingEnabled: false,
   callTranscriptionEnabled: false,
@@ -50,6 +58,8 @@ function toSettings(row: MarinaSettingsRow | undefined): MarinaSettings {
     marinaName: row.marina_name ?? DEFAULTS.marinaName,
     gpsValidationRadiusDefault:
       row.gps_validation_radius_default ?? DEFAULTS.gpsValidationRadiusDefault,
+    auditGpsRadius: row.audit_gps_radius ?? DEFAULTS.auditGpsRadius,
+    auditGpsAccuracy: row.audit_gps_accuracy ?? DEFAULTS.auditGpsAccuracy,
     activityLogRetentionDays:
       row.activity_log_retention_days ?? DEFAULTS.activityLogRetentionDays,
     callRecordingEnabled: bool(row.call_recording_enabled),
@@ -84,6 +94,8 @@ export async function saveMarinaSettings(
   changes: Partial<{
     marinaName: string;
     gpsValidationRadiusDefault: number;
+    auditGpsRadius: number;
+    auditGpsAccuracy: number;
     activityLogRetentionDays: number;
     callRecordingEnabled: boolean;
     callTranscriptionEnabled: boolean;
@@ -95,6 +107,8 @@ export async function saveMarinaSettings(
   await update(db, "marina_settings", id, {
     marina_name: changes.marinaName,
     gps_validation_radius_default: changes.gpsValidationRadiusDefault,
+    audit_gps_radius: changes.auditGpsRadius,
+    audit_gps_accuracy: changes.auditGpsAccuracy,
     activity_log_retention_days: changes.activityLogRetentionDays,
     call_recording_enabled:
       changes.callRecordingEnabled === undefined

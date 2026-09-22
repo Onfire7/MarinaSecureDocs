@@ -1,0 +1,20 @@
+# Rule tree editor
+
+Shared by the template page and the launch page. The decisions it embodies
+are recorded in `docs/audits.md` § The template editor; this file lists the
+commitments in code terms.
+
+- One model (`DraftRule[]`), two layouts by `useIsMobile()`: Outline (nested
+  cards, sticky preview column) and Drill-down (one rule per screen behind a
+  breadcrumb that collapses its middle past three levels).
+- A condition row is Subject · Verb · Value; the verb list depends on the
+  subject; negation is a verb. Rows after the first begin with the and/or
+  toggle. An incomplete condition is marked "(not counted until filled in)".
+- Location values use `LocationPicker` over the marina's containers.
+- Every rule has a palette colour in tree order: a dot beside its description,
+  a coloured left edge, and a dot on each preview row it selected (root rules
+  only when there is more than one root).
+- Desktop only: hovering a card dims preview rows it did not select, with a
+  caption; hovering a preview dot rings that rule's card and dims other
+  branches, keeping the card's ancestors lit.
+- Counts always read "n of parent".

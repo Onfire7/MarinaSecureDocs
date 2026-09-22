@@ -231,6 +231,7 @@ streams:
       - SELECT * FROM audits WHERE is_current = true
       - SELECT * FROM audit_assignees WHERE is_current = true
       - SELECT * FROM audit_targets WHERE is_current = true
+      - SELECT * FROM audit_target_questions WHERE is_current = true
       - SELECT * FROM audit_findings WHERE is_current = true
       - SELECT * FROM audit_finding_boats WHERE is_current = true
       - SELECT * FROM audit_finding_vehicles WHERE is_current = true

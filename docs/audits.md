@@ -374,6 +374,31 @@ days. **Finalize** enables when every Proposal has a decision, and requires
   for this Audit; any re-check is a new Audit launched by hand.
 - The Audit becomes **Finalized**.
 
+## Implementation notes
+
+Built 2026-09-22 on `beta2`. Where the code lives:
+
+- `src/lib/auditRules.ts`, `src/lib/audits.ts` — the pure decisions, fully
+  unit-tested.
+- `src/data/audits.ts`, `src/data/services.ts` — the data layer. Closing
+  and finalizing are RPCs (`close_audit`, `finalize_audit`); everything else
+  is a local write that syncs.
+- `src/pages/audits/` — the section, home, launch, detail/finalize and
+  Finding pages, and the rule-tree editor. `src/pages/admin/AdminServicesPage`
+  and `AdminAuditTemplatesPage`. `src/pages/locations/LocationServicesPanel`.
+- `supabase/migrations/20260922000{2,3,4}00_*.sql`; `supabase/tests/080_audits.sql`.
+- `scripts/e2e/audits.mjs` drives tests 35–42 of the approved list against
+  a running app.
+
+Two things this spec describes that the first build does **not** do yet:
+
+- *Is it placed correctly on the map? → No* records the answer but does not
+  open the map or create a `move_placement` Proposal. The finalize function
+  applies such a Proposal if one exists; nothing creates one yet.
+- The **displaced** flag lives on the target (`audit_targets.displaced_note`),
+  not on a placeholder Finding, so that writing it never marks the target
+  audited. The spec's "or a placeholder if none yet" is satisfied that way.
+
 ## Out of scope, recorded
 
 - Scheduling (rolling "x per night", random spot audits). Manual launch only.

@@ -97,6 +97,32 @@ function MarinaSettings() {
           </div>
 
           <div className="field">
+            <span className="field-label">Audit GPS radius (meters)</span>
+            <DraftNumberInput
+              className="input select-inline"
+              aria-label="Audit GPS radius"
+              value={settings.auditGpsRadius}
+              onCommit={(next) => next != null && update({ auditGpsRadius: next })}
+            />
+            <p className="muted small" style={{ marginTop: 4 }}>
+              An audit asks for new coordinates when the device is farther than this from a location's pin.
+            </p>
+          </div>
+
+          <div className="field">
+            <span className="field-label">Audit GPS accuracy limit (meters)</span>
+            <DraftNumberInput
+              className="input select-inline"
+              aria-label="Audit GPS accuracy limit"
+              value={settings.auditGpsAccuracy}
+              onCommit={(next) => next != null && update({ auditGpsAccuracy: next })}
+            />
+            <p className="muted small" style={{ marginTop: 4 }}>
+              A capture is refused when the phone's own accuracy is worse than this.
+            </p>
+          </div>
+
+          <div className="field">
             <span className="field-label">Activity Log retention (days)</span>
             <DraftNumberInput
               className="input select-inline"

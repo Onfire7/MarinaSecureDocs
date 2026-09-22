@@ -526,6 +526,9 @@ Field review of Locations against reality. Behaviour in
 | position | integer not null | Tree order at launch. |
 | state | audit_target_state not null | `pending` / `audited` / `not_audited`. |
 | not_audited_reason | text | `closed early`, `retired by Audit <name>`. |
+| displaced_note | text | "expected <boat>, found elsewhere", written by another Finding in the same audit that moved this target's occupant. On the target, not a Finding, so writing it never marks the target audited. |
+
+`audit_target_questions` — `target_id`, `question_id`, `position`: which questions the target is asked, fixed at launch like the list itself.
 
 #### `audit_findings` — Tier 0 · sync: through audit
 
@@ -541,7 +544,6 @@ One per target; a Finding with no target is a proposed new Location.
 | contact_id | → contacts | Optional occupant. |
 | unexpected_occupancy | boolean not null default false | Derived at save: `occupied` disagrees with the presence of a current Lease or `checked_in` Reservation. |
 | clearly_marked / mapped_correctly | boolean | Status kind. |
-| displaced_note | text | "expected <boat>, found elsewhere", written by another Finding in the same audit that moved the occupant. |
 
 Junctions: `audit_finding_boats`, `audit_finding_vehicles` (occupants
 recorded). `audit_finding_services` (`finding_id`, `service_id`, `present`,

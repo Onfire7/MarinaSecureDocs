@@ -37,6 +37,26 @@ Verify each task against the deployment before moving on.
       in a chat transcript on 2026-08-07. Intentionally still live; tracked
       here so it stops being invisible.
 
+## Shipping the audit system to beta2
+
+The code is on `beta2`; the remote still needs, in this order:
+
+- [ ] **Push the migrations** (`supabase db push`), then `pnpm run schema:check`
+      against the remote to confirm `schema.ts` matches.
+- [ ] **Re-apply the PowerSync sync rules** — `powersync/config/sync-config.yaml`
+      gained the services, amenities and audit tables and an `audits` stream.
+      A dashboard field: `scripts/finish-powersync-cutover.sh`'s sync-rules
+      stage covers it.
+- [ ] **Grant `manage_audits`** to whichever role launches audits (Admin, at
+      least), in Roles & Permissions. No seeded role holds it; without it the
+      Audits section shows only assigned targets and Admin hides the
+      template page.
+- [ ] **Create the Services and Amenities catalogue** and mark which types
+      each is valid for. Empty catalogues make every status audit ask nothing
+      but "marked?" and "mapped?".
+- [ ] **One manual pass on beta2** with screenshots: launch, a finding from a
+      phone, close, finalize.
+
 ## Design questions to talk out
 
 - [ ] **Marina Zones.** Nearest-first ordering (manual check-in picker today,

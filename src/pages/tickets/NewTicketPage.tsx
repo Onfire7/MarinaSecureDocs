@@ -13,6 +13,9 @@ import { useTicketStatuses } from "../../data/lookups";
 // raising a linked ticket (sourceIncidentId is never user-editable).
 export interface NewTicketState {
   target?: AttachmentTarget;
+  /** Raised from an audit finding, or against a proposed new location. */
+  sourceFindingId?: string | null;
+  proposalId?: string | null;
   sourceIncidentId?: string;
   title?: string;
   description?: string;
@@ -49,6 +52,8 @@ export function NewTicketPage() {
         target,
         statusId: openStatus.id,
         sourceIncidentId: state.sourceIncidentId,
+        sourceFindingId: state.sourceFindingId,
+        proposalId: state.proposalId,
       },
       current.user?.id ?? null,
     );

@@ -6,6 +6,7 @@ import { useCheckpointByGuid, type CheckpointRow } from "../../data/checkpoints"
 import { NoteDialog } from "../shared/NoteDialog";
 import { useCheckpointVisit } from "./useCheckpointVisit";
 import { ChecklistItemsPanel } from "./ActiveChecklistPage";
+import { AuditsSection } from "../audits/AuditsSection";
 
 const IDLE_TIMEOUT_MS = 10 * 60_000;
 
@@ -119,6 +120,14 @@ export function CheckpointCheckinView({
         <GpsPill status={visit.gpsStatus} />
       </div>
       <div className="page-sub">{checkpoint.location_name}</div>
+
+      {/* Audit targets at or under this checkpoint's location, above every
+          checklist section (docs/audits.md § Where an Audit appears). */}
+      {checkpoint.location_id && (
+        <div style={{ marginTop: 12 }}>
+          <AuditsSection underLocationId={checkpoint.location_id} />
+        </div>
+      )}
 
       <div className="section-title" style={{ marginTop: 16 }}>
         Applicable now

@@ -33,6 +33,8 @@ export interface LocationRow {
   gps_lat: number | null;
   gps_lng: number | null;
   retired_at: string | null;
+  last_occupancy_audit_at: string | null;
+  last_status_audit_at: string | null;
   /** Joined for display. */
   type_name: string;
   tracks_status: number;

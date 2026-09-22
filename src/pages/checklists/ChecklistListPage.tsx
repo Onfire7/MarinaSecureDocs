@@ -15,6 +15,7 @@ import { useRoleIdsFor } from "../../data/users";
 import { useTours, useTourCheckpoints } from "../../data/checkpoints";
 import { ManualCheckinDialog } from "./ManualCheckinDialog";
 import { TourSection } from "./TourSection";
+import { AuditsSection } from "../audits/AuditsSection";
 import { useShiftVisits } from "./useShiftVisits";
 
 // Checklists & Tours — Checklist List (see pages/checklist-list.html).
@@ -207,6 +208,10 @@ export function ChecklistListPage() {
           </button>
         </div>
       </div>
+
+      {/* Audit targets assigned to this user, above the checklists
+          (docs/audits.md § Where an Audit appears). */}
+      <AuditsSection />
 
       {nothingToStart && (
         <div className="badge badge-warn" style={{ display: "block", marginBottom: 10 }}>

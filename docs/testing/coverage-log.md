@@ -30,6 +30,8 @@ specification for the `effective_permissions` SQL view that replaces it (see
 | File | Note |
 |---|---|
 | `data/activity.ts` | Feed queries + the activity write. |
+| `data/audits.ts` | Templates, launch, findings, proposals, and the two RPCs. The decisions it makes are in `lib/audits.ts` and `lib/auditRules.ts`, which are fully covered; the transaction itself is exercised by `scripts/e2e/audits.mjs`. |
+| `data/services.ts` | Services and Amenities catalogue, per-location rows, meter readings. |
 | `data/boats.ts` | Boats, vehicles, their owners, and moving one. |
 | `data/checkins.ts` | Check-in queries and the write. |
 | `data/checklists.ts` | Templates, instances, and the submit transaction. |

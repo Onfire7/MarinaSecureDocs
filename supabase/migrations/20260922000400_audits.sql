@@ -109,11 +109,29 @@ create table audit_targets (
   position           integer not null default 0,
   state              audit_target_state not null default 'pending',
   not_audited_reason text,
+  -- "expected <boat>, found elsewhere": written by another finding in the
+  -- same audit that moved this target's occupant, before this target has a
+  -- finding of its own. On the target, not the finding, so writing it never
+  -- creates a finding (which would mark the target audited).
+  displaced_note     text,
   is_current         boolean not null default true,
   unique (audit_id, location_id)
 );
 create index audit_targets_audit_idx    on audit_targets (audit_id, position);
 create index audit_targets_location_idx on audit_targets (location_id);
+
+-- Which questions a target is asked, fixed at launch like the target list:
+-- a location whose attributes change mid-audit keeps the questions it was
+-- launched with.
+create table audit_target_questions (
+  id          uuid primary key default gen_random_uuid(),
+  target_id   uuid not null references audit_targets(id) on delete cascade,
+  question_id uuid not null references audit_questions(id) on delete cascade,
+  position    integer not null default 0,
+  is_current  boolean not null default true,
+  unique (target_id, question_id)
+);
+create index audit_target_questions_target_idx on audit_target_questions (target_id);
 
 create table audit_findings (
   id                   uuid primary key default gen_random_uuid(),
@@ -129,9 +147,6 @@ create table audit_findings (
   unexpected_occupancy boolean not null default false,
   clearly_marked       boolean,
   mapped_correctly     boolean,
-  -- "expected <boat>, found elsewhere", written by another finding in the
-  -- same audit that moved the occupant.
-  displaced_note       text,
   is_current           boolean not null default true
 );
 create index audit_findings_audit_idx on audit_findings (audit_id);
@@ -233,7 +248,7 @@ end $$;
 -- finalized audits' findings, and that must not read as a late edit.
 create trigger audit_findings_guard before insert or update of
     audit_id, target_id, recorded_by_id, occupied, contact_id, unexpected_occupancy,
-    clearly_marked, mapped_correctly, displaced_note
+    clearly_marked, mapped_correctly
   on audit_findings
   for each row execute function public.audit_finding_guard();
 
@@ -274,7 +289,8 @@ do $$
 declare t text;
 begin
   foreach t in array array['audit_templates','audits','audit_rules','audit_questions','audit_assignees',
-                           'audit_targets','audit_findings','audit_finding_boats','audit_finding_vehicles',
+                           'audit_targets','audit_target_questions',
+                           'audit_findings','audit_finding_boats','audit_finding_vehicles',
                            'audit_finding_services','audit_finding_amenities','audit_finding_answers',
                            'audit_proposals']
   loop
@@ -283,7 +299,8 @@ begin
   end loop;
 
   -- Templates, launches, assignment and the target list: manage_audits.
-  foreach t in array array['audit_templates','audits','audit_rules','audit_questions','audit_assignees','audit_targets']
+  foreach t in array array['audit_templates','audits','audit_rules','audit_questions','audit_assignees',
+                           'audit_targets','audit_target_questions']
   loop
     execute format($f$
       create policy audits_write on public.%I for all
@@ -320,6 +337,14 @@ begin
     $f$, t);
   end loop;
 end $$;
+
+-- A finding that moves an occupant flags the target it left. Any active
+-- user may set that one column on a pending target of an open audit; the
+-- rest of the row stays manage_audits.
+create policy targets_displaced_note on audit_targets for update
+  using (public.is_active_marina_user()
+         and exists (select 1 from audits a where a.id = audit_id and a.status = 'open'))
+  with check (public.is_active_marina_user());
 
 -- Proposals: the author writes them while the audit is open; a decider
 -- changes them afterwards, and a structural one only with manage_locations.
@@ -493,6 +518,17 @@ begin
     end if;
   end loop;
 
+  -- Stamp every location this audit actually looked at.
+  if a.kind = 'occupancy' then
+    update locations l set last_occupancy_audit_at = now()
+      from audit_targets t join audit_findings f on f.target_id = t.id
+     where t.audit_id = p_audit and l.id = t.location_id;
+  else
+    update locations l set last_status_audit_at = now()
+      from audit_targets t join audit_findings f on f.target_id = t.id
+     where t.audit_id = p_audit and l.id = t.location_id;
+  end if;
+
   update audits set status = 'finalized', finalized_at = now(), finalized_by_id = me where id = p_audit;
 end $$;
 
@@ -500,6 +536,16 @@ revoke execute on function public.close_audit(uuid)    from public, anon;
 revoke execute on function public.finalize_audit(uuid) from public, anon;
 grant  execute on function public.close_audit(uuid)    to authenticated;
 grant  execute on function public.finalize_audit(uuid) to authenticated;
+
+-- The activity log may now name an audit as its subject.
+alter table activity_log_entries drop constraint activity_log_entries_subject_type_check;
+alter table activity_log_entries
+  add constraint activity_log_entries_subject_type_check
+  check (subject_type in (
+    'assets', 'boats', 'calls', 'check_ins', 'checklist_instances', 'contacts',
+    'incidents', 'leases', 'locations', 'notes', 'reservations', 'roles',
+    'shifts', 'sms_threads', 'tickets', 'users', 'vehicles', 'audits'
+  ));
 
 -- ── sync scope ────────────────────────────────────────────────────────────
 
@@ -516,6 +562,8 @@ begin
    where a.id = x.audit_id and x.is_current is distinct from a.is_current;
   update audit_targets x set is_current = a.is_current from audits a
    where a.id = x.audit_id and x.is_current is distinct from a.is_current;
+  update audit_target_questions x set is_current = t.is_current from audit_targets t
+   where t.id = x.target_id and x.is_current is distinct from t.is_current;
   update audit_findings x set is_current = a.is_current from audits a
    where a.id = x.audit_id and x.is_current is distinct from a.is_current;
   update audit_finding_boats x set is_current = f.is_current from audit_findings f

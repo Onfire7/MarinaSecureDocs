@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { useInstance } from "../../data/checklists";
 import { ActiveChecklistPage } from "./ActiveChecklistPage";
 import { ChecklistDetailPage } from "./ChecklistDetailPage";
+import { AuditsSection } from "../audits/AuditsSection";
 
 // A Checklist's own status decides which screen opens it — Not Started /
 // In Progress goes to the interactive Active Checklist, Complete goes to the
@@ -31,5 +32,15 @@ export function ChecklistRoute() {
       </div>
     );
   }
-  return status === "complete" ? <ChecklistDetailPage /> : <ActiveChecklistPage />;
+  // The Audits section sits ABOVE every checklist section so it cannot be
+  // missed (docs/audits.md § Where an Audit appears). It reports; it never
+  // gates the checklist below it.
+  return status === "complete" ? (
+    <ChecklistDetailPage />
+  ) : (
+    <>
+      <AuditsSection />
+      <ActiveChecklistPage />
+    </>
+  );
 }

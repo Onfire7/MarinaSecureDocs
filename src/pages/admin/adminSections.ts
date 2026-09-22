@@ -39,6 +39,18 @@ export const ADMIN_SECTIONS: AdminSection[] = [
     requires: "manage_locations",
   },
   {
+    path: "/admin/services",
+    label: "Services & Amenities",
+    description: "What locations provide, and which types each is valid for",
+    requires: "manage_locations",
+  },
+  {
+    path: "/admin/audit-templates",
+    label: "Audit Templates",
+    description: "Rule trees and questions for occupancy and status audits",
+    requires: "manage_audits",
+  },
+  {
     path: "/admin/setup",
     label: "Marina Setup Wizard",
     description: "Build out docks and their slips, checkpoints, and a tour in one pass",

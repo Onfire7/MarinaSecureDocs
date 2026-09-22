@@ -37,7 +37,8 @@ export type SubjectType =
   | "sms_threads"
   | "tickets"
   | "users"
-  | "vehicles";
+  | "vehicles"
+  | "audits";
 
 /**
  * Per-entry visibility: an entry shows only if the subject's own governing
@@ -77,6 +78,7 @@ export const SUBJECT_LABEL: Record<SubjectType, string> = {
   tickets: "Ticket",
   users: "User",
   vehicles: "Vehicle",
+  audits: "Audit",
 };
 
 export function subjectLabel(subjectType: string): string {
@@ -109,6 +111,8 @@ export function subjectPath(
       return `/contacts/${subjectId}`;
     case "leases":
       return `/contacts/leases/${subjectId}`;
+    case "audits":
+      return `/audits/${subjectId}`;
     default:
       // Check-ins, notes, shifts, users, roles, calls and SMS threads have no
       // standalone detail route of their own.

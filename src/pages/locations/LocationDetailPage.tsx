@@ -20,6 +20,7 @@ import {
   useLocations,
 } from "../../data/locations";
 import { useLocationStatuses } from "../../data/lookups";
+import { LocationServicesPanel } from "./LocationServicesPanel";
 import { useCheckpointsForLocation } from "../../data/checkpoints";
 import { useNotesForTarget } from "../../data/notes";
 import { useIncidentsForTarget } from "../../data/incidents";
@@ -243,6 +244,8 @@ export function LocationDetailPage() {
               </div>
             </div>
           )}
+
+          <LocationServicesPanel locationId={location.id} typeId={location.location_type_id} />
 
           {current.can("view_lease") && (
             <div className="field">

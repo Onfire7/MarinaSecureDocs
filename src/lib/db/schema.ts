@@ -263,7 +263,6 @@ const audit_findings = new Table(
     unexpected_occupancy: column.integer,
     clearly_marked: column.integer,
     mapped_correctly: column.integer,
-    displaced_note: column.text,
     is_current: column.integer,
   },
   {
@@ -334,6 +333,21 @@ const audit_rules = new Table(
   },
 );
 
+const audit_target_questions = new Table(
+  {
+    target_id: column.text,
+    question_id: column.text,
+    position: column.integer,
+    is_current: column.integer,
+  },
+  {
+    indexes: {
+      by_question_id: ["question_id"],
+      by_target_id: ["target_id"],
+    },
+  },
+);
+
 const audit_targets = new Table(
   {
     audit_id: column.text,
@@ -342,6 +356,7 @@ const audit_targets = new Table(
     position: column.integer,
     state: column.text,
     not_audited_reason: column.text,
+    displaced_note: column.text,
     is_current: column.integer,
   },
   {
@@ -977,6 +992,8 @@ const locations = new Table(
     gps_lat: column.real,
     gps_lng: column.real,
     retired_at: column.text,
+    last_occupancy_audit_at: column.text,
+    last_status_audit_at: column.text,
   },
   {
     indexes: {
@@ -1425,6 +1442,7 @@ export const AppSchema = new Schema({
   audit_proposals,
   audit_questions,
   audit_rules,
+  audit_target_questions,
   audit_targets,
   audit_templates,
   audits,
@@ -1515,6 +1533,7 @@ export const TABLE_NAMES = [
   "audit_proposals",
   "audit_questions",
   "audit_rules",
+  "audit_target_questions",
   "audit_targets",
   "audit_templates",
   "audits",

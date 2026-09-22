@@ -13,6 +13,7 @@ export const NAV_SECTIONS: NavSection[] = [
   { path: "/", label: "Home", icon: "⌂" },
   { path: "/checklists", label: "Checklists", icon: "☑" },
   { path: "/locations", label: "Locations", icon: "⚓" },
+  { path: "/audits", label: "Audits", icon: "🔍" },
   { path: "/comms", label: "Comms", icon: "☎" },
   { path: "/tickets", label: "Tickets", icon: "🔧" },
   {

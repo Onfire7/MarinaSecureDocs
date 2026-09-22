@@ -31,6 +31,14 @@ alter table locations drop column current_vehicle_id;
 alter table locations add column retired_at timestamptz;
 create index locations_retired_idx on locations (id) where retired_at is not null;
 
+-- When a finalized audit last recorded a finding here, per kind. Kept on the
+-- always-synced location row because the audits themselves leave a device
+-- 30 days after finalize, and the "last audited before" rule has to work
+-- against a year of history, offline.
+alter table locations
+  add column last_occupancy_audit_at timestamptz,
+  add column last_status_audit_at    timestamptz;
+
 alter table marina_settings
   add column audit_gps_radius   integer not null default 15,
   add column audit_gps_accuracy integer not null default 10;
