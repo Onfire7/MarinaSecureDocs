@@ -67,12 +67,6 @@ function Catalogues() {
   return (
     <div>
       <AdminHeader title="Services & Amenities" />
-      <p className="muted" style={{ marginBottom: 16 }}>
-        A <b>Service</b> is a fixed utility (30A power, water, sewer); an <b>Amenity</b> is an extra (WiFi, a fire pit).
-        Tap the location types each one is valid for. What a specific location actually has is set on that location,
-        or by an approved audit.
-      </p>
-
       <div className="section-title">Services</div>
       <div className="row" style={{ marginBottom: 12 }}>
         <input
