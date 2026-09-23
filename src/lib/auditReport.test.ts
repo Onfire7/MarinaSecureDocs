@@ -177,6 +177,13 @@ describe("narrative", () => {
       "2 tickets raised, 1 still open.",
     ]);
   });
+  it("3c · findings all on one day say 'on', not 'between … and …'", () => {
+    const sameDay = {
+      ...statusAudit,
+      targets: statusAudit.targets.map((t) => ({ ...t, finding: t.finding && { ...t.finding, recordedAt: "2026-09-20T15:00:00Z" } })),
+    };
+    expect(narrative(sameDay, summarize(sameDay))[0]).toMatch(/audited by Alice and Bob on Sep 20, 2026; 1 was not reached/);
+  });
   it("3b · an open audit's not-reached count carries no 'before the audit closed'", () => {
     const open = { ...statusAudit, audit: { ...statusAudit.audit, status: "open" as const } };
     expect(narrative(open, summarize(open))[0]).toMatch(/1 was not reached\.$/);

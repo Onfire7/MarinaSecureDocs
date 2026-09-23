@@ -242,7 +242,12 @@ export function summarize(r: AuditReport): Summary {
 export function narrative(r: AuditReport, s: Summary): string[] {
   const out: string[] = [];
   const who = s.auditors.length ? ` by ${list(s.auditors)}` : "";
-  const when = s.firstFinding && s.lastFinding ? ` between ${fmtDate(s.firstFinding)} and ${fmtDate(s.lastFinding)}` : "";
+  const when =
+    s.firstFinding && s.lastFinding
+      ? fmtDate(s.firstFinding) === fmtDate(s.lastFinding)
+        ? ` on ${fmtDate(s.firstFinding)}`
+        : ` between ${fmtDate(s.firstFinding)} and ${fmtDate(s.lastFinding)}`
+      : "";
   const notReached = s.notAudited
     ? `; ${s.notAudited} ${s.notAudited === 1 ? "was" : "were"} not reached${r.audit.status !== "open" ? " before the audit closed" : ""}.`
     : ".";
