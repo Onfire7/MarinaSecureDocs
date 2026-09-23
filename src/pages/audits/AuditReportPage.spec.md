@@ -15,11 +15,15 @@ itself commits to.
 - **Three states.** *Assembling the report…* while the fetch is out; the
   report; or the neutral *This report link is no longer active* page for a
   null result - expired, revoked and unknown keys are indistinguishable here.
-- **Layout, top to bottom**: header, headline tiles, then a three-card band
-  (executive summary with coverage bar; services present / not working or
-  occupancy found; questions), the *Needs attention* card, the tab row with
-  filters, the table. Tiles wrap to two per row on a phone; the band stacks;
-  the attention list is two columns above 900px and one below.
+- **Layout, top to bottom** (settled by prototype D, second cut): a
+  letterhead - marina and kind on top, the audit name, the status and dates,
+  with *launched by / audited by / as of* and *Export…* on the right, ruled
+  off underneath; *Executive summary* as prose, first sentence larger, no
+  wider than ~900px; the tile row; the three-card band (coverage bar;
+  services present / not working, or occupancy found; questions); *Needs
+  attention* as a list; *Results* with the tab row, filters and table. Tiles
+  wrap to two per row on a phone and the band stacks; the letterhead's right
+  column left-aligns under 600px.
 - **Per location is the default tab**; the filter row (state select, search)
   applies to both tabs and to every export. The wide table scrolls
   horizontally with its first column pinned; column headers longer than

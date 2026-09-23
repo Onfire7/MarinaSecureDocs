@@ -464,19 +464,22 @@ Link, or - later - attached to an email. It contains, in order:
    awaiting decisions* / *Finalized*), launched / closed / finalized dates,
    who audited, and either *as of &lt;time&gt;* (Closed) or *finalized
    &lt;date&gt;* (Finalized).
-2. **Headline numbers.** Audited (percent, n of N); *Not working* services
-   (Status) or *Unexpected* occupancy (Occupancy); locations that *Need
-   attention*; Changes (n, approved, undecided); Tickets (raised, open).
-3. **Executive summary.** Sentences, not numbers - the paragraph a manager
-   would otherwise have to write: who audited how many of what between which
-   dates and how many were not reached; what was found not working, by
-   service; signage and mapping; changes proposed and their decisions;
-   tickets raised and open. For an Occupancy Audit: occupied, vacant, and
-   how many did not match the file. Under it, a coverage bar (audited / not
-   audited / pending, every segment labelled).
-4. **Charts.** Status: per-service *present* counts and, when any, *not
-   working*; each Question's tally. Occupancy: occupied / vacant; each
-   Question's tally. Single-hue bars, value at the tip - never a pie.
+2. **Executive summary.** Sentences, not numbers - the paragraph a manager
+   would otherwise have to write, set as prose under the header, not in a
+   card: who audited how many of what between which dates and how many
+   were not reached; what was found not working, by service; signage and
+   mapping; changes proposed and their decisions; tickets raised and open.
+   For an Occupancy Audit: occupied, vacant, and how many did not match
+   the file.
+3. **Headline numbers.** A row of tiles: Locations; Audited (percent, n of
+   N); *Not working* services (Status) or *Unexpected* occupancy
+   (Occupancy); locations that *Need attention*; Changes (n, approved,
+   undecided); Tickets open (of raised).
+4. **Charts**, a band of three cards. Coverage: a bar (audited / not
+   audited / pending, every segment labelled). Status: per-service
+   *present* counts and, when any, *not working*. Occupancy: occupied /
+   vacant. Then each Question's tally. Single-hue bars, value at the tip -
+   never a pie.
 5. **Needs attention.** One line per Location, in tree order: what is wrong
    there, in words. A Location needs attention when any of: a Service
    present but not working (with its note); *clearly marked* = No; *placed
