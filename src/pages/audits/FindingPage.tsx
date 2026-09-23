@@ -109,12 +109,27 @@ function FindingForm({
   const { finding } = useFinding(target?.finding_id ?? undefined);
   const isAuthor = !finding || finding.recorded_by_id === current.user?.id;
   const editable = !readOnly && isAuthor;
-  const { data: fBoats } = useFindingBoats(finding?.id);
-  const { data: fVehicles } = useFindingVehicles(finding?.id);
-  const { data: fServices } = useFindingServices(finding?.id);
-  const { data: fAmenities } = useFindingAmenities(finding?.id);
-  const { data: fAnswers } = useFindingAnswers(finding?.id);
-  const { data: fProposals } = useProposalsForFinding(finding?.id);
+  const partBoats = useFindingBoats(finding?.id);
+  const partVehicles = useFindingVehicles(finding?.id);
+  const partServices = useFindingServices(finding?.id);
+  const partAmenities = useFindingAmenities(finding?.id);
+  const partAnswers = useFindingAnswers(finding?.id);
+  const partProposals = useProposalsForFinding(finding?.id);
+  const fBoats = partBoats.data;
+  const fVehicles = partVehicles.data;
+  const fServices = partServices.data;
+  const fAmenities = partAmenities.data;
+  const fAnswers = partAnswers.data;
+  const fProposals = partProposals.data;
+  // These six queries are keyed on finding.id. On the render where the
+  // finding row first arrives they have only just been re-pointed: PowerSync
+  // keeps `isLoading` false and the previous (empty) `data` across a
+  // parameter change and flips `isFetching` instead. Seeding on that render
+  // filled the form from empty arrays and locked it — a reopened finding
+  // showed no occupants, services, answers or proposals.
+  const partsSettled = [partBoats, partVehicles, partServices, partAmenities, partAnswers, partProposals].every(
+    (q) => !q.isLoading && !q.isFetching,
+  );
 
   const { data: questions } = useTargetQuestions(target?.id);
   const { statuses } = useLocationStatuses();
@@ -177,7 +192,8 @@ function FindingForm({
   // Seed from the location's current state, or the existing finding, once.
   useEffect(() => {
     if (seeded) return;
-    if (target && target.finding_id && !finding) return; // wait for it
+    if (target && target.finding_id && !finding) return; // wait for the row
+    if (finding && !partsSettled) return; // and then for its parts
     const s: typeof svc = {};
     for (const v of validServices) {
       const cur = currentServices.find((c) => c.service_id === v.id);
@@ -253,7 +269,7 @@ function FindingForm({
       }
     }
     setSeeded(true);
-  }, [seeded, target, finding, validServices, validAmenities, validAttributes, currentServices, currentAmenities, currentAttributes, fServices, fAmenities, fBoats, fVehicles, fAnswers, fProposals, services.length, amenities.length, attributes.length, serviceValidity.length, amenityValidity.length, attributeValidity.length, locations.length]);
+  }, [seeded, target, finding, partsSettled, validServices, validAmenities, validAttributes, currentServices, currentAmenities, currentAttributes, fServices, fAmenities, fBoats, fVehicles, fAnswers, fProposals, services.length, amenities.length, attributes.length, serviceValidity.length, amenityValidity.length, attributeValidity.length, locations.length]);
 
   // Expected occupancy from what is on file.
   const now = Date.now();
@@ -551,22 +567,24 @@ function FindingForm({
           )}
           {showMap && (
             <div className="field">
-              <span className="field-label">Is it placed correctly on the map?</span>
+              {/* The answer sits beside the question, not under the map: the
+                  map is tall, and the buttons were out of sight by then. */}
+              <div className="row" style={{ alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
+                <span className="field-label" style={{ marginBottom: 0 }}>Is it placed correctly on the map?</span>
+                {yesNo(mappedCorrectly, setMappedCorrectly)}
+              </div>
               {target?.location_id && (
-                <div style={{ marginBottom: 8 }}>
-                  <PlacementCheck
-                    locationId={target.location_id}
-                    locationName={target.location_name}
-                    editable={editable}
-                    proposed={placement}
-                    onPropose={(p) => {
-                      setPlacement(p);
-                      if (p) setMappedCorrectly(false);
-                    }}
-                  />
-                </div>
+                <PlacementCheck
+                  locationId={target.location_id}
+                  locationName={target.location_name}
+                  editable={editable}
+                  proposed={placement}
+                  onPropose={(p) => {
+                    setPlacement(p);
+                    if (p) setMappedCorrectly(false);
+                  }}
+                />
               )}
-              {yesNo(mappedCorrectly, setMappedCorrectly)}
             </div>
           )}
         </div>

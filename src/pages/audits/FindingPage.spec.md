@@ -32,11 +32,21 @@ itself commits to.
   readings for metered services. It then returns to the audit.
 - **Read only** when the audit is not open, or the finding belongs to someone
   else. A colleague who disagrees uses *+ Note*.
+- **Reopening a finding restores everything it recorded** — occupants,
+  services, amenities, attributes, answers, the placement and GPS
+  proposals. The form seeds only once, and only after the finding row *and*
+  all six of its part queries have settled (`isLoading` and `isFetching`
+  both false); a parameter change on a PowerSync query keeps the previous
+  empty data and does not flip `isLoading`, which is what once made a
+  reopened finding come up blank.
 - **The map is shown** under *placed correctly on the map?*: the map the
   location is plotted on with its rectangle highlighted and the rest muted, or
   its nearest ancestor's map when it is plotted nowhere. *Move it on the map*
   (or *Place it*) arms a tap on the image; the tap becomes a `move_placement`
-  Proposal drawn in amber, and answers the question No. *Adjust the label*
+  Proposal drawn in amber with the location's plain name (no "(proposed)"
+  suffix, so the label is the size the finished map will show), and answers
+  the question No. The Yes/No buttons sit beside the question, above the
+  map, not below it. *Adjust the label*
   opens the same four sliders the admin map editor has (font size, padding,
   rotation) on the proposed placement, and *Move again* re-arms the tap, so a
   wrong label can be put right from the field, not only reported.

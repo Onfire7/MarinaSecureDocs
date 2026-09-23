@@ -87,7 +87,7 @@ export function PlacementCheck({
     <div>
       <div className="row" style={{ marginBottom: 6, alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <span className="muted small">
-          {own ? `Plotted on ${map.scope_name ?? map.name}` : `Not plotted on any map. Showing ${map.scope_name ?? map.name}.`}
+          {own ? `Plotted on ${map.scope_name ?? map.name}` : "Not plotted on any map."}
         </span>
         {maps.length > 1 && editable && (
           <select className="select select-inline" value={map.id} onChange={(e) => setChosenMapId(e.target.value)}>
@@ -117,6 +117,7 @@ export function PlacementCheck({
                 opacity: mine ? (dimmed ? 0.35 : 1) : 0.45,
                 background: mine ? "var(--accent-soft)" : "var(--panel)",
                 borderColor: mine ? "var(--accent)" : "var(--line)",
+                borderWidth: 1,
                 color: "var(--ink)",
                 fontWeight: mine ? 700 : 400,
                 pointerEvents: "none",
@@ -133,12 +134,17 @@ export function PlacementCheck({
               ...placementStyle(proposed.placement),
               background: "var(--warn-bg)",
               borderColor: "var(--warn)",
+              borderWidth: 1,
               color: "var(--ink)",
               fontWeight: 700,
               pointerEvents: "none",
             }}
+            title="Proposed placement — waits for approval"
           >
-            {locationName} (proposed)
+            {/* No "(proposed)" suffix: the amber colour already says so, and
+                the suffix widened the label past what the finished map will
+                actually show. */}
+            {locationName}
           </span>
         )}
       </div>
