@@ -66,46 +66,54 @@ export function VariantD({ r }: { r: AuditReport }) {
     );
 
   return (
-    <div className="rp-dash">
-      <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
+    <div className="rp-dash rp-report">
+      <div className="rp-letterhead">
         <div>
-          <div className="muted small">{r.marinaName} · {s.kind === "occupancy" ? "Occupancy" : "Status"} audit report</div>
-          <h1 className="page-title" style={{ fontSize: "1.5rem" }}>{r.audit.name}</h1>
-          <div className="muted small">
-            <Tone tone={s.status === "finalized" ? "good" : s.status === "closed" ? "warn" : "none"}>{statusWord(s.status)}</Tone>
-            {" "}· launched {fmtDate(r.audit.launched_at)}
+          <div className="muted small" style={{ textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 650 }}>
+            {r.marinaName} · {s.kind === "occupancy" ? "Occupancy" : "Status"} audit report
+          </div>
+          <h1>{r.audit.name}</h1>
+          <div className="muted">
+            {statusWord(s.status)} · launched {fmtDate(r.audit.launched_at)}
             {r.audit.closed_at ? ` · closed ${fmtDate(r.audit.closed_at)}` : ""}
-            {r.audit.finalized_at ? ` · finalized ${fmtDate(r.audit.finalized_at)}` : ` · as of ${fmtDateTime(r.asOf)}`}
-            {s.auditors.length ? ` · audited by ${s.auditors.join(", ")}` : ""}
+            {r.audit.finalized_at ? ` · finalized ${fmtDate(r.audit.finalized_at)}` : ""}
           </div>
         </div>
-        <div className="row rp-noprint" style={{ gap: 6, position: "relative" }}>
-          <button type="button" className="btn btn-sm btn-primary" onClick={() => setExportOpen(!exportOpen)}>
-            Export…
-          </button>
-          {exportOpen && <ExportDialog onClose={() => setExportOpen(false)} wideCsv={wideCsv} itemCsv={itemCsv} auditName={r.audit.name} />}
+        <div className="muted small" style={{ textAlign: "right" }}>
+          {r.launchedBy && <div>Launched by {r.launchedBy}</div>}
+          {s.auditors.length > 0 && <div>Audited by {s.auditors.join(", ")}</div>}
+          <div>{r.audit.finalized_at ? `Finalized ${fmtDate(r.audit.finalized_at)}` : `As of ${fmtDateTime(r.asOf)}`}</div>
+          <div className="row rp-noprint" style={{ gap: 6, justifyContent: "flex-end", marginTop: 8, position: "relative" }}>
+            <button type="button" className="btn btn-sm btn-primary" onClick={() => setExportOpen(!exportOpen)}>
+              Export…
+            </button>
+            {exportOpen && <ExportDialog onClose={() => setExportOpen(false)} wideCsv={wideCsv} itemCsv={itemCsv} auditName={r.audit.name} />}
+          </div>
         </div>
       </div>
 
-      <div className="rp-kpis" style={{ marginTop: 14 }}>
-        <Kpi label="Audited" value={`${s.coveragePct}%`} sub={`${s.audited} of ${s.targets} locations`} />
+      <h2>Executive summary</h2>
+      <div style={{ maxWidth: 900 }}>
+        {sentences.map((t, i) => (
+          <p key={i} className={i === 0 ? "lede" : undefined}>
+            {t}
+          </p>
+        ))}
+      </div>
+
+      <div className="rp-kpis" style={{ marginTop: 18 }}>
+        <Kpi label="Locations" value={s.targets} />
+        <Kpi label="Audited" value={`${s.coveragePct}%`} sub={`${s.audited} of ${s.targets}`} />
         {s.kind === "status" ? <Kpi label="Not working" value={s.broken.length} sub="services" /> : <Kpi label="Unexpected" value={s.unexpected.length} sub="occupancy not on file" />}
         <Kpi label="Need attention" value={attn.length} sub="locations" />
         <Kpi label="Changes" value={s.proposals.total} sub={`${s.proposals.approved} approved${s.proposals.undecided ? ` · ${s.proposals.undecided} undecided` : ""}`} />
-        <Kpi label="Tickets" value={s.tickets.total} sub={`${s.tickets.open} open`} />
+        <Kpi label="Tickets open" value={s.tickets.open} sub={`of ${s.tickets.total} raised`} />
       </div>
 
       <div className="rp-dash-grid">
         <div className="card">
-          <div className="card-kicker"><span>Executive summary</span></div>
-          {sentences.map((t, i) => (
-            <p key={i} style={{ margin: "0 0 6px", fontSize: i === 0 ? "1rem" : "0.92rem" }}>
-              {t}
-            </p>
-          ))}
-          <div style={{ marginTop: 8 }}>
-            <CoverageBar s={s} />
-          </div>
+          <div className="card-kicker"><span>Coverage</span></div>
+          <CoverageBar s={s} />
         </div>
         {s.kind === "status" ? (
           <>
@@ -148,25 +156,27 @@ export function VariantD({ r }: { r: AuditReport }) {
                   <HBars rows={[{ label: "Yes", value: qq.yes, of: qq.yes + qq.no }, { label: "No", value: qq.no, of: qq.yes + qq.no }]} />
                 </div>
               ))}
+              {s.questions.length === 0 && <p className="muted small" style={{ margin: 0 }}>No questions on this audit.</p>}
             </div>
           </>
         )}
       </div>
 
       {attn.length > 0 && (
-        <div className="card" style={{ marginBottom: 12 }}>
-          <div className="card-kicker"><span>Needs attention · {attn.length}</span></div>
-          <ul style={{ margin: 0, paddingLeft: 20, columns: attn.length > 8 ? 2 : 1, columnGap: 32 }}>
+        <>
+          <h2>Needs attention · {attn.length}</h2>
+          <ul>
             {attn.map((t) => (
-              <li key={t.id} style={{ breakInside: "avoid", marginBottom: 3 }}>
+              <li key={t.id}>
                 <b>{t.name}</b>
                 {t.area ? <span className="muted"> ({t.area})</span> : null} — {attention(t).join("; ")}
               </li>
             ))}
           </ul>
-        </div>
+        </>
       )}
 
+      <h2>Results</h2>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <div className="rp-facets">
           <button type="button" className={`rp-facet ${tab === "locations" ? "on" : ""}`} onClick={() => setTab("locations")}>Per location · {r.targets.length}</button>
