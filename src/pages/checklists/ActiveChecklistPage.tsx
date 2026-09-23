@@ -471,7 +471,13 @@ export function ChecklistItemsPanel({
             let previousLocationId = section.location_id ?? undefined;
             // A location heading breaks the flow, so items are collected into
             // runs between headings — dragging is only meaningful within one.
-            const runs: { items: typeof section.items }[] = [{ items: [] }];
+            // Each run remembers the heading that opened it, and the two render
+            // together below: pushing headings as they are found and runs
+            // afterwards once stacked every heading of a multi-location section
+            // above all of its cards, which read as empty, repeated sections.
+            const runs: { heading?: string; items: typeof section.items }[] = [
+              { items: [] },
+            ];
             for (const item of section.items) {
               const locationId = itemLocationId(item) ?? section.location_id ?? undefined;
               if (
@@ -479,18 +485,7 @@ export function ChecklistItemsPanel({
                 locationId !== previousLocationId
               ) {
                 const name = offSiteLocationNameById.get(locationId!);
-                if (name) {
-                  nodes.push(
-                    <div
-                      key={`loc-${item.id}`}
-                      className="group-heading"
-                      style={spansColumns ? { gridColumn: "1 / -1" } : undefined}
-                    >
-                      <span>{name}</span>
-                    </div>,
-                  );
-                  runs.push({ items: [] });
-                }
+                if (name) runs.push({ heading: name, items: [] });
               }
               previousLocationId = locationId;
               runs[runs.length - 1].items.push(item);
@@ -501,6 +496,17 @@ export function ChecklistItemsPanel({
             // drag order that reads top to bottom.
             for (const run of runs) {
               if (run.items.length === 0) continue;
+              if (run.heading) {
+                nodes.push(
+                  <div
+                    key={`loc-${run.items[0].id}`}
+                    className="group-heading"
+                    style={spansColumns ? { gridColumn: "1 / -1" } : undefined}
+                  >
+                    <span>{run.heading}</span>
+                  </div>,
+                );
+              }
               nodes.push(
                 <div
                   key={`run-${run.items[0].id}`}
