@@ -21,6 +21,7 @@ import {
   type ReportTarget,
   type Summary,
   type Tone,
+  uniformValue,
 } from "../../lib/auditReport";
 
 // The Audit Report's view (AuditReportPage.spec.md; docs/audits.md
@@ -98,6 +99,9 @@ export function AuditReportView({ report: r, inApp }: { report: AuditReport; inA
   const byId = new Map(r.targets.map((t) => [t.id, t]));
   const shownItems = items.filter((x) => keep(byId.get(x.targetId)!));
   const kind = s.kind === "occupancy" ? "Occupancy" : "Status";
+  // A type or area shared by every target says nothing per row.
+  const sameType = useMemo(() => uniformValue(r.targets.map((t) => t.typeName)), [r]);
+  const sameArea = useMemo(() => uniformValue(r.targets.map((t) => t.area)), [r]);
 
   return (
     <div className="report">
@@ -194,7 +198,7 @@ export function AuditReportView({ report: r, inApp }: { report: AuditReport; inA
             {attn.map((t) => (
               <li key={t.id}>
                 <b>{inApp ? <Link to={`/audits/${r.audit.id}/targets/${t.id}`}>{t.name}</Link> : t.name}</b>
-                {t.area ? <span className="muted"> ({t.area})</span> : null} — {attention(t).join("; ")}
+                {t.area && !sameArea ? <span className="muted"> ({t.area})</span> : null} — {attention(t).join("; ")}
               </li>
             ))}
           </ul>
@@ -232,16 +236,13 @@ export function AuditReportView({ report: r, inApp }: { report: AuditReport; inA
               <thead>
                 <tr>
                   <th>Location</th>
-                  <th>Area</th>
+                  {!sameArea && <th>Area</th>}
                   {headers.map((h) => (
                     <th key={h} title={h}>
                       {h.length > 22 ? h.slice(0, 21) + "…" : h}
                     </th>
                   ))}
                   <th>Notes</th>
-                  <th className="num">Changes</th>
-                  <th className="num">Tickets</th>
-                  <th>By</th>
                 </tr>
               </thead>
               <tbody>
@@ -251,19 +252,16 @@ export function AuditReportView({ report: r, inApp }: { report: AuditReport; inA
                   return (
                     <tr key={t.id} className={cls}>
                       <td>
-                        <b>{inApp && t.state === "audited" ? <Link to={`/audits/${r.audit.id}/targets/${t.id}`}>{t.name}</Link> : t.name}</b>{" "}
-                        <span className="muted small">{t.typeName}</span>
+                        <b>{inApp && t.state === "audited" ? <Link to={`/audits/${r.audit.id}/targets/${t.id}`}>{t.name}</Link> : t.name}</b>
+                        {!sameType && t.typeName ? <span className="muted small"> {t.typeName}</span> : null}
                       </td>
-                      <td className="muted">{t.area ?? ""}</td>
+                      {!sameArea && <td className="muted">{t.area ?? ""}</td>}
                       {headers.map((h) => (
                         <td key={h} className={cellClass(w.cells[h])}>
                           {w.cells[h] ?? DASH}
                         </td>
                       ))}
                       <td className="muted small report-notes">{w.notes}</td>
-                      <td className="num">{t.proposals.length || ""}</td>
-                      <td className="num">{t.tickets.length || ""}</td>
-                      <td className="muted small">{t.finding?.recordedBy ?? ""}</td>
                     </tr>
                   );
                 })}
@@ -280,24 +278,22 @@ export function AuditReportView({ report: r, inApp }: { report: AuditReport; inA
             <thead>
               <tr>
                 <th>Location</th>
-                <th>Area</th>
+                {!sameArea && <th>Area</th>}
                 <th>Category</th>
                 <th>Item</th>
                 <th>Result</th>
                 <th>Note</th>
-                <th>By</th>
               </tr>
             </thead>
             <tbody>
               {shownItems.map((x: ItemRow, i) => (
                 <tr key={i} className={x.tone === "bad" || x.tone === "warn" ? "report-row-attn" : undefined}>
                   <td><b>{x.location}</b></td>
-                  <td className="muted">{x.area}</td>
+                  {!sameArea && <td className="muted">{x.area}</td>}
                   <td className="muted">{x.category}</td>
                   <td>{x.item}</td>
                   <td><ToneBadge tone={x.tone}>{x.result}</ToneBadge></td>
                   <td className="muted">{x.note}</td>
-                  <td className="muted small">{x.recordedBy}</td>
                 </tr>
               ))}
             </tbody>

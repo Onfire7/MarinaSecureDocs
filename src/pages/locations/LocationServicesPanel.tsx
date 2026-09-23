@@ -19,8 +19,8 @@ import {
 } from "../../data/services";
 import { DraftInput, DraftNumberInput } from "../shared/DraftInput";
 
-// A location's Services, Amenities and Attributes (docs/audits.md
-// § Services, Amenities and Attributes). Everyone sees what is here;
+// A location's Attributes, Services and Amenities (docs/audits.md
+// § Attributes, Services and Amenities). Everyone sees what is here;
 // manage_locations edits presence, working, metered, notes and values
 // directly — the admin path that does not need an audit's approval. An
 // Attribute is always applicable to a valid type — there is no presence to
@@ -47,73 +47,6 @@ export function LocationServicesPanel({ locationId, typeId }: { locationId: stri
   if (validServices.length === 0 && validAmenities.length === 0 && validAttributes.length === 0) return null;
   return (
     <>
-      {validServices.length > 0 && (
-        <div className="field">
-          <span className="field-label">Services</span>
-          <div className="field-value stack" style={{ gap: 4 }}>
-            {validServices.map((s) => {
-              const row = here.find((r) => r.service_id === s.id);
-              return (
-                <div key={s.id} className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  {canEdit ? (
-                    <label>
-                      <input type="checkbox" checked={!!row} onChange={(e) => void setLocationServicePresent(locationId, s.id, e.target.checked)} /> {s.name}
-                    </label>
-                  ) : (
-                    <span className={row ? undefined : "muted"}>{row ? "✓" : "-"} {s.name}</span>
-                  )}
-                  {row && (
-                    <>
-                      <span className={`badge ${row.working ? "badge-good" : "badge-bad"}`} onClick={() => canEdit && void saveLocationService(row.id, { working: !row.working })} style={{ cursor: canEdit ? "pointer" : undefined }}>
-                        {row.working ? "working" : "not working"}
-                      </span>
-                      {canEdit ? (
-                        <label className="muted small">
-                          <input type="checkbox" checked={row.metered === 1} onChange={(e) => void saveLocationService(row.id, { metered: e.target.checked })} /> metered
-                        </label>
-                      ) : (
-                        row.metered === 1 && <span className="muted small">metered{s.unit ? ` (${s.unit})` : ""}</span>
-                      )}
-                      {canEdit ? (
-                        <ServiceNote kind="service" entryId={s.id} value={row.note ?? ""} onCommit={(note) => void saveLocationService(row.id, { note: note || null })} />
-                      ) : (
-                        row.note && <span className="muted small">{row.note}</span>
-                      )}
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-      {validAmenities.length > 0 && (
-        <div className="field">
-          <span className="field-label">Amenities</span>
-          <div className="field-value stack" style={{ gap: 4 }}>
-            {validAmenities.map((a) => {
-              const row = hereA.find((r) => r.amenity_id === a.id);
-              return (
-                <div key={a.id} className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  {canEdit ? (
-                    <label>
-                      <input type="checkbox" checked={!!row} onChange={(e) => void setLocationAmenityPresent(locationId, a.id, e.target.checked)} /> {a.name}
-                    </label>
-                  ) : (
-                    <span className={row ? undefined : "muted"}>{row ? "✓" : "-"} {a.name}</span>
-                  )}
-                  {row &&
-                    (canEdit ? (
-                      <ServiceNote kind="amenity" entryId={a.id} value={row.note ?? ""} onCommit={(note) => void saveLocationAmenity(row.id, { note: note || null })} />
-                    ) : (
-                      row.note && <span className="muted small">{row.note}</span>
-                    ))}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
       {validAttributes.length > 0 && (
         <div className="field">
           <span className="field-label">Attributes</span>
@@ -192,6 +125,73 @@ export function LocationServicesPanel({ locationId, typeId }: { locationId: stri
                   ) : (
                     <span className="muted small">none set</span>
                   )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {validServices.length > 0 && (
+        <div className="field">
+          <span className="field-label">Services</span>
+          <div className="field-value stack" style={{ gap: 4 }}>
+            {validServices.map((s) => {
+              const row = here.find((r) => r.service_id === s.id);
+              return (
+                <div key={s.id} className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  {canEdit ? (
+                    <label>
+                      <input type="checkbox" checked={!!row} onChange={(e) => void setLocationServicePresent(locationId, s.id, e.target.checked)} /> {s.name}
+                    </label>
+                  ) : (
+                    <span className={row ? undefined : "muted"}>{row ? "✓" : "-"} {s.name}</span>
+                  )}
+                  {row && (
+                    <>
+                      <span className={`badge ${row.working ? "badge-good" : "badge-bad"}`} onClick={() => canEdit && void saveLocationService(row.id, { working: !row.working })} style={{ cursor: canEdit ? "pointer" : undefined }}>
+                        {row.working ? "working" : "not working"}
+                      </span>
+                      {canEdit ? (
+                        <label className="muted small">
+                          <input type="checkbox" checked={row.metered === 1} onChange={(e) => void saveLocationService(row.id, { metered: e.target.checked })} /> metered
+                        </label>
+                      ) : (
+                        row.metered === 1 && <span className="muted small">metered{s.unit ? ` (${s.unit})` : ""}</span>
+                      )}
+                      {canEdit ? (
+                        <ServiceNote kind="service" entryId={s.id} value={row.note ?? ""} onCommit={(note) => void saveLocationService(row.id, { note: note || null })} />
+                      ) : (
+                        row.note && <span className="muted small">{row.note}</span>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {validAmenities.length > 0 && (
+        <div className="field">
+          <span className="field-label">Amenities</span>
+          <div className="field-value stack" style={{ gap: 4 }}>
+            {validAmenities.map((a) => {
+              const row = hereA.find((r) => r.amenity_id === a.id);
+              return (
+                <div key={a.id} className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  {canEdit ? (
+                    <label>
+                      <input type="checkbox" checked={!!row} onChange={(e) => void setLocationAmenityPresent(locationId, a.id, e.target.checked)} /> {a.name}
+                    </label>
+                  ) : (
+                    <span className={row ? undefined : "muted"}>{row ? "✓" : "-"} {a.name}</span>
+                  )}
+                  {row &&
+                    (canEdit ? (
+                      <ServiceNote kind="amenity" entryId={a.id} value={row.note ?? ""} onCommit={(note) => void saveLocationAmenity(row.id, { note: note || null })} />
+                    ) : (
+                      row.note && <span className="muted small">{row.note}</span>
+                    ))}
                 </div>
               );
             })}

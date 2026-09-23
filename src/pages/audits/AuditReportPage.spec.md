@@ -32,9 +32,16 @@ itself commits to.
 - **Cell vocabulary** is exactly the table in `docs/audits.md`: `-` for not
   recorded, `*` for proposed by this audit, `!` for does not match the file.
   Not-working, No and `!` cells are in the danger colour; `-` recedes.
-- **No State column.** Attention rows carry a red mark at the left edge in
-  both tabs; a not-audited row is dimmed with a grey mark and says why in
-  its Notes cell. The CSV and Excel keep State as a column.
+- **No State, Changes, Tickets or By columns.** Attention rows carry a red
+  mark at the left edge in both tabs; a not-audited row is dimmed with a
+  grey mark and says why in its Notes cell. The location's type and the
+  Area column are shown only when the targets differ in them
+  (`uniformValue`), in both tabs and in the attention list. The CSV and
+  Excel keep State, Type, Area, Changes, Tickets and Recorded by as
+  columns.
+- **Column order** is Attributes, Services, Amenities, Questions, Marked,
+  Map - the same order the Finding form, the location page and the Admin
+  catalogue use.
 - **The `/r/` prefix is routed before the app's providers mount** - the
   public page never loads Clerk or PowerSync; it uses an anon Supabase client
   for its one call.

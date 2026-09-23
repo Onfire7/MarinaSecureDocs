@@ -8,8 +8,8 @@ itself commits to.
 
 - **Built-in questions by kind.** Occupancy: *Occupied?*, then boats (types
   with `has_boat`), vehicles (`has_vehicle`) and an optional Contact.
-  Status, each section shown only when its audit's category is on: each
-  valid Attribute (value / note, no present/absent — it always applies;
+  Status, each section shown only when its audit's category is on, in this
+  order: each valid Attribute (value / note, no present/absent — it always applies;
   always a Proposal, including clearing a value) — a number field with its
   unit, or a select of its options when its kind is `choice` — each valid
   Service

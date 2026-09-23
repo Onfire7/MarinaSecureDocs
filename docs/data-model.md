@@ -370,10 +370,10 @@ removed in favour of deriving from it.
 | early_checkin / late_checkout | timestamptz | Ignored when non-billable. |
 | rate / deposit / balance | numeric | |
 
-## Services, amenities & attributes
+## Attributes, services & amenities
 
 Marina-defined catalogues of what a Location provides, and what it will
-accept. See [`audits.md`](audits.md) § *Services, Amenities and Attributes*
+accept. See [`audits.md`](audits.md) § *Attributes, Services and Amenities*
 and [ADR 0007](adr/0007-meters-on-services-not-assets.md).
 
 #### `services` — Tier 0 / `manage_locations` · sync: always

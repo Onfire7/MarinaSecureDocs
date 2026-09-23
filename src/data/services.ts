@@ -3,7 +3,7 @@ import { db, jsonArray, stamp } from "../lib/db";
 import { insert, remove, transact, update } from "./sql";
 import { rankNoteSuggestions } from "../lib/audits";
 
-// Services, Amenities and Attributes — what a Location provides, and what
+// Attributes, Services and Amenities — what a Location provides, and what
 // it will accept (docs/audits.md § Services and Amenities, ADR 0007).
 //
 // Three marina-defined catalogues, each entry valid for chosen Location

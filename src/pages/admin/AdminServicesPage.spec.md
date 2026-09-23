@@ -1,8 +1,8 @@
-# Admin — Services, Amenities & Attributes
+# Admin — Attributes, Services & Amenities
 
 `/admin/services`. `manage_locations`.
 
-- Three catalogues. A Service has a name and an optional unit; an Amenity a
+- Three catalogues, Attributes first. A Service has a name and an optional unit; an Amenity a
   name; an Attribute a name and a **kind** — `number`, which has the optional
   unit, or `choice`, which has an option list edited by the same
   `ChoiceOptionsEditor` an Audit Question's Choice kind uses. Names and units

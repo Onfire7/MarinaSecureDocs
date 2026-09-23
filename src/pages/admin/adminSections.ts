@@ -40,7 +40,7 @@ export const ADMIN_SECTIONS: AdminSection[] = [
   },
   {
     path: "/admin/services",
-    label: "Services, Amenities, & Attributes",
+    label: "Attributes, Services, & Amenities",
     description: "What locations provide, and which types each is valid for",
     requires: "manage_locations",
   },

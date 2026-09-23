@@ -10,6 +10,7 @@ import {
   wideHeaders,
   wideRows,
   wideTable,
+  uniformValue,
   type AuditReport,
   type ReportTarget,
 } from "./auditReport";
@@ -236,7 +237,7 @@ describe("attention", () => {
 
 describe("wide rows", () => {
   it("6 · headers follow what the audit asked, in catalogue order", () => {
-    expect(wideHeaders(statusAudit)).toEqual(["Power", "Water", "WiFi", "Max boat length", "Site type", "Is the pedestal breaker labelled?", "Fire ring condition", "Marked", "Map"]);
+    expect(wideHeaders(statusAudit)).toEqual(["Max boat length", "Site type", "Power", "Water", "WiFi", "Is the pedestal breaker labelled?", "Fire ring condition", "Marked", "Map"]);
     expect(wideHeaders(occupancyAudit)).toEqual(["Occupied", "Dock lines in good condition?"]);
     const noMap = { ...statusAudit, audit: { ...statusAudit.audit, includeMap: false } };
     expect(wideHeaders(noMap)).not.toContain("Map");
@@ -270,7 +271,7 @@ describe("wide rows", () => {
   });
   it("7b · the exported table keeps State as a column even though the page hides it", () => {
     const t = wideTable(statusAudit, wideRows(statusAudit));
-    expect(t.headers.slice(0, 5)).toEqual(["Location", "Area", "Type", "State", "Power"]);
+    expect(t.headers.slice(0, 5)).toEqual(["Location", "Area", "Type", "State", "Max boat length"]);
     expect(t.rows[3][3]).toBe("not audited");
     expect(t.rows[2][t.headers.indexOf("Changes")]).toBe(2);
   });
@@ -278,9 +279,19 @@ describe("wide rows", () => {
     const items = itemRows(statusAudit);
     expect(items.filter((x) => x.location === "BH14-02R")).toHaveLength(0);
     expect(items.filter((x) => x.location === "BH14-02L").map((x) => x.category)).toEqual([
-      "Service", "Service", "Amenity", "Attribute", "Attribute", "Question", "Question", "Marked", "Map", "Change", "Change", "Ticket", "Ticket",
+      "Attribute", "Attribute", "Service", "Service", "Amenity", "Question", "Question", "Marked", "Map", "Change", "Change", "Ticket", "Ticket",
     ]);
     expect(items.find((x) => x.location === "BH14-02L" && x.item === "Power")).toMatchObject({ result: "Not working", tone: "bad", note: "pedestal dead" });
+  });
+});
+
+describe("uniformValue", () => {
+  it("7d · the one value every row shares, or null", () => {
+    expect(uniformValue(statusAudit.targets.map((t) => t.typeName))).toBe("Slip");
+    expect(uniformValue(statusAudit.targets.map((t) => t.area))).toBe("BH14");
+    expect(uniformValue(["Slip", "Campsite", "Slip"])).toBe(null);
+    expect(uniformValue(["Slip", null])).toBe(null);
+    expect(uniformValue([])).toBe(null);
   });
 });
 

@@ -351,9 +351,9 @@ export const DASH = "-";
 export function wideHeaders(r: AuditReport): string[] {
   return [
     ...(r.audit.kind === "occupancy" ? ["Occupied"] : []),
+    ...r.columns.attributes.map((a) => a.name),
     ...r.columns.services,
     ...r.columns.amenities,
-    ...r.columns.attributes.map((a) => a.name),
     ...r.columns.questions,
     ...(r.audit.kind === "status" && r.audit.includeMarked ? ["Marked"] : []),
     ...(r.audit.kind === "status" && r.audit.includeMap ? ["Map"] : []),
@@ -375,6 +375,11 @@ export function wideRows(r: AuditReport): WideRow[] {
       cells["Occupied"] =
         !f || f.occupied === null ? DASH : `${f.occupied ? "Occupied" : "Vacant"}${f.unexpectedOccupancy ? " !" : ""}`;
     }
+    for (const c of r.columns.attributes) {
+      const a = t.attributes.find((x) => x.name === c.name);
+      cells[c.name] =
+        a?.value != null ? `${a.value}${c.unit && /^-?[\d.]+$/.test(a.value) ? ` ${c.unit}` : ""}${a.proposed ? " *" : ""}` : DASH;
+    }
     for (const name of r.columns.services) {
       const s = t.services.find((x) => x.name === name);
       cells[name] = !s ? DASH : !s.present ? "Absent" : s.working ? "Working" : "Not working";
@@ -382,11 +387,6 @@ export function wideRows(r: AuditReport): WideRow[] {
     for (const name of r.columns.amenities) {
       const a = t.amenities.find((x) => x.name === name);
       cells[name] = !a ? DASH : a.present ? "Yes" : "No";
-    }
-    for (const c of r.columns.attributes) {
-      const a = t.attributes.find((x) => x.name === c.name);
-      cells[c.name] =
-        a?.value != null ? `${a.value}${c.unit && /^-?[\d.]+$/.test(a.value) ? ` ${c.unit}` : ""}${a.proposed ? " *" : ""}` : DASH;
     }
     for (const prompt of r.columns.questions) {
       const a = t.answers.find((x) => x.prompt === prompt);
@@ -435,6 +435,9 @@ export function itemRows(r: AuditReport): ItemRow[] {
         note: f.unexpectedOccupancy ? "does not match what is on file" : "",
       });
     }
+    for (const a of x.attributes)
+      if (a.value != null)
+        rows.push({ ...base, category: "Attribute", item: a.name, result: `${a.value}${a.proposed ? " *" : ""}`, tone: "none", note: a.proposed ? "proposed by this audit" : "" });
     for (const s of x.services)
       rows.push({
         ...base,
@@ -446,9 +449,6 @@ export function itemRows(r: AuditReport): ItemRow[] {
       });
     for (const a of x.amenities)
       rows.push({ ...base, category: "Amenity", item: a.name, result: a.present ? "Present" : "Absent", tone: a.present ? "good" : "none", note: a.note ?? "" });
-    for (const a of x.attributes)
-      if (a.value != null)
-        rows.push({ ...base, category: "Attribute", item: a.name, result: `${a.value}${a.proposed ? " *" : ""}`, tone: "none", note: a.proposed ? "proposed by this audit" : "" });
     for (const a of x.answers)
       rows.push({
         ...base,
@@ -538,6 +538,16 @@ export function toCsv(headers: string[], rows: (string | number)[][]): string {
     return /[",\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
   };
   return [headers, ...rows].map((row) => row.map(cell).join(",")).join("\n");
+}
+
+/** The one value every target shares, or null when they differ (or there
+ *  are none). The page hides a Type or Area that would be the same on every
+ *  row - an audit of one campground needn't say "Campsite · Campgrounds"
+ *  fifty times. */
+export function uniformValue(values: (string | null)[]): string | null {
+  if (values.length === 0) return null;
+  const first = values[0];
+  return first != null && values.every((v) => v === first) ? first : null;
 }
 
 // ── words ────────────────────────────────────────────────────────────────

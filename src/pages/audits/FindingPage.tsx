@@ -509,39 +509,6 @@ function FindingForm({
 
       {(showServices || showAmenities || showAttributes) && (
         <div className="card" style={{ marginBottom: 12 }}>
-          {showServices && <div className="section-title">Services</div>}
-          {showServices && validServices.map((s) => {
-            const v = svc[s.id] ?? { present: false, working: true, note: "" };
-            return (
-              <div key={s.id} className="field">
-                <span className="field-label">{s.name}</span>
-                <div className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                  {yesNo(v.present, (p) => setSvc({ ...svc, [s.id]: { ...v, present: !!p } }), ["Present", "Absent"])}
-                  {v.present && target && (
-                    <>
-                      <label className="muted small">
-                        <input type="checkbox" checked={v.working} disabled={!editable} onChange={(e) => setSvc({ ...svc, [s.id]: { ...v, working: e.target.checked } })} /> working
-                      </label>
-                      <NoteInput kind="service" entryId={s.id} value={v.note} editable={editable} onChange={(note) => setSvc({ ...svc, [s.id]: { ...v, note } })} />
-                    </>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-          {showAmenities && <div className="section-title">Amenities</div>}
-          {showAmenities && validAmenities.map((a) => {
-            const v = amen[a.id] ?? { present: false, note: "" };
-            return (
-              <div key={a.id} className="field">
-                <span className="field-label">{a.name}</span>
-                <div className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                  {yesNo(v.present, (p) => setAmen({ ...amen, [a.id]: { ...v, present: !!p } }), ["Present", "Absent"])}
-                  {v.present && target && <NoteInput kind="amenity" entryId={a.id} value={v.note} editable={editable} onChange={(note) => setAmen({ ...amen, [a.id]: { ...v, note } })} />}
-                </div>
-              </div>
-            );
-          })}
           {showAttributes && <div className="section-title">Attributes</div>}
           {/* Always applicable to a valid type — never toggled on or off.
               Only the value is optional; leaving it blank clears it. */}
@@ -582,6 +549,39 @@ function FindingForm({
                     </>
                   )}
                   <NoteInput kind="attribute" entryId={a.id} value={v.note} editable={editable} onChange={(note) => setAttr({ ...attr, [a.id]: { ...v, note } })} />
+                </div>
+              </div>
+            );
+          })}
+          {showServices && <div className="section-title">Services</div>}
+          {showServices && validServices.map((s) => {
+            const v = svc[s.id] ?? { present: false, working: true, note: "" };
+            return (
+              <div key={s.id} className="field">
+                <span className="field-label">{s.name}</span>
+                <div className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  {yesNo(v.present, (p) => setSvc({ ...svc, [s.id]: { ...v, present: !!p } }), ["Present", "Absent"])}
+                  {v.present && target && (
+                    <>
+                      <label className="muted small">
+                        <input type="checkbox" checked={v.working} disabled={!editable} onChange={(e) => setSvc({ ...svc, [s.id]: { ...v, working: e.target.checked } })} /> working
+                      </label>
+                      <NoteInput kind="service" entryId={s.id} value={v.note} editable={editable} onChange={(note) => setSvc({ ...svc, [s.id]: { ...v, note } })} />
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {showAmenities && <div className="section-title">Amenities</div>}
+          {showAmenities && validAmenities.map((a) => {
+            const v = amen[a.id] ?? { present: false, note: "" };
+            return (
+              <div key={a.id} className="field">
+                <span className="field-label">{a.name}</span>
+                <div className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  {yesNo(v.present, (p) => setAmen({ ...amen, [a.id]: { ...v, present: !!p } }), ["Present", "Absent"])}
+                  {v.present && target && <NoteInput kind="amenity" entryId={a.id} value={v.note} editable={editable} onChange={(note) => setAmen({ ...amen, [a.id]: { ...v, note } })} />}
                 </div>
               </div>
             );

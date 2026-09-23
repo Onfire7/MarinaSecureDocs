@@ -51,7 +51,7 @@ The code is on `beta2`; the remote still needs, in this order:
       least), in Roles & Permissions. No seeded role holds it; without it the
       Audits section shows only assigned targets and Admin hides the
       template page.
-- [ ] **Create the Services, Amenities and Attributes catalogues** and mark
+- [ ] **Create the Attributes, Services and Amenities catalogues** and mark
       which types each is valid for. Production already has 3 Services from
       an earlier session; no Amenities or Attributes yet. All catalogue and
       per-location testing this session ran against the local stack only —

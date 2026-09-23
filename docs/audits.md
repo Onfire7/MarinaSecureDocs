@@ -45,7 +45,7 @@ have them today.
 No role is hardcoded anywhere. "Manager" is not a term; it means "a User
 with the permission the row requires".
 
-## Services, Amenities and Attributes
+## Attributes, Services and Amenities
 
 Three marina-defined catalogues, edited under Admin beside Location Types.
 
@@ -215,7 +215,7 @@ Fixed per kind. A template cannot switch them off.
 1. **Attributes.** For each Attribute valid for the type: value (a number
    field or a pick from its options) and note. No present/absent — it
    always applies; a blank value just means none is set. Always a Proposal
-   (§ Services, Amenities and Attributes).
+   (§ Attributes, Services and Amenities).
 2. **Services.** For each Service valid for the type: present? working? note.
 3. **Amenities.** For each Amenity valid for the type: present? note.
 4. **Marked.** *Is this Location clearly marked?* Yes/No.
@@ -487,18 +487,21 @@ Link, or - later - attached to an email. It contains, in order:
    Proposal still undecided; a Ticket raised from its Finding still open.
 6. **Results**, two tabs, one filter row (state: all / needs attention /
    audited / not audited; search):
-   - **Per location** (default): one row per target. Columns: Location
-     (name, type), Area (the parent Location), then **one column per
-     thing the Audit asked about**, in catalogue order - *Occupied* for an
-     Occupancy Audit; each Service, Amenity and Attribute valid for any
-     target's type, each Audit Question, *Marked* and *Map* for a Status
-     Audit, each only when its category is switched on - then Notes,
-     Changes, Tickets, Recorded by. There is no State column: a row that
-     needs attention is marked at its left edge, and a Location that was
-     not audited is dimmed, its cells all `-`, its Notes cell reading
-     *not audited · closed early*. (The exports keep State as a column;
-     a spreadsheet has no left edge.) Cells are short fixed words so a
-     column filters and pivots:
+   - **Per location** (default): one row per target. Columns: Location,
+     then **one column per thing the Audit asked about** - *Occupied* for
+     an Occupancy Audit; each Attribute, Service and Amenity valid for any
+     target's type, in that order and each in catalogue order; each Audit
+     Question; *Marked* and *Map* for a Status Audit, each only when its
+     category is switched on - then Notes. The Location's type and an Area
+     column (the parent Location) appear only when the targets differ in
+     them: an audit of one campground needn't say "Campsite · Campgrounds"
+     fifty times. There is no State column: a row that needs attention is
+     marked at its left edge, and a Location that was not audited is
+     dimmed, its cells all `-`, its Notes cell reading *not audited ·
+     closed early*. Changes, Tickets and who recorded the Finding are not
+     on the page; the exports carry them, with State, Type and Area always
+     present - a spreadsheet has no left edge. Cells are short fixed words
+     so a column filters and pivots:
 
      | Column | Cell |
      |---|---|
@@ -513,8 +516,9 @@ Link, or - later - attached to an email. It contains, in order:
      `-` means *not recorded*: the Location was not audited, or the entry
      was added to the catalogue after it was. The first column stays put
      under horizontal scroll; the table is meant to be wider than a phone.
-   - **Per item**: one row per Location × item - Occupancy, Service,
-     Amenity, Question, Marked, Map, Change, Ticket - with Result and Note.
+   - **Per item**: one row per Location × item - Occupancy, Attribute,
+     Service, Amenity, Question, Marked, Map, Change, Ticket - with Result
+     and Note; the Area column follows the same rule.
      The "every place where Water is absent" view.
 7. A legend for `-`, `*` and `!`.
 

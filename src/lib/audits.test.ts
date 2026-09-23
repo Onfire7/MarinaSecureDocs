@@ -219,7 +219,7 @@ describe("audit completeness", () => {
   });
   it("a category the template switched off is never unanswered", () => {
     const audit = { ...statusAudit, include_map: 0, include_amenities: 0 };
-    expect(auditCategories(audit)).toEqual(["services", "attributes", "questions", "gps", "marked"]);
+    expect(auditCategories(audit)).toEqual(["attributes", "services", "questions", "gps", "marked"]);
     const byCategory = gapsByCategory(audit, [{ targetId: "t1", ...none, map: 3, amenities: 2, services: 1 }]);
     expect(byCategory.map).toEqual([]);
     expect(byCategory.amenities).toEqual([]);

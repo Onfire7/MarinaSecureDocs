@@ -248,9 +248,9 @@ export function attributeDiff(
 
 /** The categories an Audit can leave unanswered, in the order shown. */
 export const AUDIT_CATEGORIES = [
+  "attributes",
   "services",
   "amenities",
-  "attributes",
   "questions",
   "gps",
   "marked",
@@ -259,9 +259,9 @@ export const AUDIT_CATEGORIES = [
 export type AuditCategory = (typeof AUDIT_CATEGORIES)[number];
 
 export const CATEGORY_LABEL: Record<AuditCategory, string> = {
+  attributes: "Attributes",
   services: "Services",
   amenities: "Amenities",
-  attributes: "Attributes",
   questions: "Questions",
   gps: "GPS",
   marked: "Marked",
