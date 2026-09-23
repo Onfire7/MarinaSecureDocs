@@ -51,9 +51,12 @@ The code is on `beta2`; the remote still needs, in this order:
       least), in Roles & Permissions. No seeded role holds it; without it the
       Audits section shows only assigned targets and Admin hides the
       template page.
-- [ ] **Create the Services and Amenities catalogue** and mark which types
-      each is valid for. Empty catalogues make every status audit ask nothing
-      but "marked?" and "mapped?".
+- [ ] **Create the Services, Amenities and Attributes catalogues** and mark
+      which types each is valid for. Production already has 3 Services from
+      an earlier session; no Amenities or Attributes yet. All catalogue and
+      per-location testing this session ran against the local stack only —
+      nothing to clean up on the marina's real database. Empty catalogues
+      make every status audit ask nothing but "marked?" and "mapped?".
 - [ ] **One manual pass on beta2** with screenshots: launch, a finding from a
       phone, close, finalize.
 
