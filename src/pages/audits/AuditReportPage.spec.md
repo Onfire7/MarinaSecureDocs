@@ -48,7 +48,7 @@ itself commits to.
 - **Public only**: a slim top bar - "MarinaSecure · shared audit report" -
   and nothing else of the app. No console noise: the page must not load
   Clerk or PowerSync.
-- **Stamps.** A Closed audit's header says *as of <time>* from the
+- **Stamps.** An Open or Closed audit's header says *as of <time>* from the
   document's `asOf`; a Finalized one says *finalized <date>* and the page
   never refetches.
 - **Theme** follows the viewer (system, or the app's stored choice when

@@ -139,7 +139,7 @@ export function AuditDetailPage() {
         </div>
       </div>
 
-      {audit.status !== "open" && <AuditShares auditId={audit.id} canManage={canManage} />}
+      <AuditShares auditId={audit.id} canManage={canManage} />
 
       {audit.status !== "open" && (
         <ProposalsTable

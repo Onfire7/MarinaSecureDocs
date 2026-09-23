@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { createAuditShare, listAuditShares, revokeAuditShare, shareIsLive, shareUrl, type AuditShareRow } from "../../data/auditReport";
 import { fmtDate, fmtDateTime } from "../../lib/auditReport";
 
-// Report and sharing, on a closed or finalized audit (AuditDetailPage.spec.md
+// Report and sharing, on every audit (AuditDetailPage.spec.md
 // § Report and sharing; docs/audits.md § Share Links). Everything here is an
 // online call - shares never sync to a device.
 export function AuditShares({ auditId, canManage }: { auditId: string; canManage: boolean }) {

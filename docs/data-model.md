@@ -551,7 +551,7 @@ split into categories. Copied onto the Audit at launch, like the rule tree.
 
 | Column | Type | Notes |
 |---|---|---|
-| audit_id | → audits not null, cascade | The Audit must be `closed` or `finalized`; a trigger refuses an `open` one. |
+| audit_id | → audits not null, cascade | Any status: a link to an `open` audit is a live progress report. |
 | key | uuid not null unique default gen_random_uuid() | The credential in `/r/<key>`. Never shown in a list once created except through *Copy link*. |
 | label | text | Who it went to. |
 | created_by_id / created_at | | |

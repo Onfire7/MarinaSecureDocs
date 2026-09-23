@@ -188,6 +188,14 @@ describe("narrative", () => {
     const open = { ...statusAudit, audit: { ...statusAudit.audit, status: "open" as const } };
     expect(narrative(open, summarize(open))[0]).toMatch(/1 was not reached\.$/);
   });
+  it("3d · an open audit counts what is still to visit", () => {
+    const open = {
+      ...statusAudit,
+      audit: { ...statusAudit.audit, status: "open" as const },
+      targets: statusAudit.targets.map((t) => (t.state === "not_audited" ? { ...t, state: "pending" as const, notAuditedReason: null } : t)),
+    };
+    expect(narrative(open, summarize(open))[0]).toBe("3 of 4 locations were audited by Alice and Bob between Sep 20, 2026 and Sep 21, 2026. 1 is still to visit.");
+  });
   it("4 · occupancy sentences, and the all-matched branch", () => {
     const s = summarize(occupancyAudit);
     const lines = narrative(occupancyAudit, s);

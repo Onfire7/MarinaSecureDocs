@@ -185,8 +185,8 @@ _Avoid_: pending change, request
 **Audit Report**:
 The document compiled from one Audit for reading outside the app - headline
 numbers, an executive summary in sentences, what needs attention, and the
-results per Location and per item. Compiled live while the Audit is Closed;
-stored on the Audit at finalize and never changed after.
+results per Location and per item. Compiled live while the Audit is Open or
+Closed; stored at finalize and never changed after.
 _Avoid_: results page, summary, export
 
 **Share Link**:

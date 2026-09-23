@@ -5,7 +5,7 @@
 -- everyone passes every denial test (CLAUDE.md).
 create extension if not exists pgtap;
 begin;
-select plan(36);
+select plan(37);
 
 -- ── fixtures (as owner, which bypasses RLS; triggers still run) ──────────
 insert into users (id, name, clerk_user_id, active) values
@@ -78,12 +78,15 @@ select throws_ok(
   '42501', null, 'anon cannot call the in-app report');
 reset role;
 
--- ── 10 · only a closed or finalized audit can be shared ──────────────────
+-- ── 10 · any audit can be shared; an open one is a progress link ─────────
 select set_config('request.jwt.claims', '{"sub":"user_rita"}', true);
 set local role authenticated;
-select throws_ok(
-  $$select public.create_audit_share('eeee0000-0000-4000-8000-0000000000b2', 'too early', null)$$,
-  '23514', null, 'an open audit refuses a share');
+select lives_ok(
+  $$select public.create_audit_share('eeee0000-0000-4000-8000-0000000000b2', 'progress', null)$$,
+  'an open audit can be shared');
+select is(
+  (select public.audit_report_for('eeee0000-0000-4000-8000-0000000000b2')->'audit'->>'status'),
+  'open', 'and its report says it is open');
 select is(
   (select expires_at from public.create_audit_share('eeee0000-0000-4000-8000-0000000000b1', 'forever', null)),
   null::timestamptz, 'a null expiry means never');

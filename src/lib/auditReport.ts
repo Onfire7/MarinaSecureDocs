@@ -251,7 +251,8 @@ export function narrative(r: AuditReport, s: Summary): string[] {
   const notReached = s.notAudited
     ? `; ${s.notAudited} ${s.notAudited === 1 ? "was" : "were"} not reached${r.audit.status !== "open" ? " before the audit closed" : ""}.`
     : ".";
-  out.push(`${s.audited} of ${s.targets} locations ${s.audited === 1 ? "was" : "were"} audited${who}${when}${notReached}`);
+  const stillToVisit = s.pending ? ` ${s.pending} ${s.pending === 1 ? "is" : "are"} still to visit.` : "";
+  out.push(`${s.audited} of ${s.targets} locations ${s.audited === 1 ? "was" : "were"} audited${who}${when}${notReached}${stillToVisit}`);
   if (s.kind === "status") {
     if (s.broken.length) {
       const by = new Map<string, number>();

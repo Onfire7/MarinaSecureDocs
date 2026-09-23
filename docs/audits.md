@@ -532,9 +532,10 @@ marina's name is text; there is no logo yet.
 
 A **Share Link** is a public URL, `/r/<key>`, whose key is a random UUID.
 Anyone holding it sees the Audit Report; the key is the whole credential,
-so it is treated like one. A User with `manage_audits` creates them from a
-**Closed or Finalized** Audit's page - an Open Audit has nothing to report
-and cannot be shared. Each link is its own row (`audit_shares`):
+so it is treated like one. A User with `manage_audits` creates them from any Audit's page. A link
+to an **Open** Audit is a progress link - the same report, compiled on
+every open, with what is still to visit counted. Each link is its own row
+(`audit_shares`):
 
 - a **label** naming who it went to ("Ownership group", "Bob");
 - **expires** - 90 days by default, or never;
@@ -548,10 +549,11 @@ a key cannot be probed for existence.
 
 ### Live, then static
 
-While the Audit is **Closed**, every view compiles the report from current
-data and says *as of &lt;time&gt;*: decisions made on the finalize screen
-show up on the next open. On **finalize** the compiled document is stored
-and every later view - shared or in-app - is that snapshot, verbatim. A Finalized Audit's report never changes, even when a ticket it
+While the Audit is **Open or Closed**, every view compiles the report from
+current data and says *as of &lt;time&gt;*: findings recorded in the field
+and decisions made on the finalize screen show up on the next open. On
+**finalize** the compiled document is stored and every later view - shared
+or in-app - is that snapshot, verbatim. A Finalized Audit's report never changes, even when a ticket it
 raised closes or a Location it names is renamed next year.
 
 ### In the app
