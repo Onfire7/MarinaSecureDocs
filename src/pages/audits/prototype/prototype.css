@@ -1,0 +1,370 @@
+/* PROTOTYPE — throwaway. Styles for the audit report variants. Everything is
+   prefixed rp- and lives only on the prototype branch. The public page has no
+   app shell, so the prototype covers the shell with a fixed layer and uses the
+   same tokens the app does (app.css :root). */
+
+.rp-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow: auto;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+.rp-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 20px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line-lt);
+  font-size: 0.86rem;
+}
+.rp-brand {
+  font-weight: 720;
+  letter-spacing: 0.01em;
+}
+.rp-brand small {
+  font-weight: 500;
+  color: var(--mute);
+  margin-left: 8px;
+}
+
+/* KPI row */
+.rp-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+.rp-kpi {
+  background: var(--panel);
+  border: 1px solid var(--line-lt);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.rp-kpi-label {
+  font-size: 0.74rem;
+  color: var(--mute);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 650;
+}
+.rp-kpi-value {
+  font-size: 1.7rem;
+  font-weight: 650;
+  line-height: 1.15;
+  margin-top: 2px;
+}
+.rp-kpi-sub {
+  font-size: 0.8rem;
+  color: var(--mute);
+}
+.rp-hero {
+  font-size: 3.4rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Coverage bar - a part-to-whole with status meaning; every segment labelled */
+.rp-bar {
+  display: flex;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  gap: 2px;
+  background: var(--fill);
+}
+.rp-bar > span {
+  display: block;
+  height: 100%;
+}
+.rp-bar-good { background: var(--good); }
+.rp-bar-bad { background: var(--bad); }
+.rp-bar-mute { background: var(--line); }
+.rp-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: var(--mute);
+  margin-top: 6px;
+}
+.rp-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 5px;
+  vertical-align: -1px;
+}
+
+/* Horizontal single-hue bars (one series: the accent) */
+.rp-hbars {
+  display: grid;
+  grid-template-columns: max-content 1fr max-content;
+  gap: 6px 10px;
+  align-items: center;
+  font-size: 0.86rem;
+}
+.rp-hbars .track {
+  height: 12px;
+  background: var(--fill);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.rp-hbars .fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 0 6px 6px 0;
+}
+.rp-hbars .fill.bad {
+  background: var(--bad);
+}
+.rp-hbars .num {
+  color: var(--mute);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tone badges reuse .badge; these add the neutral "none" tone */
+.rp-tone-none {
+  background: var(--fill);
+  color: var(--mute);
+}
+
+/* Filters */
+.rp-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 10px 0;
+}
+.rp-filters .input {
+  max-width: 240px;
+}
+.rp-count {
+  color: var(--mute);
+  font-size: 0.84rem;
+  margin-left: auto;
+}
+
+/* Table extras */
+.rp-table td.num,
+.rp-table th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.rp-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.rp-table th button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+.rp-row-expand td {
+  background: var(--bg);
+  font-size: 0.85rem;
+}
+.rp-detail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px 20px;
+}
+.rp-detail dt {
+  font-size: 0.72rem;
+  color: var(--mute);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 650;
+  margin: 0 0 2px;
+}
+.rp-detail dd {
+  margin: 0 0 6px;
+}
+
+/* Variant A - memo */
+.rp-memo {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 28px 20px 80px;
+}
+.rp-letterhead {
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.rp-memo h1 {
+  font-size: 1.7rem;
+  font-weight: 720;
+  margin: 0 0 4px;
+}
+.rp-memo h2 {
+  font-size: 1.05rem;
+  font-weight: 720;
+  margin: 26px 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--mute);
+}
+.rp-memo p {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+.rp-memo .lede {
+  font-size: 1.12rem;
+}
+.rp-memo ul {
+  margin: 4px 0 0;
+  padding-left: 20px;
+}
+.rp-memo li {
+  margin-bottom: 3px;
+}
+
+/* Variant B - dashboard */
+.rp-dash {
+  padding: 18px 20px 80px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.rp-dash-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin: 12px 0;
+}
+@media (min-width: 900px) {
+  .rp-dash-grid {
+    grid-template-columns: 1.1fr 1fr 1fr;
+  }
+}
+.rp-facets {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.rp-facet {
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--mute);
+  cursor: pointer;
+}
+.rp-facet.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Variant C - walkthrough */
+.rp-walk {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 0 16px 80px;
+}
+.rp-heroband {
+  background: var(--accent);
+  color: var(--accent-ink);
+  margin: 0 -16px;
+  padding: 28px 24px 22px;
+}
+.rp-heroband .rp-hero {
+  color: var(--accent-ink);
+}
+.rp-heroband .muted {
+  color: var(--accent-ink);
+  opacity: 0.8;
+}
+.rp-area {
+  margin-top: 22px;
+}
+.rp-area-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+.rp-area-head h2 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+.rp-locs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 8px;
+}
+.rp-loc {
+  background: var(--panel);
+  border: 1px solid var(--line-lt);
+  border-left: 4px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font-size: 0.86rem;
+}
+.rp-loc.ok { border-left-color: var(--good); }
+.rp-loc.attn { border-left-color: var(--bad); }
+.rp-loc.skip { border-left-color: var(--line); opacity: 0.75; }
+.rp-loc .name {
+  font-weight: 700;
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+}
+.rp-loc ul {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  color: var(--mute);
+}
+.rp-loc li.bad { color: var(--bad); }
+.rp-loc li.warn { color: var(--warn); }
+
+.rp-sticky-actions {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg);
+  padding: 8px 0;
+}
+
+@media print {
+  .rp-layer { position: static; overflow: visible; }
+  .rp-topbar, .rp-noprint { display: none !important; }
+  .rp-table th { position: static; }
+  body { background: #fff; }
+}
+
+.rp-filters .select {
+  width: auto;
+  max-width: 220px;
+}
+
+@media (max-width: 600px) {
+  .rp-letterhead > div:last-child {
+    text-align: left !important;
+  }
+  .rp-letterhead .row {
+    justify-content: flex-start !important;
+  }
+}

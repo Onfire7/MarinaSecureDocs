@@ -63,6 +63,7 @@ import { FindingPage } from "./pages/audits/FindingPage";
 import { AdminServicesPage } from "./pages/admin/AdminServicesPage";
 import { AdminAuditTemplatesPage } from "./pages/admin/AdminAuditTemplatesPage";
 import { ShiftReportPage } from "./pages/reports/ShiftReportPage";
+import { AuditReportPrototypePage } from "./pages/audits/prototype/AuditReportPrototypePage";
 
 export default function App() {
   const missing = missingConfig();
@@ -134,6 +135,8 @@ export default function App() {
                 <Route path="/audits/new" element={<LaunchAuditPage />} />
                 <Route path="/audits/:id" element={<AuditDetailPage />} />
                 <Route path="/audits/:id/propose" element={<FindingPage />} />
+                {/* PROTOTYPE — throwaway, see src/pages/audits/prototype. */}
+                <Route path="/audits/:id/report-prototype" element={<AuditReportPrototypePage />} />
                 <Route path="/audits/:id/targets/:targetId" element={<FindingPage />} />
                 <Route path="/admin" element={<AdminHomePage />} />
                 <Route path="/admin/users" element={<AdminUsersPage />} />
