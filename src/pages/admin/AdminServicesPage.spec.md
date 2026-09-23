@@ -8,8 +8,9 @@
   entry is valid for that type. Tapping toggles it.
 - Delete asks for confirmation. Deleting an entry removes it from every
   location (cascade).
-- Presence and value per location are edited on the location's page
-  (`LocationServicesPanel`) or by an approved audit, never here. An
-  Attribute's value has no "apply directly" path once an audit exists for
-  the location — every audit-driven change to it, presence or value, is a
-  Proposal.
+- Presence (Services, Amenities) and value (Attributes) per location are
+  edited on the location's page (`LocationServicesPanel`) or by an approved
+  audit, never here. An Attribute is never present or absent — it applies
+  to every location of a valid type — only its value is optional, and once
+  an audit exists for the location, every value change (including
+  clearing one) is a Proposal, with no "apply directly" path.

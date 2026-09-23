@@ -279,6 +279,63 @@ export function ConditionEditor({
   );
 }
 
+/** One option per row, add/remove — for a Choice question ("Is this RV
+ * site back-in or pull-through?"). Replaces a comma-separated text field:
+ * an option that itself contains a comma had nowhere to go, and a row per
+ * option is what every other add/remove list in this editor already looks
+ * like (conditions, questions). */
+function ChoiceOptionsEditor({
+  choices,
+  onChange,
+}: {
+  choices: string[];
+  onChange: (choices: string[]) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const value = draft.trim();
+    if (!value) return;
+    onChange([...choices, value]);
+    setDraft("");
+  };
+  return (
+    <div className="stack" style={{ gap: 4, marginTop: 4 }}>
+      {choices.map((c, i) => (
+        <div key={i} className="row" style={{ gap: 6, alignItems: "center" }}>
+          <input
+            className="input"
+            value={c}
+            onChange={(e) => onChange(choices.map((x, j) => (j === i ? e.target.value : x)))}
+            style={{ flex: 1 }}
+          />
+          <button
+            type="button"
+            className="btn btn-sm btn-bare"
+            aria-label="Remove option"
+            onClick={() => onChange(choices.filter((_, j) => j !== i))}
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      <div className="row" style={{ gap: 6 }}>
+        <input
+          className="input"
+          value={draft}
+          placeholder="Add an option…"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+          style={{ flex: 1 }}
+        />
+        <button type="button" className="btn btn-sm" onClick={add} disabled={!draft.trim()}>
+          + option
+        </button>
+      </div>
+      {choices.length === 0 && <span className="muted small">No options yet — the answer has nothing to pick from.</span>}
+    </div>
+  );
+}
+
 const QUESTION_KINDS: { key: QuestionKind; label: string }[] = [
   { key: "yes_no", label: "Yes / No" },
   { key: "choice", label: "Choice" },
@@ -341,12 +398,9 @@ export function QuestionEditor({
             </label>
           )}
           {q.kind === "choice" && (
-            <input
-              className="input"
-              style={{ marginTop: 4 }}
-              placeholder="Choices, comma-separated"
-              value={q.choices.join(", ")}
-              onChange={(e) => setQ(q.id, { choices: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
+            <ChoiceOptionsEditor
+              choices={q.choices}
+              onChange={(choices) => setQ(q.id, { choices })}
             />
           )}
           {q.kind === "meter_reading" && (

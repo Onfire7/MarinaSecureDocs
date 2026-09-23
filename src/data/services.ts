@@ -229,31 +229,34 @@ export function saveLocationAmenity(rowId: string, changes: { note?: string | nu
  * Finding once an audit exists for the location; that path always goes
  * through a set_attribute Proposal (see docs/audits.md).
  */
-export function setLocationAttributePresent(
+/**
+ * An Attribute is always applicable to a Location of a valid type — there
+ * is nothing to turn on or off — so this is the one function that sets it:
+ * a null value clears it (deletes the row); any other value creates or
+ * updates it. Direct edit only, from the admin location editor. Once an
+ * audit exists for the Location, a value changes only through an approved
+ * set_attribute Proposal (see docs/audits.md).
+ */
+export function saveLocationAttributeValue(
   locationId: string,
   attributeId: string,
-  present: boolean,
+  value: number | null,
+  note?: string | null,
 ): Promise<void> {
   return transact(async (tx) => {
     await tx.execute("DELETE FROM location_attributes WHERE location_id = ? AND attribute_id = ?", [
       locationId,
       attributeId,
     ]);
-    if (present) {
+    if (value !== null) {
       await insert(tx, "location_attributes", {
         location_id: locationId,
         attribute_id: attributeId,
-        value: 0,
-        note: null,
+        value,
+        note: note ?? null,
       });
     }
   });
-}
-export function saveLocationAttribute(
-  rowId: string,
-  changes: { value?: number; note?: string | null },
-): Promise<void> {
-  return update(db, "location_attributes", rowId, { value: changes.value, note: changes.note });
 }
 
 /**

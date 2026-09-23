@@ -5,7 +5,7 @@
 -- passes every denial test (CLAUDE.md).
 create extension if not exists pgtap;
 begin;
-select plan(32);
+select plan(35);
 
 -- Rows affected by an UPDATE run as the current role, so RLS is exercised
 -- from the caller's side. A data-modifying CTE cannot sit inside is().
@@ -211,7 +211,7 @@ insert into audit_findings (id, audit_id, target_id, recorded_by_id) values
   ('ffff0000-0000-4000-8000-0000000000f6','eeee0000-0000-4000-8000-0000000000a2','eeee1111-0000-4000-8000-000000000005','11111111-0000-4000-8000-000000000001');
 insert into audit_proposals (finding_id, kind, payload) values
   ('ffff0000-0000-4000-8000-0000000000f6','set_attribute',
-   '{"attribute_id":"aaaa0000-0000-4000-8000-0000000000a1","present":true,"value":35,"note":null}');
+   '{"attribute_id":"aaaa0000-0000-4000-8000-0000000000a1","value":35,"note":null}');
 select set_config('request.jwt.claims', '{"sub":"user_carl"}', true);
 set local role authenticated;
 select is(pg_temp.upd_count($u$update audit_proposals set decision = 'approved', decided_by_id = '11111111-0000-4000-8000-000000000003'
@@ -227,6 +227,32 @@ reset role;
 select is((select value from location_attributes where location_id = 'dddd0000-0000-4000-8000-000000000081'
              and attribute_id = 'aaaa0000-0000-4000-8000-0000000000a1')::int, 35,
   'the attribute value landed on the location');
+
+-- Clearing a value (never a "present" flag) removes the row.
+insert into audits (id, name, kind, status, launched_by_id) values
+  ('eeee0000-0000-4000-8000-0000000000a4','Fixture Audit Four','status','open','11111111-0000-4000-8000-000000000001');
+insert into audit_targets (id, audit_id, location_id, location_name, position) values
+  ('eeee1111-0000-4000-8000-000000000008','eeee0000-0000-4000-8000-0000000000a4','dddd0000-0000-4000-8000-000000000081','AF-S1',0);
+insert into audit_findings (id, audit_id, target_id, recorded_by_id) values
+  ('ffff0000-0000-4000-8000-0000000000f8','eeee0000-0000-4000-8000-0000000000a4','eeee1111-0000-4000-8000-000000000008','11111111-0000-4000-8000-000000000001');
+insert into audit_proposals (finding_id, kind, payload) values
+  ('ffff0000-0000-4000-8000-0000000000f8','set_attribute',
+   '{"attribute_id":"aaaa0000-0000-4000-8000-0000000000a1","value":null,"note":null}');
+select set_config('request.jwt.claims', '{"sub":"user_carl"}', true);
+set local role authenticated;
+select is(pg_temp.upd_count($u$update audit_proposals set decision = 'approved', decided_by_id = '11111111-0000-4000-8000-000000000003'
+             where finding_id = 'ffff0000-0000-4000-8000-0000000000f8'$u$), 1,
+  'clearing an attribute value is decided the same way as setting one');
+reset role;
+select close_audit('eeee0000-0000-4000-8000-0000000000a4');
+select set_config('request.jwt.claims', '{"sub":"user_alice"}', true);
+set local role authenticated;
+select lives_ok($$select finalize_audit('eeee0000-0000-4000-8000-0000000000a4')$$,
+  'finalize_audit applies a set_attribute proposal with a null value');
+reset role;
+select is((select count(*) from location_attributes where location_id = 'dddd0000-0000-4000-8000-000000000081'
+             and attribute_id = 'aaaa0000-0000-4000-8000-0000000000a1')::int, 0,
+  'a null value deletes the row rather than leaving it at its last number');
 
 select is((select include_services::int + include_amenities::int + include_attributes::int
             + include_marked::int + include_map::int from audit_templates where id = 'eeee0000-0000-4000-8000-000000000080'),

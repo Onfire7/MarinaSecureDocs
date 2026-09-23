@@ -61,17 +61,20 @@ Location records, for each valid entry:
 - Service: present (row exists), **working** (boolean), **metered**
   (boolean), note.
 - Amenity: present (row exists), note.
-- Attribute: present (row exists), **value** (number), note.
+- Attribute: **value** (number, optional), note. Unlike a Service or
+  Amenity, an Attribute is never present or absent — it applies to every
+  Location of a valid type — so there is no separate presence to record,
+  only a value that may be left blank.
 
 Amenities of a parent (a pavilion, a bathhouse) are recorded on the parent
 only; they are understood to serve its children and are not copied down.
 
 An Attribute's value carries no "still fine" fast path the way a Service's
 `working` flag does: once an Audit exists for the Location, **every**
-Attribute change — presence or value — is a Proposal, never applied
-directly from a Finding. A capacity limit is worth a second look every
-time it moves. The admin location editor still writes it directly, for a
-Location no audit has yet looked at.
+value change — including clearing one that was set — is a Proposal, never
+applied directly from a Finding. A capacity limit is worth a second look
+every time it moves. The admin location editor still writes it directly,
+for a Location no audit has yet looked at.
 
 **Notes** are entered through a typeable selection. The suggestions are the
 distinct notes already recorded for that same Service or Amenity across all
@@ -206,8 +209,9 @@ Fixed per kind. A template cannot switch them off.
 **Status** — each numbered group is one of the Template's **categories**
 (§ Audit Templates) and is asked only when its checkbox is on:
 
-1. **Attributes.** For each Attribute valid for the type: present? value?
-   note. Always a Proposal (§ Services, Amenities and Attributes).
+1. **Attributes.** For each Attribute valid for the type: value? note. No
+   present/absent — it always applies; a blank value just means none is
+   set. Always a Proposal (§ Services, Amenities and Attributes).
 2. **Services.** For each Service valid for the type: present? working? note.
 3. **Amenities.** For each Amenity valid for the type: present? note.
 4. **Marked.** *Is this Location clearly marked?* Yes/No.
@@ -410,7 +414,7 @@ Built 2026-09-22 on `beta2`. Where the code lives:
 - `src/pages/audits/` — the section, home, launch, detail/finalize and
   Finding pages, and the rule-tree editor. `src/pages/admin/AdminServicesPage`
   and `AdminAuditTemplatesPage`. `src/pages/locations/LocationServicesPanel`.
-- `supabase/migrations/20260922000{2,3,4,7,8}00_*.sql`; `supabase/tests/080_audits.sql`.
+- `supabase/migrations/20260922000{2,3,4,7,8,9}00_*.sql`; `supabase/tests/080_audits.sql`.
 - `scripts/e2e/audits.mjs` drives tests 35–42 of the approved list against
   a running app.
 - `src/pages/audits/CategoryCheckboxes.tsx` — the five category checkboxes,
@@ -440,6 +444,17 @@ Two bugs the build turned up, both fixed before this shipped:
   clicks close enough together raced: the second click's spread of the
   (still-stale) prop silently reverted the first click's change once its
   write landed. Fixed by having `CategoryCheckboxes` emit a one-key patch.
+
+**Corrected after the first build shipped** (2026-09-22): Attributes were
+first modeled with a presence toggle, the same shape as Services and
+Amenities. The owner's correction: an Attribute is never present or
+absent — it always applies to every Location of a valid type — only its
+value is optional. `ObservedAttribute` and the `set_attribute` Proposal
+payload dropped `present`; a null value now means "not set" or "cleared",
+decided in SQL by `p.payload->'value' is not null` rather than a boolean
+(migration `20260922000900`). The Choice question editor also moved from
+one comma-separated text field to a proper add/remove list, so an option
+that itself needs a comma has somewhere to go.
 
 ## Out of scope, recorded
 

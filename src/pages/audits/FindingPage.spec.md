@@ -9,8 +9,9 @@ itself commits to.
 - **Built-in questions by kind.** Occupancy: *Occupied?*, then boats (types
   with `has_boat`), vehicles (`has_vehicle`) and an optional Contact.
   Status, each section shown only when its audit's category is on: each
-  valid Attribute (present / value / note — always a Proposal), each valid
-  Service (present / working / note), each valid Amenity (present / note),
+  valid Attribute (value / note, no present/absent — it always applies;
+  always a Proposal, including clearing a value), each valid Service
+  (present / working / note), each valid Amenity (present / note),
   *clearly marked?*, *placed correctly on the map?*. A proposed new
   location (no target) always shows Attributes, Services and Amenities,
   ignoring category flags — they don't apply to data entry on something

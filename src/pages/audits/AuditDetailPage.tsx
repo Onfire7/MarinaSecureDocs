@@ -202,9 +202,9 @@ function ProposalsTable({
         return `${nameOf(amenities, pl.amenity_id)} ${pl.present ? "present" : "absent"}`;
       case "set_attribute": {
         const attr = attributes.find((x) => x.id === pl.attribute_id);
-        return pl.present
+        return pl.value != null
           ? `${attr?.name ?? "?"} → ${pl.value}${attr?.unit ? ` ${attr.unit}` : ""}`
-          : `${attr?.name ?? "?"} removed`;
+          : `${attr?.name ?? "?"} cleared`;
       }
       default:
         return "";

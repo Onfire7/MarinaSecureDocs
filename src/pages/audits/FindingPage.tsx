@@ -146,7 +146,9 @@ function FindingForm({
   const [mappedCorrectly, setMappedCorrectly] = useState<YesNo>(null);
   const [svc, setSvc] = useState<Record<string, { present: boolean; working: boolean; note: string }>>({});
   const [amen, setAmen] = useState<Record<string, { present: boolean; note: string }>>({});
-  const [attr, setAttr] = useState<Record<string, { present: boolean; value: string; note: string }>>({});
+  // No present/absent: an Attribute is always applicable to a valid type,
+  // and only its value (as typed text, so the field can be blank) is optional.
+  const [attr, setAttr] = useState<Record<string, { value: string; note: string }>>({});
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [gpsCapture, setGpsCapture] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
   const [placement, setPlacement] = useState<ProposedPlacement | null>(null);
@@ -200,12 +202,11 @@ function FindingForm({
       if (prop) {
         const pl = parseProposalPayload(prop);
         at[v.id] = {
-          present: Boolean(pl.present),
           value: pl.value != null ? String(pl.value) : "",
           note: pl.note != null ? String(pl.note) : "",
         };
       } else {
-        at[v.id] = { present: !!cur, value: cur ? String(cur.value) : "", note: cur?.note ?? "" };
+        at[v.id] = { value: cur ? String(cur.value) : "", note: cur?.note ?? "" };
       }
     }
     if (
@@ -335,17 +336,14 @@ function FindingForm({
             ? Object.entries(svc).map(([serviceId, v]) => ({ serviceId, present: v.present, working: v.working, note: v.note || null }))
             : [],
           amenities: target ? Object.entries(amen).map(([amenityId, v]) => ({ amenityId, present: v.present, note: v.note || null })) : [],
-          // Skip "present, no value typed yet" — a half-entered attribute
-          // is not an observation, and location_attributes.value is not null.
+          // An Attribute is always applicable; a blank field just means no
+          // value was entered (or one was cleared) — never "not observed".
           attributes: target
-            ? Object.entries(attr)
-                .filter(([, v]) => !(v.present && v.value.trim() === ""))
-                .map(([attributeId, v]) => ({
-                  attributeId,
-                  present: v.present,
-                  value: v.value.trim() === "" ? null : Number(v.value),
-                  note: v.note || null,
-                }))
+            ? Object.entries(attr).map(([attributeId, v]) => ({
+                attributeId,
+                value: v.value.trim() === "" ? null : Number(v.value),
+                note: v.note || null,
+              }))
             : [],
           answers: Object.entries(answers).map(([questionId, a]) => ({ questionId, value: a.value })),
           proposals,
@@ -507,29 +505,26 @@ function FindingForm({
             );
           })}
           {showAttributes && <div className="section-title">Attributes</div>}
+          {/* Always applicable to a valid type — never toggled on or off.
+              Only the value is optional; leaving it blank clears it. */}
           {showAttributes && validAttributes.map((a) => {
-            const v = attr[a.id] ?? { present: false, value: "", note: "" };
+            const v = attr[a.id] ?? { value: "", note: "" };
             return (
               <div key={a.id} className="field">
                 <span className="field-label">{a.name}</span>
                 <div className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                  {yesNo(v.present, (p) => setAttr({ ...attr, [a.id]: { ...v, present: !!p } }), ["Present", "Absent"])}
-                  {v.present && target && (
-                    <>
-                      <input
-                        className="input select-inline"
-                        type="number"
-                        step="any"
-                        style={{ width: 90 }}
-                        placeholder="value"
-                        disabled={!editable}
-                        value={v.value}
-                        onChange={(e) => setAttr({ ...attr, [a.id]: { ...v, value: e.target.value } })}
-                      />
-                      {a.unit && <span className="muted small">{a.unit}</span>}
-                      <NoteInput kind="attribute" entryId={a.id} value={v.note} editable={editable} onChange={(note) => setAttr({ ...attr, [a.id]: { ...v, note } })} />
-                    </>
-                  )}
+                  <input
+                    className="input select-inline"
+                    type="number"
+                    step="any"
+                    style={{ width: 90 }}
+                    placeholder="none"
+                    disabled={!editable}
+                    value={v.value}
+                    onChange={(e) => setAttr({ ...attr, [a.id]: { ...v, value: e.target.value } })}
+                  />
+                  {a.unit && <span className="muted small">{a.unit}</span>}
+                  <NoteInput kind="attribute" entryId={a.id} value={v.note} editable={editable} onChange={(note) => setAttr({ ...attr, [a.id]: { ...v, note } })} />
                 </div>
               </div>
             );
@@ -537,9 +532,9 @@ function FindingForm({
           {target && (showServices || showAttributes) && (
             <p className="muted small">
               {showServices && showAttributes
-                ? "Presence and attribute values wait for approval; working and service notes apply now."
+                ? "Service presence and attribute values wait for approval; working and service notes apply now."
                 : showAttributes
-                  ? "Presence and values wait for approval."
+                  ? "Attribute values wait for approval."
                   : "Presence changes wait for approval; working and notes apply now."}
             </p>
           )}

@@ -19,3 +19,8 @@ commitments in code terms.
   caption; hovering a preview dot rings that rule's card and dims other
   branches, keeping the card's ancestors lit.
 - Counts always read "n of parent".
+- A rule's Questions are Yes/No (with an optional *raise a Ticket on No*),
+  Choice, Text, or Meter reading. A Choice question's options are an
+  add/remove list (`ChoiceOptionsEditor`) — one row per option, an input to
+  add another — not a single comma-separated field, so an option that
+  itself contains a comma still has somewhere to go.

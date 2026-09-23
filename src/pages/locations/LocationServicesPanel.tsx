@@ -1,10 +1,9 @@
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import {
   saveLocationAmenity,
-  saveLocationAttribute,
+  saveLocationAttributeValue,
   saveLocationService,
   setLocationAmenityPresent,
-  setLocationAttributePresent,
   setLocationServicePresent,
   useAmenities,
   useAmenityValidity,
@@ -20,9 +19,11 @@ import {
 import { DraftInput, DraftNumberInput } from "../shared/DraftInput";
 
 // A location's Services, Amenities and Attributes (docs/audits.md
-// § Services and Amenities). Everyone sees what is here; manage_locations
-// edits presence, working, metered, notes and values directly — the admin
-// path that does not need an audit's approval. Once an audit exists for
+// § Services, Amenities and Attributes). Everyone sees what is here;
+// manage_locations edits presence, working, metered, notes and values
+// directly — the admin path that does not need an audit's approval. An
+// Attribute is always applicable to a valid type — there is no presence to
+// toggle, only a value, optional and clearable. Once an audit exists for
 // this location, an Attribute's value only changes through an approved
 // Proposal (docs/audits.md), never from here mid-audit and never from a
 // Finding directly — this panel is the "before any audit" and "manager
@@ -116,36 +117,39 @@ export function LocationServicesPanel({ locationId, typeId }: { locationId: stri
         <div className="field">
           <span className="field-label">Attributes</span>
           <div className="field-value stack" style={{ gap: 4 }}>
+            {/* Always applicable to a valid type — never toggled on or off.
+                Only the value is optional; leaving it blank clears it. */}
             {validAttributes.map((a) => {
               const row = hereAt.find((r) => r.attribute_id === a.id);
               return (
                 <div key={a.id} className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <span>{a.name}</span>
                   {canEdit ? (
-                    <label>
-                      <input type="checkbox" checked={!!row} onChange={(e) => void setLocationAttributePresent(locationId, a.id, e.target.checked)} /> {a.name}
-                    </label>
+                    <>
+                      <DraftNumberInput
+                        className="input select-inline"
+                        style={{ width: 90 }}
+                        placeholder="none"
+                        value={row?.value ?? null}
+                        onCommit={(value) => void saveLocationAttributeValue(locationId, a.id, value ?? null, row?.note ?? null)}
+                      />
+                      {a.unit && <span className="muted small">{a.unit}</span>}
+                      <ServiceNote
+                        kind="attribute"
+                        entryId={a.id}
+                        value={row?.note ?? ""}
+                        onCommit={(note) => row && void saveLocationAttributeValue(locationId, a.id, row.value, note || null)}
+                      />
+                    </>
+                  ) : row ? (
+                    <span className="muted small">
+                      {row.value}
+                      {a.unit ? ` ${a.unit}` : ""}
+                      {row.note ? ` — ${row.note}` : ""}
+                    </span>
                   ) : (
-                    <span className={row ? undefined : "muted"}>{row ? "✓" : "-"} {a.name}</span>
+                    <span className="muted small">none set</span>
                   )}
-                  {row &&
-                    (canEdit ? (
-                      <>
-                        <DraftNumberInput
-                          className="input select-inline"
-                          style={{ width: 90 }}
-                          value={row.value}
-                          onCommit={(value) => value !== undefined && void saveLocationAttribute(row.id, { value })}
-                        />
-                        {a.unit && <span className="muted small">{a.unit}</span>}
-                        <ServiceNote kind="attribute" entryId={a.id} value={row.note ?? ""} onCommit={(note) => void saveLocationAttribute(row.id, { note: note || null })} />
-                      </>
-                    ) : (
-                      <span className="muted small">
-                        {row.value}
-                        {a.unit ? ` ${a.unit}` : ""}
-                        {row.note ? ` — ${row.note}` : ""}
-                      </span>
-                    ))}
                 </div>
               );
             })}

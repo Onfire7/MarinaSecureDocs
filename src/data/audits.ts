@@ -649,8 +649,9 @@ export interface FindingInput {
   mappedCorrectly?: boolean | null;
   services: ObservedService[];
   amenities: { amenityId: string; present: boolean; note: string | null }[];
-  /** Every entry becomes a set_attribute Proposal when it differs from
-   *  what's on file — presence or value — never applied directly. */
+  /** Every entry becomes a set_attribute Proposal when its value differs
+   *  from what's on file — never applied directly. An Attribute is always
+   *  applicable to a valid type; a null value means none was entered. */
   attributes: ObservedAttribute[];
   answers: { questionId: string; value: unknown }[];
   /** Proposals the form produced (gps, rename, create_location, …). Presence
@@ -838,9 +839,10 @@ export async function saveFinding(input: FindingInput, actorId: string): Promise
         }
       }
 
-      // Attributes: always a Proposal, even a value-only change on one
-      // already present — a capacity limit is worth a second look every
-      // time it moves.
+      // Attributes: always a Proposal, even a value-only change — a
+      // capacity limit is worth a second look every time it moves. An
+      // Attribute is always applicable to a valid type; there is no
+      // presence to toggle, only a value that may be unset (null).
       const currentAttributes = await tx.getAll<{ attribute_id: string; value: number; note: string | null }>(
         "SELECT attribute_id, value, note FROM location_attributes WHERE location_id = ?",
         [loc],
@@ -852,7 +854,7 @@ export async function saveFinding(input: FindingInput, actorId: string): Promise
       for (const p of attrDiff.proposals) {
         input.proposals.push({
           kind: "set_attribute",
-          payload: { attribute_id: p.attributeId, present: p.present, value: p.value, note: p.note },
+          payload: { attribute_id: p.attributeId, value: p.value, note: p.note },
         });
       }
 

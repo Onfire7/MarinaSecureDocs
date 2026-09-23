@@ -417,15 +417,15 @@ parent's amenities are not copied to children.
 | Column | Type | Notes |
 |---|---|---|
 | location_id | → locations not null | |
-| attribute_id | → attributes not null | `unique (location_id, attribute_id)`. Row present = attribute enforced. |
+| attribute_id | → attributes not null | `unique (location_id, attribute_id)`. An Attribute is never present or absent on a Location of a valid type — it always applies — so row presence here means only "a value has been entered." No value entered = no row, not a separate flag. |
 | value | numeric not null | In the attribute's `unit`. |
 | note | text | |
 
 Unlike `location_services` / `location_amenities`, no Tier 0 write policy:
-once an Audit exists for the Location, every change — presence or value —
-is a `set_attribute` Proposal, applied only by the security-definer
-`finalize_audit()`. A direct edit (the admin location editor) still needs
-only `manage_locations`, the same as the catalogue.
+once an Audit exists for the Location, every value change — including
+clearing one — is a `set_attribute` Proposal, applied only by the
+security-definer `finalize_audit()`. A direct edit (the admin location
+editor) still needs only `manage_locations`, the same as the catalogue.
 
 #### `service_meter_readings` — Tier 0 · sync: **age**
 
@@ -585,7 +585,7 @@ Proposal when it differs from the Location's row. `audit_finding_answers`:
 | finding_id | → audit_findings not null, cascade | |
 | kind | audit_proposal_kind not null | `create_location` / `retire_location` / `rename` / `retype` / `reparent` / `move_placement` / `set_gps` / `set_service` / `set_amenity` / `set_attribute`. |
 | structural | boolean not null | True for the first six; deciding those needs `manage_locations`. Stored rather than derived so RLS can test it. |
-| payload | jsonb not null | Kind-specific. `create_location`: name, type, parent, gps, services, amenities, status, occupants. `set_gps`: lat, lng, accuracy. `set_service`: service_id, present. `set_attribute`: attribute_id, present, value, note — always the full observation, never just a presence flag. A `STRUCTURED_COLUMNS` entry. |
+| payload | jsonb not null | Kind-specific. `create_location`: name, type, parent, gps, services, amenities, status, occupants. `set_gps`: lat, lng, accuracy. `set_service`: service_id, present. `set_attribute`: attribute_id, value (null clears it), note — decided by whether `value` is null, never a separate presence flag. A `STRUCTURED_COLUMNS` entry. |
 | decision | audit_decision | Null until decided; `approved` / `rejected`. |
 | decided_by_id / decided_at / reason | | Reason required on reject. |
 | applied_location_id | → locations | For `create_location`, the row created on approval; tickets carrying this proposal re-target to it. |
