@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  attributeChoices,
   createAmenity,
   createAttribute,
   createService,
@@ -16,11 +17,13 @@ import {
   useAttributes,
   useServiceValidity,
   useServices,
+  type AttributeKind,
 } from "../../data/services";
 import { useLocationTypes } from "../../data/locations";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
 import { DraftInput } from "../shared/DraftInput";
+import { ChoiceOptionsEditor } from "../shared/ChoiceOptionsEditor";
 
 // Admin — Services, Amenities & Attributes (docs/audits.md § Services and
 // Amenities). Three catalogues, each entry valid for chosen Location Types.
@@ -47,7 +50,7 @@ function Catalogues() {
   const { data: types } = useLocationTypes();
   const [serviceDraft, setServiceDraft] = useState({ name: "", unit: "" });
   const [amenityDraft, setAmenityDraft] = useState("");
-  const [attributeDraft, setAttributeDraft] = useState({ name: "", unit: "" });
+  const [attributeDraft, setAttributeDraft] = useState<{ name: string; kind: AttributeKind; unit: string }>({ name: "", kind: "number", unit: "" });
 
   const typesFor = (
     rows: { location_type_id: string; service_id?: string; amenity_id?: string; attribute_id?: string }[],
@@ -183,20 +186,35 @@ function Catalogues() {
           value={attributeDraft.name}
           onChange={(e) => setAttributeDraft({ ...attributeDraft, name: e.target.value })}
         />
-        <input
-          className="input"
-          style={{ maxWidth: 120 }}
-          placeholder="Unit (ft)"
-          value={attributeDraft.unit}
-          onChange={(e) => setAttributeDraft({ ...attributeDraft, unit: e.target.value })}
-        />
+        <select
+          className="select select-inline"
+          aria-label="New attribute kind"
+          value={attributeDraft.kind}
+          onChange={(e) => setAttributeDraft({ ...attributeDraft, kind: e.target.value as AttributeKind })}
+        >
+          <option value="number">Number</option>
+          <option value="choice">Choice</option>
+        </select>
+        {attributeDraft.kind === "number" && (
+          <input
+            className="input"
+            style={{ maxWidth: 120 }}
+            placeholder="Unit (ft)"
+            value={attributeDraft.unit}
+            onChange={(e) => setAttributeDraft({ ...attributeDraft, unit: e.target.value })}
+          />
+        )}
         <button
           type="button"
           className="btn btn-sm btn-primary"
           disabled={!attributeDraft.name.trim()}
           onClick={() => {
-            void createAttribute({ name: attributeDraft.name.trim(), unit: attributeDraft.unit.trim() || null });
-            setAttributeDraft({ name: "", unit: "" });
+            void createAttribute({
+              name: attributeDraft.name.trim(),
+              kind: attributeDraft.kind,
+              unit: attributeDraft.kind === "number" ? attributeDraft.unit.trim() || null : null,
+            });
+            setAttributeDraft({ name: "", kind: "number", unit: "" });
           }}
         >
           Add attribute
@@ -207,17 +225,38 @@ function Catalogues() {
           <div key={a.id} className="card">
             <div className="row" style={{ alignItems: "center", marginBottom: 8 }}>
               <DraftInput className="input" style={{ maxWidth: 240 }} value={a.name} onCommit={(name) => void saveAttribute(a.id, { name })} />
-              <DraftInput
-                className="input"
-                style={{ maxWidth: 120 }}
-                placeholder="unit"
-                value={a.unit ?? ""}
-                onCommit={(unit) => void saveAttribute(a.id, { unit: unit || null })}
-              />
+              <select
+                className="select select-inline"
+                aria-label={`${a.name} kind`}
+                value={a.kind}
+                onChange={(e) => void saveAttribute(a.id, { kind: e.target.value as AttributeKind })}
+              >
+                <option value="number">Number</option>
+                <option value="choice">Choice</option>
+              </select>
+              {a.kind === "number" && (
+                <DraftInput
+                  className="input"
+                  style={{ maxWidth: 120 }}
+                  placeholder="unit"
+                  value={a.unit ?? ""}
+                  onCommit={(unit) => void saveAttribute(a.id, { unit: unit || null })}
+                />
+              )}
               <button type="button" className="btn btn-sm btn-quiet" onClick={() => window.confirm(`Delete ${a.name}?`) && void deleteAttribute(a.id)}>
                 Delete
               </button>
             </div>
+            {a.kind === "choice" && (
+              <div style={{ marginBottom: 8 }}>
+                <div className="muted small">Options</div>
+                <ChoiceOptionsEditor
+                  choices={attributeChoices(a)}
+                  onChange={(choices) => void saveAttribute(a.id, { choices })}
+                  emptyMessage="No options yet — there is nothing to pick from at a location."
+                />
+              </div>
+            )}
             <div className="muted small" style={{ marginBottom: 4 }}>Valid for</div>
             {typeChips("attribute", a.id, typesFor(attributeTypes, a.id, "attribute_id"))}
           </div>

@@ -5,7 +5,7 @@
 -- passes every denial test (CLAUDE.md).
 create extension if not exists pgtap;
 begin;
-select plan(35);
+select plan(38);
 
 -- Rows affected by an UPDATE run as the current role, so RLS is exercised
 -- from the caller's side. A data-modifying CTE cannot sit inside is().
@@ -257,6 +257,33 @@ select is((select count(*) from location_attributes where location_id = 'dddd000
 select is((select include_services::int + include_amenities::int + include_attributes::int
             + include_marked::int + include_map::int from audit_templates where id = 'eeee0000-0000-4000-8000-000000000080'),
   5, 'a template asks about every built-in Status category by default');
+
+-- ── a choice Attribute lands in value_text, and only one column may hold it
+insert into attributes (id, name, kind, choices) values
+  ('aaaa0000-0000-4000-8000-0000000000a2','Fixture Site Type','choice', array['Back-in','Pull-through']);
+insert into audits (id, name, kind, status, launched_by_id) values
+  ('eeee0000-0000-4000-8000-0000000000a5','Fixture Audit Five','status','open','11111111-0000-4000-8000-000000000001');
+insert into audit_targets (id, audit_id, location_id, location_name, position) values
+  ('eeee1111-0000-4000-8000-000000000009','eeee0000-0000-4000-8000-0000000000a5','dddd0000-0000-4000-8000-000000000081','AF-S1',0);
+insert into audit_findings (id, audit_id, target_id, recorded_by_id) values
+  ('ffff0000-0000-4000-8000-0000000000f9','eeee0000-0000-4000-8000-0000000000a5','eeee1111-0000-4000-8000-000000000009','11111111-0000-4000-8000-000000000001');
+insert into audit_proposals (finding_id, kind, decision, decided_by_id, payload) values
+  ('ffff0000-0000-4000-8000-0000000000f9','set_attribute','approved','11111111-0000-4000-8000-000000000001',
+   '{"attribute_id":"aaaa0000-0000-4000-8000-0000000000a2","value":null,"text":"Pull-through","note":null}');
+select close_audit('eeee0000-0000-4000-8000-0000000000a5');
+select set_config('request.jwt.claims', '{"sub":"user_alice"}', true);
+set local role authenticated;
+select lives_ok($$select finalize_audit('eeee0000-0000-4000-8000-0000000000a5')$$,
+  'finalize_audit applies a choice Attribute');
+reset role;
+select is((select value_text from location_attributes where location_id = 'dddd0000-0000-4000-8000-000000000081'
+             and attribute_id = 'aaaa0000-0000-4000-8000-0000000000a2'), 'Pull-through',
+  'a choice Attribute lands in value_text, not value');
+select throws_ok(
+  $$insert into location_attributes (location_id, attribute_id, value, value_text)
+    values ('dddd0000-0000-4000-8000-000000000083','aaaa0000-0000-4000-8000-0000000000a2', 3, 'Back-in')$$,
+  '23514', null,
+  'a Location Attribute holds a number or a choice, never both');
 
 select * from finish();
 rollback;

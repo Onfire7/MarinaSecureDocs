@@ -51,9 +51,10 @@ Three marina-defined catalogues, edited under Admin beside Location Types.
 - A **Service** is a fixed utility: 30A power, 50A power, water, sewer. It
   declares an optional **unit** (kWh, gallons) used when metered.
 - An **Amenity** is an extra: WiFi, fire pit, grill, picnic table.
-- An **Attribute** is a number the Location enforces: maximum boat length,
-  maximum vehicle length. It declares an optional **unit** (ft) shown
-  beside the value.
+- An **Attribute** is what the Location enforces about what it will accept.
+  It declares a **kind**: a `number` with an optional **unit** (maximum boat
+  length, in ft) or a `choice` with **options** (site type: back-in or
+  pull-through) — the same option list an Audit Question's Choice kind uses.
 
 Each catalogue entry names the Location Types it is **valid for**. A
 Location records, for each valid entry:
@@ -61,7 +62,8 @@ Location records, for each valid entry:
 - Service: present (row exists), **working** (boolean), **metered**
   (boolean), note.
 - Amenity: present (row exists), note.
-- Attribute: **value** (number, optional), note. Unlike a Service or
+- Attribute: **value** (optional) — a number for a `number` kind, one of
+  the options for a `choice` kind — and a note. Unlike a Service or
   Amenity, an Attribute is never present or absent — it applies to every
   Location of a valid type — so there is no separate presence to record,
   only a value that may be left blank.
@@ -209,9 +211,10 @@ Fixed per kind. A template cannot switch them off.
 **Status** — each numbered group is one of the Template's **categories**
 (§ Audit Templates) and is asked only when its checkbox is on:
 
-1. **Attributes.** For each Attribute valid for the type: value? note. No
-   present/absent — it always applies; a blank value just means none is
-   set. Always a Proposal (§ Services, Amenities and Attributes).
+1. **Attributes.** For each Attribute valid for the type: value (a number
+   field or a pick from its options) and note. No present/absent — it
+   always applies; a blank value just means none is set. Always a Proposal
+   (§ Services, Amenities and Attributes).
 2. **Services.** For each Service valid for the type: present? working? note.
 3. **Amenities.** For each Amenity valid for the type: present? note.
 4. **Marked.** *Is this Location clearly marked?* Yes/No.
@@ -219,6 +222,11 @@ Fixed per kind. A template cannot switch them off.
    plotted on is shown with its rectangle highlighted (its nearest
    ancestor's map when it is plotted nowhere); tapping a new spot is a
    `move_placement` Proposal and answers No.
+
+Every section opens **pre-filled from what the marina already knows** — a
+Service that's on file starts on *Present* with its working flag and note,
+an Attribute with its recorded value. The auditor confirms what's there and
+changes what isn't, rather than entering a Location from scratch.
 
 **Both kinds**: the **GPS prompt**, shown only when the Location has no
 coordinates, or the device is farther from them than the marina's *audit

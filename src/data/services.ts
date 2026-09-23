@@ -1,5 +1,5 @@
 import { useQuery } from "@powersync/react";
-import { db, stamp } from "../lib/db";
+import { db, jsonArray, stamp } from "../lib/db";
 import { insert, remove, transact, update } from "./sql";
 import { rankNoteSuggestions } from "../lib/audits";
 
@@ -26,11 +26,21 @@ export interface AmenityRow {
   name: string;
   position: number;
 }
+export type AttributeKind = "number" | "choice";
 export interface AttributeRow {
   id: string;
   name: string;
+  /** `number` carries a unit; `choice` carries options. */
+  kind: AttributeKind;
   unit: string | null;
+  /** JSON-encoded text[] on the device — use {@link attributeChoices}. */
+  choices: string | null;
   position: number;
+}
+
+/** A choice Attribute's options, off the device's text[] column. */
+export function attributeChoices(row: { choices: string | null }): string[] {
+  return jsonArray(row.choices);
 }
 export interface ValidityRow {
   id: string;
@@ -77,11 +87,29 @@ export function saveAmenity(id: string, input: { name?: string }): Promise<void>
 export function deleteAmenity(id: string): Promise<void> {
   return remove(db, "amenities", id);
 }
-export function createAttribute(input: { name: string; unit?: string | null }): Promise<string> {
-  return insert(db, "attributes", { name: input.name, unit: input.unit ?? null, position: 0 });
+export function createAttribute(input: {
+  name: string;
+  kind?: AttributeKind;
+  unit?: string | null;
+}): Promise<string> {
+  return insert(db, "attributes", {
+    name: input.name,
+    kind: input.kind ?? "number",
+    unit: input.unit ?? null,
+    choices: JSON.stringify([]),
+    position: 0,
+  });
 }
-export function saveAttribute(id: string, input: { name?: string; unit?: string | null }): Promise<void> {
-  return update(db, "attributes", id, { name: input.name, unit: input.unit });
+export function saveAttribute(
+  id: string,
+  input: { name?: string; kind?: AttributeKind; unit?: string | null; choices?: string[] },
+): Promise<void> {
+  return update(db, "attributes", id, {
+    name: input.name,
+    kind: input.kind,
+    unit: input.unit,
+    choices: input.choices === undefined ? undefined : JSON.stringify(input.choices),
+  });
 }
 export function deleteAttribute(id: string): Promise<void> {
   return remove(db, "attributes", id);
@@ -131,9 +159,13 @@ export interface LocationAttributeRow {
   id: string;
   location_id: string;
   attribute_id: string;
-  value: number;
+  /** Set for a `number` Attribute; null for a `choice` one. */
+  value: number | null;
+  /** Set for a `choice` Attribute; null for a `number` one. */
+  value_text: string | null;
   note: string | null;
   attribute_name: string;
+  attribute_kind: AttributeKind;
   unit: string | null;
 }
 
@@ -155,7 +187,7 @@ export function useLocationAmenities(locationId: string | undefined) {
 }
 export function useLocationAttributes(locationId: string | undefined) {
   return useQuery<LocationAttributeRow>(
-    `SELECT la.*, at.name AS attribute_name, at.unit
+    `SELECT la.*, at.name AS attribute_name, at.kind AS attribute_kind, at.unit
        FROM location_attributes la JOIN attributes at ON at.id = la.attribute_id
       WHERE la.location_id = ? ORDER BY at.position, at.name`,
     [locationId ?? ""],
@@ -240,7 +272,7 @@ export function saveLocationAmenity(rowId: string, changes: { note?: string | nu
 export function saveLocationAttributeValue(
   locationId: string,
   attributeId: string,
-  value: number | null,
+  value: { value: number | null; text: string | null },
   note?: string | null,
 ): Promise<void> {
   return transact(async (tx) => {
@@ -248,11 +280,12 @@ export function saveLocationAttributeValue(
       locationId,
       attributeId,
     ]);
-    if (value !== null) {
+    if (value.value !== null || value.text !== null) {
       await insert(tx, "location_attributes", {
         location_id: locationId,
         attribute_id: attributeId,
-        value,
+        value: value.value,
+        value_text: value.text,
         note: note ?? null,
       });
     }

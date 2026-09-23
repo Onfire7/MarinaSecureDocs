@@ -175,6 +175,8 @@ const attributes = new Table(
     name: column.text,
     unit: column.text,
     position: column.integer,
+    kind: column.text,
+    choices: column.text, // JSON-encoded
   },
   {
     indexes: {
@@ -949,6 +951,7 @@ const location_attributes = new Table(
     attribute_id: column.text,
     value: column.real,
     note: column.text,
+    value_text: column.text,
   },
   {
     indexes: {
@@ -1664,6 +1667,7 @@ export const TABLE_NAMES = [
  * refuses the write. See src/lib/db/uploadShape.ts.
  */
 export const STRUCTURED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
+  attributes: ["choices"],
   audit_finding_answers: ["value"],
   audit_proposals: ["payload"],
   audit_questions: ["choices"],

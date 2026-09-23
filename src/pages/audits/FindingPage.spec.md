@@ -10,7 +10,9 @@ itself commits to.
   with `has_boat`), vehicles (`has_vehicle`) and an optional Contact.
   Status, each section shown only when its audit's category is on: each
   valid Attribute (value / note, no present/absent — it always applies;
-  always a Proposal, including clearing a value), each valid Service
+  always a Proposal, including clearing a value) — a number field with its
+  unit, or a select of its options when its kind is `choice` — each valid
+  Service
   (present / working / note), each valid Amenity (present / note),
   *clearly marked?*, *placed correctly on the map?*. A proposed new
   location (no target) always shows Attributes, Services and Amenities,
@@ -18,6 +20,12 @@ itself commits to.
   that doesn't exist yet. Both kinds: Status select (applies at once), the
   target's own questions, the GPS block, *Propose a change*, the
   Ticket / Incident / Note actions.
+- **The form opens pre-filled from what the location already records** —
+  services present with their working flag and note, amenities, attribute
+  values, the current status. An audit verifies; it does not re-enter a
+  location from scratch, and an untouched section proposes nothing. The seed
+  waits for every catalogue, validity and location query to settle, on the
+  same both-flags rule reopening uses below.
 - **Unexpected occupancy** is derived live from the Lease and checked-in
   Reservation on file and shown as a badge; it is never asked.
 - **Occupant search never erases what was typed.** Picking a boat after typing

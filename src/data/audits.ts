@@ -843,18 +843,25 @@ export async function saveFinding(input: FindingInput, actorId: string): Promise
       // capacity limit is worth a second look every time it moves. An
       // Attribute is always applicable to a valid type; there is no
       // presence to toggle, only a value that may be unset (null).
-      const currentAttributes = await tx.getAll<{ attribute_id: string; value: number; note: string | null }>(
-        "SELECT attribute_id, value, note FROM location_attributes WHERE location_id = ?",
-        [loc],
-      );
+      const currentAttributes = await tx.getAll<{
+        attribute_id: string;
+        value: number | null;
+        value_text: string | null;
+        note: string | null;
+      }>("SELECT attribute_id, value, value_text, note FROM location_attributes WHERE location_id = ?", [loc]);
       const attrDiff = attributeDiff(
-        currentAttributes.map((c) => ({ attributeId: c.attribute_id, value: c.value, note: c.note })),
+        currentAttributes.map((c) => ({
+          attributeId: c.attribute_id,
+          value: c.value,
+          text: c.value_text,
+          note: c.note,
+        })),
         input.attributes,
       );
       for (const p of attrDiff.proposals) {
         input.proposals.push({
           kind: "set_attribute",
-          payload: { attribute_id: p.attributeId, value: p.value, note: p.note },
+          payload: { attribute_id: p.attributeId, value: p.value, text: p.text, note: p.note },
         });
       }
 

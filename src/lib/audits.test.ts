@@ -159,37 +159,43 @@ describe("service presence diff yields proposals", () => {
 
 describe("attribute diff yields proposals for every change", () => {
   // An Attribute is always applicable to a valid type — there is no
-  // present/absent toggle — only its value is optional.
+  // present/absent toggle — only its value is optional. A `number` kind
+  // fills `value`, a `choice` kind fills `text`.
   const current = [
-    { attributeId: "max_boat", value: 40, note: null },
-    { attributeId: "max_vehicle", value: 22, note: "trailers ok" },
+    { attributeId: "max_boat", value: 40, text: null, note: null },
+    { attributeId: "max_vehicle", value: 22, text: null, note: "trailers ok" },
+    { attributeId: "site_type", value: null, text: "Back-in", note: null },
   ];
   it("a value change proposes, and clearing a value (to null) proposes too", () => {
-    const observed = [
-      { attributeId: "max_boat", value: 35, note: null },
-      { attributeId: "max_vehicle", value: null, note: null },
-      { attributeId: "max_trailer", value: 18, note: null },
-    ];
-    const d = attributeDiff(current, observed);
+    const d = attributeDiff(current, [
+      { attributeId: "max_boat", value: 35, text: null, note: null },
+      { attributeId: "max_vehicle", value: null, text: null, note: null },
+      { attributeId: "max_trailer", value: 18, text: null, note: null },
+    ]);
     expect(d.proposals).toEqual([
-      { attributeId: "max_boat", value: 35, note: null },
-      { attributeId: "max_vehicle", value: null, note: null },
-      { attributeId: "max_trailer", value: 18, note: null },
+      { attributeId: "max_boat", value: 35, text: null, note: null },
+      { attributeId: "max_vehicle", value: null, text: null, note: null },
+      { attributeId: "max_trailer", value: 18, text: null, note: null },
     ]);
   });
-  it("an unchanged observation produces nothing", () => {
+  it("a choice attribute proposes when a different option is picked", () => {
+    const d = attributeDiff(current, [{ attributeId: "site_type", value: null, text: "Pull-through", note: null }]);
+    expect(d.proposals).toEqual([{ attributeId: "site_type", value: null, text: "Pull-through", note: null }]);
+  });
+  it("an unchanged observation produces nothing, whichever kind", () => {
     const d = attributeDiff(current, [
-      { attributeId: "max_boat", value: 40, note: null },
-      { attributeId: "max_vehicle", value: 22, note: "trailers ok" },
+      { attributeId: "max_boat", value: 40, text: null, note: null },
+      { attributeId: "max_vehicle", value: 22, text: null, note: "trailers ok" },
+      { attributeId: "site_type", value: null, text: "Back-in", note: null },
     ]);
     expect(d.proposals).toEqual([]);
   });
   it("a never-set attribute observed as still unset produces nothing", () => {
-    const d = attributeDiff(current, [{ attributeId: "max_trailer", value: null, note: null }]);
+    const d = attributeDiff(current, [{ attributeId: "max_trailer", value: null, text: null, note: null }]);
     expect(d.proposals).toEqual([]);
   });
   it("a note-only change on an already-set attribute still proposes", () => {
-    const d = attributeDiff(current, [{ attributeId: "max_boat", value: 40, note: "no houseboats" }]);
-    expect(d.proposals).toEqual([{ attributeId: "max_boat", value: 40, note: "no houseboats" }]);
+    const d = attributeDiff(current, [{ attributeId: "max_boat", value: 40, text: null, note: "no houseboats" }]);
+    expect(d.proposals).toEqual([{ attributeId: "max_boat", value: 40, text: null, note: "no houseboats" }]);
   });
 });

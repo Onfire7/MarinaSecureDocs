@@ -203,10 +203,11 @@ being recorded on them.
 _Avoid_: feature, facility, extra
 
 **Attribute**:
-A number a Location enforces on what it will accept — maximum boat length,
-maximum vehicle length. Unlike a Service or Amenity, an Attribute is never
-present or absent: it applies to every Location of a valid type, and only
-its value is optional. Once an Audit exists for a Location, its Attribute
+A fact a Location enforces about what it will accept — a number with a unit
+(maximum boat length), or a choice from options the marina defines (a
+campsite being back-in or pull-through). Unlike a Service or Amenity, an
+Attribute is never present or absent: it applies to every Location of a
+valid type, and only its value is optional. Once an Audit exists for a Location, its Attribute
 values change only through an approved Proposal — there is nothing to
 toggle without review.
 _Avoid_: spec, limit, restriction

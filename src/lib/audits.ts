@@ -202,36 +202,43 @@ export function servicePresenceDiff(
 
 export interface CurrentAttribute {
   attributeId: string;
-  value: number;
+  /** A `number` Attribute's value; null for a `choice` one. */
+  value: number | null;
+  /** A `choice` Attribute's value; null for a `number` one. */
+  text: string | null;
   note: string | null;
 }
 export interface ObservedAttribute {
   attributeId: string;
-  /** Null means no value entered — an Attribute is always applicable to a
-   *  valid type, never toggled on or off; only its value is optional. */
+  /** Both null means no value entered — an Attribute is always applicable
+   *  to a valid type, never toggled on or off; only its value is optional. */
   value: number | null;
+  text: string | null;
   note: string | null;
 }
 
 /**
- * Every change is a Proposal, including clearing a value that was set — a
- * capacity limit (maximum boat length, maximum vehicle length) is worth a
- * second look every time it moves, not just when it's first entered.
+ * Every change is a Proposal, including clearing a value that was set —
+ * what a Location will accept (maximum boat length, back-in or
+ * pull-through) is worth a second look every time it moves, not just when
+ * it's first entered.
  */
 export function attributeDiff(
   current: CurrentAttribute[],
   observed: ObservedAttribute[],
 ): {
-  proposals: { attributeId: string; value: number | null; note: string | null }[];
+  proposals: { attributeId: string; value: number | null; text: string | null; note: string | null }[];
 } {
   const have = new Map(current.map((c) => [c.attributeId, c]));
-  const proposals: { attributeId: string; value: number | null; note: string | null }[] = [];
+  const proposals: { attributeId: string; value: number | null; text: string | null; note: string | null }[] = [];
   for (const o of observed) {
     const cur = have.get(o.attributeId);
-    const curValue = cur?.value ?? null;
-    const curNote = cur?.note ?? null;
-    if (curValue !== o.value || curNote !== (o.note ?? null)) {
-      proposals.push({ attributeId: o.attributeId, value: o.value, note: o.note ?? null });
+    if (
+      (cur?.value ?? null) !== o.value ||
+      (cur?.text ?? null) !== (o.text ?? null) ||
+      (cur?.note ?? null) !== (o.note ?? null)
+    ) {
+      proposals.push({ attributeId: o.attributeId, value: o.value, text: o.text ?? null, note: o.note ?? null });
     }
   }
   return { proposals };

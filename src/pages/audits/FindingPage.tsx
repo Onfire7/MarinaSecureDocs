@@ -21,6 +21,7 @@ import {
   type ProposalKind,
 } from "../../data/audits";
 import {
+  attributeChoices,
   useAmenities,
   useAmenityValidity,
   useAttributeValidity,
@@ -121,30 +122,55 @@ function FindingForm({
   const fAmenities = partAmenities.data;
   const fAnswers = partAnswers.data;
   const fProposals = partProposals.data;
-  // These six queries are keyed on finding.id. On the render where the
-  // finding row first arrives they have only just been re-pointed: PowerSync
-  // keeps `isLoading` false and the previous (empty) `data` across a
-  // parameter change and flips `isFetching` instead. Seeding on that render
-  // filled the form from empty arrays and locked it — a reopened finding
-  // showed no occupants, services, answers or proposals.
-  const partsSettled = [partBoats, partVehicles, partServices, partAmenities, partAnswers, partProposals].every(
-    (q) => !q.isLoading && !q.isFetching,
-  );
-
   const { data: questions } = useTargetQuestions(target?.id);
   const { statuses } = useLocationStatuses();
   const { statuses: ticketStatuses } = useTicketStatuses();
   const { data: types } = useLocationTypes();
   const { data: locations } = useLocations();
-  const { data: services } = useServices();
-  const { data: amenities } = useAmenities();
-  const { data: attributes } = useAttributes();
-  const { data: serviceValidity } = useServiceValidity();
-  const { data: amenityValidity } = useAmenityValidity();
-  const { data: attributeValidity } = useAttributeValidity();
-  const { data: currentServices } = useLocationServices(locationId ?? undefined);
-  const { data: currentAmenities } = useLocationAmenities(locationId ?? undefined);
-  const { data: currentAttributes } = useLocationAttributes(locationId ?? undefined);
+  const catServices = useServices();
+  const catAmenities = useAmenities();
+  const catAttributes = useAttributes();
+  const validService = useServiceValidity();
+  const validAmenity = useAmenityValidity();
+  const validAttribute = useAttributeValidity();
+  const locServices = useLocationServices(locationId ?? undefined);
+  const locAmenities = useLocationAmenities(locationId ?? undefined);
+  const locAttributes = useLocationAttributes(locationId ?? undefined);
+  const services = catServices.data;
+  const amenities = catAmenities.data;
+  const attributes = catAttributes.data;
+  const serviceValidity = validService.data;
+  const amenityValidity = validAmenity.data;
+  const attributeValidity = validAttribute.data;
+  const currentServices = locServices.data;
+  const currentAmenities = locAmenities.data;
+  const currentAttributes = locAttributes.data;
+
+  /**
+   * The form seeds itself once, from what the marina already knows — so an
+   * auditor confirms "power is here, still working" rather than entering it
+   * from scratch. That only works if every query it reads has actually
+   * answered first.
+   *
+   * PowerSync's `useQuery` starts with empty data, and across a parameter
+   * change it keeps the previous data with `isLoading` still false and
+   * flips `isFetching` instead. Seeding before these settle filled the form
+   * from empty arrays and then locked: a location whose services and
+   * attributes were on file came up blank, as did a reopened finding's
+   * occupants and answers.
+   */
+  const sourcesSettled = [
+    catServices,
+    catAmenities,
+    catAttributes,
+    validService,
+    validAmenity,
+    validAttribute,
+    locServices,
+    locAmenities,
+    locAttributes,
+    ...(finding ? [partBoats, partVehicles, partServices, partAmenities, partAnswers, partProposals] : []),
+  ].every((q) => !q.isLoading && !q.isFetching);
   const { data: leases } = useLeasesForLocation(locationId ?? undefined);
   const { data: reservations } = useReservationsForTarget("location", locationId ?? undefined);
 
@@ -162,8 +188,9 @@ function FindingForm({
   const [svc, setSvc] = useState<Record<string, { present: boolean; working: boolean; note: string }>>({});
   const [amen, setAmen] = useState<Record<string, { present: boolean; note: string }>>({});
   // No present/absent: an Attribute is always applicable to a valid type,
-  // and only its value (as typed text, so the field can be blank) is optional.
-  const [attr, setAttr] = useState<Record<string, { value: string; note: string }>>({});
+  // and only its value is optional. `value` is the typed text of a number
+  // Attribute (so the field can be blank); `text` is a choice one's option.
+  const [attr, setAttr] = useState<Record<string, { value: string; text: string; note: string }>>({});
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [gpsCapture, setGpsCapture] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
   const [placement, setPlacement] = useState<ProposedPlacement | null>(null);
@@ -193,7 +220,7 @@ function FindingForm({
   useEffect(() => {
     if (seeded) return;
     if (target && target.finding_id && !finding) return; // wait for the row
-    if (finding && !partsSettled) return; // and then for its parts
+    if (!sourcesSettled) return; // and for everything the seed reads
     const s: typeof svc = {};
     for (const v of validServices) {
       const cur = currentServices.find((c) => c.service_id === v.id);
@@ -219,22 +246,16 @@ function FindingForm({
         const pl = parseProposalPayload(prop);
         at[v.id] = {
           value: pl.value != null ? String(pl.value) : "",
+          text: pl.text != null ? String(pl.text) : "",
           note: pl.note != null ? String(pl.note) : "",
         };
       } else {
-        at[v.id] = { value: cur ? String(cur.value) : "", note: cur?.note ?? "" };
+        at[v.id] = {
+          value: cur?.value != null ? String(cur.value) : "",
+          text: cur?.value_text ?? "",
+          note: cur?.note ?? "",
+        };
       }
-    }
-    if (
-      validServices.length === 0 &&
-      validAmenities.length === 0 &&
-      validAttributes.length === 0 &&
-      !finding &&
-      services.length + amenities.length + attributes.length > 0 &&
-      serviceValidity.length + amenityValidity.length + attributeValidity.length === 0
-    ) {
-      // Catalogue exists but validity not synced yet; keep waiting.
-      return;
     }
     setSvc(s);
     setAmen(a);
@@ -269,7 +290,7 @@ function FindingForm({
       }
     }
     setSeeded(true);
-  }, [seeded, target, finding, partsSettled, validServices, validAmenities, validAttributes, currentServices, currentAmenities, currentAttributes, fServices, fAmenities, fBoats, fVehicles, fAnswers, fProposals, services.length, amenities.length, attributes.length, serviceValidity.length, amenityValidity.length, attributeValidity.length, locations.length]);
+  }, [seeded, target, finding, sourcesSettled, validServices, validAmenities, validAttributes, currentServices, currentAmenities, currentAttributes, fServices, fAmenities, fBoats, fVehicles, fAnswers, fProposals]);
 
   // Expected occupancy from what is on file.
   const now = Date.now();
@@ -358,6 +379,7 @@ function FindingForm({
             ? Object.entries(attr).map(([attributeId, v]) => ({
                 attributeId,
                 value: v.value.trim() === "" ? null : Number(v.value),
+                text: v.text.trim() === "" ? null : v.text,
                 note: v.note || null,
               }))
             : [],
@@ -524,22 +546,41 @@ function FindingForm({
           {/* Always applicable to a valid type — never toggled on or off.
               Only the value is optional; leaving it blank clears it. */}
           {showAttributes && validAttributes.map((a) => {
-            const v = attr[a.id] ?? { value: "", note: "" };
+            const v = attr[a.id] ?? { value: "", text: "", note: "" };
             return (
               <div key={a.id} className="field">
                 <span className="field-label">{a.name}</span>
                 <div className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                  <input
-                    className="input select-inline"
-                    type="number"
-                    step="any"
-                    style={{ width: 90 }}
-                    placeholder="none"
-                    disabled={!editable}
-                    value={v.value}
-                    onChange={(e) => setAttr({ ...attr, [a.id]: { ...v, value: e.target.value } })}
-                  />
-                  {a.unit && <span className="muted small">{a.unit}</span>}
+                  {a.kind === "choice" ? (
+                    <select
+                      className="select select-inline"
+                      aria-label={a.name}
+                      disabled={!editable}
+                      value={v.text}
+                      onChange={(e) => setAttr({ ...attr, [a.id]: { ...v, text: e.target.value } })}
+                    >
+                      <option value="">none</option>
+                      {attributeChoices(a).map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <>
+                      <input
+                        className="input select-inline"
+                        type="number"
+                        step="any"
+                        style={{ width: 90 }}
+                        placeholder="none"
+                        disabled={!editable}
+                        value={v.value}
+                        onChange={(e) => setAttr({ ...attr, [a.id]: { ...v, value: e.target.value } })}
+                      />
+                      {a.unit && <span className="muted small">{a.unit}</span>}
+                    </>
+                  )}
                   <NoteInput kind="attribute" entryId={a.id} value={v.note} editable={editable} onChange={(note) => setAttr({ ...attr, [a.id]: { ...v, note } })} />
                 </div>
               </div>

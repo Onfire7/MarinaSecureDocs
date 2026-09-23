@@ -1,5 +1,6 @@
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import {
+  attributeChoices,
   saveLocationAmenity,
   saveLocationAttributeValue,
   saveLocationService,
@@ -121,31 +122,72 @@ export function LocationServicesPanel({ locationId, typeId }: { locationId: stri
                 Only the value is optional; leaving it blank clears it. */}
             {validAttributes.map((a) => {
               const row = hereAt.find((r) => r.attribute_id === a.id);
+              const shown = a.kind === "choice" ? row?.value_text : row?.value != null ? String(row.value) : null;
               return (
                 <div key={a.id} className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <span>{a.name}</span>
                   {canEdit ? (
                     <>
-                      <DraftNumberInput
-                        className="input select-inline"
-                        style={{ width: 90 }}
-                        placeholder="none"
-                        value={row?.value ?? null}
-                        onCommit={(value) => void saveLocationAttributeValue(locationId, a.id, value ?? null, row?.note ?? null)}
-                      />
-                      {a.unit && <span className="muted small">{a.unit}</span>}
+                      {a.kind === "choice" ? (
+                        <select
+                          className="select select-inline"
+                          aria-label={a.name}
+                          value={row?.value_text ?? ""}
+                          onChange={(e) =>
+                            void saveLocationAttributeValue(
+                              locationId,
+                              a.id,
+                              { value: null, text: e.target.value || null },
+                              row?.note ?? null,
+                            )
+                          }
+                        >
+                          <option value="">none</option>
+                          {attributeChoices(a).map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <>
+                          <DraftNumberInput
+                            className="input select-inline"
+                            style={{ width: 90 }}
+                            placeholder="none"
+                            value={row?.value ?? null}
+                            onCommit={(value) =>
+                              void saveLocationAttributeValue(
+                                locationId,
+                                a.id,
+                                { value: value ?? null, text: null },
+                                row?.note ?? null,
+                              )
+                            }
+                          />
+                          {a.unit && <span className="muted small">{a.unit}</span>}
+                        </>
+                      )}
                       <ServiceNote
                         kind="attribute"
                         entryId={a.id}
                         value={row?.note ?? ""}
-                        onCommit={(note) => row && void saveLocationAttributeValue(locationId, a.id, row.value, note || null)}
+                        onCommit={(note) =>
+                          row &&
+                          void saveLocationAttributeValue(
+                            locationId,
+                            a.id,
+                            { value: row.value, text: row.value_text },
+                            note || null,
+                          )
+                        }
                       />
                     </>
-                  ) : row ? (
+                  ) : shown != null ? (
                     <span className="muted small">
-                      {row.value}
-                      {a.unit ? ` ${a.unit}` : ""}
-                      {row.note ? ` — ${row.note}` : ""}
+                      {shown}
+                      {a.kind === "number" && a.unit ? ` ${a.unit}` : ""}
+                      {row?.note ? ` — ${row.note}` : ""}
                     </span>
                   ) : (
                     <span className="muted small">none set</span>
