@@ -59,7 +59,7 @@ const statusAudit: AuditReport = {
   columns: {
     services: ["Power", "Water"],
     amenities: ["WiFi"],
-    attributes: [{ name: "Max boat length", unit: "ft" }, { name: "Site type", unit: null }],
+    attributes: [{ name: "Max boat length", unit: "ft" }, { name: "Access", unit: null }],
     questions: ["Is the pedestal breaker labelled?", "Fire ring condition"],
   },
   targets: [
@@ -73,7 +73,7 @@ const statusAudit: AuditReport = {
       amenities: [{ name: "WiFi", present: true, note: null }],
       attributes: [
         { name: "Max boat length", unit: "ft", value: "38", proposed: false },
-        { name: "Site type", unit: null, value: null, proposed: false },
+        { name: "Access", unit: null, value: null, proposed: false },
       ],
       answers: [
         { prompt: "Is the pedestal breaker labelled?", kind: "yes_no", value: true, ticketId: null },
@@ -103,7 +103,7 @@ const statusAudit: AuditReport = {
       amenities: [{ name: "WiFi", present: true, note: "weak signal" }],
       attributes: [
         { name: "Max boat length", unit: "ft", value: "35", proposed: true },
-        { name: "Site type", unit: null, value: "Back-in", proposed: true },
+        { name: "Access", unit: null, value: "Back-in", proposed: true },
       ],
       answers: [
         { prompt: "Is the pedestal breaker labelled?", kind: "yes_no", value: false, ticketId: "k1" },
@@ -111,7 +111,7 @@ const statusAudit: AuditReport = {
       ],
       proposals: [
         { id: "p3", kind: "move_placement", structural: true, decision: null, reason: null, recordedBy: "Bob", payload: {} },
-        { id: "p4", kind: "set_attribute", structural: false, decision: "approved", reason: null, recordedBy: "Bob", payload: { attributeName: "Site type", value: null, text: "Back-in" } },
+        { id: "p4", kind: "set_attribute", structural: false, decision: "approved", reason: null, recordedBy: "Bob", payload: { attributeName: "Access", value: null, text: "Back-in" } },
       ],
       tickets: [
         { id: "k1", title: "Label pedestal breaker at BH14-02L", priority: "medium", status: "Open", open: true },
@@ -228,8 +228,8 @@ describe("attention", () => {
   });
   it("5b · a proposal is described from its resolved payload", () => {
     expect(describeProposal(statusAudit.targets[1].proposals[0])).toBe("Max boat length → 40 ft");
-    expect(describeProposal(statusAudit.targets[2].proposals[1])).toBe("Site type → Back-in");
-    expect(describeProposal({ id: "x", kind: "set_attribute", structural: false, decision: null, reason: null, recordedBy: null, payload: { attributeName: "Site type", value: null, text: null } })).toBe("Site type cleared");
+    expect(describeProposal(statusAudit.targets[2].proposals[1])).toBe("Access → Back-in");
+    expect(describeProposal({ id: "x", kind: "set_attribute", structural: false, decision: null, reason: null, recordedBy: null, payload: { attributeName: "Access", value: null, text: null } })).toBe("Access cleared");
     expect(describeProposal({ id: "x", kind: "create_location", structural: true, decision: null, reason: null, recordedBy: null, payload: { name: "RV101", locationTypeName: "Campsite", parentName: "Loop D" } })).toBe("New location RV101 (Campsite under Loop D)");
     expect(describeProposal({ id: "x", kind: "set_gps", structural: false, decision: null, reason: null, recordedBy: null, payload: {} })).toBe("GPS captured");
   });
@@ -237,7 +237,7 @@ describe("attention", () => {
 
 describe("wide rows", () => {
   it("6 · headers follow what the audit asked, in catalogue order", () => {
-    expect(wideHeaders(statusAudit)).toEqual(["Max boat length", "Site type", "Power", "Water", "WiFi", "Is the pedestal breaker labelled?", "Fire ring condition", "Marked", "Map"]);
+    expect(wideHeaders(statusAudit)).toEqual(["Max boat length", "Access", "Power", "Water", "WiFi", "Is the pedestal breaker labelled?", "Fire ring condition", "Marked", "Map"]);
     expect(wideHeaders(occupancyAudit)).toEqual(["Occupied", "Dock lines in good condition?"]);
     const noMap = { ...statusAudit, audit: { ...statusAudit.audit, includeMap: false } };
     expect(wideHeaders(noMap)).not.toContain("Map");
@@ -250,7 +250,7 @@ describe("wide rows", () => {
       Water: "Working",
       WiFi: "Yes",
       "Max boat length": "38 ft",
-      "Site type": "-",
+      "Access": "-",
       "Is the pedestal breaker labelled?": "Yes",
       "Fire ring condition": "Good",
       Marked: "Yes",
@@ -260,7 +260,7 @@ describe("wide rows", () => {
     expect(rows[1].cells.WiFi).toBe("No");
     expect(rows[2].cells.Power).toBe("Not working");
     expect(rows[2].cells["Max boat length"]).toBe("35 ft *");
-    expect(rows[2].cells["Site type"]).toBe("Back-in *");
+    expect(rows[2].cells["Access"]).toBe("Back-in *");
     expect(rows[2].cells["Is the pedestal breaker labelled?"]).toBe("No");
     expect(rows[2].cells.Marked).toBe("No");
     expect(rows[2].notes).toBe("Power: pedestal dead; Water: shared tap; WiFi: weak signal");

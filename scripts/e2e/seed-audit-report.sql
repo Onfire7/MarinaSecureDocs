@@ -10,7 +10,7 @@ declare
   s_power   uuid; s_water uuid; s_sewer uuid;
   a_fire    uuid; a_table uuid; a_wifi uuid;
   at_len    uuid := (select id from attributes where name = 'Max boat length');
-  at_site   uuid := (select id from attributes where name = 'Site type');
+  at_site   uuid := (select id from attributes where name = 'Access');
   st_open   uuid := (select id from ticket_statuses where name = 'Open');
   audit1    uuid; audit2 uuid; rule1 uuid; rule2 uuid; q1 uuid; q2 uuid; q3 uuid;
   tgt       record; f uuid; n int := 0; nowts timestamptz := now() - interval '3 days';

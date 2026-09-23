@@ -54,7 +54,7 @@ Three marina-defined catalogues, edited under Admin beside Location Types.
 - An **Amenity** is an extra: WiFi, fire pit, grill, picnic table.
 - An **Attribute** is what the Location enforces about what it will accept.
   It declares a **kind**: a `number` with an optional **unit** (maximum boat
-  length, in ft) or a `choice` with **options** (site type: back-in or
+  length, in ft) or a `choice` with **options** (access: back-in or
   pull-through) — the same option list an Audit Question's Choice kind uses.
 
 Each catalogue entry names the Location Types it is **valid for**. A
