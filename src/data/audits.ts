@@ -4,7 +4,7 @@ import { db, id as newId, stamp } from "../lib/db";
 import { supabase } from "../lib/db/supabase";
 import { insert, remove, transact, update } from "./sql";
 import { recordActivity } from "./activity";
-import { servicePresenceDiff, unexpectedOccupancy, type ObservedService } from "../lib/audits";
+import { attributeDiff, servicePresenceDiff, unexpectedOccupancy, type ObservedAttribute, type ObservedService } from "../lib/audits";
 import {
   resolveTargets,
   type AuditKind,
@@ -25,7 +25,27 @@ import { useAllLocationAmenities, useAllLocationServices } from "./services";
 
 // ── rows ─────────────────────────────────────────────────────────────────
 
-export interface AuditTemplateRow {
+// Which built-in Status-kind sections a Template or Audit asks about.
+// Occupancy's built-ins ("Occupied?" plus occupants) are not split into
+// categories — they're what makes it an Occupancy audit — so these only
+// mean anything for kind "status". Copied from Template onto Audit at
+// launch, like the rule tree and kind.
+export interface AuditCategoryFlags {
+  include_attributes: number;
+  include_services: number;
+  include_amenities: number;
+  include_marked: number;
+  include_map: number;
+}
+export const DEFAULT_CATEGORY_FLAGS: AuditCategoryFlags = {
+  include_attributes: 1,
+  include_services: 1,
+  include_amenities: 1,
+  include_marked: 1,
+  include_map: 1,
+};
+
+export interface AuditTemplateRow extends AuditCategoryFlags {
   id: string;
   name: string;
   kind: AuditKind;
@@ -53,7 +73,7 @@ export interface AuditQuestionRow {
   service_id: string | null;
 }
 export type AuditStatus = "open" | "closed" | "finalized";
-export interface AuditRow {
+export interface AuditRow extends AuditCategoryFlags {
   id: string;
   name: string;
   kind: AuditKind;
@@ -120,7 +140,8 @@ export type ProposalKind =
   | "move_placement"
   | "set_gps"
   | "set_service"
-  | "set_amenity";
+  | "set_amenity"
+  | "set_attribute";
 export interface AuditProposalRow {
   id: string;
   finding_id: string;
@@ -291,10 +312,26 @@ export function createAuditTemplate(
     kind: input.kind,
     created_by_id: actorId,
     created_at: stamp(),
+    // Explicit, not relied on as a Postgres default: PowerSync's local row
+    // is a JSON blob keyed by what was actually written. A column never
+    // set locally reads back as NULL when a later PATCH uploads the row,
+    // which a `not null` column then refuses — the checkbox toggle a user
+    // makes right after creating a template would be silently discarded.
+    ...DEFAULT_CATEGORY_FLAGS,
   });
 }
-export function saveAuditTemplate(templateId: string, input: { name?: string }): Promise<void> {
-  return update(db, "audit_templates", templateId, { name: input.name });
+export function saveAuditTemplate(
+  templateId: string,
+  input: { name?: string } & Partial<AuditCategoryFlags>,
+): Promise<void> {
+  return update(db, "audit_templates", templateId, {
+    name: input.name,
+    include_attributes: input.include_attributes,
+    include_services: input.include_services,
+    include_amenities: input.include_amenities,
+    include_marked: input.include_marked,
+    include_map: input.include_map,
+  });
 }
 export function deleteAuditTemplate(templateId: string): Promise<void> {
   return remove(db, "audit_templates", templateId);
@@ -402,7 +439,7 @@ export function useRuleLocations(): RuleLocation[] {
 
 // ── launching ────────────────────────────────────────────────────────────
 
-export interface LaunchInput {
+export interface LaunchInput extends AuditCategoryFlags {
   name: string;
   kind: AuditKind;
   templateId: string | null;
@@ -430,6 +467,11 @@ export async function launchAudit(input: LaunchInput, actorId: string | null): P
       launched_by_id: actorId,
       launched_at: stamp(),
       is_current: 1,
+      include_attributes: input.include_attributes,
+      include_services: input.include_services,
+      include_amenities: input.include_amenities,
+      include_marked: input.include_marked,
+      include_map: input.include_map,
     });
     const idMap = new Map<string, string>();
     await insertTree(tx, { template_id: null, audit_id: auditId }, input.roots, idMap);
@@ -607,9 +649,12 @@ export interface FindingInput {
   mappedCorrectly?: boolean | null;
   services: ObservedService[];
   amenities: { amenityId: string; present: boolean; note: string | null }[];
+  /** Every entry becomes a set_attribute Proposal when it differs from
+   *  what's on file — presence or value — never applied directly. */
+  attributes: ObservedAttribute[];
   answers: { questionId: string; value: unknown }[];
   /** Proposals the form produced (gps, rename, create_location, …). Presence
-   *  proposals are derived here from `services` / `amenities`. */
+   *  proposals are derived here from `services` / `amenities` / `attributes`. */
   proposals: { kind: ProposalKind; payload: Record<string, unknown> }[];
   expected: { hasCurrentLease: boolean; hasActiveReservation: boolean };
 }
@@ -791,6 +836,24 @@ export async function saveFinding(input: FindingInput, actorId: string): Promise
         } else if (row && (row.note ?? null) !== (a.note ?? null)) {
           await update(tx, "location_amenities", row.id, { note: a.note });
         }
+      }
+
+      // Attributes: always a Proposal, even a value-only change on one
+      // already present — a capacity limit is worth a second look every
+      // time it moves.
+      const currentAttributes = await tx.getAll<{ attribute_id: string; value: number; note: string | null }>(
+        "SELECT attribute_id, value, note FROM location_attributes WHERE location_id = ?",
+        [loc],
+      );
+      const attrDiff = attributeDiff(
+        currentAttributes.map((c) => ({ attributeId: c.attribute_id, value: c.value, note: c.note })),
+        input.attributes,
+      );
+      for (const p of attrDiff.proposals) {
+        input.proposals.push({
+          kind: "set_attribute",
+          payload: { attribute_id: p.attributeId, present: p.present, value: p.value, note: p.note },
+        });
       }
 
       await recordActivity(tx, {

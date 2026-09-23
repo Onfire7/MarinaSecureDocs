@@ -8,10 +8,15 @@ itself commits to.
 
 - **Built-in questions by kind.** Occupancy: *Occupied?*, then boats (types
   with `has_boat`), vehicles (`has_vehicle`) and an optional Contact.
-  Status: each valid Service (present / working / note), each valid Amenity
-  (present / note), *clearly marked?*, *placed correctly on the map?*.
-  Both: Status select (applies at once), the target's own questions, the GPS
-  block, *Propose a change*, the Ticket / Incident / Note actions.
+  Status, each section shown only when its audit's category is on: each
+  valid Attribute (present / value / note — always a Proposal), each valid
+  Service (present / working / note), each valid Amenity (present / note),
+  *clearly marked?*, *placed correctly on the map?*. A proposed new
+  location (no target) always shows Attributes, Services and Amenities,
+  ignoring category flags — they don't apply to data entry on something
+  that doesn't exist yet. Both kinds: Status select (applies at once), the
+  target's own questions, the GPS block, *Propose a change*, the
+  Ticket / Incident / Note actions.
 - **Unexpected occupancy** is derived live from the Lease and checked-in
   Reservation on file and shown as a badge; it is never asked.
 - **Occupant search never erases what was typed.** Picking a boat after typing

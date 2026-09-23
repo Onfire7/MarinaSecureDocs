@@ -199,3 +199,40 @@ export function servicePresenceDiff(
   }
   return { proposals, immediate };
 }
+
+export interface CurrentAttribute {
+  attributeId: string;
+  value: number;
+  note: string | null;
+}
+export interface ObservedAttribute {
+  attributeId: string;
+  present: boolean;
+  value: number | null;
+  note: string | null;
+}
+
+/**
+ * Every change is a Proposal — presence AND value, unlike a Service's
+ * working flag. A capacity limit (maximum boat length, maximum vehicle
+ * length) is worth a second look every time it moves, not just when it
+ * appears or disappears.
+ */
+export function attributeDiff(
+  current: CurrentAttribute[],
+  observed: ObservedAttribute[],
+): {
+  proposals: { attributeId: string; present: boolean; value: number | null; note: string | null }[];
+} {
+  const have = new Map(current.map((c) => [c.attributeId, c]));
+  const proposals: { attributeId: string; present: boolean; value: number | null; note: string | null }[] = [];
+  for (const o of observed) {
+    const cur = have.get(o.attributeId);
+    const presentChanged = o.present !== (cur !== undefined);
+    const valueChanged = cur !== undefined && o.present && (cur.value !== o.value || (cur.note ?? null) !== (o.note ?? null));
+    if (presentChanged || valueChanged) {
+      proposals.push({ attributeId: o.attributeId, present: o.present, value: o.value, note: o.note ?? null });
+    }
+  }
+  return { proposals };
+}

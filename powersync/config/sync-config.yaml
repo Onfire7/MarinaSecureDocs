@@ -91,6 +91,9 @@ streams:
       - SELECT * FROM amenity_location_types
       - SELECT * FROM location_services
       - SELECT * FROM location_amenities
+      - SELECT * FROM attributes
+      - SELECT * FROM attribute_location_types
+      - SELECT * FROM location_attributes
       # Audit templates and every rule tree, template-owned or copied onto
       # an audit at launch. Rules are a few rows per audit.
       - SELECT * FROM audit_templates

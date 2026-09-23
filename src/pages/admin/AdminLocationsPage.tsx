@@ -1779,7 +1779,7 @@ function MapPlotter({
             <div className="card-title">{activePlacement.location_name}</div>
             {(
               [
-                ["fontSize", "Font size (px)", 8, 32, DEFAULT_PLACEMENT_STYLE.fontSize],
+                ["fontSize", "Font size (px)", 2, 32, DEFAULT_PLACEMENT_STYLE.fontSize],
                 ["paddingX", "Padding, left/right (px)", 0, 24, DEFAULT_PLACEMENT_STYLE.paddingX],
                 ["paddingY", "Padding, top/bottom (px)", 0, 24, DEFAULT_PLACEMENT_STYLE.paddingY],
                 ["rotation", "Rotation °", -180, 180, 0],

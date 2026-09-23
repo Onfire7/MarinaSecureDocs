@@ -13,7 +13,7 @@ import {
   type AuditTargetRow,
 } from "../../data/audits";
 import { useLocationTypes, useLocations } from "../../data/locations";
-import { useAmenities, useServices } from "../../data/services";
+import { useAmenities, useAttributes, useServices } from "../../data/services";
 
 // An audit: progress and its targets while open, the finalize screen once
 // closed (docs/audits.md § Closing, § Finalizing). Decisions save one at a
@@ -158,6 +158,7 @@ const KIND_LABEL: Record<AuditProposalRow["kind"], string> = {
   set_gps: "GPS",
   set_service: "Service",
   set_amenity: "Amenity",
+  set_attribute: "Attribute",
 };
 
 function ProposalsTable({
@@ -177,6 +178,7 @@ function ProposalsTable({
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const { data: services } = useServices();
   const { data: amenities } = useAmenities();
+  const { data: attributes } = useAttributes();
   const { data: types } = useLocationTypes();
   const { data: locations } = useLocations();
   const nameOf = (list: { id: string; name: string }[], id: unknown) => list.find((x) => x.id === id)?.name ?? "?";
@@ -198,6 +200,12 @@ function ProposalsTable({
         return `${nameOf(services, pl.service_id)} ${pl.present ? "present" : "absent"}`;
       case "set_amenity":
         return `${nameOf(amenities, pl.amenity_id)} ${pl.present ? "present" : "absent"}`;
+      case "set_attribute": {
+        const attr = attributes.find((x) => x.id === pl.attribute_id);
+        return pl.present
+          ? `${attr?.name ?? "?"} → ${pl.value}${attr?.unit ? ` ${attr.unit}` : ""}`
+          : `${attr?.name ?? "?"} removed`;
+      }
       default:
         return "";
     }

@@ -370,11 +370,11 @@ removed in favour of deriving from it.
 | early_checkin / late_checkout | timestamptz | Ignored when non-billable. |
 | rate / deposit / balance | numeric | |
 
-## Services & amenities
+## Services, amenities & attributes
 
-Marina-defined catalogues of what a Location provides. See
-[`audits.md`](audits.md) § *Services and Amenities* and
-[ADR 0007](adr/0007-meters-on-services-not-assets.md).
+Marina-defined catalogues of what a Location provides, and what it will
+accept. See [`audits.md`](audits.md) § *Services, Amenities and Attributes*
+and [ADR 0007](adr/0007-meters-on-services-not-assets.md).
 
 #### `services` — Tier 0 / `manage_locations` · sync: always
 
@@ -406,6 +406,26 @@ or the admin location editor; never directly from a Finding.
 `location_id`, `amenity_id` (`unique` pair), `note text`. Same rules as
 `location_services`. Recorded on the Location that offers the amenity; a
 parent's amenities are not copied to children.
+
+#### `attributes` — Tier 0 / `manage_locations` · sync: always
+
+`name text not null unique`, `unit text` (ft; shown beside the value),
+`position integer`. `attribute_location_types` — junction, as `services`.
+
+#### `location_attributes` — Tier 0 / `manage_locations` · sync: always
+
+| Column | Type | Notes |
+|---|---|---|
+| location_id | → locations not null | |
+| attribute_id | → attributes not null | `unique (location_id, attribute_id)`. Row present = attribute enforced. |
+| value | numeric not null | In the attribute's `unit`. |
+| note | text | |
+
+Unlike `location_services` / `location_amenities`, no Tier 0 write policy:
+once an Audit exists for the Location, every change — presence or value —
+is a `set_attribute` Proposal, applied only by the security-definer
+`finalize_audit()`. A direct edit (the admin location editor) still needs
+only `manage_locations`, the same as the catalogue.
 
 #### `service_meter_readings` — Tier 0 · sync: **age**
 
@@ -476,7 +496,11 @@ Field review of Locations against reality. Behaviour in
 #### `audit_templates` — Tier 0 / `manage_audits` · sync: always
 
 `name text not null`, `kind audit_kind not null` (`occupancy` / `status`),
-`created_by_id → users`.
+`created_by_id → users`, and five `include_* boolean not null default true`
+columns (`attributes`, `services`, `amenities`, `marked`, `map`) — which
+built-in Status-kind categories the Template asks about (`audits.md` §
+Audit Templates). Meaningless for kind `occupancy`, whose built-ins aren't
+split into categories. Copied onto the Audit at launch, like the rule tree.
 
 #### `audit_rules` — Tier 0 / `manage_audits` · sync: always
 
@@ -513,6 +537,7 @@ Field review of Locations against reality. Behaviour in
 | closed_by_id / closed_at | | Null `closed_by_id` on an automatic close. |
 | finalized_by_id / finalized_at | | |
 | is_current | boolean not null default true | Sync scope: true while not finalized, and for 30 days after; maintained by `refresh_sync_scopes_all()`. Every child table below inherits the scope through its audit. |
+| include_attributes / include_services / include_amenities / include_marked / include_map | boolean not null default true | Copied from the Template at launch (or set directly at launch for a blank one). Which built-in Status-kind categories this Audit asks about. |
 
 `audit_assignees` — `audit_id`, `user_id` / `role_id` (exactly one).
 
@@ -558,9 +583,9 @@ Proposal when it differs from the Location's row. `audit_finding_answers`:
 | Column | Type | Notes |
 |---|---|---|
 | finding_id | → audit_findings not null, cascade | |
-| kind | audit_proposal_kind not null | `create_location` / `retire_location` / `rename` / `retype` / `reparent` / `move_placement` / `set_gps` / `set_service` / `set_amenity`. |
+| kind | audit_proposal_kind not null | `create_location` / `retire_location` / `rename` / `retype` / `reparent` / `move_placement` / `set_gps` / `set_service` / `set_amenity` / `set_attribute`. |
 | structural | boolean not null | True for the first six; deciding those needs `manage_locations`. Stored rather than derived so RLS can test it. |
-| payload | jsonb not null | Kind-specific. `create_location`: name, type, parent, gps, services, amenities, status, occupants. `set_gps`: lat, lng, accuracy. `set_service`: service_id, present. A `STRUCTURED_COLUMNS` entry. |
+| payload | jsonb not null | Kind-specific. `create_location`: name, type, parent, gps, services, amenities, status, occupants. `set_gps`: lat, lng, accuracy. `set_service`: service_id, present. `set_attribute`: attribute_id, present, value, note — always the full observation, never just a presence flag. A `STRUCTURED_COLUMNS` entry. |
 | decision | audit_decision | Null until decided; `approved` / `rejected`. |
 | decided_by_id / decided_at / reason | | Reason required on reject. |
 | applied_location_id | → locations | For `create_location`, the row created on approval; tickets carrying this proposal re-target to it. |

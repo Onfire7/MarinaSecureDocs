@@ -3,15 +3,18 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import type { AuditKind } from "../../lib/auditRules";
 import {
+  DEFAULT_CATEGORY_FLAGS,
   launchAudit,
   rowsToDraft,
   saveTemplateTree,
   useAuditTemplates,
   useTemplateQuestions,
   useTemplateRules,
+  type AuditCategoryFlags,
   type DraftRule,
 } from "../../data/audits";
 import { useRoles, useUsers } from "../../data/users";
+import { CategoryCheckboxes } from "./CategoryCheckboxes";
 import { RuleTreeEditor, useEditorContext, useResolution } from "./RuleTreeEditor";
 
 // Launch an audit (docs/audits.md § Launching). The template's tree is shown
@@ -35,6 +38,7 @@ export function LaunchAuditPage() {
   const [edited, setEdited] = useState(false);
   const [userIds, setUserIds] = useState<string[]>([]);
   const [roleIds, setRoleIds] = useState<string[]>([]);
+  const [categories, setCategories] = useState<AuditCategoryFlags>(DEFAULT_CATEGORY_FLAGS);
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +48,13 @@ export function LaunchAuditPage() {
     setRoots(stored);
     setKind(template.kind);
     setName(`${template.name} - ${new Date().toLocaleDateString()}`);
+    setCategories({
+      include_attributes: template.include_attributes,
+      include_services: template.include_services,
+      include_amenities: template.include_amenities,
+      include_marked: template.include_marked,
+      include_map: template.include_map,
+    });
   }, [template, stored, edited]);
 
   const ctx = useEditorContext(kind, roots);
@@ -124,6 +135,12 @@ export function LaunchAuditPage() {
           </div>
           <span className="muted small">Any assignee may record any target; a location is done once.</span>
         </div>
+        {kind === "status" && (
+          <div className="field" style={{ marginTop: 10 }}>
+            <span className="field-label">Ask about</span>
+            <CategoryCheckboxes flags={categories} onChange={(patch) => setCategories((prev) => ({ ...prev, ...patch }))} />
+          </div>
+        )}
       </div>
 
       <div className="section-title">Rules - {res.targets.length} target locations</div>
@@ -147,7 +164,16 @@ export function LaunchAuditPage() {
             setError(null);
             try {
               const auditId = await launchAudit(
-                { name: name.trim(), kind, templateId: template?.id ?? null, roots, targets: res.targets, userIds, roleIds },
+                {
+                  name: name.trim(),
+                  kind,
+                  templateId: template?.id ?? null,
+                  roots,
+                  targets: res.targets,
+                  userIds,
+                  roleIds,
+                  ...categories,
+                },
                 current.user?.id ?? null,
               );
               navigate(`/audits/${auditId}`, { replace: true });

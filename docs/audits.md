@@ -44,13 +44,16 @@ have them today.
 No role is hardcoded anywhere. "Manager" is not a term; it means "a User
 with the permission the row requires".
 
-## Services and Amenities
+## Services, Amenities and Attributes
 
-Two marina-defined catalogues, edited under Admin beside Location Types.
+Three marina-defined catalogues, edited under Admin beside Location Types.
 
 - A **Service** is a fixed utility: 30A power, 50A power, water, sewer. It
   declares an optional **unit** (kWh, gallons) used when metered.
 - An **Amenity** is an extra: WiFi, fire pit, grill, picnic table.
+- An **Attribute** is a number the Location enforces: maximum boat length,
+  maximum vehicle length. It declares an optional **unit** (ft) shown
+  beside the value.
 
 Each catalogue entry names the Location Types it is **valid for**. A
 Location records, for each valid entry:
@@ -58,9 +61,17 @@ Location records, for each valid entry:
 - Service: present (row exists), **working** (boolean), **metered**
   (boolean), note.
 - Amenity: present (row exists), note.
+- Attribute: present (row exists), **value** (number), note.
 
 Amenities of a parent (a pavilion, a bathhouse) are recorded on the parent
 only; they are understood to serve its children and are not copied down.
+
+An Attribute's value carries no "still fine" fast path the way a Service's
+`working` flag does: once an Audit exists for the Location, **every**
+Attribute change — presence or value — is a Proposal, never applied
+directly from a Finding. A capacity limit is worth a second look every
+time it moves. The admin location editor still writes it directly, for a
+Location no audit has yet looked at.
 
 **Notes** are entered through a typeable selection. The suggestions are the
 distinct notes already recorded for that same Service or Amenity across all
@@ -80,10 +91,18 @@ An Audit Template is reusable and has:
 
 - a **name**
 - a **kind**: `occupancy` or `status`, chosen once, never varying per rule
+- for a Status Template, which built-in **categories** it asks about:
+  Attributes, Services, Amenities, whether the Location is clearly marked,
+  and whether it's placed correctly on the map — each a checkbox, all on
+  by default. Occupancy's built-ins (`Occupied?` and its occupants) are one
+  question, not a set of categories, so this doesn't apply to that kind.
 - a tree of **Audit Rules**
 - **Audit Questions**, each attached to one rule
 
-Templates are edited under Admin beside Checklist Templates.
+Templates are edited under Admin beside Checklist Templates. Category
+choices copy onto the Audit at launch, the same as the rule tree — editing
+a Template's categories afterward never reaches an Audit already launched
+from it.
 
 ### Rules
 
@@ -184,15 +203,18 @@ Fixed per kind. A template cannot switch them off.
    current Lease and no active Reservation, or vacant with one. The auditor
    sees it as a badge on the Finding; it is not editable.
 
-**Status**
+**Status** — each numbered group is one of the Template's **categories**
+(§ Audit Templates) and is asked only when its checkbox is on:
 
-1. For each Service valid for the type: present? working? note.
-2. For each Amenity valid for the type: present? note.
-3. *Is this Location clearly marked?* Yes/No.
-4. *Is this Location placed correctly on the map?* The map it is plotted on
-   is shown with its rectangle highlighted (its nearest ancestor's map when
-   it is plotted nowhere); tapping a new spot is a `move_placement` Proposal
-   and answers No.
+1. **Attributes.** For each Attribute valid for the type: present? value?
+   note. Always a Proposal (§ Services, Amenities and Attributes).
+2. **Services.** For each Service valid for the type: present? working? note.
+3. **Amenities.** For each Amenity valid for the type: present? note.
+4. **Marked.** *Is this Location clearly marked?* Yes/No.
+5. **Map.** *Is this Location placed correctly on the map?* The map it is
+   plotted on is shown with its rectangle highlighted (its nearest
+   ancestor's map when it is plotted nowhere); tapping a new spot is a
+   `move_placement` Proposal and answers No.
 
 **Both kinds**: the **GPS prompt**, shown only when the Location has no
 coordinates, or the device is farther from them than the marina's *audit
@@ -388,15 +410,36 @@ Built 2026-09-22 on `beta2`. Where the code lives:
 - `src/pages/audits/` — the section, home, launch, detail/finalize and
   Finding pages, and the rule-tree editor. `src/pages/admin/AdminServicesPage`
   and `AdminAuditTemplatesPage`. `src/pages/locations/LocationServicesPanel`.
-- `supabase/migrations/20260922000{2,3,4}00_*.sql`; `supabase/tests/080_audits.sql`.
+- `supabase/migrations/20260922000{2,3,4,7,8}00_*.sql`; `supabase/tests/080_audits.sql`.
 - `scripts/e2e/audits.mjs` drives tests 35–42 of the approved list against
   a running app.
+- `src/pages/audits/CategoryCheckboxes.tsx` — the five category checkboxes,
+  shared by the Template editor and the launch page. It emits only the
+  changed key, never the whole row: a caller that saved the full row on
+  every click could lose one change to a second click that raced ahead of
+  the first one's round trip through the live query.
 
 One thing in this spec is satisfied differently from how it reads:
 
 - The **displaced** flag lives on the target (`audit_targets.displaced_note`),
   not on a placeholder Finding, so that writing it never marks the target
   audited. The spec's "or a placeholder if none yet" is satisfied that way.
+
+Two bugs the build turned up, both fixed before this shipped:
+
+- `createAuditTemplate()` never wrote the five category columns locally,
+  relying on Postgres's column default. PowerSync's local row is a JSON
+  blob of only the keys actually written, so the first click on a category
+  checkbox tried to PATCH a row where those columns read as SQL NULL —
+  `not null` refused it, and the connector discarded the write outright.
+  Every `not null default` column an `insert()` call in this codebase
+  writes now sets it explicitly, matching the convention `audit_targets`
+  and `audit_findings` already followed for `is_current`.
+- The category checkboxes originally saved the whole `AuditCategoryFlags`
+  row on every click, rebuilt from the component's current prop. Two
+  clicks close enough together raced: the second click's spread of the
+  (still-stale) prop silently reverted the first click's change once its
+  write landed. Fixed by having `CategoryCheckboxes` emit a one-key patch.
 
 ## Out of scope, recorded
 

@@ -157,6 +157,32 @@ const attachments = new Table(
   },
 );
 
+const attribute_location_types = new Table(
+  {
+    attribute_id: column.text,
+    location_type_id: column.text,
+  },
+  {
+    indexes: {
+      by_attribute_id: ["attribute_id"],
+      by_location_type_id: ["location_type_id"],
+    },
+  },
+);
+
+const attributes = new Table(
+  {
+    name: column.text,
+    unit: column.text,
+    position: column.integer,
+  },
+  {
+    indexes: {
+      by_name: ["name"],
+    },
+  },
+);
+
 const audit_assignees = new Table(
   {
     audit_id: column.text,
@@ -373,6 +399,11 @@ const audit_templates = new Table(
     kind: column.text,
     created_by_id: column.text,
     created_at: column.text,
+    include_attributes: column.integer,
+    include_services: column.integer,
+    include_amenities: column.integer,
+    include_marked: column.integer,
+    include_map: column.integer,
   },
   {
     indexes: {
@@ -394,6 +425,11 @@ const audits = new Table(
     finalized_by_id: column.text,
     finalized_at: column.text,
     is_current: column.integer,
+    include_attributes: column.integer,
+    include_services: column.integer,
+    include_amenities: column.integer,
+    include_marked: column.integer,
+    include_map: column.integer,
   },
   {
     indexes: {
@@ -902,6 +938,21 @@ const location_amenities = new Table(
   {
     indexes: {
       by_amenity_id: ["amenity_id"],
+      by_location_id: ["location_id"],
+    },
+  },
+);
+
+const location_attributes = new Table(
+  {
+    location_id: column.text,
+    attribute_id: column.text,
+    value: column.real,
+    note: column.text,
+  },
+  {
+    indexes: {
+      by_attribute_id: ["attribute_id"],
       by_location_id: ["location_id"],
     },
   },
@@ -1432,6 +1483,8 @@ export const AppSchema = new Schema({
   asset_statuses,
   assets,
   attachments,
+  attribute_location_types,
+  attributes,
   audit_assignees,
   audit_finding_amenities,
   audit_finding_answers,
@@ -1475,6 +1528,7 @@ export const AppSchema = new Schema({
   lease_lessees,
   leases,
   location_amenities,
+  location_attributes,
   location_map_placements,
   location_services,
   location_statuses,
@@ -1523,6 +1577,8 @@ export const TABLE_NAMES = [
   "asset_statuses",
   "assets",
   "attachments",
+  "attribute_location_types",
+  "attributes",
   "audit_assignees",
   "audit_finding_amenities",
   "audit_finding_answers",
@@ -1566,6 +1622,7 @@ export const TABLE_NAMES = [
   "lease_lessees",
   "leases",
   "location_amenities",
+  "location_attributes",
   "location_map_placements",
   "location_services",
   "location_statuses",

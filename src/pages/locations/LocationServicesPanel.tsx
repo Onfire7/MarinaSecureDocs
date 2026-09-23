@@ -1,35 +1,48 @@
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import {
   saveLocationAmenity,
+  saveLocationAttribute,
   saveLocationService,
   setLocationAmenityPresent,
+  setLocationAttributePresent,
   setLocationServicePresent,
   useAmenities,
   useAmenityValidity,
+  useAttributeValidity,
+  useAttributes,
   useLocationAmenities,
+  useLocationAttributes,
   useLocationServices,
   useNoteSuggestions,
   useServiceValidity,
   useServices,
 } from "../../data/services";
-import { DraftInput } from "../shared/DraftInput";
+import { DraftInput, DraftNumberInput } from "../shared/DraftInput";
 
-// A location's Services and Amenities (docs/audits.md § Services and
-// Amenities). Everyone sees what is here; manage_locations edits presence,
-// working, metered and notes directly — the admin path that does not need
-// an audit's approval.
+// A location's Services, Amenities and Attributes (docs/audits.md
+// § Services and Amenities). Everyone sees what is here; manage_locations
+// edits presence, working, metered, notes and values directly — the admin
+// path that does not need an audit's approval. Once an audit exists for
+// this location, an Attribute's value only changes through an approved
+// Proposal (docs/audits.md), never from here mid-audit and never from a
+// Finding directly — this panel is the "before any audit" and "manager
+// correcting a mistake" path.
 export function LocationServicesPanel({ locationId, typeId }: { locationId: string; typeId: string }) {
   const current = useCurrent();
   const canEdit = current.can("manage_locations");
   const { data: services } = useServices();
   const { data: amenities } = useAmenities();
+  const { data: attributes } = useAttributes();
   const { data: sv } = useServiceValidity();
   const { data: av } = useAmenityValidity();
+  const { data: atv } = useAttributeValidity();
   const { data: here } = useLocationServices(locationId);
   const { data: hereA } = useLocationAmenities(locationId);
+  const { data: hereAt } = useLocationAttributes(locationId);
   const validServices = services.filter((s) => sv.some((v) => v.service_id === s.id && v.location_type_id === typeId));
   const validAmenities = amenities.filter((a) => av.some((v) => v.amenity_id === a.id && v.location_type_id === typeId));
-  if (validServices.length === 0 && validAmenities.length === 0) return null;
+  const validAttributes = attributes.filter((a) => atv.some((v) => v.attribute_id === a.id && v.location_type_id === typeId));
+  if (validServices.length === 0 && validAmenities.length === 0 && validAttributes.length === 0) return null;
   return (
     <>
       {validServices.length > 0 && (
@@ -99,11 +112,51 @@ export function LocationServicesPanel({ locationId, typeId }: { locationId: stri
           </div>
         </div>
       )}
+      {validAttributes.length > 0 && (
+        <div className="field">
+          <span className="field-label">Attributes</span>
+          <div className="field-value stack" style={{ gap: 4 }}>
+            {validAttributes.map((a) => {
+              const row = hereAt.find((r) => r.attribute_id === a.id);
+              return (
+                <div key={a.id} className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  {canEdit ? (
+                    <label>
+                      <input type="checkbox" checked={!!row} onChange={(e) => void setLocationAttributePresent(locationId, a.id, e.target.checked)} /> {a.name}
+                    </label>
+                  ) : (
+                    <span className={row ? undefined : "muted"}>{row ? "✓" : "-"} {a.name}</span>
+                  )}
+                  {row &&
+                    (canEdit ? (
+                      <>
+                        <DraftNumberInput
+                          className="input select-inline"
+                          style={{ width: 90 }}
+                          value={row.value}
+                          onCommit={(value) => value !== undefined && void saveLocationAttribute(row.id, { value })}
+                        />
+                        {a.unit && <span className="muted small">{a.unit}</span>}
+                        <ServiceNote kind="attribute" entryId={a.id} value={row.note ?? ""} onCommit={(note) => void saveLocationAttribute(row.id, { note: note || null })} />
+                      </>
+                    ) : (
+                      <span className="muted small">
+                        {row.value}
+                        {a.unit ? ` ${a.unit}` : ""}
+                        {row.note ? ` — ${row.note}` : ""}
+                      </span>
+                    ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </>
   );
 }
 
-function ServiceNote({ kind, entryId, value, onCommit }: { kind: "service" | "amenity"; entryId: string; value: string; onCommit: (v: string) => void }) {
+function ServiceNote({ kind, entryId, value, onCommit }: { kind: "service" | "amenity" | "attribute"; entryId: string; value: string; onCommit: (v: string) => void }) {
   const suggestions = useNoteSuggestions(kind, entryId);
   const listId = `loc-notes-${kind}-${entryId}`;
   return (

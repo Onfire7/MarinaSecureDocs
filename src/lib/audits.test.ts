@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  attributeDiff,
   gpsPrompt,
   mergeSearchMatch,
   orderTargets,
@@ -153,5 +154,36 @@ describe("service presence diff yields proposals", () => {
     const d = servicePresenceDiff(current, [{ serviceId: "sewer", present: true, working: false, note: "x" }]);
     expect(d.proposals).toEqual([{ serviceId: "sewer", present: true }]);
     expect(d.immediate).toEqual([]);
+  });
+});
+
+describe("attribute diff yields proposals for every change", () => {
+  const current = [
+    { attributeId: "max_boat", value: 40, note: null },
+    { attributeId: "max_vehicle", value: 22, note: "trailers ok" },
+  ];
+  it("presence changes propose; a value change on an already-present attribute proposes too", () => {
+    const observed = [
+      { attributeId: "max_boat", present: true, value: 35, note: null },
+      { attributeId: "max_vehicle", present: false, value: null, note: null },
+      { attributeId: "max_trailer", present: true, value: 18, note: null },
+    ];
+    const d = attributeDiff(current, observed);
+    expect(d.proposals).toEqual([
+      { attributeId: "max_boat", present: true, value: 35, note: null },
+      { attributeId: "max_vehicle", present: false, value: null, note: null },
+      { attributeId: "max_trailer", present: true, value: 18, note: null },
+    ]);
+  });
+  it("an unchanged observation produces nothing", () => {
+    const d = attributeDiff(current, [
+      { attributeId: "max_boat", present: true, value: 40, note: null },
+      { attributeId: "max_vehicle", present: true, value: 22, note: "trailers ok" },
+    ]);
+    expect(d.proposals).toEqual([]);
+  });
+  it("a note-only change on an already-present attribute still proposes", () => {
+    const d = attributeDiff(current, [{ attributeId: "max_boat", present: true, value: 40, note: "no houseboats" }]);
+    expect(d.proposals).toEqual([{ attributeId: "max_boat", present: true, value: 40, note: "no houseboats" }]);
   });
 });

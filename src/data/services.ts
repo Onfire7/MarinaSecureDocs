@@ -3,13 +3,17 @@ import { db, stamp } from "../lib/db";
 import { insert, remove, transact, update } from "./sql";
 import { rankNoteSuggestions } from "../lib/audits";
 
-// Services and Amenities — what a Location provides (docs/audits.md
-// § Services and Amenities, ADR 0007).
+// Services, Amenities and Attributes — what a Location provides, and what
+// it will accept (docs/audits.md § Services and Amenities, ADR 0007).
 //
-// Two marina-defined catalogues, each entry valid for chosen Location Types.
-// Per location a row means "present"; a Service row also says whether it
-// works and whether it is metered. Presence changes here (the admin editor)
-// or through an approved audit Proposal — never straight from a Finding.
+// Three marina-defined catalogues, each entry valid for chosen Location
+// Types. Services and Amenities are presence: a row means "here". An
+// Attribute is a number the location enforces — maximum boat length,
+// maximum vehicle length — so its row carries a value, not just presence.
+// Services and Amenities can change from the admin editor or an approved
+// audit Proposal; an Attribute value only ever changes through a Proposal
+// once an audit exists, because a capacity limit is worth a second look —
+// the admin editor still writes it directly, with no audit involved.
 
 export interface ServiceRow {
   id: string;
@@ -22,11 +26,18 @@ export interface AmenityRow {
   name: string;
   position: number;
 }
+export interface AttributeRow {
+  id: string;
+  name: string;
+  unit: string | null;
+  position: number;
+}
 export interface ValidityRow {
   id: string;
   location_type_id: string;
   service_id?: string;
   amenity_id?: string;
+  attribute_id?: string;
 }
 
 export function useServices() {
@@ -35,11 +46,17 @@ export function useServices() {
 export function useAmenities() {
   return useQuery<AmenityRow>("SELECT * FROM amenities ORDER BY position, name");
 }
+export function useAttributes() {
+  return useQuery<AttributeRow>("SELECT * FROM attributes ORDER BY position, name");
+}
 export function useServiceValidity() {
   return useQuery<ValidityRow>("SELECT * FROM service_location_types");
 }
 export function useAmenityValidity() {
   return useQuery<ValidityRow>("SELECT * FROM amenity_location_types");
+}
+export function useAttributeValidity() {
+  return useQuery<ValidityRow>("SELECT * FROM attribute_location_types");
 }
 
 export function createService(input: { name: string; unit?: string | null }): Promise<string> {
@@ -60,15 +77,29 @@ export function saveAmenity(id: string, input: { name?: string }): Promise<void>
 export function deleteAmenity(id: string): Promise<void> {
   return remove(db, "amenities", id);
 }
+export function createAttribute(input: { name: string; unit?: string | null }): Promise<string> {
+  return insert(db, "attributes", { name: input.name, unit: input.unit ?? null, position: 0 });
+}
+export function saveAttribute(id: string, input: { name?: string; unit?: string | null }): Promise<void> {
+  return update(db, "attributes", id, { name: input.name, unit: input.unit });
+}
+export function deleteAttribute(id: string): Promise<void> {
+  return remove(db, "attributes", id);
+}
 
 /** Replace the set of types a catalogue entry is valid for. */
 export async function setValidTypes(
-  kind: "service" | "amenity",
+  kind: "service" | "amenity" | "attribute",
   entryId: string,
   typeIds: string[],
 ): Promise<void> {
-  const table = kind === "service" ? "service_location_types" : "amenity_location_types";
-  const column = kind === "service" ? "service_id" : "amenity_id";
+  const table =
+    kind === "service"
+      ? "service_location_types"
+      : kind === "amenity"
+        ? "amenity_location_types"
+        : "attribute_location_types";
+  const column = kind === "service" ? "service_id" : kind === "amenity" ? "amenity_id" : "attribute_id";
   await transact(async (tx) => {
     await tx.execute(`DELETE FROM ${table} WHERE ${column} = ?`, [entryId]);
     for (const typeId of typeIds) {
@@ -96,6 +127,15 @@ export interface LocationAmenityRow {
   note: string | null;
   amenity_name: string;
 }
+export interface LocationAttributeRow {
+  id: string;
+  location_id: string;
+  attribute_id: string;
+  value: number;
+  note: string | null;
+  attribute_name: string;
+  unit: string | null;
+}
 
 export function useLocationServices(locationId: string | undefined) {
   return useQuery<LocationServiceRow>(
@@ -110,6 +150,14 @@ export function useLocationAmenities(locationId: string | undefined) {
     `SELECT la.*, a.name AS amenity_name
        FROM location_amenities la JOIN amenities a ON a.id = la.amenity_id
       WHERE la.location_id = ? ORDER BY a.position, a.name`,
+    [locationId ?? ""],
+  );
+}
+export function useLocationAttributes(locationId: string | undefined) {
+  return useQuery<LocationAttributeRow>(
+    `SELECT la.*, at.name AS attribute_name, at.unit
+       FROM location_attributes la JOIN attributes at ON at.id = la.attribute_id
+      WHERE la.location_id = ? ORDER BY at.position, at.name`,
     [locationId ?? ""],
   );
 }
@@ -175,14 +223,50 @@ export function setLocationAmenityPresent(
 export function saveLocationAmenity(rowId: string, changes: { note?: string | null }): Promise<void> {
   return update(db, "location_amenities", rowId, { note: changes.note });
 }
+/**
+ * Direct edit only — from the admin location editor, holding
+ * manage_locations. An Attribute value never changes this way from a
+ * Finding once an audit exists for the location; that path always goes
+ * through a set_attribute Proposal (see docs/audits.md).
+ */
+export function setLocationAttributePresent(
+  locationId: string,
+  attributeId: string,
+  present: boolean,
+): Promise<void> {
+  return transact(async (tx) => {
+    await tx.execute("DELETE FROM location_attributes WHERE location_id = ? AND attribute_id = ?", [
+      locationId,
+      attributeId,
+    ]);
+    if (present) {
+      await insert(tx, "location_attributes", {
+        location_id: locationId,
+        attribute_id: attributeId,
+        value: 0,
+        note: null,
+      });
+    }
+  });
+}
+export function saveLocationAttribute(
+  rowId: string,
+  changes: { value?: number; note?: string | null },
+): Promise<void> {
+  return update(db, "location_attributes", rowId, { value: changes.value, note: changes.note });
+}
 
 /**
  * Note suggestions for one catalogue entry: the distinct notes already in
  * use across locations, most-used first. A query, not a table.
  */
-export function useNoteSuggestions(kind: "service" | "amenity", entryId: string | undefined) {
-  const table = kind === "service" ? "location_services" : "location_amenities";
-  const column = kind === "service" ? "service_id" : "amenity_id";
+export function useNoteSuggestions(
+  kind: "service" | "amenity" | "attribute",
+  entryId: string | undefined,
+) {
+  const table =
+    kind === "service" ? "location_services" : kind === "amenity" ? "location_amenities" : "location_attributes";
+  const column = kind === "service" ? "service_id" : kind === "amenity" ? "amenity_id" : "attribute_id";
   const { data } = useQuery<{ note: string | null }>(
     `SELECT note FROM ${table} WHERE ${column} = ? AND note IS NOT NULL AND note <> ''`,
     [entryId ?? ""],

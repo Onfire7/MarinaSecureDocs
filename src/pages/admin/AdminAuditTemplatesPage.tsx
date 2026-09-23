@@ -17,6 +17,7 @@ import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
 import { DraftInput } from "../shared/DraftInput";
+import { CategoryCheckboxes } from "../audits/CategoryCheckboxes";
 import { RuleTreeEditor, useEditorContext, useResolution } from "../audits/RuleTreeEditor";
 
 // Admin — Audit Templates (docs/audits.md § Audit Templates). A template is
@@ -134,6 +135,15 @@ function TemplateEditor({ templateId }: { templateId: string }) {
           </button>
         </div>
       </div>
+      {template.kind === "status" && (
+        <div className="field" style={{ marginBottom: 16 }}>
+          <span className="field-label">Ask about</span>
+          <CategoryCheckboxes
+            flags={template}
+            onChange={(flags) => void saveAuditTemplate(templateId, flags)}
+          />
+        </div>
+      )}
       <RuleTreeEditor
         roots={tree}
         onChange={(next) => {

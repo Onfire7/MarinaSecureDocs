@@ -5,7 +5,7 @@
 -- passes every denial test (CLAUDE.md).
 create extension if not exists pgtap;
 begin;
-select plan(28);
+select plan(32);
 
 -- Rows affected by an UPDATE run as the current role, so RLS is exercised
 -- from the caller's side. A data-modifying CTE cannot sit inside is().
@@ -202,6 +202,35 @@ select ok((select not is_current from audits where id = 'eeee0000-0000-4000-8000
   'a month after finalize the audit leaves scope');
 select ok((select not is_current from audit_findings where id = 'ffff0000-0000-4000-8000-0000000000f1'),
   'and its findings leave with it');
+
+-- ── attributes: a third catalogue, category toggles default true ────────
+insert into attributes (id, name, unit) values ('aaaa0000-0000-4000-8000-0000000000a1','Fixture Max Boat Length','ft');
+insert into attribute_location_types (attribute_id, location_type_id)
+  values ('aaaa0000-0000-4000-8000-0000000000a1','cccc0000-0000-4000-8000-000000000080');
+insert into audit_findings (id, audit_id, target_id, recorded_by_id) values
+  ('ffff0000-0000-4000-8000-0000000000f6','eeee0000-0000-4000-8000-0000000000a2','eeee1111-0000-4000-8000-000000000005','11111111-0000-4000-8000-000000000001');
+insert into audit_proposals (finding_id, kind, payload) values
+  ('ffff0000-0000-4000-8000-0000000000f6','set_attribute',
+   '{"attribute_id":"aaaa0000-0000-4000-8000-0000000000a1","present":true,"value":35,"note":null}');
+select set_config('request.jwt.claims', '{"sub":"user_carl"}', true);
+set local role authenticated;
+select is(pg_temp.upd_count($u$update audit_proposals set decision = 'approved', decided_by_id = '11111111-0000-4000-8000-000000000003'
+             where finding_id = 'ffff0000-0000-4000-8000-0000000000f6'$u$), 1,
+  'manage_audits alone decides a set_attribute proposal — not structural');
+reset role;
+select close_audit('eeee0000-0000-4000-8000-0000000000a2');
+select set_config('request.jwt.claims', '{"sub":"user_alice"}', true);
+set local role authenticated;
+select lives_ok($$select finalize_audit('eeee0000-0000-4000-8000-0000000000a2')$$,
+  'finalize_audit applies an approved set_attribute proposal');
+reset role;
+select is((select value from location_attributes where location_id = 'dddd0000-0000-4000-8000-000000000081'
+             and attribute_id = 'aaaa0000-0000-4000-8000-0000000000a1')::int, 35,
+  'the attribute value landed on the location');
+
+select is((select include_services::int + include_amenities::int + include_attributes::int
+            + include_marked::int + include_map::int from audit_templates where id = 'eeee0000-0000-4000-8000-000000000080'),
+  5, 'a template asks about every built-in Status category by default');
 
 select * from finish();
 rollback;

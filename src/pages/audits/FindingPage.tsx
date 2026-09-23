@@ -16,13 +16,17 @@ import {
   useProposalsForFinding,
   useTargetQuestions,
   parseProposalPayload,
+  type AuditCategoryFlags,
   type AuditQuestionRow,
   type ProposalKind,
 } from "../../data/audits";
 import {
   useAmenities,
   useAmenityValidity,
+  useAttributeValidity,
+  useAttributes,
   useLocationAmenities,
+  useLocationAttributes,
   useLocationServices,
   useNoteSuggestions,
   useServiceValidity,
@@ -67,7 +71,16 @@ export function FindingPage() {
       </div>
     );
   }
-  return <FindingForm auditId={audit.id} auditName={audit.name} kind={audit.kind} status={audit.status} target={proposing ? null : target} />;
+  return (
+    <FindingForm
+      auditId={audit.id}
+      auditName={audit.name}
+      kind={audit.kind}
+      status={audit.status}
+      target={proposing ? null : target}
+      categories={audit}
+    />
+  );
 }
 
 function FindingForm({
@@ -76,12 +89,15 @@ function FindingForm({
   kind,
   status,
   target,
+  categories,
 }: {
   auditId: string;
   auditName: string;
   kind: "occupancy" | "status";
   status: string;
   target: ReturnType<typeof useAuditTarget>["target"] | null;
+  /** Which built-in Status-kind sections this audit asks about. */
+  categories: AuditCategoryFlags;
 }) {
   const current = useCurrent();
   const navigate = useNavigate();
@@ -107,10 +123,13 @@ function FindingForm({
   const { data: locations } = useLocations();
   const { data: services } = useServices();
   const { data: amenities } = useAmenities();
+  const { data: attributes } = useAttributes();
   const { data: serviceValidity } = useServiceValidity();
   const { data: amenityValidity } = useAmenityValidity();
+  const { data: attributeValidity } = useAttributeValidity();
   const { data: currentServices } = useLocationServices(locationId ?? undefined);
   const { data: currentAmenities } = useLocationAmenities(locationId ?? undefined);
+  const { data: currentAttributes } = useLocationAttributes(locationId ?? undefined);
   const { data: leases } = useLeasesForLocation(locationId ?? undefined);
   const { data: reservations } = useReservationsForTarget("location", locationId ?? undefined);
 
@@ -127,6 +146,7 @@ function FindingForm({
   const [mappedCorrectly, setMappedCorrectly] = useState<YesNo>(null);
   const [svc, setSvc] = useState<Record<string, { present: boolean; working: boolean; note: string }>>({});
   const [amen, setAmen] = useState<Record<string, { present: boolean; note: string }>>({});
+  const [attr, setAttr] = useState<Record<string, { present: boolean; value: string; note: string }>>({});
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [gpsCapture, setGpsCapture] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
   const [placement, setPlacement] = useState<ProposedPlacement | null>(null);
@@ -147,6 +167,10 @@ function FindingForm({
     () => amenities.filter((a) => amenityValidity.some((v) => v.amenity_id === a.id && v.location_type_id === typeIdOfTarget)),
     [amenities, amenityValidity, typeIdOfTarget],
   );
+  const validAttributes = useMemo(
+    () => attributes.filter((a) => attributeValidity.some((v) => v.attribute_id === a.id && v.location_type_id === typeIdOfTarget)),
+    [attributes, attributeValidity, typeIdOfTarget],
+  );
 
   // Seed from the location's current state, or the existing finding, once.
   useEffect(() => {
@@ -166,12 +190,38 @@ function FindingForm({
       const f = fAmenities.find((c) => c.amenity_id === v.id);
       a[v.id] = f ? { present: f.present === 1, note: f.note ?? "" } : { present: !!cur, note: cur?.note ?? "" };
     }
-    if (validServices.length === 0 && validAmenities.length === 0 && !finding && services.length + amenities.length > 0 && serviceValidity.length + amenityValidity.length === 0) {
+    // Attributes have no finding-parts table of their own — every change is
+    // a Proposal, so an already-recorded observation lives in that
+    // Proposal's payload, the same way GPS and rename do.
+    const at: typeof attr = {};
+    for (const v of validAttributes) {
+      const cur = currentAttributes.find((c) => c.attribute_id === v.id);
+      const prop = fProposals.find((p) => p.kind === "set_attribute" && String(parseProposalPayload(p).attribute_id) === v.id);
+      if (prop) {
+        const pl = parseProposalPayload(prop);
+        at[v.id] = {
+          present: Boolean(pl.present),
+          value: pl.value != null ? String(pl.value) : "",
+          note: pl.note != null ? String(pl.note) : "",
+        };
+      } else {
+        at[v.id] = { present: !!cur, value: cur ? String(cur.value) : "", note: cur?.note ?? "" };
+      }
+    }
+    if (
+      validServices.length === 0 &&
+      validAmenities.length === 0 &&
+      validAttributes.length === 0 &&
+      !finding &&
+      services.length + amenities.length + attributes.length > 0 &&
+      serviceValidity.length + amenityValidity.length + attributeValidity.length === 0
+    ) {
       // Catalogue exists but validity not synced yet; keep waiting.
       return;
     }
     setSvc(s);
     setAmen(a);
+    setAttr(at);
     if (finding) {
       setOccupied(finding.occupied === null ? null : finding.occupied === 1);
       setContactId(finding.contact_id);
@@ -202,7 +252,7 @@ function FindingForm({
       }
     }
     setSeeded(true);
-  }, [seeded, target, finding, validServices, validAmenities, currentServices, currentAmenities, fServices, fAmenities, fBoats, fVehicles, fAnswers, fProposals, services.length, amenities.length, serviceValidity.length, amenityValidity.length, locations.length]);
+  }, [seeded, target, finding, validServices, validAmenities, validAttributes, currentServices, currentAmenities, currentAttributes, fServices, fAmenities, fBoats, fVehicles, fAnswers, fProposals, services.length, amenities.length, attributes.length, serviceValidity.length, amenityValidity.length, attributeValidity.length, locations.length]);
 
   // Expected occupancy from what is on file.
   const now = Date.now();
@@ -221,6 +271,17 @@ function FindingForm({
   const typeRow = types.find((t) => t.id === typeIdOfTarget);
   const holdsBoat = !!typeRow && typeRow.has_boat === 1;
   const holdsVehicle = !!typeRow && typeRow.has_vehicle === 1;
+
+  // A proposed new location isn't governed by any audit's category toggles
+  // — it's initial data entry, not a question being asked about an
+  // existing one. For an existing target, a Status audit that turned a
+  // category off simply never renders that section.
+  const asksStatusQuestions = kind === "status" || !target;
+  const showServices = asksStatusQuestions && (!target || categories.include_services === 1) && validServices.length > 0;
+  const showAmenities = asksStatusQuestions && (!target || categories.include_amenities === 1) && validAmenities.length > 0;
+  const showAttributes = asksStatusQuestions && (!target || categories.include_attributes === 1) && validAttributes.length > 0;
+  const showMarked = kind === "status" && !!target && categories.include_marked === 1;
+  const showMap = kind === "status" && !!target && categories.include_map === 1;
 
   const canSave =
     editable &&
@@ -274,6 +335,18 @@ function FindingForm({
             ? Object.entries(svc).map(([serviceId, v]) => ({ serviceId, present: v.present, working: v.working, note: v.note || null }))
             : [],
           amenities: target ? Object.entries(amen).map(([amenityId, v]) => ({ amenityId, present: v.present, note: v.note || null })) : [],
+          // Skip "present, no value typed yet" — a half-entered attribute
+          // is not an observation, and location_attributes.value is not null.
+          attributes: target
+            ? Object.entries(attr)
+                .filter(([, v]) => !(v.present && v.value.trim() === ""))
+                .map(([attributeId, v]) => ({
+                  attributeId,
+                  present: v.present,
+                  value: v.value.trim() === "" ? null : Number(v.value),
+                  note: v.note || null,
+                }))
+            : [],
           answers: Object.entries(answers).map(([questionId, a]) => ({ questionId, value: a.value })),
           proposals,
           expected: { hasCurrentLease, hasActiveReservation },
@@ -398,10 +471,10 @@ function FindingForm({
         </div>
       )}
 
-      {(kind === "status" || !target) && (validServices.length > 0 || validAmenities.length > 0) && (
+      {(showServices || showAmenities || showAttributes) && (
         <div className="card" style={{ marginBottom: 12 }}>
-          {validServices.length > 0 && <div className="section-title">Services</div>}
-          {validServices.map((s) => {
+          {showServices && <div className="section-title">Services</div>}
+          {showServices && validServices.map((s) => {
             const v = svc[s.id] ?? { present: false, working: true, note: "" };
             return (
               <div key={s.id} className="field">
@@ -420,8 +493,8 @@ function FindingForm({
               </div>
             );
           })}
-          {validAmenities.length > 0 && <div className="section-title">Amenities</div>}
-          {validAmenities.map((a) => {
+          {showAmenities && <div className="section-title">Amenities</div>}
+          {showAmenities && validAmenities.map((a) => {
             const v = amen[a.id] ?? { present: false, note: "" };
             return (
               <div key={a.id} className="field">
@@ -433,34 +506,74 @@ function FindingForm({
               </div>
             );
           })}
-          {target && <p className="muted small">Presence changes wait for approval; working and notes apply now.</p>}
+          {showAttributes && <div className="section-title">Attributes</div>}
+          {showAttributes && validAttributes.map((a) => {
+            const v = attr[a.id] ?? { present: false, value: "", note: "" };
+            return (
+              <div key={a.id} className="field">
+                <span className="field-label">{a.name}</span>
+                <div className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  {yesNo(v.present, (p) => setAttr({ ...attr, [a.id]: { ...v, present: !!p } }), ["Present", "Absent"])}
+                  {v.present && target && (
+                    <>
+                      <input
+                        className="input select-inline"
+                        type="number"
+                        step="any"
+                        style={{ width: 90 }}
+                        placeholder="value"
+                        disabled={!editable}
+                        value={v.value}
+                        onChange={(e) => setAttr({ ...attr, [a.id]: { ...v, value: e.target.value } })}
+                      />
+                      {a.unit && <span className="muted small">{a.unit}</span>}
+                      <NoteInput kind="attribute" entryId={a.id} value={v.note} editable={editable} onChange={(note) => setAttr({ ...attr, [a.id]: { ...v, note } })} />
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {target && (showServices || showAttributes) && (
+            <p className="muted small">
+              {showServices && showAttributes
+                ? "Presence and attribute values wait for approval; working and service notes apply now."
+                : showAttributes
+                  ? "Presence and values wait for approval."
+                  : "Presence changes wait for approval; working and notes apply now."}
+            </p>
+          )}
         </div>
       )}
 
-      {kind === "status" && target && (
+      {(showMarked || showMap) && (
         <div className="card" style={{ marginBottom: 12 }}>
-          <div className="field">
-            <span className="field-label">Is this location clearly marked?</span>
-            {yesNo(clearlyMarked, setClearlyMarked)}
-          </div>
-          <div className="field">
-            <span className="field-label">Is it placed correctly on the map?</span>
-            {target.location_id && (
-              <div style={{ marginBottom: 8 }}>
-                <PlacementCheck
-                  locationId={target.location_id}
-                  locationName={target.location_name}
-                  editable={editable}
-                  proposed={placement}
-                  onPropose={(p) => {
-                    setPlacement(p);
-                    if (p) setMappedCorrectly(false);
-                  }}
-                />
-              </div>
-            )}
-            {yesNo(mappedCorrectly, setMappedCorrectly)}
-          </div>
+          {showMarked && (
+            <div className="field">
+              <span className="field-label">Is this location clearly marked?</span>
+              {yesNo(clearlyMarked, setClearlyMarked)}
+            </div>
+          )}
+          {showMap && (
+            <div className="field">
+              <span className="field-label">Is it placed correctly on the map?</span>
+              {target?.location_id && (
+                <div style={{ marginBottom: 8 }}>
+                  <PlacementCheck
+                    locationId={target.location_id}
+                    locationName={target.location_name}
+                    editable={editable}
+                    proposed={placement}
+                    onPropose={(p) => {
+                      setPlacement(p);
+                      if (p) setMappedCorrectly(false);
+                    }}
+                  />
+                </div>
+              )}
+              {yesNo(mappedCorrectly, setMappedCorrectly)}
+            </div>
+          )}
         </div>
       )}
 
@@ -559,7 +672,7 @@ function NoteInput({
   editable,
   onChange,
 }: {
-  kind: "service" | "amenity";
+  kind: "service" | "amenity" | "attribute";
   entryId: string;
   value: string;
   editable: boolean;

@@ -202,6 +202,13 @@ a picnic table. A parent Location's Amenities apply to its children without
 being recorded on them.
 _Avoid_: feature, facility, extra
 
+**Attribute**:
+A number a Location enforces on what it will accept — maximum boat length,
+maximum vehicle length. Unlike a Service or Amenity, there is nothing to
+toggle without review: once an Audit exists for a Location, its Attribute
+values change only through an approved Proposal.
+_Avoid_: spec, limit, restriction
+
 ## Incidents, tickets & notes
 
 **Note**:
