@@ -544,8 +544,27 @@ split into categories. Copied onto the Audit at launch, like the rule tree.
 | finalized_by_id / finalized_at | | |
 | is_current | boolean not null default true | Sync scope: true while not finalized, and for 30 days after; maintained by `refresh_sync_scopes_all()`. Every child table below inherits the scope through its audit. |
 | include_attributes / include_services / include_amenities / include_marked / include_map | boolean not null default true | Copied from the Template at launch (or set directly at launch for a blank one). Which built-in Status-kind categories this Audit asks about. |
+| report_snapshot | jsonb | The Audit Report as compiled by `finalize_audit()`. Null until then. Served verbatim to every view afterwards (`docs/audits.md` § Sharing the results). |
 
 `audit_assignees` — `audit_id`, `user_id` / `role_id` (exactly one).
+
+#### `audit_shares` — Tier 1 `manage_audits` (read and write) · sync: through audit, gated by `manage_audits`
+
+| Column | Type | Notes |
+|---|---|---|
+| audit_id | → audits not null, cascade | The Audit must be `closed` or `finalized`; a trigger refuses an `open` one. |
+| key | uuid not null unique default gen_random_uuid() | The credential in `/r/<key>`. Never shown in a list once created except through *Copy link*. |
+| label | text | Who it went to. |
+| created_by_id / created_at | | |
+| expires_at | timestamptz | Default `now() + 90 days`; null means never. |
+| revoked_at | timestamptz | Set once, never cleared. |
+| view_count | integer not null default 0 | Bumped by `audit_report()`. |
+| last_viewed_at | timestamptz | Likewise. |
+
+Read only through `audit_report(key)` by the public; the key never reaches
+an anonymous client any other way. Tier 0 users cannot read this table at
+all - a share key in a guard's local database would be a credential lying
+around.
 
 #### `audit_targets` — Tier 0 · sync: through audit
 

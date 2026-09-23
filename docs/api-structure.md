@@ -124,6 +124,29 @@ The nameless-contact prompt and merge-suggestion flow described in
 [Role Workflows](workflows.md) happens entirely in the frontend when such a
 contact is later viewed. The Function's job stops at creating the bare record.
 
+## Public report links
+
+The one place an anonymous caller reads marina data. A Share Link
+(`docs/audits.md` § Sharing the results) is `/r/<key>`; the page behind it
+loads no Clerk and no PowerSync and makes one call through PostgREST with
+the anon key:
+
+| Function | Who may call | Behavior |
+|---|---|---|
+| `audit_report(p_key uuid) → jsonb` | `anon`, `authenticated` · SECURITY DEFINER | Looks the key up in `audit_shares`. Missing, revoked or expired all return **null** - one answer, so a key cannot be probed. Otherwise bumps `view_count` / `last_viewed_at` and returns the document: `audits.report_snapshot` when the audit is finalized, else `build_audit_report()` compiled now with an `asOf` stamp. |
+| `audit_report_for(p_audit uuid) → jsonb` | `authenticated` · SECURITY INVOKER | The in-app view at `/audits/:id/report`. Same document, no share row; RLS decides whether the caller can see the audit at all. |
+| `build_audit_report(p_audit uuid) → jsonb` | internal only | The **single builder** - also what `finalize_audit()` stores. Shape is `AuditReport` in `src/data/auditReport.ts`; it carries no contact, boat, vehicle or GPS data and no completeness gaps. Presentation (sentences, wide rows, CSV) is pure TypeScript over it. |
+| `create_audit_share(p_audit uuid, p_label text, p_expires_at timestamptz) → audit_shares` | `authenticated` with `manage_audits` | Refuses an `open` audit. Returns the row so the page can copy the URL at once. |
+| `revoke_audit_share(p_share uuid)` | `authenticated` with `manage_audits` | Sets `revoked_at`; never clears it. |
+
+The key is 122 random bits and the only credential; there is no lockout
+because there is nothing to enumerate. The route is served by the SPA
+redirect like every other path - nothing to add to `netlify.toml`.
+
+The in-app report is therefore an **online** read, unlike the rest of the
+app: one builder in the database beat two builders that could drift, and a
+report is something read at a desk, not on a dock with no signal.
+
 ## Netlify Functions
 
 These run alongside the static frontend. None holds a Twilio credential or

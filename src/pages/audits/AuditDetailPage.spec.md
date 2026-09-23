@@ -28,3 +28,10 @@
   reason. Displaced notes show as badges. An audited row that is missing
   something names the categories: "no answer for services, map".
 - *+ propose a new location* while open.
+- **Report and sharing** (closed and finalized audits). *View report* opens
+  `/audits/:id/report`. `manage_audits` also sees **Share**: a label and an
+  expiry (90 days, or never) make a link, and the URL is copied on creation.
+  Below it, every link the audit has - label, created, expires, views, last
+  viewed - each with *Copy link* and *Revoke*; a revoked or expired one is
+  shown struck through and stays listed. Spec: `docs/audits.md` § Sharing
+  the results.

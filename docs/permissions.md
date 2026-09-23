@@ -63,7 +63,7 @@ The full, fixed catalog of permissions. Marinas cannot invent new permissions, b
 | `manage_chats` | Adding yourself, or another user, as a participant to any chat room — regardless of whether you were originally invited. This is what lets a manager or department head join an in-progress conversation, or place someone else into one. |
 | `manage_assets` | Creating/editing assets, maintenance rules, and checkout records. |
 | `manage_locations` | Creating/editing locations, location types, checkpoints, and the Services and Amenities catalogue. Also required to finalize an Audit that carries structural Proposals (new, retired, renamed, retyped, reparented or re-placed Locations). |
-| `manage_audits` | Creating Audit Templates, launching and closing Audits, and approving or rejecting non-structural Proposals (Service and Amenity presence, GPS coordinates). See `docs/audits.md`. |
+| `manage_audits` | Creating Audit Templates, launching and closing Audits, approving or rejecting non-structural Proposals (Service and Amenity presence, GPS coordinates), and creating or revoking Share Links to an Audit Report. See `docs/audits.md`. |
 | `manage_reservations` | Creating/editing reservations and overriding status/dates. |
 | `manage_marina_settings` | Editing the MarinaSettings record: retention policy, GPS defaults, phone lines, recording toggle. |
 

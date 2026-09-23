@@ -39,6 +39,7 @@ have them today.
 | Approve or reject a Proposal about Service or Amenity presence, or GPS | `manage_audits` |
 | Approve or reject a structural Proposal (new, retired, renamed, retyped, reparented, re-placed Location) | `manage_locations` |
 | Finalize | `manage_audits`; **and** `manage_locations` when any structural Proposal exists |
+| Create or revoke a Share Link; view a report in-app | `manage_audits` to share; any User who can see the Audit to view |
 | Maintain the Services and Amenities catalogue | `manage_locations` |
 
 No role is hardcoded anywhere. "Manager" is not a term; it means "a User
@@ -439,7 +440,145 @@ days. **Finalize** enables when every Proposal has a decision, and requires
   created in error.
 - Rejected Proposals stay recorded with their reason. A rejection is final
   for this Audit; any re-check is a new Audit launched by hand.
+- The **Audit Report** is compiled and stored on the Audit
+  (`audits.report_snapshot`). From here on every view of the report, shared
+  or in-app, is that snapshot - see § Sharing the results.
 - The Audit becomes **Finalized**.
+
+## Sharing the results
+
+Settled with the owner 2026-09-23, by prototype (branch
+`prototype/audit-report`, four variants; the chosen one is D, a combination
+of B's dashboard band with A's summary and attention list). The audience is
+the **Marina Management Team**: people who run the marina and may not use
+the app, reading on a laptop or a phone, and who will paste the numbers
+into a spreadsheet.
+
+### The Audit Report
+
+The **Audit Report** is one document compiled from one Audit, read outside
+the app. It is the same document whether it is viewed in-app, by a Share
+Link, or - later - attached to an email. It contains, in order:
+
+1. **Header.** Marina name, audit name, kind, the status word (*Closed -
+   awaiting decisions* / *Finalized*), launched / closed / finalized dates,
+   who audited, and either *as of &lt;time&gt;* (Closed) or *finalized
+   &lt;date&gt;* (Finalized).
+2. **Headline numbers.** Audited (percent, n of N); *Not working* services
+   (Status) or *Unexpected* occupancy (Occupancy); locations that *Need
+   attention*; Changes (n, approved, undecided); Tickets (raised, open).
+3. **Executive summary.** Sentences, not numbers - the paragraph a manager
+   would otherwise have to write: who audited how many of what between which
+   dates and how many were not reached; what was found not working, by
+   service; signage and mapping; changes proposed and their decisions;
+   tickets raised and open. For an Occupancy Audit: occupied, vacant, and
+   how many did not match the file. Under it, a coverage bar (audited / not
+   audited / pending, every segment labelled).
+4. **Charts.** Status: per-service *present* counts and, when any, *not
+   working*; each Question's tally. Occupancy: occupied / vacant; each
+   Question's tally. Single-hue bars, value at the tip - never a pie.
+5. **Needs attention.** One line per Location, in tree order: what is wrong
+   there, in words. A Location needs attention when any of: a Service
+   present but not working (with its note); *clearly marked* = No; *placed
+   correctly* = No; Unexpected Occupancy; a Yes/No Question answered No; a
+   Proposal still undecided; a Ticket raised from its Finding still open.
+6. **Results**, two tabs, one filter row (state: all / needs attention /
+   audited / not audited; search):
+   - **Per location** (default): one row per target. Columns: Location
+     (name, type), Area (the parent Location), State, then **one column per
+     thing the Audit asked about**, in catalogue order - *Occupied* for an
+     Occupancy Audit; each Service, Amenity and Attribute valid for any
+     target's type, each Audit Question, *Marked* and *Map* for a Status
+     Audit, each only when its category is switched on - then Notes,
+     Changes, Tickets, Recorded by, Recorded at. Cells are short fixed
+     words so a column filters and pivots in a spreadsheet:
+
+     | Column | Cell |
+     |---|---|
+     | Service | `Working` · `Not working` · `Absent` · `-` |
+     | Amenity | `Yes` · `No` · `-` |
+     | Attribute | the value with its unit, e.g. `38 ft`, `Back-in`; `*` after it when this Audit proposed it |
+     | Question | `Yes` · `No` · the option chosen · the text · `-` |
+     | Marked, Map | `Yes` · `No` · `-` |
+     | Occupied | `Occupied` · `Vacant`; `!` after it when it does not match the file |
+     | Notes | the Finding's service and amenity notes, `Service: note; …` |
+
+     `-` means *not recorded*: the Location was not audited, or the entry
+     was added to the catalogue after it was. A row needing attention is
+     marked at its left edge. The first column stays put under horizontal
+     scroll; the table is meant to be wider than a phone.
+   - **Per item**: one row per Location × item - Occupancy, Service,
+     Amenity, Question, Marked, Map, Change, Ticket - with Result and Note.
+     The "every place where Water is absent" view.
+7. A legend for `-`, `*` and `!`.
+
+**Left out, on purpose.** Contact names and details, boat and vehicle names
+and registrations, GPS coordinates (a captured fix shows only as a change),
+and the *still unanswered* completeness gaps - those are an internal
+measure and stay on the audit page. Auditors' names and their notes are
+in: they are about the Location, and the reader is management.
+
+**Theme.** The app's own tokens and type; follows the viewer's light or
+dark preference; print is always light and drops every control. The
+marina's name is text; there is no logo yet.
+
+### Share Links
+
+A **Share Link** is a public URL, `/r/<key>`, whose key is a random UUID.
+Anyone holding it sees the Audit Report; the key is the whole credential,
+so it is treated like one. A User with `manage_audits` creates them from a
+**Closed or Finalized** Audit's page - an Open Audit has nothing to report
+and cannot be shared. Each link is its own row (`audit_shares`):
+
+- a **label** naming who it went to ("Ownership group", "Bob");
+- **expires** - 90 days by default, or never;
+- **revoked** - immediate and permanent; to re-share, make a new one;
+- **views** and **last viewed**, bumped on every successful open.
+
+The audit page lists its links with those facts, *Copy link* and *Revoke*.
+Expired, revoked and unknown keys all land on the same neutral page -
+*This report link is no longer active. Ask the marina for a new one.* - so
+a key cannot be probed for existence.
+
+### Live, then static
+
+While the Audit is **Closed**, every view compiles the report from current
+data and says *as of &lt;time&gt;*: decisions made on the finalize screen
+show up on the next open. On **finalize** the compiled document is stored
+on the Audit and every later view - shared or in-app - is that snapshot,
+verbatim. A Finalized Audit's report never changes, even when a ticket it
+raised closes or a Location it names is renamed next year.
+
+### In the app
+
+The same report renders in-app at `/audits/:id/report` for any User who
+can see the Audit, with two differences: Location names link to their
+Finding, and the page sits inside the shell. The public page has no shell,
+no sign-in and no local database - it fetches the document once.
+
+### Export
+
+*Export…* asks two things and then does them:
+
+- **Formats**, any combination of **PDF**, **Excel**, **CSV**.
+- **Rows**: *Per location*, *Per item*, or *both* - each as currently
+  filtered.
+
+CSV writes one file per chosen row set with exactly the table's headers.
+Excel writes one workbook: a *Summary* sheet (the headline numbers and the
+executive summary sentences) plus a *Locations* and/or *Items* sheet. PDF
+is the browser's print of the page for now, styled for paper; a
+server-rendered PDF arrives with the emailed report. Files are named
+`<audit name> - locations.csv`, `… - items.csv`, `<audit name>.xlsx`.
+
+### Later, recorded
+
+- **Emailed report.** The executive summary sentences are the body, the
+  snapshot the attachment, the Twilio/SendGrid path the shift report uses
+  the transport. The sentences are a pure function so the email renders
+  them without a browser.
+- **Shift reports** will move onto this document shape - headline numbers,
+  sentences, attention list, rows - which is why the shape is generic.
 
 ## Implementation notes
 

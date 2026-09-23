@@ -182,6 +182,18 @@ to name, type, parent or map placement, a GPS coordinate, or the presence of
 a Service or Amenity.
 _Avoid_: pending change, request
 
+**Audit Report**:
+The document compiled from one Audit for reading outside the app - headline
+numbers, an executive summary in sentences, what needs attention, and the
+results per Location and per item. Compiled live while the Audit is Closed;
+stored on the Audit at finalize and never changed after.
+_Avoid_: results page, summary, export
+
+**Share Link**:
+A public URL to an Audit Report whose random key is the whole credential.
+One per recipient; labelled, expiring, revocable, and counted.
+_Avoid_: public link, guest link, token
+
 **Unexpected Occupancy**:
 A Finding that a Location is occupied with no current Lease or active
 Reservation on file, or vacant when one is.
