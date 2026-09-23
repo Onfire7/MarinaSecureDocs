@@ -88,7 +88,7 @@ function Catalogues() {
 
   return (
     <div>
-      <AdminHeader title="Services & Amenities" />
+      <AdminHeader title="Services, Amenities, & Attributes" />
       <div className="section-title">Services</div>
       <div className="row" style={{ marginBottom: 12 }}>
         <input
