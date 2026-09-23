@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { useQuery } from "@powersync/react";
-import { useAudit, useAuditGaps, useAuditProposals, useAuditTargets, type AuditProposalRow, type AuditRow } from "./audits";
+import { useAudit, useAuditGaps, useAuditProposals, useAuditQuestions, useAuditTargets, type AuditProposalRow, type AuditRow } from "./audits";
 import { useLocations, useLocationTypes } from "./locations";
-import { useAmenities, useAttributes, useServices } from "./services";
+import { useAmenities, useAmenityValidity, useAttributeValidity, useAttributes, useServiceValidity, useServices } from "./services";
 import { useMarinaName } from "./settings";
 import { AUDIT_CATEGORIES, gapsOfTarget, type AuditCategory } from "../lib/audits";
 
@@ -26,6 +26,13 @@ export interface ReportAmenity {
   name: string;
   present: boolean;
   note: string | null;
+}
+export interface ReportAttribute {
+  name: string;
+  unit: string | null;
+  /** What the report shows: the Finding's proposed value when it made one, else what the location records. */
+  value: string | null;
+  proposed: boolean;
 }
 export interface ReportAnswer {
   prompt: string;
@@ -71,14 +78,25 @@ export interface ReportTarget {
   } | null;
   services: ReportService[];
   amenities: ReportAmenity[];
+  attributes: ReportAttribute[];
   answers: ReportAnswer[];
   proposals: ReportProposal[];
   tickets: ReportTicket[];
   /** Categories this audited location still has no answer for. */
   gaps: AuditCategory[];
 }
+/** The columns a per-location table needs: every catalogue entry valid for
+ *  any type in the audit, and every question the audit asks, in catalogue
+ *  order - so a location that wasn't reached still has the same columns. */
+export interface ReportColumns {
+  services: string[];
+  amenities: string[];
+  attributes: { name: string; unit: string | null }[];
+  questions: string[];
+}
 export interface AuditReport {
   audit: AuditRow;
+  columns: ReportColumns;
   marinaName: string;
   launchedBy: string | null;
   closedBy: string | null;
@@ -114,6 +132,10 @@ export function useAuditReport(auditId: string | undefined): { report: AuditRepo
   const services = useServices();
   const amenities = useAmenities();
   const attributes = useAttributes();
+  const serviceValidity = useServiceValidity();
+  const amenityValidity = useAmenityValidity();
+  const attributeValidity = useAttributeValidity();
+  const questions = useAuditQuestions(auditId);
   const people = useQuery<{ id: string; name: string }>("SELECT id, name FROM users");
   const marinaName = useMarinaName();
   const assignees = useQuery<{ user_name: string | null; role_name: string | null }>(
@@ -159,6 +181,12 @@ export function useAuditReport(auditId: string | undefined): { report: AuditRepo
       ORDER BY q.position`,
     [id],
   );
+  const locAttributes = useQuery<{ location_id: string; attribute_id: string; value: number | null; value_text: string | null }>(
+    `SELECT la.location_id, la.attribute_id, la.value, la.value_text
+       FROM location_attributes la
+      WHERE la.location_id IN (SELECT t.location_id FROM audit_targets t WHERE t.audit_id = ?)`,
+    [id],
+  );
   const tickets = useQuery<{ id: string; title: string; priority: string; source_finding_id: string; status_name: string | null; is_terminal: number | null }>(
     `SELECT t.id, t.title, t.priority, t.source_finding_id, ts.name AS status_name, ts.is_terminal
        FROM tickets t
@@ -172,6 +200,7 @@ export function useAuditReport(auditId: string | undefined): { report: AuditRepo
   const sources = [
     targets, proposals, gaps, locations, types, services, amenities, attributes,
     people, assignees, findings, fServices, fAmenities, fAnswers, tickets,
+    serviceValidity, amenityValidity, attributeValidity, questions, locAttributes,
   ];
   const settled = !audit.isLoading && sources.every((q) => !q.isLoading && !q.isFetching);
 
@@ -237,11 +266,45 @@ export function useAuditReport(auditId: string | undefined): { report: AuditRepo
     const tktBy = new Map<string, typeof tickets.data>();
     for (const t of tickets.data) (tktBy.get(t.source_finding_id) ?? tktBy.set(t.source_finding_id, []).get(t.source_finding_id)!).push(t);
 
+    const typeIds = new Set(targets.data.map((t) => t.location_type_id).filter(Boolean) as string[]);
+    const validFor = (rows: { location_type_id: string }[], key: string) =>
+      new Set(rows.filter((v) => typeIds.has(v.location_type_id)).map((v) => (v as unknown as Record<string, string>)[key]));
+    const svcIds = validFor(serviceValidity.data, "service_id");
+    const amenIds = validFor(amenityValidity.data, "amenity_id");
+    const attrIds = validFor(attributeValidity.data, "attribute_id");
+    const columns: ReportColumns = {
+      services: services.data.filter((x) => svcIds.has(x.id)).map((x) => x.name),
+      amenities: amenities.data.filter((x) => amenIds.has(x.id)).map((x) => x.name),
+      attributes: attributes.data.filter((x) => attrIds.has(x.id)).map((x) => ({ name: x.name, unit: x.unit })),
+      questions: questions.data.map((q) => q.prompt),
+    };
+    const attrValid = new Map<string, Set<string>>();
+    for (const v of attributeValidity.data)
+      (attrValid.get(v.location_type_id) ?? attrValid.set(v.location_type_id, new Set()).get(v.location_type_id)!).add(v.attribute_id ?? "");
+    const locAttrBy = new Map<string, typeof locAttributes.data>();
+    for (const la of locAttributes.data) (locAttrBy.get(la.location_id) ?? locAttrBy.set(la.location_id, []).get(la.location_id)!).push(la);
+
     const shaped: ReportTarget[] = targets.data.map((t) => {
       const f = findingByTarget.get(t.id) ?? null;
       const loc = t.location_id ? locById.get(t.location_id) : undefined;
       const parent = loc?.parent_id ? locById.get(loc.parent_id) : undefined;
       const g = gapByTarget.get(t.id);
+      const validAttrs = t.location_type_id ? attrValid.get(t.location_type_id) ?? new Set<string>() : new Set<string>();
+      const fProps = f ? propBy.get(f.id) ?? [] : [];
+      const attrs: ReportAttribute[] = attributes.data
+        .filter((a) => validAttrs.has(a.id))
+        .map((a) => {
+          const prop = fProps.find((p) => p.kind === "set_attribute" && parsePayload(p.payload).attribute_id === a.id);
+          const cur = (t.location_id ? locAttrBy.get(t.location_id) ?? [] : []).find((x) => x.attribute_id === a.id);
+          const shown = (v: unknown, text: unknown) => (text != null ? String(text) : v != null ? String(v) : null);
+          const pl = prop ? parsePayload(prop.payload) : null;
+          return {
+            name: a.name,
+            unit: a.unit,
+            value: pl ? shown(pl.value, pl.text) : shown(cur?.value ?? null, cur?.value_text ?? null),
+            proposed: !!prop,
+          };
+        });
       return {
         id: t.id,
         locationId: t.location_id,
@@ -264,6 +327,7 @@ export function useAuditReport(auditId: string | undefined): { report: AuditRepo
           : null,
         services: (f ? svcBy.get(f.id) ?? [] : []).map((s) => ({ name: s.name, present: s.present === 1, working: s.working === 1, note: s.note })),
         amenities: (f ? amenBy.get(f.id) ?? [] : []).map((s) => ({ name: s.name, present: s.present === 1, note: s.note })),
+        attributes: attrs,
         answers: (f ? ansBy.get(f.id) ?? [] : []).map((r) => ({ prompt: r.prompt, kind: r.kind, value: parseJson(r.value), ticketId: r.ticket_id })),
         proposals: (f ? propBy.get(f.id) ?? [] : []).map(toProposal),
         tickets: (f ? tktBy.get(f.id) ?? [] : []).map((k) => ({ id: k.id, title: k.title, priority: k.priority, status: k.status_name, open: k.is_terminal !== 1 })),
@@ -280,6 +344,7 @@ export function useAuditReport(auditId: string | undefined): { report: AuditRepo
 
     return {
       audit: a,
+      columns,
       marinaName,
       launchedBy: person(a.launched_by_id),
       closedBy: person(a.closed_by_id),
@@ -289,7 +354,7 @@ export function useAuditReport(auditId: string | undefined): { report: AuditRepo
       newLocationProposals,
       asOf: new Date().toISOString(),
     };
-  }, [audit.audit, settled, targets.data, proposals.data, gaps.data, locations.data, types.data, services.data, amenities.data, attributes.data, people.data, marinaName, assignees.data, findings.data, fServices.data, fAmenities.data, fAnswers.data, tickets.data]);
+  }, [audit.audit, settled, targets.data, proposals.data, gaps.data, locations.data, types.data, services.data, amenities.data, attributes.data, people.data, marinaName, assignees.data, findings.data, fServices.data, fAmenities.data, fAnswers.data, tickets.data, serviceValidity.data, amenityValidity.data, attributeValidity.data, questions.data, locAttributes.data]);
 
   return { report, isLoading: !settled };
 }

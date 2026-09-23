@@ -12,18 +12,20 @@ import { PrototypeSwitcher } from "../../shared/PrototypeSwitcher";
 import { VariantA, name as nameA } from "./VariantA";
 import { VariantB, name as nameB } from "./VariantB";
 import { VariantC, name as nameC } from "./VariantC";
+import { VariantD, name as nameD } from "./VariantD";
 import "./prototype.css";
 
 const VARIANTS = [
   { key: "A", name: nameA },
   { key: "B", name: nameB },
   { key: "C", name: nameC },
+  { key: "D", name: nameD },
 ];
 
 export function AuditReportPrototypePage() {
   const { id } = useParams();
   const [params] = useSearchParams();
-  const variant = params.get("variant") ?? "A";
+  const variant = params.get("variant") ?? "D";
   const { report, isLoading } = useAuditReport(id);
   return (
     <div className="rp-layer">
@@ -46,8 +48,10 @@ export function AuditReportPrototypePage() {
         <VariantB r={report} />
       ) : variant === "C" ? (
         <VariantC r={report} />
-      ) : (
+      ) : variant === "A" ? (
         <VariantA r={report} />
+      ) : (
+        <VariantD r={report} />
       )}
       <PrototypeSwitcher variants={VARIANTS} />
     </div>

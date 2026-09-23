@@ -302,3 +302,55 @@ export function list(parts: string[]): string {
 export function statusWord(status: string): string {
   return status === "finalized" ? "Finalized" : status === "closed" ? "Closed - awaiting decisions" : "In progress";
 }
+
+/** One row per location, one column per catalogue entry and question - the
+ *  shape that pastes into a spreadsheet. Cells are short fixed words so a
+ *  column can be filtered or pivoted; notes travel in their own column. */
+export interface WideRow {
+  target: ReportTarget;
+  cells: Record<string, string>;
+  notes: string;
+}
+export const DASH = "-";
+export function wideRows(r: AuditReport): WideRow[] {
+  return r.targets.map((t) => {
+    const cells: Record<string, string> = {};
+    const f = t.finding;
+    if (r.audit.kind === "occupancy") cells["Occupied"] = !f || f.occupied === null ? DASH : f.occupied ? (f.unexpectedOccupancy ? "Occupied !" : "Occupied") : f.unexpectedOccupancy ? "Vacant !" : "Vacant";
+    for (const name of r.columns.services) {
+      const s = t.services.find((x) => x.name === name);
+      cells[name] = !s ? DASH : !s.present ? "Absent" : s.working ? "Working" : "Not working";
+    }
+    for (const name of r.columns.amenities) {
+      const a = t.amenities.find((x) => x.name === name);
+      cells[name] = !a ? DASH : a.present ? "Yes" : "No";
+    }
+    for (const c of r.columns.attributes) {
+      const a = t.attributes.find((x) => x.name === c.name);
+      cells[c.name] = a?.value != null ? `${a.value}${c.unit && /^[\d.]+$/.test(a.value) ? ` ${c.unit}` : ""}${a.proposed ? " *" : ""}` : DASH;
+    }
+    for (const prompt of r.columns.questions) {
+      const a = t.answers.find((x) => x.prompt === prompt);
+      cells[prompt] = !a || a.value == null ? DASH : a.value === true ? "Yes" : a.value === false ? "No" : String(a.value);
+    }
+    if (r.audit.kind === "status") {
+      cells["Marked"] = !f || f.clearlyMarked === null ? DASH : f.clearlyMarked ? "Yes" : "No";
+      cells["Map"] = !f || f.mappedCorrectly === null ? DASH : f.mappedCorrectly ? "Yes" : "No";
+    }
+    const notes = [
+      ...t.services.filter((s) => s.note).map((s) => `${s.name}: ${s.note}`),
+      ...t.amenities.filter((a) => a.note).map((a) => `${a.name}: ${a.note}`),
+    ].join("; ");
+    return { target: t, cells, notes };
+  });
+}
+export function wideHeaders(r: AuditReport): string[] {
+  return [
+    ...(r.audit.kind === "occupancy" ? ["Occupied"] : []),
+    ...r.columns.services,
+    ...r.columns.amenities,
+    ...r.columns.attributes.map((a) => a.name),
+    ...r.columns.questions,
+    ...(r.audit.kind === "status" ? ["Marked", "Map"] : []),
+  ];
+}

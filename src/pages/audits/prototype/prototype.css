@@ -368,3 +368,20 @@
     justify-content: flex-start !important;
   }
 }
+
+/* Variant D - wide per-location table */
+.rp-wide th,
+.rp-wide td {
+  white-space: nowrap;
+  padding: 7px 10px;
+  font-size: 0.84rem;
+}
+.rp-wide th {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rp-cell-none { color: var(--line); }
+.rp-cell-bad { color: var(--bad); font-weight: 650; }
+.rp-cell-good { color: var(--good); }
+.rp-attn-row td:first-child { box-shadow: inset 3px 0 0 var(--bad); }
