@@ -243,3 +243,101 @@ export function attributeDiff(
   }
   return { proposals };
 }
+
+// ── Completeness ─────────────────────────────────────────────────────────
+
+/** The categories an Audit can leave unanswered, in the order shown. */
+export const AUDIT_CATEGORIES = [
+  "services",
+  "amenities",
+  "attributes",
+  "questions",
+  "gps",
+  "marked",
+  "map",
+] as const;
+export type AuditCategory = (typeof AUDIT_CATEGORIES)[number];
+
+export const CATEGORY_LABEL: Record<AuditCategory, string> = {
+  services: "Services",
+  amenities: "Amenities",
+  attributes: "Attributes",
+  questions: "Questions",
+  gps: "GPS",
+  marked: "Marked",
+  map: "Map",
+};
+
+/** What one audited Location still has no answer for. Counts, not booleans,
+ *  so "3 services unanswered here" survives to the row. */
+export interface TargetGaps {
+  targetId: string;
+  services: number;
+  amenities: number;
+  attributes: number;
+  questions: number;
+  gps: number;
+  marked: number;
+  map: number;
+}
+
+export interface AuditShape {
+  kind: "occupancy" | "status";
+  include_services: number;
+  include_amenities: number;
+  include_attributes: number;
+  include_marked: number;
+  include_map: number;
+}
+
+/**
+ * Which categories this Audit asks about at all. A category the Template
+ * switched off was never asked, so it can't be unanswered; an Occupancy
+ * Audit asks none of the Status built-ins. Questions and GPS belong to both
+ * kinds and have no switch — a Question is only asked where a Rule attached
+ * it, and GPS is how a Location acquires coordinates at all.
+ */
+export function auditCategories(audit: AuditShape): AuditCategory[] {
+  const status = audit.kind === "status";
+  return AUDIT_CATEGORIES.filter((c) => {
+    switch (c) {
+      case "services":
+        return status && audit.include_services === 1;
+      case "amenities":
+        return status && audit.include_amenities === 1;
+      case "attributes":
+        return status && audit.include_attributes === 1;
+      case "marked":
+        return status && audit.include_marked === 1;
+      case "map":
+        return status && audit.include_map === 1;
+      default:
+        return true; // questions, gps
+    }
+  });
+}
+
+/**
+ * The audited Locations each category still has no answer for — the pills
+ * on the audit. Only categories the Audit asks about are considered, and
+ * only Locations that were actually audited: "not audited" is already its
+ * own count, and pending work isn't a gap yet.
+ *
+ * Empty everywhere is the answer a manager is looking for before
+ * finalizing, which is why this reports by category rather than by row.
+ */
+export function gapsByCategory(audit: AuditShape, gaps: TargetGaps[]): Record<AuditCategory, string[]> {
+  const asked = new Set(auditCategories(audit));
+  const out = Object.fromEntries(AUDIT_CATEGORIES.map((c) => [c, [] as string[]])) as Record<AuditCategory, string[]>;
+  for (const g of gaps) {
+    for (const c of AUDIT_CATEGORIES) {
+      if (asked.has(c) && g[c] > 0) out[c].push(g.targetId);
+    }
+  }
+  return out;
+}
+
+/** The categories one row is missing something in, for the row itself. */
+export function gapsOfTarget(audit: AuditShape, gap: TargetGaps): AuditCategory[] {
+  return auditCategories(audit).filter((c) => gap[c] > 0);
+}

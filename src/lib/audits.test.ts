@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   attributeDiff,
+  auditCategories,
+  gapsByCategory,
+  gapsOfTarget,
   gpsPrompt,
   mergeSearchMatch,
   orderTargets,
@@ -197,5 +200,50 @@ describe("attribute diff yields proposals for every change", () => {
   it("a note-only change on an already-set attribute still proposes", () => {
     const d = attributeDiff(current, [{ attributeId: "max_boat", value: 40, text: null, note: "no houseboats" }]);
     expect(d.proposals).toEqual([{ attributeId: "max_boat", value: 40, text: null, note: "no houseboats" }]);
+  });
+});
+
+describe("audit completeness", () => {
+  const statusAudit = {
+    kind: "status" as const,
+    include_services: 1,
+    include_amenities: 1,
+    include_attributes: 1,
+    include_marked: 1,
+    include_map: 1,
+  };
+  const none = { services: 0, amenities: 0, attributes: 0, questions: 0, gps: 0, marked: 0, map: 0 };
+
+  it("an occupancy audit asks no status categories, only questions and GPS", () => {
+    expect(auditCategories({ ...statusAudit, kind: "occupancy" })).toEqual(["questions", "gps"]);
+  });
+  it("a category the template switched off is never unanswered", () => {
+    const audit = { ...statusAudit, include_map: 0, include_amenities: 0 };
+    expect(auditCategories(audit)).toEqual(["services", "attributes", "questions", "gps", "marked"]);
+    const byCategory = gapsByCategory(audit, [{ targetId: "t1", ...none, map: 3, amenities: 2, services: 1 }]);
+    expect(byCategory.map).toEqual([]);
+    expect(byCategory.amenities).toEqual([]);
+    expect(byCategory.services).toEqual(["t1"]);
+  });
+  it("collects the audited locations behind each category", () => {
+    const byCategory = gapsByCategory(statusAudit, [
+      { targetId: "t1", ...none, services: 2, map: 1 },
+      { targetId: "t2", ...none, map: 1 },
+      { targetId: "t3", ...none },
+    ]);
+    expect(byCategory.services).toEqual(["t1"]);
+    expect(byCategory.map).toEqual(["t1", "t2"]);
+    expect(byCategory.questions).toEqual([]);
+  });
+  it("a finding with every answer leaves every category empty", () => {
+    const byCategory = gapsByCategory(statusAudit, [{ targetId: "t1", ...none }]);
+    expect(Object.values(byCategory).every((ids) => ids.length === 0)).toBe(true);
+  });
+  it("a row reports its own categories in display order", () => {
+    expect(gapsOfTarget(statusAudit, { targetId: "t1", ...none, map: 1, services: 4, gps: 1 })).toEqual([
+      "services",
+      "gps",
+      "map",
+    ]);
   });
 });

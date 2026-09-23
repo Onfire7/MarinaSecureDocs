@@ -557,6 +557,76 @@ export function useAuditTarget(targetId: string | undefined) {
   const { data, isLoading } = useQuery<AuditTargetRow>(`${TARGET_SELECT} WHERE t.id = ?`, [targetId ?? ""]);
   return { target: data[0] ?? null, isLoading };
 }
+/**
+ * What every audited Location of this audit still has no answer for, one
+ * row per Finding (docs/audits.md § Confirming an audit is complete). The
+ * page decides which of these columns the audit actually asks about;
+ * counting them is cheap and kind-independent.
+ *
+ * Every lookup is a correlated subquery, never a `LEFT JOIN` on a foreign
+ * key: PowerSync's local tables are views over a JSON blob, so `id` is the
+ * only real column and a join on anything else scans (CLAUDE.md). The two
+ * joins here are both on `id`.
+ *
+ * "Unanswered" differs by category, and each definition is the one a
+ * manager would check by hand:
+ * - a Service or Amenity valid for the Location's type that the Finding
+ *   holds no row for at all - it was added to the catalogue, or made valid
+ *   for the type, after this Location was audited;
+ * - an Attribute the Location has no value for and the Finding proposed
+ *   none, so nobody knows it yet;
+ * - a Question the Rules attached to this target with no answer recorded;
+ * - no coordinates on the Location and no GPS Proposal in the Finding;
+ * - the two Yes/No built-ins left blank.
+ */
+export interface TargetGapsRow {
+  target_id: string;
+  services: number;
+  amenities: number;
+  attributes: number;
+  questions: number;
+  gps: number;
+  marked: number;
+  map: number;
+}
+export function useAuditGaps(auditId: string | undefined) {
+  return useQuery<TargetGapsRow>(
+    `SELECT t.id AS target_id,
+       (SELECT COUNT(*) FROM service_location_types slt
+         WHERE slt.location_type_id = l.location_type_id
+           AND NOT EXISTS (SELECT 1 FROM audit_finding_services fs
+                            WHERE fs.finding_id = f.id AND fs.service_id = slt.service_id)) AS services,
+       (SELECT COUNT(*) FROM amenity_location_types alt
+         WHERE alt.location_type_id = l.location_type_id
+           AND NOT EXISTS (SELECT 1 FROM audit_finding_amenities fa
+                            WHERE fa.finding_id = f.id AND fa.amenity_id = alt.amenity_id)) AS amenities,
+       (SELECT COUNT(*) FROM attribute_location_types atl
+         WHERE atl.location_type_id = l.location_type_id
+           AND NOT EXISTS (SELECT 1 FROM location_attributes la
+                            WHERE la.location_id = l.id AND la.attribute_id = atl.attribute_id)
+           AND NOT EXISTS (SELECT 1 FROM audit_proposals p
+                            WHERE p.finding_id = f.id AND p.kind = 'set_attribute'
+                              AND json_extract(p.payload, '$.attribute_id') = atl.attribute_id
+                              AND (json_extract(p.payload, '$.value') IS NOT NULL
+                                OR json_extract(p.payload, '$.text') IS NOT NULL))) AS attributes,
+       (SELECT COUNT(*) FROM audit_target_questions tq
+         WHERE tq.target_id = t.id
+           AND NOT EXISTS (SELECT 1 FROM audit_finding_answers fa
+                            WHERE fa.finding_id = f.id AND fa.question_id = tq.question_id
+                              AND fa.value IS NOT NULL AND fa.value NOT IN ('null', '""'))) AS questions,
+       CASE WHEN l.gps_lat IS NOT NULL AND l.gps_lng IS NOT NULL THEN 0
+            WHEN EXISTS (SELECT 1 FROM audit_proposals p WHERE p.finding_id = f.id AND p.kind = 'set_gps') THEN 0
+            ELSE 1 END AS gps,
+       CASE WHEN f.clearly_marked IS NULL THEN 1 ELSE 0 END AS marked,
+       CASE WHEN f.mapped_correctly IS NULL THEN 1 ELSE 0 END AS map
+       FROM audit_findings f
+       JOIN audit_targets t ON t.id = f.target_id
+       LEFT JOIN locations l ON l.id = t.location_id
+      WHERE f.audit_id = ?`,
+    [auditId ?? ""],
+  );
+}
+
 export function useTargetQuestions(targetId: string | undefined) {
   return useQuery<AuditQuestionRow>(
     `SELECT q.* FROM audit_target_questions tq JOIN audit_questions q ON q.id = tq.question_id

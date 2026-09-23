@@ -382,6 +382,37 @@ finalizer to see; nothing is resolved automatically.
 Closed Audits accept no Findings. There is no reopening; launch a new Audit
 over the same rules instead, so every Finding belongs to one point in time.
 
+## Confirming an Audit is complete
+
+A Location can be *Audited* and still have nothing on file for half of what
+the Audit asks. The audit page therefore carries a **pill per category** —
+Services, Amenities, Attributes, Questions, GPS, Marked, Map — for every
+category the Audit asks about that still has an unanswered item on a
+Location that **has** been audited. Each pill names the category and how
+many audited Locations it is unanswered on; tapping one filters the
+Locations list to exactly those, and the row itself says what it has no
+answer for.
+
+A category the Template switched off is never unanswered, and an Occupancy
+Audit has only Questions and GPS. *Not Audited* Locations are not gaps —
+they are already their own count — and neither are pending ones.
+
+What counts as unanswered is, per category:
+
+- a **Service** or **Amenity** valid for the Location's type that the
+  Finding holds no answer for at all. This is normal and not an error: the
+  catalogue gained an entry, or the entry became valid for the type, after
+  that Location was audited.
+- an **Attribute** the Location has no value for, and this Finding proposed
+  none — nobody knows it yet.
+- a **Question** the Rules attached to the target with no answer recorded.
+- **GPS**: the Location has no coordinates and the Finding carries no GPS
+  Proposal.
+- **Marked** and **Map**: the built-in Yes/No left blank.
+
+When nothing is outstanding the pills are replaced by the sentence that
+says so, because "no pills" and "nothing loaded yet" must not look alike.
+
 ## Finalizing
 
 The finalize screen for a Closed Audit shows:

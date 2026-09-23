@@ -7,11 +7,20 @@ import {
   finalizeAudit,
   parseProposalPayload,
   useAudit,
+  useAuditGaps,
   useAuditProposals,
   useAuditTargets,
   type AuditProposalRow,
   type AuditTargetRow,
+  type TargetGapsRow,
 } from "../../data/audits";
+import {
+  CATEGORY_LABEL,
+  gapsByCategory,
+  gapsOfTarget,
+  type AuditCategory,
+  type TargetGaps,
+} from "../../lib/audits";
 import { useLocationTypes, useLocations } from "../../data/locations";
 import { useAmenities, useAttributes, useServices } from "../../data/services";
 
@@ -24,9 +33,11 @@ export function AuditDetailPage() {
   const { audit, isLoading } = useAudit(id);
   const { data: targets } = useAuditTargets(id);
   const { data: proposals } = useAuditProposals(id);
+  const { data: gapRows } = useAuditGaps(id);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "pending" | "audited" | "not_audited">("all");
+  const [gapFilter, setGapFilter] = useState<AuditCategory | null>(null);
 
   if (isLoading || !audit) {
     return (
@@ -41,7 +52,14 @@ export function AuditDetailPage() {
   const undecided = proposals.filter((p) => p.decision === null);
   const structuralApproved = proposals.some((p) => p.structural === 1 && p.decision === "approved");
   const canFinalize = audit.status === "closed" && canManage && undecided.length === 0 && (!structuralApproved || canStructural);
-  const unexpected = targets.filter((t) => t.finding_id).length; // refined below per finding
+
+  // What the audited locations still have no answer for, by category. An
+  // audit reads as finished long before it is: a location can be audited
+  // and still be missing the services the catalogue gained last week.
+  const gaps: TargetGaps[] = gapRows.map(asTargetGaps);
+  const byCategory = gapsByCategory(audit, gaps);
+  const openCategories = (Object.keys(byCategory) as AuditCategory[]).filter((c) => byCategory[c].length > 0);
+  const gapTargets = gapFilter ? new Set(byCategory[gapFilter]) : null;
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -55,7 +73,10 @@ export function AuditDetailPage() {
     }
   };
 
-  const shownTargets = targets.filter((t) => filter === "all" || t.state === filter);
+  const shownTargets = targets.filter(
+    (t) => (filter === "all" || t.state === filter) && (!gapTargets || gapTargets.has(t.id)),
+  );
+  const gapsOf = new Map(gaps.map((g) => [g.targetId, g]));
 
   return (
     <div>
@@ -90,7 +111,30 @@ export function AuditDetailPage() {
           <span><b>{audit.audited_count}</b> audited</span>
           <span><b>{audit.not_audited_count}</b> not audited</span>
           <span><b>{proposals.length}</b> proposals{undecided.length > 0 && `, ${undecided.length} undecided`}</span>
-          <span className="muted small">{unexpected ? "" : ""}</span>
+        </div>
+        <div className="row" style={{ gap: 6, flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
+          {openCategories.length === 0 ? (
+            <span className="muted small">
+              {audit.audited_count > 0
+                ? "Every category answered on every audited location."
+                : "Nothing audited yet."}
+            </span>
+          ) : (
+            <>
+              <span className="muted small">Unanswered:</span>
+              {openCategories.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`badge badge-btn ${gapFilter === c ? "badge-accent" : "badge-warn"}`}
+                  title={`${byCategory[c].length} audited location${byCategory[c].length === 1 ? "" : "s"} with no answer for ${CATEGORY_LABEL[c]}`}
+                  onClick={() => setGapFilter(gapFilter === c ? null : c)}
+                >
+                  {CATEGORY_LABEL[c]} · {byCategory[c].length}
+                </button>
+              ))}
+            </>
+          )}
         </div>
       </div>
 
@@ -111,6 +155,11 @@ export function AuditDetailPage() {
             {f.replace("_", " ")}
           </button>
         ))}
+        {gapFilter && (
+          <button type="button" className="badge badge-btn badge-accent" onClick={() => setGapFilter(null)}>
+            {CATEGORY_LABEL[gapFilter]} unanswered ✕
+          </button>
+        )}
         {audit.status === "open" && (
           <Link to={`/audits/${audit.id}/propose`} className="btn btn-sm">
             + propose a new location
@@ -119,19 +168,51 @@ export function AuditDetailPage() {
       </div>
       <div className="stack" style={{ gap: 6 }}>
         {shownTargets.map((t) => (
-          <TargetRow key={t.id} audit={audit.id} target={t} open={audit.status === "open"} />
+          <TargetRow
+            key={t.id}
+            audit={audit.id}
+            target={t}
+            open={audit.status === "open"}
+            gaps={gapsOf.get(t.id) ? gapsOfTarget(audit, gapsOf.get(t.id)!) : []}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function TargetRow({ audit, target, open }: { audit: string; target: AuditTargetRow; open: boolean }) {
+function asTargetGaps(r: TargetGapsRow): TargetGaps {
+  return {
+    targetId: r.target_id,
+    services: r.services,
+    amenities: r.amenities,
+    attributes: r.attributes,
+    questions: r.questions,
+    gps: r.gps,
+    marked: r.marked,
+    map: r.map,
+  };
+}
+
+function TargetRow({
+  audit,
+  target,
+  open,
+  gaps,
+}: {
+  audit: string;
+  target: AuditTargetRow;
+  open: boolean;
+  gaps: AuditCategory[];
+}) {
   const body = (
     <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
       <span>
         <b>{target.location_name}</b> <span className="muted small">{target.type_name ?? ""}{target.status_name ? ` · ${target.status_name}` : ""}</span>
         {target.displaced_note && <span className="badge badge-warn" style={{ marginLeft: 6 }}>{target.displaced_note}</span>}
+        {gaps.length > 0 && (
+          <span className="muted small"> · no answer for {gaps.map((c) => CATEGORY_LABEL[c].toLowerCase()).join(", ")}</span>
+        )}
       </span>
       <span className={`badge ${target.state === "audited" ? "badge-good" : target.state === "not_audited" ? "badge-bad" : ""}`}>
         {target.state === "not_audited" ? `not audited · ${target.not_audited_reason ?? ""}` : target.state}
