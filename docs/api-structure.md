@@ -134,9 +134,9 @@ the anon key:
 | Function | Who may call | Behavior |
 |---|---|---|
 | `audit_report(p_key uuid) → jsonb` | `anon`, `authenticated` · SECURITY DEFINER | Looks the key up in `audit_shares`. Missing, revoked or expired all return **null** - one answer, so a key cannot be probed. Otherwise bumps `view_count` / `last_viewed_at` and returns the document: `audits.report_snapshot` when the audit is finalized, else `build_audit_report()` compiled now with an `asOf` stamp. |
-| `audit_report_for(p_audit uuid) → jsonb` | `authenticated` · SECURITY INVOKER | The in-app view at `/audits/:id/report`. Same document, no share row; RLS decides whether the caller can see the audit at all. |
-| `build_audit_report(p_audit uuid) → jsonb` | internal only | The **single builder** - also what `finalize_audit()` stores. Shape is `AuditReport` in `src/data/auditReport.ts`; it carries no contact, boat, vehicle or GPS data and no completeness gaps. Presentation (sentences, wide rows, CSV) is pure TypeScript over it. |
-| `create_audit_share(p_audit uuid, p_label text, p_expires_at timestamptz) → audit_shares` | `authenticated` with `manage_audits` | Refuses an `open` audit. Returns the row so the page can copy the URL at once. |
+| `audit_report_for(p_audit uuid) → jsonb` | `authenticated` · SECURITY DEFINER, refuses a caller with no marina user | The in-app view at `/audits/:id/report`. Same document, no share row. Tier 0 - any active marina user, as the audits table itself. |
+| `build_audit_report(p_audit uuid) → jsonb` | internal only | The **single builder** - also what `finalize_audit()` stores in `audit_report_snapshots`. Shape is `AuditReport` in `src/lib/auditReport.ts`; it carries no contact, boat, vehicle or GPS data and no completeness gaps. Presentation (sentences, wide rows, CSV) is pure TypeScript over it. `audit_report_document()` sits between: the snapshot for a finalized audit, a fresh build otherwise. |
+| `create_audit_share(p_audit uuid, p_label text, p_expires_at timestamptz) → audit_shares` | `authenticated` with `manage_audits` (RLS) | Refuses an `open` audit. Null expiry means never. Returns the row so the page can copy the URL at once. The audit page lists shares with a plain PostgREST read of `audit_shares` under the same RLS. |
 | `revoke_audit_share(p_share uuid)` | `authenticated` with `manage_audits` | Sets `revoked_at`; never clears it. |
 
 The key is 122 random bits and the only credential; there is no lockout

@@ -211,6 +211,19 @@ Screenshots or it didn't happen.
   can. `uploadData` now refuses to send without a token and never treats a 401
   as fatal. The repro that found it: tap offline, swap the token source in
   `clerkToken.ts` for `async () => null`, go back online.
+- **A static import loads even when nothing renders it.** The public report
+  page (`/r/<key>`) must not load Clerk or PowerSync - a recipient has
+  neither - and an early `return` in `App.tsx` did nothing about it, because
+  the module graph is static and Vite had already fetched both. The
+  signed-in app is now `lazy(() => import("./AuthedApp"))` and the public
+  page has its own data module that never imports `src/lib/db`. The e2e
+  test asserts on request URLs, not on what rendered.
+- **`now()` is frozen for the whole pgTAP transaction.** A test that expects a
+  timestamp to move between two calls in one file will never see it move;
+  `build_audit_report()` stamps `asOf` with `clock_timestamp()` for that
+  reason. And a table revoked from `authenticated` cannot be read by the
+  test while it impersonates a user - capture the comparison value as owner
+  first, and `grant select` on a temp table before switching to `anon`.
 - **A `LEFT JOIN` on anything but `id` is a full scan.** PowerSync's local
   tables are views over a JSON blob, so `id` is the only real column — every
   other one is `CAST(json_extract(data, '$.x'))`, and every index you declare

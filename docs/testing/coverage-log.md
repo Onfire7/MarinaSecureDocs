@@ -29,6 +29,8 @@ specification for the `effective_permissions` SQL view that replaces it (see
 
 | File | Note |
 |---|---|
+| `data/sharedReport.ts` | The public report page's one anon RPC. Covered by `supabase/tests/090_audit_report.sql` (the function) and `scripts/e2e/audit-report.mjs` (the call, signed out). |
+| `data/auditReport.ts` | Four RPC/PostgREST calls for the Audit Report and its Share Links, all online by design. The functions behind them are covered by `supabase/tests/090_audit_report.sql`; the calls themselves by `scripts/e2e/audit-report.mjs`. |
 | `data/activity.ts` | Feed queries + the activity write. |
 | `data/audits.ts` | Templates, launch, findings, proposals, and the two RPCs. The decisions it makes are in `lib/audits.ts` and `lib/auditRules.ts`, which are fully covered; the transaction itself is exercised by `scripts/e2e/audits.mjs`. |
 | `data/services.ts` | Services and Amenities catalogue, per-location rows, meter readings. |

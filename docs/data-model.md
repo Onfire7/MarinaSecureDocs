@@ -544,11 +544,10 @@ split into categories. Copied onto the Audit at launch, like the rule tree.
 | finalized_by_id / finalized_at | | |
 | is_current | boolean not null default true | Sync scope: true while not finalized, and for 30 days after; maintained by `refresh_sync_scopes_all()`. Every child table below inherits the scope through its audit. |
 | include_attributes / include_services / include_amenities / include_marked / include_map | boolean not null default true | Copied from the Template at launch (or set directly at launch for a blank one). Which built-in Status-kind categories this Audit asks about. |
-| report_snapshot | jsonb | The Audit Report as compiled by `finalize_audit()`. Null until then. Served verbatim to every view afterwards (`docs/audits.md` § Sharing the results). |
 
 `audit_assignees` — `audit_id`, `user_id` / `role_id` (exactly one).
 
-#### `audit_shares` — Tier 1 `manage_audits` (read and write) · sync: through audit, gated by `manage_audits`
+#### `audit_shares` — Tier 1 `manage_audits` (read and write) · sync: **none**
 
 | Column | Type | Notes |
 |---|---|---|
@@ -561,10 +560,18 @@ split into categories. Copied onto the Audit at launch, like the rule tree.
 | view_count | integer not null default 0 | Bumped by `audit_report()`. |
 | last_viewed_at | timestamptz | Likewise. |
 
-Read only through `audit_report(key)` by the public; the key never reaches
-an anonymous client any other way. Tier 0 users cannot read this table at
-all - a share key in a guard's local database would be a credential lying
-around.
+Never synced: the audit page reads it online through PostgREST under RLS,
+and the public reads it only through `audit_report(key)`. A share key in a
+guard's local database would be a credential lying around, so Tier 0 users
+cannot read this table at all.
+
+#### `audit_report_snapshots` — no policies · sync: **none**
+
+`audit_id` (primary key → audits, cascade), `document jsonb not null`,
+`created_at`. The Audit Report as `finalize_audit()` compiled it, served
+verbatim to every view afterwards (`docs/audits.md` § Sharing the
+results). Only the report functions touch it. An audit finalized before
+the table existed gets its snapshot on first read.
 
 #### `audit_targets` — Tier 0 · sync: through audit
 

@@ -22,6 +22,7 @@ import {
   type TargetGaps,
 } from "../../lib/audits";
 import { useLocationTypes, useLocations } from "../../data/locations";
+import { AuditShares } from "./AuditShares";
 import { useAmenities, useAttributes, useServices } from "../../data/services";
 
 // An audit: progress and its targets while open, the finalize screen once
@@ -137,6 +138,8 @@ export function AuditDetailPage() {
           )}
         </div>
       </div>
+
+      {audit.status !== "open" && <AuditShares auditId={audit.id} canManage={canManage} />}
 
       {audit.status !== "open" && (
         <ProposalsTable

@@ -7,7 +7,8 @@ report inside the app for anyone who can see the audit. Behaviour is
 itself commits to.
 
 - **One fetch.** The page calls `audit_report(key)` (public) or
-  `audit_report_for(audit_id)` (in-app) and renders the returned document.
+  `audit_report_for(audit_id)` (in-app) through `src/data/auditReport.ts`
+  and renders the returned document.
   It never assembles the report from tables itself; the document is built in
   one place, in the database, so a shared view and an in-app view can never
   disagree. Presentation - the sentences, the wide rows, the CSV - is pure
@@ -31,7 +32,12 @@ itself commits to.
 - **Cell vocabulary** is exactly the table in `docs/audits.md`: `-` for not
   recorded, `*` for proposed by this audit, `!` for does not match the file.
   Not-working, No and `!` cells are in the danger colour; `-` recedes.
-- **Attention rows** carry a mark at the left edge in both tabs.
+- **No State column.** Attention rows carry a red mark at the left edge in
+  both tabs; a not-audited row is dimmed with a grey mark and says why in
+  its Notes cell. The CSV and Excel keep State as a column.
+- **The `/r/` prefix is routed before the app's providers mount** - the
+  public page never loads Clerk or PowerSync; it uses an anon Supabase client
+  for its one call.
 - **Export…** opens a small panel: format checkboxes (PDF, Excel, CSV; at
   least one) and a rows select (per location / per item / both). CSV and
   Excel download; PDF calls `window.print()` under the print stylesheet,

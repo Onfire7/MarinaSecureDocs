@@ -440,9 +440,9 @@ days. **Finalize** enables when every Proposal has a decision, and requires
   created in error.
 - Rejected Proposals stay recorded with their reason. A rejection is final
   for this Audit; any re-check is a new Audit launched by hand.
-- The **Audit Report** is compiled and stored on the Audit
-  (`audits.report_snapshot`). From here on every view of the report, shared
-  or in-app, is that snapshot - see § Sharing the results.
+- The **Audit Report** is compiled and stored (`audit_report_snapshots`).
+  From here on every view of the report, shared or in-app, is that
+  snapshot - see § Sharing the results.
 - The Audit becomes **Finalized**.
 
 ## Sharing the results
@@ -488,13 +488,17 @@ Link, or - later - attached to an email. It contains, in order:
 6. **Results**, two tabs, one filter row (state: all / needs attention /
    audited / not audited; search):
    - **Per location** (default): one row per target. Columns: Location
-     (name, type), Area (the parent Location), State, then **one column per
+     (name, type), Area (the parent Location), then **one column per
      thing the Audit asked about**, in catalogue order - *Occupied* for an
      Occupancy Audit; each Service, Amenity and Attribute valid for any
      target's type, each Audit Question, *Marked* and *Map* for a Status
      Audit, each only when its category is switched on - then Notes,
-     Changes, Tickets, Recorded by, Recorded at. Cells are short fixed
-     words so a column filters and pivots in a spreadsheet:
+     Changes, Tickets, Recorded by. There is no State column: a row that
+     needs attention is marked at its left edge, and a Location that was
+     not audited is dimmed, its cells all `-`, its Notes cell reading
+     *not audited · closed early*. (The exports keep State as a column;
+     a spreadsheet has no left edge.) Cells are short fixed words so a
+     column filters and pivots:
 
      | Column | Cell |
      |---|---|
@@ -507,9 +511,8 @@ Link, or - later - attached to an email. It contains, in order:
      | Notes | the Finding's service and amenity notes, `Service: note; …` |
 
      `-` means *not recorded*: the Location was not audited, or the entry
-     was added to the catalogue after it was. A row needing attention is
-     marked at its left edge. The first column stays put under horizontal
-     scroll; the table is meant to be wider than a phone.
+     was added to the catalogue after it was. The first column stays put
+     under horizontal scroll; the table is meant to be wider than a phone.
    - **Per item**: one row per Location × item - Occupancy, Service,
      Amenity, Question, Marked, Map, Change, Ticket - with Result and Note.
      The "every place where Water is absent" view.
@@ -548,8 +551,7 @@ a key cannot be probed for existence.
 While the Audit is **Closed**, every view compiles the report from current
 data and says *as of &lt;time&gt;*: decisions made on the finalize screen
 show up on the next open. On **finalize** the compiled document is stored
-on the Audit and every later view - shared or in-app - is that snapshot,
-verbatim. A Finalized Audit's report never changes, even when a ticket it
+and every later view - shared or in-app - is that snapshot, verbatim. A Finalized Audit's report never changes, even when a ticket it
 raised closes or a Location it names is renamed next year.
 
 ### In the app

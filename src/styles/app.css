@@ -1649,3 +1649,316 @@ h3 {
   border-color: var(--bad);
   font-weight: 600;
 }
+
+/* ---------- Audit report (AuditReportPage) ---------- */
+/* The public page has no shell; the in-app page sits in the usual main
+   column. Both use these. Tokens only - it follows the viewer's theme. */
+
+.report-page {
+  min-height: 100%;
+  background: var(--bg);
+}
+.report-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line-lt);
+  font-size: 0.86rem;
+}
+.report-brand {
+  font-weight: 720;
+}
+.report-brand small {
+  font-weight: 500;
+  color: var(--mute);
+  margin-left: 8px;
+}
+.report {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 18px 20px 80px;
+}
+.report-letterhead {
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.report-letterhead-right {
+  text-align: right;
+}
+.report-kicker {
+  font-size: 0.78rem;
+  color: var(--mute);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 650;
+}
+.report h1 {
+  font-size: 1.7rem;
+  font-weight: 720;
+  margin: 0 0 4px;
+}
+.report h2 {
+  font-size: 1.05rem;
+  font-weight: 720;
+  margin: 26px 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--mute);
+}
+.report-prose {
+  max-width: 900px;
+}
+.report-prose p {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+.report-prose .lede {
+  font-size: 1.12rem;
+}
+.report ul {
+  margin: 4px 0 0;
+  padding-left: 20px;
+}
+.report li {
+  margin-bottom: 3px;
+}
+.report-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+.report-kpi {
+  background: var(--panel);
+  border: 1px solid var(--line-lt);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.report-kpi-label {
+  font-size: 0.74rem;
+  color: var(--mute);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 650;
+}
+.report-kpi-value {
+  font-size: 1.7rem;
+  font-weight: 650;
+  line-height: 1.15;
+  margin-top: 2px;
+}
+.report-kpi-sub {
+  font-size: 0.8rem;
+  color: var(--mute);
+}
+.report-band {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin: 12px 0;
+}
+@media (min-width: 900px) {
+  .report-band {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+.report-bar {
+  display: flex;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  gap: 2px;
+  background: var(--fill);
+}
+.report-bar > span {
+  display: block;
+  height: 100%;
+}
+.report-bar-good { background: var(--good); }
+.report-bar-bad { background: var(--bad); }
+.report-bar-mute { background: var(--line); }
+.report-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: var(--mute);
+  margin-top: 6px;
+}
+.report-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 5px;
+  vertical-align: -1px;
+}
+.report-hbars {
+  display: grid;
+  gap: 6px;
+  font-size: 0.86rem;
+}
+.report-hbar {
+  display: grid;
+  grid-template-columns: minmax(60px, max-content) 1fr 2.5em;
+  gap: 10px;
+  align-items: center;
+}
+.report-hbar .track {
+  height: 12px;
+  background: var(--fill);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.report-hbar .fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 0 6px 6px 0;
+}
+.report-hbar .fill.bad {
+  background: var(--bad);
+}
+.report-hbar .num {
+  color: var(--mute);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.report-tone-none {
+  background: var(--fill);
+  color: var(--mute);
+}
+.report-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.report-tabs {
+  display: flex;
+  gap: 4px;
+}
+.report-tab {
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--mute);
+  cursor: pointer;
+}
+.report-tab.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.report-filters {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.report-filters .select {
+  width: auto;
+}
+.report-filters .input {
+  max-width: 220px;
+}
+.report-scroll {
+  overflow-x: auto;
+  margin-top: 8px;
+}
+.report-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.report-table td.num,
+.report-table th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-wide th,
+.report-wide td {
+  white-space: nowrap;
+  padding: 7px 10px;
+  font-size: 0.84rem;
+}
+.report-wide th:first-child,
+.report-wide td:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--panel);
+  z-index: 2;
+}
+.report-wide th:first-child {
+  background: var(--fill);
+  z-index: 3;
+}
+.report-wide .report-notes {
+  white-space: normal;
+  min-width: 180px;
+  max-width: 260px;
+}
+.report-cell-none { color: var(--line); }
+.report-cell-bad { color: var(--bad); font-weight: 650; }
+.report-cell-good { color: var(--good); }
+.report-row-attn td:first-child { box-shadow: inset 3px 0 0 var(--bad); }
+.report-row-skip td { color: var(--mute); }
+.report-row-skip td:first-child { box-shadow: inset 3px 0 0 var(--line); }
+.report-export {
+  position: absolute;
+  right: 0;
+  top: 110%;
+  width: 300px;
+  z-index: 5;
+  box-shadow: var(--shadow);
+  text-align: left;
+}
+@media (max-width: 600px) {
+  .report-letterhead-right {
+    text-align: left;
+  }
+  .report-letterhead-right .row {
+    justify-content: flex-start;
+  }
+  .report-export {
+    right: auto;
+    left: 0;
+  }
+}
+@media print {
+  :root {
+    --bg: #fff;
+    --panel: #fff;
+    --ink: #111;
+  }
+  .report-noprint,
+  .sidenav,
+  .appbar,
+  .tabbar {
+    display: none !important;
+  }
+  .report {
+    padding: 0;
+    max-width: none;
+  }
+  .report-table th,
+  .report-wide th:first-child,
+  .report-wide td:first-child {
+    position: static;
+  }
+  .report-scroll {
+    overflow: visible;
+  }
+}

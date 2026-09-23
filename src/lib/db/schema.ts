@@ -343,6 +343,19 @@ const audit_questions = new Table(
   },
 );
 
+const audit_report_snapshots = new Table(
+  {
+    audit_id: column.text,
+    document: column.text,
+    created_at: column.text,
+  },
+  {
+    indexes: {
+      by_audit_id: ["audit_id"],
+    },
+  },
+);
+
 const audit_rules = new Table(
   {
     template_id: column.text,
@@ -357,6 +370,27 @@ const audit_rules = new Table(
       by_audit_id: ["audit_id"],
       by_parent_rule_id: ["parent_rule_id"],
       by_template_id: ["template_id"],
+    },
+  },
+);
+
+const audit_shares = new Table(
+  {
+    audit_id: column.text,
+    key: column.text,
+    label: column.text,
+    created_by_id: column.text,
+    created_at: column.text,
+    expires_at: column.text,
+    revoked_at: column.text,
+    view_count: column.integer,
+    last_viewed_at: column.text,
+  },
+  {
+    indexes: {
+      by_audit_id: ["audit_id"],
+      by_created_by_id: ["created_by_id"],
+      by_key: ["key"],
     },
   },
 );
@@ -1497,7 +1531,9 @@ export const AppSchema = new Schema({
   audit_findings,
   audit_proposals,
   audit_questions,
+  audit_report_snapshots,
   audit_rules,
+  audit_shares,
   audit_target_questions,
   audit_targets,
   audit_templates,
@@ -1591,7 +1627,9 @@ export const TABLE_NAMES = [
   "audit_findings",
   "audit_proposals",
   "audit_questions",
+  "audit_report_snapshots",
   "audit_rules",
+  "audit_shares",
   "audit_target_questions",
   "audit_targets",
   "audit_templates",
@@ -1671,6 +1709,7 @@ export const STRUCTURED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   audit_finding_answers: ["value"],
   audit_proposals: ["payload"],
   audit_questions: ["choices"],
+  audit_report_snapshots: ["document"],
   audit_rules: ["conditions"],
   checklist_instance_items: ["result"],
   checklist_template_items: ["config"],
