@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   attention,
+  removedNote,
   describeProposal,
   itemRows,
   narrative,
@@ -349,5 +350,50 @@ describe("a filtered document", () => {
     expect(attention(statusAudit.targets[2])).toContain("Power not working - pedestal dead");
     expect(attention({ ...statusAudit.targets[2], services: [] })).not.toContain("Power not working - pedestal dead");
     expect(itemRows(withoutServices).some((r) => r.category === "Service")).toBe(false);
+  });
+});
+
+describe("a location that has since been removed", () => {
+  // Tests 1-3 of the list approved 2026-09-24. A report that lists a
+  // retired Location as though it were still there sends somebody to look
+  // at something that is gone (docs/audits.md § 6).
+  const gone = (over: Partial<ReportTarget> = {}): ReportTarget => ({
+    ...statusAudit.targets[0],
+    retiredAt: "2026-09-24T10:00:00Z",
+    ...over,
+  });
+  const retirement = (decision: "approved" | "rejected" | null) => ({
+    id: "pz", kind: "retire_location" as const, structural: true, decision, reason: null, recordedBy: "Bob", payload: {},
+  });
+
+  it("12 · says who removed it, and says nothing about one still standing", () => {
+    expect(removedNote(statusAudit.targets[0])).toBe(null);
+    expect(removedNote(gone({ proposals: [retirement("approved")] }))).toBe("removed by this audit");
+    expect(removedNote(gone())).toMatch(/^removed /);
+    expect(removedNote(gone())).not.toBe("removed by this audit");
+  });
+  it("12b · a retirement nobody approved has not removed anything", () => {
+    // The Location is still there; the Proposal is only a request.
+    expect(removedNote({ ...statusAudit.targets[0], proposals: [retirement(null)] })).toBe(null);
+    expect(removedNote({ ...statusAudit.targets[0], proposals: [retirement("rejected")] })).toBe(null);
+    // Retired, but this audit's request was refused - somebody else took it.
+    expect(removedNote(gone({ proposals: [retirement("rejected")] }))).toMatch(/^removed /);
+  });
+  it("13 · the note leads the Notes cell, and the row is flagged for striking", () => {
+    const report: AuditReport = {
+      ...statusAudit,
+      targets: [gone({ proposals: [retirement("approved")] }), statusAudit.targets[3]],
+    };
+    const rows = wideRows(report);
+    expect(rows[0].removed).toBe(true);
+    expect(rows[0].notes.startsWith("removed by this audit")).toBe(true);
+    // the row that was never reached keeps what it always said
+    expect(rows[1].removed).toBe(false);
+    expect(rows[1].notes).toMatch(/not audited/);
+  });
+  it("14 · the summary mentions it, and stays quiet when nothing went", () => {
+    const report: AuditReport = { ...statusAudit, targets: [gone(), statusAudit.targets[1]] };
+    expect(narrative(report, summarize(report)).join(" ")).toMatch(/1 location has since been removed/);
+    expect(narrative(statusAudit, summarize(statusAudit)).join(" ")).not.toMatch(/removed/);
   });
 });

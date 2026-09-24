@@ -91,6 +91,9 @@ export interface ReportTarget {
   /** The parent location's name. */
   area: string | null;
   state: "pending" | "audited" | "not_audited";
+  /** When the Location was retired, if it has been. Absent on documents
+   *  compiled before 2026-09-24, and on snapshots taken then. */
+  retiredAt?: string | null;
   notAuditedReason: string | null;
   displacedNote: string | null;
   finding: ReportFinding | null;
@@ -253,6 +256,12 @@ export function narrative(r: AuditReport, s: Summary): string[] {
     : ".";
   const stillToVisit = s.pending ? ` ${s.pending} ${s.pending === 1 ? "is" : "are"} still to visit.` : "";
   out.push(`${s.audited} of ${s.targets} locations ${s.audited === 1 ? "was" : "were"} audited${who}${when}${notReached}${stillToVisit}`);
+  // Early, and in prose: a reader scanning the summary should not have to
+  // notice a line through a row forty rows down.
+  const removed = r.targets.filter((t) => removedNote(t) !== null).length;
+  if (removed > 0) {
+    out.push(`${removed} location${removed === 1 ? " has" : "s have"} since been removed.`);
+  }
   if (s.kind === "status") {
     if (s.broken.length) {
       const by = new Map<string, number>();
@@ -387,6 +396,24 @@ export interface WideRow {
   /** Keyed by header; the fixed vocabulary in docs/audits.md. */
   cells: Record<string, string>;
   notes: string;
+  /** The Location is gone; the table strikes the row through. */
+  removed: boolean;
+}
+
+/**
+ * What became of a Location that is no longer there, in words.
+ *
+ * The row stays in the report - the reading it carries is history worth
+ * keeping, and it was audited whatever happened afterwards - but a reader
+ * sent to look at a site that has been removed has been wasted.
+ *
+ * A retirement nobody approved has removed nothing: the Proposal is a
+ * request, and the Location is still standing until finalize applies it.
+ */
+export function removedNote(t: ReportTarget): string | null {
+  if (!t.retiredAt) return null;
+  const byThisAudit = t.proposals.some((p) => p.kind === "retire_location" && p.decision === "approved");
+  return byThisAudit ? "removed by this audit" : `removed ${fmtDate(t.retiredAt)}`;
 }
 export function wideRows(r: AuditReport): WideRow[] {
   const yesNo = (v: boolean | null | undefined) => (v == null ? DASH : v ? "Yes" : "No");
@@ -416,14 +443,18 @@ export function wideRows(r: AuditReport): WideRow[] {
     }
     if (r.audit.kind === "status" && r.audit.includeMarked) cells["Marked"] = yesNo(f?.clearlyMarked);
     if (r.audit.kind === "status" && r.audit.includeMap) cells["Map"] = yesNo(f?.mappedCorrectly);
-    const notes =
+    const said =
       t.state === "not_audited"
         ? `not audited${t.notAuditedReason ? ` · ${t.notAuditedReason}` : ""}`
         : [
             ...t.services.filter((s) => s.note).map((s) => `${s.name}: ${s.note}`),
             ...t.amenities.filter((a) => a.note).map((a) => `${a.name}: ${a.note}`),
           ].join("; ");
-    return { target: t, cells, notes };
+    // First: a spreadsheet has no strikethrough, so for anyone reading the
+    // export this sentence is the only thing saying the site is gone.
+    const gone = removedNote(t);
+    const notes = [gone, said].filter(Boolean).join(" · ");
+    return { target: t, cells, notes, removed: gone !== null };
   });
 }
 

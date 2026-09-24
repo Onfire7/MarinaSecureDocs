@@ -643,7 +643,10 @@ Link, or - later - attached to an email. It contains, in order:
    awaiting decisions* / *Finalized*), launched / closed / finalized dates,
    who audited, and either *as of &lt;time&gt;* (Closed) or *finalized
    &lt;date&gt;* (Finalized).
-2. **Executive summary.** Sentences, not numbers - the paragraph a manager
+2. **Executive summary.** A removal gets a sentence of its own there
+   ("2 locations have since been removed"), because a reader scanning the
+   prose should not have to notice a line through a row forty rows down.
+   Sentences, not numbers - the paragraph a manager
    would otherwise have to write, set as prose under the header, not in a
    card: who audited how many of what between which dates and how many
    were not reached; what was found not working, by service; signage and
@@ -694,7 +697,14 @@ Link, or - later - attached to an email. It contains, in order:
      fifty times. There is no State column: a row that needs attention is
      marked at its left edge, and a Location that was not audited is
      dimmed, its cells all `-`, its Notes cell reading *not audited ·
-     closed early*. Changes, Tickets and who recorded the Finding are not
+     closed early*. A Location that has since been **removed** is **struck
+     through**, and its Notes cell says so first: *removed by this audit*
+     when this Audit's own approved retirement is what took it, otherwise
+     *removed &lt;date&gt;*. The reading it carries is still history worth
+     keeping - the row is not dropped, and the totals do not move, because
+     the Location was audited whatever became of it afterwards. A
+     spreadsheet has no strikethrough, which is why the words are in the
+     Notes cell rather than in the styling alone. Changes, Tickets and who recorded the Finding are not
      on the page; the exports carry them, with State, Type and Area always
      present - a spreadsheet has no left edge. Cells are short fixed words
      so a column filters and pivots:

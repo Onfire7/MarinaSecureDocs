@@ -1923,6 +1923,13 @@ h3 {
 .report-row-attn td:first-child { box-shadow: inset 3px 0 0 var(--bad); }
 .report-row-skip td { color: var(--mute); }
 .report-row-skip td:first-child { box-shadow: inset 3px 0 0 var(--line); }
+/* The Location is gone. The row stays - its reading is history worth
+   keeping - struck through so nobody is sent to look at it. The Notes cell
+   is exempt: it is the cell that says WHY the rest is struck, and striking
+   the explanation through reads as though it too no longer applied. */
+.report-row-gone td { text-decoration: line-through; }
+.report-row-gone td.report-notes { text-decoration: none; font-style: italic; }
+.report-row-gone td:first-child { box-shadow: inset 3px 0 0 var(--mute); }
 .report-export {
   position: absolute;
   right: 0;

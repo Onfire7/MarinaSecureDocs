@@ -248,9 +248,12 @@ export function AuditReportView({ report: r, inApp }: { report: AuditReport; inA
               <tbody>
                 {shownWide.map((w) => {
                   const t = w.target;
-                  const cls = t.state === "not_audited" ? "report-row-skip" : needsAttention(t) ? "report-row-attn" : undefined;
+                  const cls = [
+                    w.removed ? "report-row-gone" : "",
+                    t.state === "not_audited" ? "report-row-skip" : needsAttention(t) ? "report-row-attn" : "",
+                  ].filter(Boolean).join(" ") || undefined;
                   return (
-                    <tr key={t.id} className={cls}>
+                    <tr key={t.id} className={cls} data-testid={w.removed ? "report-row-gone" : undefined}>
                       <td>
                         <b>{inApp && t.state === "audited" ? <Link to={`/audits/${r.audit.id}/targets/${t.id}`}>{t.name}</Link> : t.name}</b>
                         {!sameType && t.typeName ? <span className="muted small"> {t.typeName}</span> : null}

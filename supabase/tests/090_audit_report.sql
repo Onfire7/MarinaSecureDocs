@@ -5,7 +5,7 @@
 -- everyone passes every denial test (CLAUDE.md).
 create extension if not exists pgtap;
 begin;
-select plan(52);
+select plan(55);
 
 -- ── fixtures (as owner, which bypasses RLS; triggers still run) ──────────
 insert into users (id, name, clerk_user_id, active) values
@@ -337,6 +337,28 @@ select public.revoke_audit_share((select id from audit_shares where label = 'no 
 reset role;
 select is((select public.audit_report((select no_gps from fkeys))), null,
   'revoking a filtered link refuses it like any other');
+
+-- ── which Locations have since been removed ─────────────────────────────
+-- Tests 4 and 5 of the list approved 2026-09-24. A report that lists a
+-- retired Location as though it were still there sends a reader to look at
+-- something that is gone.
+update locations set retired_at = now() where id = 'dddd0000-0000-4000-8000-000000000097';
+select is(
+  (select jsonb_path_query_array(public.audit_report_for('eeee0000-0000-4000-8000-0000000000b3'),
+                                 '$.targets[*].retiredAt') @> '[null]'::jsonb), true,
+  'a Location still standing carries no removal date');
+select ok(
+  (select public.audit_report_for('eeee0000-0000-4000-8000-0000000000b3')
+            #>> '{targets,1,retiredAt}') is not null,
+  'and one that has been removed carries the date it went');
+
+-- The Audit finalized earlier in this file has a stored snapshot. A removal
+-- after that must not reach back into it: a finalized report never changes.
+update locations set retired_at = now() where id = 'dddd0000-0000-4000-8000-000000000091';
+select is(
+  (select public.audit_report_for('eeee0000-0000-4000-8000-0000000000b1') #>> '{targets,0,retiredAt}'),
+  null,
+  'a finalized report is the snapshot, and does not start striking rows out later');
 
 select * from finish();
 rollback;

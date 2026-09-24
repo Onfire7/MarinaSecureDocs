@@ -204,6 +204,54 @@ await page.waitForSelector('[data-testid="report-summary"]', { timeout: 60000 })
 await page.waitForTimeout(1500);
 check("19f the in-app report still shows everything", /Shore power 30A/.test(await page.locator("body").innerText()));
 
+// ── 20: a Location that has since been removed (docs/audits.md § 6) ──────
+// Tests 6 and 7 of the list approved 2026-09-24.
+const goneName = sql(`select t.location_name from audit_targets t
+     join audit_findings f on f.target_id = t.id
+    where t.audit_id = '${auditId}' order by t.position limit 1`);
+sql(`update locations set retired_at = now()
+      where id = (select location_id from audit_targets
+                   where audit_id = '${auditId}' and location_name = '${goneName}')`);
+// A fresh link: the one at the top of this file was revoked by 18b.
+// Wrapped in a SELECT: psql prints "INSERT 0 1" after a bare INSERT, and
+// sql() hands back everything it printed.
+const goneKey = sql(`with s as (insert into audit_shares (audit_id, label)
+     values ('${auditId}', 'e2e removed ${stamp}') returning key) select key from s`);
+const gp = await pub.context().newPage();
+await gp.goto(`${APP_URL}/r/${goneKey}`, { waitUntil: "domcontentloaded" });
+await gp.waitForSelector('[data-testid="report-locations"]', { timeout: 60000 });
+await gp.waitForTimeout(2000);
+const goneRow = gp.locator('[data-testid="report-row-gone"]');
+check("20a the removed location's row is struck through", (await goneRow.count()) === 1, `${await goneRow.count()} struck of ${await gp.locator('[data-testid="report-locations"] tbody tr').count()} rows`);
+check("20b and it is the right one, saying so in its notes",
+  /^removed/.test((await goneRow.locator("td.report-notes").innerText()).trim()) &&
+    (await goneRow.locator("td").first().innerText()).includes(goneName),
+  `${goneName}: ${(await goneRow.locator("td.report-notes").innerText()).trim().slice(0, 60)}`);
+check("20c the summary says it in prose too",
+  /location has since been removed/.test(await gp.locator('[data-testid="report-summary"]').innerText()));
+
+// A spreadsheet has no strikethrough, so the words have to be in the file.
+const gdl = [];
+gp.on("download", (d) => gdl.push(d));
+await gp.getByTestId("report-export").click();
+await gp.getByLabel("Rows").selectOption("locations");
+await gp.getByTestId("report-export-run").click();
+await gp.waitForTimeout(2500);
+const gcsv = gdl.find((d) => d.suggestedFilename().endsWith("locations.csv"));
+if (gcsv) {
+  const line = readFileSync(await gcsv.path(), "utf8").split("\n").find((l) => l.startsWith(goneName) || l.startsWith(`"${goneName}`));
+  check("20d and the export carries it, where there is no styling to carry", /removed/.test(line ?? ""), (line ?? "no row").slice(0, 120));
+} else {
+  check("20d and the export carries it, where there is no styling to carry", false, "no CSV downloaded");
+}
+// Put it back: this database is shared with the other suites, and one of
+// them clicks BH14-01L by name. A retired Location is filtered out of the
+// pickers, so leaving it retired breaks them an hour later, somewhere else.
+sql(`update locations set retired_at = null
+      where id = (select location_id from audit_targets
+                   where audit_id = '${auditId}' and location_name = '${goneName}')`);
+await gp.close();
+
 await browser.close();
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} passed`);
