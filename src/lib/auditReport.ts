@@ -295,7 +295,19 @@ export function narrative(r: AuditReport, s: Summary): string[] {
 
 // ── attention ────────────────────────────────────────────────────────────
 
-/** What a reader should look at for one location, in words. */
+/**
+ * What a reader should look at for one location, in words.
+ *
+ * Undecided Proposals are deliberately NOT here. Every Attribute answer is
+ * a Proposal by design, so an audit of any size carries hundreds of them
+ * before anyone has finalized it - on the Campgrounds audit, 402 - and
+ * listing each one put every location in "Needs attention" and buried the
+ * things that are actually wrong. A Proposal awaiting a decision is the
+ * approval queue's business, on the audit page, where it can be acted on;
+ * the report says how many are outstanding in one line of the summary.
+ * What belongs here is what a manager would want to send somebody to look
+ * at.
+ */
 export function attention(x: ReportTarget): string[] {
   const out: string[] = [];
   for (const s of x.services) if (s.present && !s.working) out.push(`${s.name} not working${s.note ? ` - ${s.note}` : ""}`);
@@ -303,7 +315,6 @@ export function attention(x: ReportTarget): string[] {
   if (x.finding?.mappedCorrectly === false) out.push("wrong on the map");
   if (x.finding?.unexpectedOccupancy) out.push(x.finding.occupied ? "occupied, nothing on file" : "vacant, but leased or reserved");
   for (const a of x.answers) if (a.value === false) out.push(`${a.prompt.replace(/\?$/, "")}: No`);
-  for (const p of x.proposals) if (p.decision === null) out.push(`${describeProposal(p)} (undecided)`);
   for (const k of x.tickets) if (k.open) out.push(`ticket open: ${k.title}`);
   return out;
 }
@@ -462,15 +473,20 @@ export function itemRows(r: AuditReport): ItemRow[] {
       rows.push({ ...base, category: "Marked", item: "Clearly marked?", result: f.clearlyMarked ? "Yes" : "No", tone: f.clearlyMarked ? "good" : "bad", note: "" });
     if (r.audit.kind === "status" && r.audit.includeMap && f.mappedCorrectly !== null)
       rows.push({ ...base, category: "Map", item: "Placed correctly?", result: f.mappedCorrectly ? "Yes" : "No", tone: f.mappedCorrectly ? "good" : "bad", note: "" });
+    // Decided changes are an outcome and belong in the report. An undecided
+    // one is a queue item, and there are hundreds of them before finalize
+    // (see attention()); the value it proposes already shows against the
+    // Attribute it belongs to, marked with a *.
     for (const p of x.proposals)
-      rows.push({
-        ...base,
-        category: "Change",
-        item: describeProposal(p),
-        result: p.decision ?? "undecided",
-        tone: p.decision === "approved" ? "good" : p.decision === "rejected" ? "none" : "warn",
-        note: p.reason ?? "",
-      });
+      if (p.decision !== null)
+        rows.push({
+          ...base,
+          category: "Change",
+          item: describeProposal(p),
+          result: p.decision,
+          tone: p.decision === "approved" ? "good" : "none",
+          note: p.reason ?? "",
+        });
     for (const k of x.tickets)
       rows.push({ ...base, category: "Ticket", item: k.title, result: k.status ?? (k.open ? "open" : "closed"), tone: k.open ? "warn" : "none", note: k.priority });
   }

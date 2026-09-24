@@ -627,7 +627,17 @@ Link, or - later - attached to an email. It contains, in order:
    there, in words. A Location needs attention when any of: a Service
    present but not working (with its note); *clearly marked* = No; *placed
    correctly* = No; Unexpected Occupancy; a Yes/No Question answered No; a
-   Proposal still undecided; a Ticket raised from its Finding still open.
+   Ticket raised from its Finding still open.
+   - **An undecided Proposal is not one of them**, and nor is it a row in
+     the per-item tab. Every Attribute answer is a Proposal by design, so
+     an audit of any size carries hundreds before it is finalized - the
+     Campgrounds audit carried 402 - and listing each one put every
+     Location in the list and buried the things that are actually wrong.
+     Proposals awaiting a decision belong to the approval queue on the
+     Audit's page, where they can be acted on; the report gives the count
+     in one line of the summary and marks a proposed value with `*` where
+     it stands. A **decided** Proposal is an outcome, and stays.
+
 6. **Results**, two tabs, one filter row (state: all / needs attention /
    audited / not audited; search):
    - **Per location** (default): one row per target. Columns: Location,

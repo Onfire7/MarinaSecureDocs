@@ -211,13 +211,21 @@ describe("narrative", () => {
 });
 
 describe("attention", () => {
+  it("5c · an undecided proposal is not a location that needs attention", () => {
+    // t3 carries an undecided move_placement. Every Attribute answer is a
+    // Proposal, so counting them here put every location in the list and
+    // buried the broken pedestal.
+    const undecidedOnly = { ...statusAudit.targets[1], proposals: statusAudit.targets[2].proposals.filter((p) => p.decision === null) };
+    expect(attention(undecidedOnly)).toEqual([]);
+    expect(needsAttention(undecidedOnly)).toBe(false);
+    expect(attention(statusAudit.targets[2]).some((line) => /undecided|Move on the map/.test(line))).toBe(false);
+  });
   it("5 · every trigger, in words; a clean target has none", () => {
     expect(attention(statusAudit.targets[2])).toEqual([
       "Power not working - pedestal dead",
       "not clearly marked",
       "wrong on the map",
       "Is the pedestal breaker labelled: No",
-      "Move on the map (undecided)",
       "ticket open: Label pedestal breaker at BH14-02L",
     ]);
     expect(attention(occupancyAudit.targets[1])).toEqual(["occupied, nothing on file", "Dock lines in good condition: No"]);
@@ -279,7 +287,7 @@ describe("wide rows", () => {
     const items = itemRows(statusAudit);
     expect(items.filter((x) => x.location === "BH14-02R")).toHaveLength(0);
     expect(items.filter((x) => x.location === "BH14-02L").map((x) => x.category)).toEqual([
-      "Attribute", "Attribute", "Service", "Service", "Amenity", "Question", "Question", "Marked", "Map", "Change", "Change", "Ticket", "Ticket",
+      "Attribute", "Attribute", "Service", "Service", "Amenity", "Question", "Question", "Marked", "Map", "Change", "Ticket", "Ticket",
     ]);
     expect(items.find((x) => x.location === "BH14-02L" && x.item === "Power")).toMatchObject({ result: "Not working", tone: "bad", note: "pedestal dead" });
   });

@@ -22,7 +22,9 @@ itself commits to.
   off underneath; *Executive summary* as prose, first sentence larger, no
   wider than ~900px; the tile row; the three-card band (coverage bar;
   services present / not working, or occupancy found; questions); *Needs
-  attention* as a list; *Results* with the tab row, filters and table. Tiles
+  attention* as a list - what a manager would send somebody to look at, so
+  never an undecided Proposal (docs/audits.md § 5); *Results* with the tab
+  row, filters and table. Tiles
   wrap to two per row on a phone and the band stacks; the letterhead's right
   column left-aligns under 600px.
 - **Per location is the default tab**; the filter row (state select, search)
