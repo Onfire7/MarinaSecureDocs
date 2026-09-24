@@ -223,6 +223,8 @@ describe("attention", () => {
   it("5 · every trigger, in words; a clean target has none", () => {
     expect(attention(statusAudit.targets[2])).toEqual([
       "Power not working - pedestal dead",
+      "Water: shared tap",
+      "WiFi: weak signal",
       "not clearly marked",
       "wrong on the map",
       "Is the pedestal breaker labelled: No",
@@ -233,6 +235,20 @@ describe("attention", () => {
     expect(attention(statusAudit.targets[0])).toEqual([]);
     expect(needsAttention(statusAudit.targets[0])).toBe(false);
     expect(needsAttention(statusAudit.targets[3])).toBe(false);
+  });
+  it("5d · a note is a reason to look, wherever it was recorded", () => {
+    // Somebody typed it on a phone, in the rain. It was already in the
+    // Notes column; a reader should not have to cross-reference two tables.
+    const noted: ReportTarget = {
+      ...statusAudit.targets[0],
+      services: [{ name: "Power", present: true, working: true, note: "pedestal loose" }],
+      amenities: [{ name: "Fire pit", present: true, note: "ring cracked" }],
+    };
+    expect(attention(noted)).toEqual(["Power: pedestal loose", "Fire pit: ring cracked"]);
+    expect(needsAttention(noted)).toBe(true);
+    // and a not-working service says it once, not twice
+    const broken: ReportTarget = { ...noted, services: [{ name: "Power", present: true, working: false, note: "dead" }] };
+    expect(attention(broken).filter((l) => /Power/.test(l))).toEqual(["Power not working - dead"]);
   });
   it("5b · a proposal is described from its resolved payload", () => {
     expect(describeProposal(statusAudit.targets[1].proposals[0])).toBe("Max boat length → 40 ft");

@@ -4,8 +4,13 @@
 
 - **Header** names the audit, its kind and status. While the audit is open
   everyone who can see it gets **Wizard** (`/audits/:id/wizard`);
-  `manage_audits` also sees *Close early*, and *Reopen* and *Finalize* once
-  closed.
+  `manage_audits` also sees the close button, and *Reopen* and *Finalize*
+  once closed.
+- **The close button reads *Close early*** while any Location is still to
+  visit, and warns that those Locations are marked Not Audited. With
+  nothing pending it reads **Close audit**, because there is nothing early
+  about it - which is the normal way an audit reopened after it auto-closed
+  gets closed again.
 - **Reopen** puts a closed audit back to Open and returns the locations the
   close pushed out of the queue — those marked Not Audited *"closed early"*
   and no others; a location skipped for its own reason keeps its reason, and

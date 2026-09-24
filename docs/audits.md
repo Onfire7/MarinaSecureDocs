@@ -625,9 +625,16 @@ Link, or - later - attached to an email. It contains, in order:
    never a pie.
 5. **Needs attention.** One line per Location, in tree order: what is wrong
    there, in words. A Location needs attention when any of: a Service
-   present but not working (with its note); *clearly marked* = No; *placed
-   correctly* = No; Unexpected Occupancy; a Yes/No Question answered No; a
-   Ticket raised from its Finding still open.
+   present but not working (with its note); **a note on any other Service
+   or Amenity**; *clearly marked* = No; *placed correctly* = No; Unexpected
+   Occupancy; a Yes/No Question answered No; a Ticket raised from its
+   Finding still open.
+   - **A note is always a reason to look.** Somebody typed it on a phone,
+     in the rain; they do that when there is something to say. It is the
+     same text as the Notes column, so a reader is not made to
+     cross-reference two tables to find "tap drips". A note on a Service
+     that is *not working* is already the reason for that line and is not
+     repeated.
    - **An undecided Proposal is not one of them**, and nor is it a row in
      the per-item tab. Every Attribute answer is a Proposal by design, so
      an audit of any size carries hundreds before it is finalized - the

@@ -298,6 +298,10 @@ export function narrative(r: AuditReport, s: Summary): string[] {
 /**
  * What a reader should look at for one location, in words.
  *
+ * Notes ARE here, wherever they were recorded: the Notes column of the
+ * table is the same text, and a reader should not have to cross-reference
+ * two tables to find out that the auditor wrote "tap drips".
+ *
  * Undecided Proposals are deliberately NOT here. Every Attribute answer is
  * a Proposal by design, so an audit of any size carries hundreds of them
  * before anyone has finalized it - on the Campgrounds audit, 402 - and
@@ -310,7 +314,14 @@ export function narrative(r: AuditReport, s: Summary): string[] {
  */
 export function attention(x: ReportTarget): string[] {
   const out: string[] = [];
-  for (const s of x.services) if (s.present && !s.working) out.push(`${s.name} not working${s.note ? ` - ${s.note}` : ""}`);
+  // A note is somebody typing on a phone in the rain: they only do it when
+  // there is something to say. One on a service that is NOT working is
+  // already the reason for that line; anywhere else it is its own.
+  for (const s of x.services) {
+    if (s.present && !s.working) out.push(`${s.name} not working${s.note ? ` - ${s.note}` : ""}`);
+    else if (s.note) out.push(`${s.name}: ${s.note}`);
+  }
+  for (const a of x.amenities) if (a.note) out.push(`${a.name}: ${a.note}`);
   if (x.finding?.clearlyMarked === false) out.push("not clearly marked");
   if (x.finding?.mappedCorrectly === false) out.push("wrong on the map");
   if (x.finding?.unexpectedOccupancy) out.push(x.finding.occupied ? "occupied, nothing on file" : "vacant, but leased or reserved");

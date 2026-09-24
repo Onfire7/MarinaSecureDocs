@@ -51,6 +51,7 @@ export function AuditDetailPage() {
   }
   const canManage = current.can("manage_audits");
   const canStructural = current.can("manage_locations");
+  const pending = audit.target_count - audit.audited_count - audit.not_audited_count;
   const undecided = proposals.filter((p) => p.decision === null);
   const structuralApproved = proposals.some((p) => p.structural === 1 && p.decision === "approved");
   const canFinalize = audit.status === "closed" && canManage && undecided.length === 0 && (!structuralApproved || canStructural);
@@ -96,8 +97,21 @@ export function AuditDetailPage() {
             </Link>
           )}
           {audit.status === "open" && canManage && (
-            <button type="button" className="btn btn-sm" disabled={busy} onClick={() => window.confirm("Close this audit early? Remaining locations are marked Not Audited.") && void run(() => closeAudit(audit.id))}>
-              Close early
+            <button
+              type="button"
+              className="btn btn-sm"
+              data-testid="close-audit"
+              disabled={busy}
+              onClick={() =>
+                window.confirm(
+                  pending === 0
+                    ? "Close this audit? Nothing is left to visit."
+                    : `Close this audit early? The ${pending} location${pending === 1 ? "" : "s"} still to visit are marked Not Audited.`,
+                ) && void run(() => closeAudit(audit.id))
+              }
+            >
+              {/* Nothing is left to visit, so there is nothing early about it. */}
+              {pending === 0 ? "Close audit" : "Close early"}
             </button>
           )}
           {audit.status === "closed" && canManage && (

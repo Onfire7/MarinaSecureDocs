@@ -215,9 +215,13 @@ let proposedName = `BH14-99X ${stamp}`;
 {
   const page = await newPage();
   await page.goto(`${APP_URL}/audits/${auditId}`, { waitUntil: "domcontentloaded" });
-  await synced(page, "text=Close early");
+  await synced(page, '[data-testid="close-audit"]');
+  await page.waitForTimeout(1500);
+  check("40z with locations still to visit, closing is closing EARLY",
+    (await page.getByTestId("close-audit").innerText()).trim() === "Close early",
+    (await page.getByTestId("close-audit").innerText()).trim());
   page.once("dialog", (d) => d.accept());
-  await page.locator("button", { hasText: "Close early" }).click();
+  await page.getByTestId("close-audit").click();
   await synced(page, "text=Finalize", 30000);
   await page.waitForTimeout(2000);
   const notAudited = sql(`select count(*) from audit_targets where audit_id='${auditId}' and state='not_audited' and not_audited_reason='closed early'`);
@@ -228,7 +232,7 @@ let proposedName = `BH14-99X ${stamp}`;
   // The way back, for the shift that ended sooner than the auditor meant.
   page.once("dialog", (d) => d.accept());
   await page.getByTestId("reopen-audit").click();
-  await synced(page, "text=Close early", 30000);
+  await synced(page, '[data-testid="close-audit"]', 30000);
   await page.waitForTimeout(2500);
   const reopened = sql(`select status || '/' || coalesce(closed_at::text,'-') || '/' || (reopened_at is not null)::text from audits where id='${auditId}'`);
   const backInQueue = sql(`select count(*) from audit_targets where audit_id='${auditId}' and state='pending'`);
@@ -236,7 +240,7 @@ let proposedName = `BH14-99X ${stamp}`;
   await page.screenshot({ path: `${OUT}/e2e-40-reopened.png` });
   // and close it again, so the rest of this test reads as it did
   page.once("dialog", (d) => d.accept());
-  await page.locator("button", { hasText: "Close early" }).click();
+  await page.getByTestId("close-audit").click();
   await synced(page, "text=Finalize", 30000);
   await page.waitForTimeout(2500);
   check("40d and it closes again on request", sql(`select status from audits where id='${auditId}'`) === "closed");
