@@ -23,6 +23,31 @@ export const POWERSYNC_URL = import.meta.env.VITE_POWERSYNC_URL as
   | string
   | undefined;
 
+/**
+ * The origin to put in a link somebody else will open - a share link, an
+ * NFC tag's check-in URL.
+ *
+ * NOT `window.location.origin`. A link built from wherever the app happened
+ * to be open carries that address to its recipient: a link made from
+ * `marinasecure2.netlify.app`, or from a branch preview, or from a PWA
+ * installed at an old address, goes out with that domain on it. The marina
+ * has one public address and a link should always carry it.
+ *
+ * Netlify sets `URL` to the site's primary domain at build time, and
+ * netlify.toml passes it in - deliberately, so this is a line in the repo
+ * rather than another dashboard field nobody remembers (CLAUDE.md:
+ * "anything that is a file locally and a dashboard field remotely will be
+ * forgotten"). Unset - `pnpm dev`, a bare `vite build` - it falls back to
+ * the current origin, which is right for localhost.
+ */
+export const PUBLIC_URL = import.meta.env.VITE_PUBLIC_URL as string | undefined;
+
+export function publicOrigin(configured: string | undefined = PUBLIC_URL, here?: string): string {
+  const fallback = here ?? (typeof window === "undefined" ? "" : window.location.origin);
+  const trimmed = (configured ?? "").trim().replace(/\/+$/, "");
+  return /^https?:\/\//.test(trimmed) ? trimmed : fallback;
+}
+
 export function missingConfig(): string[] {
   const missing: string[] = [];
   if (!CLERK_PUBLISHABLE_KEY) missing.push("VITE_CLERK_PUBLISHABLE_KEY");

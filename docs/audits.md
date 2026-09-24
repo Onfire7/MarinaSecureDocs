@@ -694,6 +694,13 @@ marina's name is text; there is no logo yet.
 ### Share Links
 
 A **Share Link** is a public URL, `/r/<key>`, whose key is a random UUID.
+Its domain is the **deployment's public address** (`VITE_PUBLIC_URL`, which
+netlify.toml fills from Netlify's `$URL`), never
+`window.location.origin` - a link built from wherever the app happened to
+be open carries that address to its recipient, and one of this repo's two
+sites is a different build with no `/r/` route, so a link that lands there
+asks them to sign in. Unset, it falls back to the current origin, which is
+right for localhost.
 Anyone holding it sees the Audit Report; the key is the whole credential,
 so it is treated like one. A User with `manage_audits` creates them from any Audit's page. A link
 to an **Open** Audit is a progress link - the same report, compiled on

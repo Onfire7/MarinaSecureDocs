@@ -20,8 +20,11 @@ Verify each task against the deployment before moving on.
 - [ ] **Archive `beta`.** The InstantDB build's deployed tip is tagged
       `archive/beta` (pushed 2026-09-22), so the branch can go whenever the
       site does. In order, once beta.marinasecure.com is retired:
-      1. Repoint or accept the NFC tags — they carry `beta.marinasecure.com`
-         URLs and open the old site when the app is closed.
+      1. Repoint or accept the NFC tags — the ones already written carry
+         `beta.marinasecure.com` URLs and open the old site when the app is
+         closed. Newly generated check-in URLs no longer can: since
+         2026-09-24 they are built from the deployment's public address
+         rather than from whatever address the admin screen was open at.
       2. Delete or disable the `marinasecure` Netlify site, or change its
          production branch; otherwise deleting the branch breaks its build.
       3. `git push origin --delete beta` and `git branch -D beta`. The local

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { publicOrigin } from "../../lib/config";
 import { matchesTerms, queryTerms } from "../../lib/search";
 import {
   addTourCheckpoints,
@@ -299,7 +300,9 @@ function CheckpointCard({
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(false);
   const [writingTag, setWritingTag] = useState(false);
-  const url = `${window.location.origin}/checkin/${checkpoint.guid_url}`;
+  // The marina's public address, not wherever this admin screen happens to
+  // be open: this string gets written onto a physical tag.
+  const url = `${publicOrigin()}/checkin/${checkpoint.guid_url}`;
 
   const update = (fields: Parameters<typeof saveCheckpoint>[1]) =>
     void saveCheckpoint(checkpoint.id, fields);

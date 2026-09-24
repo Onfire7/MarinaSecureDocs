@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { publicOrigin } from "../../lib/config";
 import type { ReactNode } from "react";
 import {
   compareNames,
@@ -1136,7 +1137,9 @@ function CheckpointEditor({
 }) {
   const [copied, setCopied] = useState(false);
   const [writingTag, setWritingTag] = useState(false);
-  const url = `${window.location.origin}/checkin/${checkpoint.guid_url}`;
+  // The marina's public address, not wherever this admin screen happens to
+  // be open: this string gets written onto a physical tag.
+  const url = `${publicOrigin()}/checkin/${checkpoint.guid_url}`;
 
   const copy = async () => {
     await navigator.clipboard.writeText(url);

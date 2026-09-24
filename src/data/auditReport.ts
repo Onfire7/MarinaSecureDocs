@@ -1,3 +1,4 @@
+import { publicOrigin } from "../lib/config";
 import { supabase } from "../lib/db/supabase";
 import type { AuditReport } from "../lib/auditReport";
 import type { ShareFilter, ShareOptions } from "../lib/auditShareFilter";
@@ -72,7 +73,7 @@ export async function revokeAuditShare(shareId: string): Promise<void> {
 }
 
 export function shareUrl(key: string): string {
-  return `${window.location.origin}/r/${key}`;
+  return `${publicOrigin()}/r/${key}`;
 }
 export function shareIsLive(s: AuditShareRow, now = Date.now()): boolean {
   return !s.revoked_at && (!s.expires_at || new Date(s.expires_at).getTime() > now);
