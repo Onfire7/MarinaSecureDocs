@@ -66,6 +66,27 @@
   # last thing standing between a pasted secret and a published bundle.
   SECRETS_SCAN_OMIT_KEYS = "VITE_CLERK_PUBLISHABLE_KEY,VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,VITE_POWERSYNC_URL"
 
+# The marina has ONE address, and a link that went out on another must not
+# stay broken. `marinasecure2.netlify.app` serves the same build, so a
+# report link on it works - but it is not the address anybody should be
+# sent, and a link one character away from it (`beta.marinasecure.com`)
+# lands on the OTHER site, which has no /r/ route and asks the recipient to
+# sign in. Anything arriving on the netlify.app name is sent to the primary
+# domain, path and all, before react-router sees it.
+#
+# The host in `from` is what scopes this: the `beta` site builds the same
+# file and never matches it. Branch deploys
+# (`beta2--marinasecure2.netlify.app`) are a different host and stay
+# reachable, which is what lets a wrong-origin fix be tested at all.
+#
+# It must come BEFORE the catch-all: first match wins, and `force` is what
+# beats the 200 below.
+[[redirects]]
+  from = "https://marinasecure2.netlify.app/*"
+  to = "https://beta2.marinasecure.com/:splat"
+  status = 301
+  force = true
+
 # Single-page app: react-router owns all paths (including /checkin/:guidUrl
 # deep links from NFC tags/QR codes), so every URL serves index.html.
 [[redirects]]
