@@ -412,7 +412,8 @@ nothing moves to the next item.
 
 The on-screen keyboard is allowed to cover the pager, and never the
 question: the pages shrink to what is still visible, over 250ms, and the
-question stays centred in it.
+question stays centred in it. Arriving at an item with nothing to type
+into dismisses it.
 
 The run reports progress as **what it has touched**, not what has a value:
 a Location pre-filled from six months ago is not a Location anyone looked

@@ -50,7 +50,11 @@ variants; this is D).
   with nothing behind it — *Absent*, a Yes/No, a status — moves straight on.
 - **Fields take focus on arrival**, so a number is typed without reaching
   for the screen. Numbers use a decimal keyboard; every field's Enter key is
-  `next`.
+  `next`. **A page with nothing to type into takes focus away**, so the
+  keyboard goes rather than standing over a page of buttons because the
+  page before it had a note. Only focus belonging to a page the run has
+  left is dropped: a note being typed into is on the current page, and this
+  runs again on every re-render.
 - **The keyboard does not resize the viewport.** It is allowed to cover the
   pager - there is nothing to do down there while typing. What it must not
   cover is the question, so the *pages* give way instead: each takes the

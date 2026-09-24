@@ -131,6 +131,27 @@ await settle(1800);
 check("2l answering No raised a ticket", sql(`select count(*) from tickets where source_finding_id = '${fid}'`) === "1", sql(`select title from tickets where source_finding_id = '${fid}'`));
 await page.screenshot({ path: `${OUT}/wizard-run.png` });
 
+// ── 2m/2n: the keyboard follows the fields ───────────────────────────────
+const focusInfo = () => page.evaluate(() => ({ tag: document.activeElement?.tagName, mode: document.activeElement?.getAttribute("inputmode") }));
+await page.locator('[data-testid="wz-pip"]').nth(attrIndex).click();
+await settle();
+check("2m arriving at a number field focuses it", (await focusInfo()).mode === "decimal", JSON.stringify(await focusInfo()));
+await page.locator('[data-testid="wz-pip"]').nth(qIndex).click();
+await settle();
+check("2n arriving at a page with nothing to type into lets the keyboard go", (await focusInfo()).tag !== "INPUT", JSON.stringify(await focusInfo()));
+
+// The case that matters: scrolling away from a note, with no tap to move
+// focus for us.
+await page.locator('[data-testid="wz-pip"]').nth(svcIndex).click();
+await settle();
+await page.locator(".wz-d-page").nth(svcIndex).getByTestId("wz-note").click();
+await settle(400);
+check("2o a note can be focused by hand", (await focusInfo()).tag === "INPUT", JSON.stringify(await focusInfo()));
+await page.mouse.move(200, 400);
+await page.mouse.wheel(0, 740);
+await settle(1200);
+check("2p scrolling off it dismisses the keyboard", (await focusInfo()).tag !== "INPUT", JSON.stringify(await focusInfo()));
+
 // ── 3: rolling over and the jump list ────────────────────────────────────
 await page.locator('[data-testid="wz-pip"]').last().click();
 await settle();

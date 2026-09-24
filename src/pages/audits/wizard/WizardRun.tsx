@@ -496,9 +496,24 @@ function tween(el: HTMLElement, to: number, ms: number, done: () => void) {
   requestAnimationFrame(frame);
 }
 
-/** The field on the page just landed on takes focus, so a number is typed
- *  without reaching for the screen. */
+/**
+ * The field on the page just landed on takes focus, so a number is typed
+ * without reaching for the screen - and where a page has no field, the
+ * keyboard is dismissed rather than left standing over a page of buttons
+ * because the page before it had a note.
+ *
+ * Only focus belonging to a page we have LEFT is blurred. A note being
+ * typed into sits on the current page, and this runs again whenever the
+ * queries re-emit - which a write does - so blurring indiscriminately
+ * would close the keyboard under the auditor's thumb.
+ */
 function focusActive(el: HTMLElement, index: number) {
   const page = el.querySelector<HTMLElement>(`[data-page="${index}"]`);
-  page?.querySelector<HTMLInputElement>("[data-autofocus]")?.focus();
+  const field = page?.querySelector<HTMLInputElement>("[data-autofocus]");
+  if (field) {
+    field.focus();
+    return;
+  }
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && el.contains(active) && !page?.contains(active)) active.blur();
 }
