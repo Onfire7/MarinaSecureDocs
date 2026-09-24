@@ -5,7 +5,7 @@
 -- passes every denial test (CLAUDE.md).
 create extension if not exists pgtap;
 begin;
-select plan(44);
+select plan(51);
 
 -- Rows affected by an UPDATE run as the current role, so RLS is exercised
 -- from the caller's side. A data-modifying CTE cannot sit inside is().
@@ -334,6 +334,66 @@ update audit_findings set confirmed_at = now() where id = 'ffff0000-0000-4000-80
 reset role;
 select is((select status::text from audits where id = 'eeee0000-0000-4000-8000-0000000000a6'), 'closed',
   'the audit closes when the last location is confirmed, not when its last answer lands');
+
+-- ── reopening an audit ──────────────────────────────────────────────────
+-- Closing is a convenience; being unable to undo it is not. The way back
+-- restores what the close pushed out of the queue and nothing else.
+insert into locations (id, name, location_type_id) values
+  ('dddd0000-0000-4000-8000-000000000087','AF-S7','cccc0000-0000-4000-8000-000000000080'),
+  ('dddd0000-0000-4000-8000-000000000088','AF-S8','cccc0000-0000-4000-8000-000000000080'),
+  ('dddd0000-0000-4000-8000-000000000089','AF-S9','cccc0000-0000-4000-8000-000000000080');
+insert into audits (id, name, kind, status, launched_by_id) values
+  ('eeee0000-0000-4000-8000-0000000000a7','Fixture Audit Seven','status','open','11111111-0000-4000-8000-000000000001');
+insert into audit_targets (id, audit_id, location_id, location_name, position) values
+  ('eeee1111-0000-4000-8000-00000000000c','eeee0000-0000-4000-8000-0000000000a7','dddd0000-0000-4000-8000-000000000087','AF-S7',0),
+  ('eeee1111-0000-4000-8000-00000000000d','eeee0000-0000-4000-8000-0000000000a7','dddd0000-0000-4000-8000-000000000088','AF-S8',1),
+  ('eeee1111-0000-4000-8000-00000000000e','eeee0000-0000-4000-8000-0000000000a7','dddd0000-0000-4000-8000-000000000089','AF-S9',2);
+-- S7 was audited and signed off; S9 was skipped for its own reason; S8 was
+-- simply never reached before the shift ended.
+insert into audit_findings (id, audit_id, target_id, recorded_by_id, confirmed_at) values
+  ('ffff0000-0000-4000-8000-0000000000fc','eeee0000-0000-4000-8000-0000000000a7',
+   'eeee1111-0000-4000-8000-00000000000c','11111111-0000-4000-8000-000000000002', now());
+update audit_targets set state = 'not_audited', not_audited_reason = 'gate locked'
+ where id = 'eeee1111-0000-4000-8000-00000000000e';
+select set_config('request.jwt.claims', '{"sub":"user_alice"}', true);
+set local role authenticated;
+select close_audit('eeee0000-0000-4000-8000-0000000000a7');
+reset role;
+
+select set_config('request.jwt.claims', '{"sub":"user_bob"}', true);
+set local role authenticated;
+select throws_ok($$select reopen_audit('eeee0000-0000-4000-8000-0000000000a7')$$, '42501', null,
+  'reopening an audit takes manage_audits');
+reset role;
+select set_config('request.jwt.claims', '{"sub":"user_carl"}', true);
+set local role authenticated;
+select lives_ok($$select reopen_audit('eeee0000-0000-4000-8000-0000000000a7')$$,
+  'manage_audits alone reopens it - the same key that closed it');
+reset role;
+select is((select status::text from audits where id = 'eeee0000-0000-4000-8000-0000000000a7'), 'open',
+  'the audit is open again, with no closed_at');
+select is((select state::text from audit_targets where id = 'eeee1111-0000-4000-8000-00000000000d'), 'pending',
+  'a location the close pushed out is back in the queue');
+select is((select state::text || '/' || not_audited_reason from audit_targets where id = 'eeee1111-0000-4000-8000-00000000000e'),
+  'not_audited/gate locked',
+  'one marked Not Audited for its own reason is left as it was');
+
+-- The trap: every target confirmed means nothing is pending, and the
+-- auto-close would shut an audit somebody had just deliberately reopened.
+select set_config('request.jwt.claims', '{"sub":"user_bob"}', true);
+set local role authenticated;
+insert into audit_findings (id, audit_id, target_id, recorded_by_id, confirmed_at) values
+  ('ffff0000-0000-4000-8000-0000000000fd','eeee0000-0000-4000-8000-0000000000a7',
+   'eeee1111-0000-4000-8000-00000000000d','11111111-0000-4000-8000-000000000002', now());
+reset role;
+select is((select status::text from audits where id = 'eeee0000-0000-4000-8000-0000000000a7'), 'open',
+  'a reopened audit does not close itself again - a person closes it');
+
+select set_config('request.jwt.claims', '{"sub":"user_carl"}', true);
+set local role authenticated;
+select throws_ok($$select reopen_audit('eeee0000-0000-4000-8000-0000000000a1')$$, '23514', null,
+  'a finalized audit is not reopened - its proposals have been applied');
+reset role;
 
 select * from finish();
 rollback;

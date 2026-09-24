@@ -1017,6 +1017,12 @@ export async function finalizeAudit(auditId: string): Promise<void> {
   const { error } = await supabase.rpc("finalize_audit", { p_audit: auditId });
   if (error) throw new Error(error.message);
 }
+/** Back to Open, with the locations the close pushed out of the queue.
+ *  Refused on a finalized audit; see docs/audits.md § Reopening an Audit. */
+export async function reopenAudit(auditId: string): Promise<void> {
+  const { error } = await supabase.rpc("reopen_audit", { p_audit: auditId });
+  if (error) throw new Error(error.message);
+}
 
 export function parseProposalPayload(row: AuditProposalRow): Record<string, unknown> {
   return parseJson<Record<string, unknown>>(row.payload, {});

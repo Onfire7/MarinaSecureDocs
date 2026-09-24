@@ -224,6 +224,22 @@ let proposedName = `BH14-99X ${stamp}`;
   const finalizeDisabled = await page.locator("button", { hasText: "Finalize" }).isDisabled();
   check("42 finalize stays disabled with an undecided proposal", finalizeDisabled);
   check("40a closing early marks the rest Not Audited", Number(notAudited) === expected - 1, `${notAudited} not audited`);
+
+  // The way back, for the shift that ended sooner than the auditor meant.
+  page.once("dialog", (d) => d.accept());
+  await page.getByTestId("reopen-audit").click();
+  await synced(page, "text=Close early", 30000);
+  await page.waitForTimeout(2500);
+  const reopened = sql(`select status || '/' || coalesce(closed_at::text,'-') || '/' || (reopened_at is not null)::text from audits where id='${auditId}'`);
+  const backInQueue = sql(`select count(*) from audit_targets where audit_id='${auditId}' and state='pending'`);
+  check("40c Reopen puts the audit back to open, with its locations", /^open\/-\/true$/.test(reopened) && Number(backInQueue) === expected - 1, `${reopened}, ${backInQueue} pending`);
+  await page.screenshot({ path: `${OUT}/e2e-40-reopened.png` });
+  // and close it again, so the rest of this test reads as it did
+  page.once("dialog", (d) => d.accept());
+  await page.locator("button", { hasText: "Close early" }).click();
+  await synced(page, "text=Finalize", 30000);
+  await page.waitForTimeout(2500);
+  check("40d and it closes again on request", sql(`select status from audits where id='${auditId}'`) === "closed");
   // Bulk approve.
   const boxes = page.locator("input[aria-label='select proposal']");
   const n = await boxes.count();

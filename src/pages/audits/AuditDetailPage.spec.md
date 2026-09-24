@@ -4,7 +4,16 @@
 
 - **Header** names the audit, its kind and status. While the audit is open
   everyone who can see it gets **Wizard** (`/audits/:id/wizard`);
-  `manage_audits` also sees *Close early*, and *Finalize* once closed.
+  `manage_audits` also sees *Close early*, and *Reopen* and *Finalize* once
+  closed.
+- **Reopen** puts a closed audit back to Open and returns the locations the
+  close pushed out of the queue — those marked Not Audited *"closed early"*
+  and no others; a location skipped for its own reason keeps its reason, and
+  locations already signed off stay signed off. A reopened audit **never
+  closes itself again**: Close early becomes the only way it closes, or the
+  auto-close would shut it the moment the next answer landed. It is refused
+  on a finalized audit, whose proposals have already been applied. Confirms
+  first — it changes a record other people read.
 - **Finalize is enabled** only when every proposal has a decision and, if any
   approved proposal is structural, the user also holds `manage_locations`.
   The disabled button's tooltip says which.

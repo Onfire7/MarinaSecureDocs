@@ -6,6 +6,7 @@ import {
   decideProposal,
   finalizeAudit,
   parseProposalPayload,
+  reopenAudit,
   useAudit,
   useAuditGaps,
   useAuditProposals,
@@ -97,6 +98,20 @@ export function AuditDetailPage() {
           {audit.status === "open" && canManage && (
             <button type="button" className="btn btn-sm" disabled={busy} onClick={() => window.confirm("Close this audit early? Remaining locations are marked Not Audited.") && void run(() => closeAudit(audit.id))}>
               Close early
+            </button>
+          )}
+          {audit.status === "closed" && canManage && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              data-testid="reopen-audit"
+              disabled={busy}
+              onClick={() =>
+                window.confirm("Reopen this audit? Locations it closed early go back in the queue, and it will not close itself again.") &&
+                void run(() => reopenAudit(audit.id))
+              }
+            >
+              Reopen
             </button>
           )}
           {audit.status === "closed" && canManage && (

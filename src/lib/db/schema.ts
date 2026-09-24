@@ -467,6 +467,7 @@ const audits = new Table(
     include_amenities: column.integer,
     include_marked: column.integer,
     include_map: column.integer,
+    reopened_at: column.text,
   },
   {
     indexes: {

@@ -445,6 +445,31 @@ What applies at once and what waits for approval is unchanged
 (§ What applies immediately). A Yes/No Question that raises a Ticket on No
 raises it here too, once.
 
+### Reopening an Audit
+
+An Audit closes itself when no target is left pending, and closes early
+when someone says so. Both are undone by **Reopen**, on the Audit's page
+for `manage_audits` - the same key that closed it.
+
+It restores exactly what the close took: targets marked *Not Audited*
+with the reason *closed early* go back to Pending. A target marked Not
+Audited for its own reason keeps it, and a Location that was properly
+signed off stays Audited - an Audit being reopened says nothing about the
+Locations that were finished, and clearing them would throw away the
+record of who finished what.
+
+**A reopened Audit never closes itself again.** Reopening one whose
+targets are all confirmed would otherwise last until the next Finding
+write tripped the auto-close, which is the opposite of what was asked
+for. `audits.reopened_at` records the reopening and stands the auto-close
+down for good; Close early is still there, and is now the only way that
+Audit closes.
+
+A **finalized** Audit is not reopened. Finalizing is the one path from an
+Audit into marina structure - Locations created, Attributes applied,
+Proposals spent - and a second pass over decisions already acted on is a
+different and much worse problem than a shift that ended early.
+
 ### Confirming a Location
 
 The last page of every Location is **the Location itself**: every item
