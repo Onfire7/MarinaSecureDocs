@@ -153,6 +153,10 @@ export interface AuditProposalRow {
   decided_at: string | null;
   reason: string | null;
   applied_location_id: string | null;
+  /** Applied the moment it was recorded, because nothing was on file. */
+  auto_applied: number;
+  /** Computed: 1 when nothing is on file for what this Proposal names. */
+  fills_blank?: number;
   /** Joined. */
   target_location_id: string | null;
   location_name: string | null;
@@ -974,9 +978,32 @@ export function setAnswerTicket(findingId: string, questionId: string, ticketId:
 
 export function useAuditProposals(auditId: string | undefined) {
   return useQuery<AuditProposalRow>(
+    // `fills_blank` is what lets the finalize screen put the Proposals that
+    // decide nothing in their own group (docs/audits.md § Filling a blank
+    // is not a decision). Correlated subqueries, never a LEFT JOIN on a
+    // foreign key - the joins here are both on `id` (CLAUDE.md).
     `SELECT p.*, t.location_id AS target_location_id,
             COALESCE(t.location_name, json_extract(p.payload, '$.name')) AS location_name,
-            u.name AS recorded_by_name
+            u.name AS recorded_by_name,
+            CASE p.kind
+              WHEN 'set_attribute' THEN
+                CASE WHEN NOT EXISTS (
+                  SELECT 1 FROM location_attributes la
+                   WHERE la.location_id = t.location_id
+                     AND la.attribute_id = json_extract(p.payload, '$.attribute_id')
+                     AND (la.value IS NOT NULL OR la.value_text IS NOT NULL)) THEN 1 ELSE 0 END
+              WHEN 'set_service' THEN
+                CASE WHEN NOT EXISTS (
+                  SELECT 1 FROM location_services ls
+                   WHERE ls.location_id = t.location_id
+                     AND ls.service_id = json_extract(p.payload, '$.service_id')) THEN 1 ELSE 0 END
+              WHEN 'set_amenity' THEN
+                CASE WHEN NOT EXISTS (
+                  SELECT 1 FROM location_amenities lm
+                   WHERE lm.location_id = t.location_id
+                     AND lm.amenity_id = json_extract(p.payload, '$.amenity_id')) THEN 1 ELSE 0 END
+              ELSE 0
+            END AS fills_blank
        FROM audit_proposals p
        JOIN audit_findings f ON f.id = p.finding_id
        LEFT JOIN audit_targets t ON t.id = f.target_id

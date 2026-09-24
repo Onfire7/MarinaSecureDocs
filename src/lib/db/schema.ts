@@ -316,6 +316,7 @@ const audit_proposals = new Table(
     reason: column.text,
     applied_location_id: column.text,
     is_current: column.integer,
+    auto_applied: column.integer,
   },
   {
     indexes: {

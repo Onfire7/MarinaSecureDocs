@@ -229,6 +229,62 @@ let proposedName = `BH14-99X ${stamp}`;
   check("42 finalize stays disabled with an undecided proposal", finalizeDisabled);
   check("40a closing early marks the rest Not Audited", Number(notAudited) === expected - 1, `${notAudited} not audited`);
 
+  // Filling a blank is not a decision (docs/audits.md). Tests 14 and 15 of
+  // the list approved 2026-09-24: the pile that decides nothing arrives in
+  // its own group, ticked, and one press clears it.
+  //
+  // A new audit cannot produce one of these any more - the database applies
+  // them as they are recorded - so the fixture has to be a LEGACY row, the
+  // shape of the 460 recorded before that rule existed: undecided, with
+  // nothing on file for what it names. Insert it, then undo what the
+  // trigger did to it.
+  // Three plain statements, no dollar-quoting: sql() hands the query to a
+  // shell in double quotes, where $$ is the shell's own PID.
+  sql(`insert into audit_proposals (finding_id, kind, payload)
+       select f.id, 'set_service',
+              jsonb_build_object('service_id', s.id, 'present', true, 'e2e_legacy', true)
+         from audit_findings f
+         join audit_targets t on t.id = f.target_id
+         join services s on not exists (select 1 from location_services ls
+                                         where ls.location_id = t.location_id and ls.service_id = s.id)
+        where f.audit_id = '${auditId}'
+        limit 1`);
+  sql(`update audit_proposals set decision = null, decided_at = null, reason = null, auto_applied = false
+        where payload ? 'e2e_legacy'`);
+  sql(`delete from location_services ls
+        using audit_proposals p, audit_findings f, audit_targets t
+        where p.payload ? 'e2e_legacy' and f.id = p.finding_id and t.id = f.target_id
+          and ls.location_id = t.location_id
+          and ls.service_id = (p.payload->>'service_id')::uuid`);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await synced(page, '[data-testid="proposal-group"]', 60000);
+  await page.waitForTimeout(3000);
+
+  const groups = await page.locator('[data-testid="proposal-group"]').evaluateAll((els) =>
+    els.map((e) => `${e.dataset.class}:${e.querySelectorAll("input[aria-label='select proposal']").length}`),
+  );
+  const ticked = await page.locator("input[aria-label='select proposal']:checked").count();
+  const blanks = Number(sql(`select count(*) from audit_proposals p
+      join audit_findings f on f.id = p.finding_id
+      left join audit_targets t on t.id = f.target_id
+     where f.audit_id = '${auditId}' and p.decision is null and not p.structural
+       and p.kind = 'set_service'
+       and (p.payload->>'present')::boolean
+       and not exists (select 1 from location_services ls
+                        where ls.location_id = t.location_id
+                          and ls.service_id = (p.payload->>'service_id')::uuid)`));
+  check("40e proposals are grouped by what a decision would mean", groups.some((g) => g.startsWith("blank:")) && groups.some((g) => g.startsWith("structural:")), groups.join(" | "));
+  check("40f and the ones that decide nothing arrive ticked", blanks > 0 && ticked === blanks, `${ticked} ticked, ${blanks} fill a blank`);
+  // One press clears the pile and leaves the real decisions standing.
+  await page.locator("button", { hasText: "Approve checked" }).click();
+  await page.waitForTimeout(3000);
+  check("40g one press clears them, and the structural one is still waiting",
+    sql(`select count(*) from audit_proposals p join audit_findings f on f.id = p.finding_id
+          where f.audit_id = '${auditId}' and p.decision is null and not p.structural`) === "0" &&
+    sql(`select count(*) from audit_proposals p join audit_findings f on f.id = p.finding_id
+          where f.audit_id = '${auditId}' and p.decision is null and p.structural`) !== "0",
+    "blank pile approved, structural left");
+
   // The way back, for the shift that ended sooner than the auditor meant.
   page.once("dialog", (d) => d.accept());
   await page.getByTestId("reopen-audit").click();

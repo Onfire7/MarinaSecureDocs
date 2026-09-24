@@ -322,6 +322,10 @@ naming the Audit:
   "Occupied by someone who refused ID" is recorded as occupied with no
   Contact; no placeholder Contact is ever created.
 - Service *working* flags and Amenity notes on entries already present.
+- **Anything that fills a blank.** A first Attribute value, or a Service or
+  Amenity found present where the Location had no row, applies at once and
+  is recorded as an already-approved Proposal marked `auto_applied`. See
+  § Filling a blank is not a decision.
 - Audit Question answers, the Tickets they raise, Incidents, Notes.
 - Meter readings.
 
@@ -337,7 +341,39 @@ decision at finalize**:
 | Rename, change type, change parent | structural |
 | Move on the map | structural; every User navigates by it |
 | GPS coordinates | a wrong pin misleads everyone who follows |
-| Service or Amenity **presence** changed | false negatives are common (a riser under leaves); management may send someone to re-check |
+| Service or Amenity **presence** removed, or changed against a row already on file | false negatives are common (a riser under leaves); management may send someone to re-check |
+| An Attribute value **changed or cleared** where one was already on file | two readings disagree and somebody has to say which is right |
+
+### Filling a blank is not a decision
+
+Added 2026-09-24, after an audit of 76 campsites produced **460 undecided
+Proposals** - almost all of them a first value for a Location that had
+nothing on file.
+
+Approving those decides nothing. No value is overwritten, nothing is lost,
+and the "review" is a person ticking 460 boxes without reading them, which
+trains the habit that makes the *real* decisions get rubber-stamped too.
+The table above is the test: a Proposal should exist where there is
+something to decide.
+
+So **a value that fills a blank applies at once**, and the Proposal
+recording it is born approved, `decided_by_id` null, `auto_applied` true,
+reason *nothing was on file*. What still waits for a human is unchanged:
+anything structural, GPS, a **removal**, and a **change** to a value
+already on file - including the Attribute case, which the table above
+never listed and the implementation had been holding anyway.
+
+Two rules make it safe:
+
+- **An auto-applied value belongs to this Audit until finalize.** Re-answer
+  the item and the audit corrects its own value, again without asking:
+  the blank test passes when nothing is on file *or* when what is on file
+  is this Finding's own `auto_applied` Proposal, which the new one
+  supersedes. A Proposal a human decided is never superseded this way.
+- **Finalize skips `auto_applied` Proposals.** They are already applied,
+  and re-applying would overwrite whatever the Location has now - a manual
+  correction made between the audit and the finalize would be silently
+  undone.
 
 A Ticket raised against a proposed new Location is attached to the
 proposed **parent** Location, carries the Proposal, and is re-targeted to

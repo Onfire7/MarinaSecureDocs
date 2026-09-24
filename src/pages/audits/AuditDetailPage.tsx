@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
+import { classifyProposal, groupProposals } from "../../lib/auditProposals";
 import {
   closeAudit,
   decideProposal,
@@ -294,6 +295,24 @@ function ProposalsTable({
 }) {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [reasons, setReasons] = useState<Record<string, string>>({});
+  /** Has the user touched a checkbox yet? Until they have, the ticks are
+   *  derived rather than stored - see `ticked`. */
+  const [ownTicks, setOwnTicks] = useState(false);
+
+  // The group that decides nothing arrives ticked, so clearing it is one
+  // press of Approve checked (docs/audits.md § Filling a blank).
+  //
+  // Derived, NOT set once by an effect. An effect latching on the first
+  // render that has rows ticks whatever that first emission happened to
+  // contain, and a PowerSync query's first emission is not its last: the
+  // rows arrive, then the correlated `fills_blank` settles as the tables it
+  // reads catch up. Ticking nothing, permanently, is what that looked like.
+  const blanks = proposals.filter((p) => p.decision === null && classifyProposal(p) === "blank").map((p) => p.id);
+  const ticked = ownTicks ? checked : new Set(blanks);
+  const setTicks = (next: Set<string>) => {
+    setOwnTicks(true);
+    setChecked(next);
+  };
   const { data: services } = useServices();
   const { data: amenities } = useAmenities();
   const { data: attributes } = useAttributes();
@@ -331,11 +350,11 @@ function ProposalsTable({
   const mayDecide = (p: AuditProposalRow) => !decided && canManage && (p.structural === 0 || canStructural);
   const decideChecked = async (decision: "approved" | "rejected") => {
     for (const p of proposals) {
-      if (!checked.has(p.id) || !mayDecide(p)) continue;
+      if (!ticked.has(p.id) || !mayDecide(p)) continue;
       if (decision === "rejected" && !(reasons[p.id] ?? "").trim()) continue;
       await decideProposal(p.id, decision, reasons[p.id] ?? null, actorId);
     }
-    setChecked(new Set());
+    setTicks(new Set());
   };
 
   return (
@@ -344,17 +363,23 @@ function ProposalsTable({
         <span>Proposals · {proposals.length}</span>
         {!decided && canManage && (
           <span className="row" style={{ gap: 6 }}>
-            <button type="button" className="btn btn-sm" disabled={checked.size === 0} onClick={() => void decideChecked("approved")}>
+            <button type="button" className="btn btn-sm" disabled={ticked.size === 0} onClick={() => void decideChecked("approved")}>
               Approve checked
             </button>
-            <button type="button" className="btn btn-sm btn-danger" disabled={checked.size === 0} onClick={() => void decideChecked("rejected")}>
+            <button type="button" className="btn btn-sm btn-danger" disabled={ticked.size === 0} onClick={() => void decideChecked("rejected")}>
               Reject checked
             </button>
           </span>
         )}
       </div>
       {proposals.length === 0 && <div className="muted small">No proposals. Nothing structural changed.</div>}
-      {proposals.map((p) => {
+      {groupProposals(proposals).map((g) => (
+        <div key={g.cls} data-testid="proposal-group" data-class={g.cls}>
+          <div className="section-title" style={{ marginTop: 12 }}>
+            {g.label} · {g.rows.length}
+            <span className="muted small" style={{ fontWeight: 400, marginLeft: 8 }}>{g.hint}</span>
+          </div>
+          {g.rows.map((p) => {
         const allowed = mayDecide(p);
         return (
           <div key={p.id} className="row" style={{ padding: "6px 0", borderBottom: "1px solid var(--line-lt)", gap: 8, alignItems: "center", flexWrap: "wrap", opacity: allowed || decided ? 1 : 0.55 }}>
@@ -363,12 +388,12 @@ function ProposalsTable({
                 type="checkbox"
                 aria-label="select proposal"
                 disabled={!allowed}
-                checked={checked.has(p.id)}
+                checked={ticked.has(p.id)}
                 onChange={(e) => {
-                  const next = new Set(checked);
+                  const next = new Set(ticked);
                   if (e.target.checked) next.add(p.id);
                   else next.delete(p.id);
-                  setChecked(next);
+                  setTicks(next);
                 }}
               />
             )}
@@ -377,7 +402,11 @@ function ProposalsTable({
               <b>{p.location_name ?? "-"}</b> <span className="muted small">{describe(p)}</span>
               <span className="muted small"> · {p.recorded_by_name ?? ""}</span>
             </span>
-            {p.decision ? (
+            {p.auto_applied === 1 ? (
+              <span className="badge badge-good" data-testid="auto-applied" title="Nothing was on file, so it was applied as it was recorded">
+                applied · nothing was on file
+              </span>
+            ) : p.decision ? (
               <span className={`badge ${p.decision === "approved" ? "badge-good" : "badge-bad"}`}>
                 {p.decision}
                 {p.reason ? ` - ${p.reason}` : ""}
@@ -413,7 +442,9 @@ function ProposalsTable({
             {!allowed && !decided && p.structural === 1 && <span className="muted small">needs manage_locations</span>}
           </div>
         );
-      })}
+          })}
+        </div>
+      ))}
     </div>
   );
 }

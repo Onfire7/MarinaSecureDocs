@@ -5,7 +5,7 @@
 -- passes every denial test (CLAUDE.md).
 create extension if not exists pgtap;
 begin;
-select plan(51);
+select plan(62);
 
 -- Rows affected by an UPDATE run as the current role, so RLS is exercised
 -- from the caller's side. A data-modifying CTE cannot sit inside is().
@@ -394,6 +394,114 @@ set local role authenticated;
 select throws_ok($$select reopen_audit('eeee0000-0000-4000-8000-0000000000a1')$$, '23514', null,
   'a finalized audit is not reopened - its proposals have been applied');
 reset role;
+
+-- ── filling a blank is not a decision ───────────────────────────────────
+-- An audit of 76 campsites produced 460 undecided Proposals, nearly all of
+-- them a first value for a Location with nothing on file. Approving those
+-- decides nothing (docs/audits.md § Filling a blank is not a decision).
+insert into location_types (id, name, tracks_status) values
+  ('cccc0000-0000-4000-8000-000000000081','Blank Fixture Site', true);
+insert into locations (id, name, location_type_id) values
+  ('dddd0000-0000-4000-8000-00000000008a','BF-1','cccc0000-0000-4000-8000-000000000081'),
+  ('dddd0000-0000-4000-8000-00000000008b','BF-2','cccc0000-0000-4000-8000-000000000081');
+insert into services (id, name) values ('55550000-0000-4000-8000-000000000081','BF Power');
+insert into amenities (id, name) values ('66660000-0000-4000-8000-000000000081','BF Fire pit');
+insert into attributes (id, name, unit) values ('aaaa0000-0000-4000-8000-000000000081','BF Length','ft');
+-- BF-2 already knows things; BF-1 knows nothing.
+insert into location_attributes (location_id, attribute_id, value) values
+  ('dddd0000-0000-4000-8000-00000000008b','aaaa0000-0000-4000-8000-000000000081', 30);
+insert into location_services (location_id, service_id) values
+  ('dddd0000-0000-4000-8000-00000000008b','55550000-0000-4000-8000-000000000081');
+
+insert into audits (id, name, kind, status, launched_by_id) values
+  ('eeee0000-0000-4000-8000-0000000000a8','Fixture Audit Eight','status','open','11111111-0000-4000-8000-000000000001');
+insert into audit_targets (id, audit_id, location_id, location_name, position) values
+  ('eeee1111-0000-4000-8000-00000000000f','eeee0000-0000-4000-8000-0000000000a8','dddd0000-0000-4000-8000-00000000008a','BF-1',0),
+  ('eeee1111-0000-4000-8000-000000000010','eeee0000-0000-4000-8000-0000000000a8','dddd0000-0000-4000-8000-00000000008b','BF-2',1);
+insert into audit_findings (id, audit_id, target_id, recorded_by_id) values
+  ('ffff0000-0000-4000-8000-00000000000a','eeee0000-0000-4000-8000-0000000000a8','eeee1111-0000-4000-8000-00000000000f','11111111-0000-4000-8000-000000000002'),
+  ('ffff0000-0000-4000-8000-00000000000b','eeee0000-0000-4000-8000-0000000000a8','eeee1111-0000-4000-8000-000000000010','11111111-0000-4000-8000-000000000002');
+
+-- A first Attribute value, on a Location with nothing on file.
+insert into audit_proposals (id, finding_id, kind, payload) values
+  ('99990000-0000-4000-8000-00000000000a','ffff0000-0000-4000-8000-00000000000a','set_attribute',
+   '{"attribute_id":"aaaa0000-0000-4000-8000-000000000081","value":38,"text":null}');
+select is((select value from location_attributes
+            where location_id = 'dddd0000-0000-4000-8000-00000000008a'
+              and attribute_id = 'aaaa0000-0000-4000-8000-000000000081')::int, 38,
+  'a first Attribute value reaches the Location at once');
+select is((select decision::text || '/' || auto_applied::text || '/' || coalesce(decided_by_id::text,'nobody')
+             from audit_proposals where id = '99990000-0000-4000-8000-00000000000a'),
+  'approved/true/nobody', 'and its Proposal is born approved, auto-applied, decided by nobody');
+
+-- A Service and an Amenity found where the Location had no row.
+insert into audit_proposals (id, finding_id, kind, payload) values
+  ('99990000-0000-4000-8000-00000000000b','ffff0000-0000-4000-8000-00000000000a','set_service',
+   '{"service_id":"55550000-0000-4000-8000-000000000081","present":true}'),
+  ('99990000-0000-4000-8000-00000000000c','ffff0000-0000-4000-8000-00000000000a','set_amenity',
+   '{"amenity_id":"66660000-0000-4000-8000-000000000081","present":true}');
+select is((select count(*)::int from location_services
+            where location_id = 'dddd0000-0000-4000-8000-00000000008a'), 1,
+  'a Service found where there was no row is added at once');
+select is((select count(*)::int from location_amenities
+            where location_id = 'dddd0000-0000-4000-8000-00000000008a'), 1,
+  'and an Amenity likewise');
+
+-- BF-2 has values already: these are decisions, and wait.
+insert into audit_proposals (id, finding_id, kind, payload) values
+  ('99990000-0000-4000-8000-00000000000d','ffff0000-0000-4000-8000-00000000000b','set_attribute',
+   '{"attribute_id":"aaaa0000-0000-4000-8000-000000000081","value":40,"text":null}'),
+  ('99990000-0000-4000-8000-00000000000e','ffff0000-0000-4000-8000-00000000000b','set_service',
+   '{"service_id":"55550000-0000-4000-8000-000000000081","present":false}');
+select is((select count(*)::int from audit_proposals
+            where id in ('99990000-0000-4000-8000-00000000000d','99990000-0000-4000-8000-00000000000e')
+              and decision is null and not auto_applied), 2,
+  'changing a value on file, and removing one, both wait for a person');
+select is((select value from location_attributes
+            where location_id = 'dddd0000-0000-4000-8000-00000000008b'
+              and attribute_id = 'aaaa0000-0000-4000-8000-000000000081')::int, 30,
+  'and neither touched the Location');
+
+-- The audit may correct what it applied, without asking anybody.
+insert into audit_proposals (id, finding_id, kind, payload) values
+  ('99990000-0000-4000-8000-00000000000f','ffff0000-0000-4000-8000-00000000000a','set_attribute',
+   '{"attribute_id":"aaaa0000-0000-4000-8000-000000000081","value":42,"text":null}');
+select is((select value from location_attributes
+            where location_id = 'dddd0000-0000-4000-8000-00000000008a'
+              and attribute_id = 'aaaa0000-0000-4000-8000-000000000081')::int, 42,
+  're-answering an auto-applied item corrects it, still without approval');
+select is((select count(*)::int from audit_proposals
+            where finding_id = 'ffff0000-0000-4000-8000-00000000000a' and kind = 'set_attribute'), 1,
+  'and supersedes the first Proposal rather than adding a second');
+
+-- A decision a person made is never superseded this way.
+select set_config('request.jwt.claims', '{"sub":"user_carl"}', true);
+set local role authenticated;
+update audit_proposals set decision = 'approved', decided_by_id = '11111111-0000-4000-8000-000000000003'
+ where id = '99990000-0000-4000-8000-00000000000d';
+reset role;
+insert into audit_proposals (id, finding_id, kind, payload) values
+  ('99990000-0000-4000-8000-000000000010','ffff0000-0000-4000-8000-00000000000b','set_attribute',
+   '{"attribute_id":"aaaa0000-0000-4000-8000-000000000081","value":44,"text":null}');
+select is((select count(*)::int from audit_proposals where id = '99990000-0000-4000-8000-00000000000d'), 1,
+  'a Proposal a person decided survives a later answer to the same item');
+
+-- The trap: finalize must not apply an auto-applied Proposal a second time
+-- and undo a correction somebody made in between.
+update location_attributes set value = 39
+ where location_id = 'dddd0000-0000-4000-8000-00000000008a'
+   and attribute_id = 'aaaa0000-0000-4000-8000-000000000081';
+select set_config('request.jwt.claims', '{"sub":"user_alice"}', true);
+set local role authenticated;
+select close_audit('eeee0000-0000-4000-8000-0000000000a8');
+update audit_proposals set decision = 'rejected', reason = 'not this time', decided_by_id = '11111111-0000-4000-8000-000000000001'
+ where decision is null and finding_id in ('ffff0000-0000-4000-8000-00000000000a','ffff0000-0000-4000-8000-00000000000b');
+select lives_ok($$select finalize_audit('eeee0000-0000-4000-8000-0000000000a8')$$, 'finalize');
+reset role;
+select is((select value from location_attributes
+            where location_id = 'dddd0000-0000-4000-8000-00000000008a'
+              and attribute_id = 'aaaa0000-0000-4000-8000-000000000081')::int, 39,
+  'finalize skips what was already applied, so a hand correction survives it');
 
 select * from finish();
 rollback;

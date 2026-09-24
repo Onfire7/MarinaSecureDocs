@@ -52,6 +52,16 @@ page.on("response", async (r) => {
   if (r.status() >= 400 && !r.url().includes("clerk")) errors.push(`${r.status()} ${r.url().slice(0, 100)} ${(await r.text().catch(() => "")).slice(0, 160)}`);
 });
 const settle = (ms = 1200) => page.waitForTimeout(ms);
+// Anything the DATABASE does in response to a local write is behind an
+// upload, so a bare read straight after answering is a race. Poll for it.
+const until = async (want, ms = 10000) => {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    if (want()) return true;
+    await page.waitForTimeout(400);
+  }
+  return false;
+};
 const at = () =>
   page.evaluate(() => {
     const col = document.querySelector(".wz-d-col:not([class*=wz-out])");
@@ -118,6 +128,15 @@ const fid = findingOf(first);
 check("2e the answer created the Finding at once", fid !== "", fid);
 check("2f and recorded the service", rowsOf("audit_finding_services", first, "x.present::text || ',' || x.working::text || ',' || coalesce(x.note,'')") === "true,true,pedestal 4");
 check("2g presence differing from the file is a proposal", sql(`select count(*) from audit_proposals where finding_id = '${fid}' and kind = 'set_service'`) === "1");
+// Filling a blank is not a decision (docs/audits.md): the Location had no
+// row for this Service, so it is on the Location already and the Proposal
+// recording it is born approved.
+check("2g2 and with nothing on file, it is applied at once", await until(() => sql(`select count(*) from location_services ls
+        join audit_targets t on t.location_id = ls.location_id
+       where t.audit_id = '${auditId}' and t.location_name = '${first}'
+         and ls.service_id = (select id from services where name = 'E2E Power')`) === "1"));
+check("2g3 approved, auto-applied, decided by nobody", sql(`select decision::text || '/' || auto_applied::text || '/' || coalesce(decided_by_id::text, 'nobody')
+       from audit_proposals where finding_id = '${fid}' and kind = 'set_service'`) === "approved/true/nobody");
 // Recording is not finishing: the run ends each location with a
 // confirmation page, so the Finding is work in progress until it is reached.
 check("2h answering records without marking the location audited", sql(`select state from audit_targets where audit_id = '${auditId}' and location_name = '${first}'`) === "pending");
@@ -131,13 +150,21 @@ await settle();
 await page.locator(".wz-d-page").nth(attrIndex).locator("input[inputmode=decimal]").fill("32");
 await page.locator(".wz-d-page").nth(attrIndex).locator("input[inputmode=decimal]").press("Enter");
 await settle(1500);
-check("2j an attribute value is one proposal", sql(`select count(*) from audit_proposals where finding_id = '${fid}' and kind = 'set_attribute'`) === "1", sql(`select payload::text from audit_proposals where finding_id = '${fid}' and kind = 'set_attribute'`));
+check("2j an attribute value is one proposal", sql(`select count(*) from audit_proposals where finding_id = '${fid}' and kind = 'set_attribute'`) === "1", sql(`select decision::text || '/' || auto_applied::text || '/' || payload::text from audit_proposals where finding_id = '${fid}' and kind = 'set_attribute'`));
+check("2j2 a first Attribute value is on the Location, not waiting", await until(() => sql(`select value::int from location_attributes la
+        join audit_targets t on t.location_id = la.location_id
+       where t.audit_id = '${auditId}' and t.location_name = '${first}'
+         and la.attribute_id = (select id from attributes where name = 'E2E Length')`) === "32"));
 await page.locator('[data-testid="wz-pip"]').nth(attrIndex).click();
 await settle();
 await page.locator(".wz-d-page").nth(attrIndex).locator("input[inputmode=decimal]").fill("36");
 await page.locator(".wz-d-page").nth(attrIndex).locator("input[inputmode=decimal]").press("Enter");
 await settle(1500);
 check("2k re-answering replaces it rather than adding another", sql(`select count(*) from audit_proposals where finding_id = '${fid}' and kind = 'set_attribute'`) === "1" && /36/.test(sql(`select payload::text from audit_proposals where finding_id = '${fid}' and kind = 'set_attribute'`)));
+check("2k2 and the correction reaches the Location too, still unasked", await until(() => sql(`select value::int from location_attributes la
+        join audit_targets t on t.location_id = la.location_id
+       where t.audit_id = '${auditId}' and t.location_name = '${first}'
+         and la.attribute_id = (select id from attributes where name = 'E2E Length')`) === "36"));
 
 // a Yes/No question answered No raises its ticket
 const qIndex = labels.findIndex((l) => /breaker/i.test(l ?? ""));

@@ -34,7 +34,18 @@
 - **Proposals table** (closed and finalized audits): one row per proposal with
   a checkbox, kind badge (structural ones amber), the location, a description
   of the change, who recorded it, and either its decision or Approve / Reject
-  with a reason field. Rejecting needs a reason. *Approve checked* / *Reject
+  with a reason field.
+- **Grouped by what a decision would mean**, undecided first, in this order:
+  *Fills a blank* (nothing is on file - the group is **pre-ticked**, so
+  clearing it is one press of *Approve checked*), *Changes a value*,
+  *Removes something*, *Structural*. Each heading carries its count. An
+  audit of any size produces a pile of the first kind and a handful of the
+  rest; undivided, the handful is what gets lost. New audits make few of
+  these - a first value now applies at once (docs/audits.md § Filling a
+  blank is not a decision) - but audits recorded before that change still
+  carry theirs, and this is how they get cleared.
+- A row applied automatically reads **applied · nothing was on file**
+  rather than naming an approver, because nobody approved it. Rejecting needs a reason. *Approve checked* / *Reject
   checked* act on the checkboxes. Rows the user may not decide are dimmed
   and say "needs manage_locations". Decisions save one at a time and can be
   undone until finalize.
