@@ -20,6 +20,7 @@
 // the jump list with the pager at its foot: there is no reason to scroll a
 // screen at a time on a machine that can show the lot.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { ConfirmPage } from "./ConfirmPage";
 import { ItemControl } from "./ItemControl";
 import { JumpBody } from "./JumpBody";
 import { useVisiblePageHeight } from "./useVisiblePageHeight";
@@ -209,7 +210,14 @@ export function WizardRun(p: RunProps) {
       {wide ? (
         <div className="wz-d-desk">
           <div className={`wz-d-main ${slide ? (slide.dir === 1 ? "wz-in-right" : "wz-in-left") : ""}`} key={step.targetIndex}>
-            <LocationPage t={t} p={p} items={items} answers={answers} onAdvance={() => goItem(step.itemIndex + 1)} />
+            <LocationPage
+              t={t}
+              p={p}
+              items={items}
+              answers={answers}
+              onAdvance={() => goItem(step.itemIndex + 1)}
+              onConfirmed={() => goLocation(step.targetIndex + 1)}
+            />
           </div>
           <aside className="wz-d-side">
             <div className="wz-d-side-list">
@@ -284,6 +292,7 @@ export function WizardRun(p: RunProps) {
                 p.setIndex(firstOf(step.targetIndex) + i);
               }}
               onAdvance={() => goItem(step.itemIndex + 1)}
+              onConfirmed={() => goLocation(step.targetIndex + 1)}
             />
           </div>
 
@@ -330,12 +339,14 @@ function LocationPage({
   items,
   answers,
   onAdvance,
+  onConfirmed,
 }: {
   t: WizardTarget;
   p: RunProps;
   items: ReturnType<RunProps["itemsFor"]>;
   answers: RunProps["answers"][string] | undefined;
   onAdvance: () => void;
+  onConfirmed: () => void;
 }) {
   let group = "";
   return (
@@ -349,6 +360,13 @@ function LocationPage({
         group = item.group;
         const value = answers?.[item.key];
         const onFile = p.onFile(t, item);
+        if (item.kind === "confirm")
+          return (
+            <div key={item.key}>
+              <div className="wz-b-group">{item.label}</div>
+              <ConfirmPage t={t} p={p} onDone={onConfirmed} />
+            </div>
+          );
         return (
           <div key={item.key}>
             {head && <div className="wz-b-group">{head}</div>}
@@ -378,6 +396,7 @@ function Column({
   scrollRef,
   onScrollItem,
   onAdvance,
+  onConfirmed,
 }: {
   className: string;
   steps: Step[];
@@ -389,6 +408,8 @@ function Column({
   scrollRef?: React.MutableRefObject<HTMLDivElement | null>;
   onScrollItem?: (i: number) => void;
   onAdvance?: () => void;
+  /** Confirming a location is the end of it: the run moves on. */
+  onConfirmed?: () => void;
 }) {
   const own = useRef<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
@@ -418,7 +439,7 @@ function Column({
       {items.map((item, i) => {
         const onFile = p.onFile(target, item);
         return (
-          <section className="wz-d-page" key={item.key} data-page={i}>
+          <section className={`wz-d-page ${item.kind === "confirm" ? "wz-d-confirm" : ""}`} key={item.key} data-page={i}>
             <div className="wz-d-heading">
               <h1 className="wz-d-loc">{target.location_name}</h1>
               {target.type_name && <div className="wz-d-type">{target.type_name}</div>}
@@ -426,16 +447,22 @@ function Column({
               <div className="wz-d-group">{item.group}</div>
               <div className="wz-d-label">{item.label}</div>
             </div>
-            <ItemControl
-              item={item}
-              value={answers?.[item.key]}
-              statuses={p.statuses}
-              big
-              autoFocus={i === activeIndex}
-              advance={onAdvance}
-              onChange={(v, mode) => p.setAnswer(target.id, item.key, v, mode)}
-            />
-            {onFile && <div className="wz-a-prefill">On file: {onFile}</div>}
+            {item.kind === "confirm" ? (
+              <ConfirmPage t={target} p={p} onDone={onConfirmed} />
+            ) : (
+              <>
+                <ItemControl
+                  item={item}
+                  value={answers?.[item.key]}
+                  statuses={p.statuses}
+                  big
+                  autoFocus={i === activeIndex}
+                  advance={onAdvance}
+                  onChange={(v, mode) => p.setAnswer(target.id, item.key, v, mode)}
+                />
+                {onFile && <div className="wz-a-prefill">On file: {onFile}</div>}
+              </>
+            )}
             <div className="muted small">
               {i + 1} of {items.length} here · {p.savedNote}
             </div>

@@ -17,6 +17,9 @@ variants; this is D).
   Services, Amenities, Questions, Checks, GPS — the order the rest of the
   app uses. Each group's heading is a checkbox that takes the whole group
   and goes indeterminate when part of it is on.
+- *Confirm this location is done* is one of those items, offered under
+  Status (Occupancy on an occupancy audit) and turned off like any other.
+  Wherever it is offered, it is asked **last**.
 - **Locations**: *Still to do* (targets not yet audited) by default, or
   *All, including audited* to amend.
 - The footer counts the run — "12 locations · 147 steps" — and *Start* is
@@ -93,12 +96,37 @@ variants; this is D).
   **jump list as a right-hand sidebar** with the pager at its foot. There is
   no reason to scroll a screen at a time on a machine that can show the lot.
 
+## Confirming a location
+
+- **The last page of a location is the location.** Every item this audit
+  asks about it — not just the ones this run selected — with what is
+  recorded against each: this run's answer, else the earlier pass's, else
+  what is on file. An item with nothing behind it reads *not answered*, in
+  italics, and the foot counts them: a gap is seen before the sign-off, not
+  afterwards on the audit page.
+- **Confirming is what marks the location audited**, and it is the only
+  thing that does. It writes `audit_findings.confirmed_at`; a database
+  trigger moves the target between `pending` and `audited` to match, and
+  the audit closes itself when the last location is confirmed rather than
+  when the last answer lands. Confirming moves the run on to the next
+  location.
+- Returning to a confirmed location shows **Audited** and a *Reopen*,
+  which clears the stamp and puts it back in the queue with every answer
+  still recorded. Several passes can accumulate and the sign-off happens
+  once.
+- **A run with the page turned off confirms on the first answer**, as the
+  wizard did before this page existed: such a run has no other moment to
+  say a location is done. An existing Finding is left as it stands either
+  way — a second pass over a confirmed location does not reopen it.
+
 ## Jumping
 
 - Search over name and type, and *Still to do* / *Done* / *All* with counts.
   A row shows the location, its type, and either how many of its items this
   run has answered or how many it has.
-- Done means a Finding exists, or this run has answered something here.
+- Done means the location has been confirmed, or this run has answered
+  something here. A location with a pass of answers against it and no
+  confirmation is still to do.
 
 ## Saving
 
@@ -112,7 +140,12 @@ variants; this is D).
   blurs it on the way out, so without that rule, scrolling through a
   location would commit every number back to itself, and the first write is
   what creates the Finding. Scrolling is not auditing.
-- The first answer at a location creates its Finding, which marks it
-  audited. Partial runs are expected; the audit page's unanswered pills are
-  what say the rest is open.
+- The first answer at a location creates its Finding, **unconfirmed** when
+  the run carries a confirmation page. Partial runs are the expectation,
+  not the exception; recording is not finishing.
+- **Arriving at a location shows what is already recorded there**, not just
+  what is on file. An earlier pass's Service, Amenity, Question, check or
+  Attribute value is seeded over the Location's own row — a presence or an
+  attribute the audit recorded is waiting in a Proposal, and the Location
+  will go on saying otherwise until someone approves it.
 - Progress counts **what this run touched**, never what merely has a value.

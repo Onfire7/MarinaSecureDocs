@@ -379,7 +379,14 @@ h3 {
 /* ---------- Badges ---------- */
 
 .badge {
-  display: inline-block;
+  /* inline-flex, not inline-block: a pill's text is centred in it rather
+     than sitting on its own baseline. align-self keeps it its own size when
+     it is a flex child - the audit page's state pill is one, beside a name
+     that wraps to two lines, and stretch would make the pill that tall. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
   font-size: 0.75rem;
   font-weight: 650;
   border-radius: 999px;

@@ -19,6 +19,13 @@ export interface RunProps {
    *  it leaves, and scrolling past is not auditing. */
   setAnswer: (targetId: string, key: string, v: AnswerValue, mode?: AnswerMode) => void;
   itemsFor: (t: WizardTarget) => WizardItem[];
+  /** Every item this audit asks about that location, selected or not: what
+   *  the confirmation page lists. A run sweeping one service still has to
+   *  show the whole location before anyone signs it off. */
+  reviewItems: (t: WizardTarget) => WizardItem[];
+  /** When the location was confirmed done, or null while it is still in
+   *  the queue. */
+  confirmedAt: (targetId: string) => string | null;
   statuses: { id: string; name: string }[];
   /** What the marina already records for this item, as a phrase. */
   onFile: (t: WizardTarget, item: WizardItem) => string | null;

@@ -426,8 +426,7 @@ Location because a phone slept, or because a thumb found Back, is worse
 here than on the Finding form, which at least holds one Location's work.
 
 **An item that changed nothing writes nothing**, so walking through a
-Location without answering anything leaves it Pending. The first answer
-creates the Finding, and the Finding is what marks the Location Audited;
+Location without answering anything leaves it Pending and records nothing;
 scrolling past is not auditing.
 
 Each write touches **only the item it was given**. A run that asks about
@@ -437,19 +436,47 @@ so the wizard has its own writer (`src/data/auditWizard.ts`). Re-answering
 an item replaces the Proposal it made rather than adding a second one, and
 answering back to what is on file withdraws the Proposal entirely.
 
-The first answer at a Location **creates its Finding**, which marks the
-Location Audited even when the run asked about one item. That is
-deliberate: the unanswered-category pills (§ Confirming an Audit is
-complete) are what say the rest is still open.
+The first answer at a Location **creates its Finding**, unconfirmed
+(§ Confirming a Location). Recording is not finishing: a run is expected
+to be a slice, and the Location stays in the queue until somebody says it
+is done.
 
 What applies at once and what waits for approval is unchanged
 (§ What applies immediately). A Yes/No Question that raises a Ticket on No
 raises it here too, once.
 
+### Confirming a Location
+
+The last page of every Location is **the Location itself**: every item
+this Audit asks about it, as it now stands, and a button that marks it
+Audited. Under each item is what has been recorded - by this run, by the
+pass before it, or, failing both, what is on file - and items with nothing
+behind them say *not answered*, so a gap is seen before the sign-off
+rather than afterwards on the Audit page.
+
+It is an item like any other, offered under Status (Occupancy on an
+Occupancy audit) and turned off like any other, and it is always asked
+last: there is nothing to confirm before the questions have been asked.
+
+What it writes is `audit_findings.confirmed_at`, and a Location is
+**Audited exactly while that is set** - a database trigger keeps the
+target in step, and the Audit closes itself when the last Location is
+confirmed rather than when the last answer lands. *Reopen* clears it and
+hands the Location back to the queue with every answer still recorded
+against it. So several passes can accumulate - the pedestals this morning,
+the fire rings on Thursday - and the sign-off happens once, when the
+auditor is ready.
+
+A run with the page turned off has no other moment to make that
+statement, so its Findings are **born confirmed**: answering is all it
+says, which is what the wizard did before this page existed. The Finding
+form is the same case - it shows the whole Location at once, so saving it
+confirms.
+
 ### Jumping about
 
 The locations are a filterable list - search, and *Still to do* / *Done* /
-*All* with counts - reached from the bottom bar on a phone and always
+*All* with counts, where Done means confirmed (or touched by this run) - reached from the bottom bar on a phone and always
 visible in the sidebar on a desktop. Picking one goes there. Next and
 Previous move a Location at a time.
 

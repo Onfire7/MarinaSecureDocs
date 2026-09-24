@@ -748,6 +748,11 @@ export async function saveFinding(input: FindingInput, actorId: string): Promise
       unexpected_occupancy: unexpected ? 1 : 0,
       clearly_marked: input.clearlyMarked == null ? null : input.clearlyMarked ? 1 : 0,
       mapped_correctly: input.mappedCorrectly == null ? null : input.mappedCorrectly ? 1 : 0,
+      // The form shows the whole location at once, so saving it says the
+      // location is done - which is what marks the target audited. The
+      // wizard, which shows a slice, has its own confirmation page and
+      // writes a null here until the auditor reaches it.
+      confirmed_at: stamp(),
       updated_at: stamp(),
     };
     let findingId = input.existingFindingId ?? null;

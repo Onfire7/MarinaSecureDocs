@@ -292,6 +292,7 @@ const audit_findings = new Table(
     clearly_marked: column.integer,
     mapped_correctly: column.integer,
     is_current: column.integer,
+    confirmed_at: column.text,
   },
   {
     indexes: {

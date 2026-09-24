@@ -601,6 +601,7 @@ One per target; a Finding with no target is a proposed new Location.
 | contact_id | → contacts | Optional occupant. |
 | unexpected_occupancy | boolean not null default false | Derived at save: `occupied` disagrees with the presence of a current Lease or `checked_in` Reservation. |
 | clearly_marked / mapped_correctly | boolean | Status kind. |
+| confirmed_at | timestamptz | When the auditor said the Location was done. The target is `audited` **exactly while this is set** — `audit_finding_after_write()` keeps it in step, and the Audit auto-closes only when no target is left pending. The wizard writes null until its confirmation page (docs/audits.md § Confirming a Location); the Finding form, which shows the whole Location at once, stamps it on every save. No default: a writer that does not think about it leaves the Location in the queue, which is the safe way round. |
 
 Junctions: `audit_finding_boats`, `audit_finding_vehicles` (occupants
 recorded). `audit_finding_services` (`finding_id`, `service_id`, `present`,

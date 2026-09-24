@@ -24,7 +24,19 @@ begin
   insert into amenities (name) select 'Fire pit' where not exists (select 1 from amenities where name='Fire pit');
   insert into amenities (name) select 'Picnic table' where not exists (select 1 from amenities where name='Picnic table');
   insert into amenities (name) select 'WiFi' where not exists (select 1 from amenities where name='WiFi');
+  -- The marina's own catalogue usually has one; a freshly seeded database
+  -- need not, and a null here fails the validity insert below with a
+  -- not-null violation rather than anything that names the cause.
   select id into s_power from services where name like 'Shore power%' limit 1;
+  if s_power is null then
+    insert into services (name, unit) values ('Shore power 30A', 'kWh') returning id into s_power;
+  end if;
+  if at_len is null then
+    insert into attributes (name, kind, unit) values ('Max boat length', 'number', 'ft') returning id into at_len;
+  end if;
+  if at_site is null then
+    insert into attributes (name, kind, choices) values ('Access', 'choice', array['Back-in','Pull-through']) returning id into at_site;
+  end if;
   select id into s_water from services where name='Water';
   select id into s_sewer from services where name='Sewer';
   select id into a_fire from amenities where name='Fire pit';

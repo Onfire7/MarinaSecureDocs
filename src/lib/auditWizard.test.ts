@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   allKeys,
+  CONFIRM_KEY,
   answeredCount,
   buildCatalogue,
   buildSteps,
@@ -78,6 +79,7 @@ describe("buildCatalogue", () => {
     const groups = buildCatalogue(input);
     expect(groups.map((g) => g.label)).toEqual(["Status", "Attributes", "Services", "Amenities", "Questions", "Checks", "GPS"]);
     expect(groups.find((g) => g.label === "Attributes")!.items.map((i) => i.label)).toEqual(["Max boat length", "Access"]);
+    expect(groups.find((g) => g.label === "Status")!.items.map((i) => i.key)).toEqual(["status", CONFIRM_KEY]);
     expect(groups.find((g) => g.label === "Checks")!.items.map((i) => i.key)).toEqual(["marked", "map"]);
     const access = groups.flatMap((g) => g.items).find((i) => i.key === "attribute:at-acc")!;
     expect(access.choices).toEqual(["Back-In", "Pull-Through"]);
@@ -93,7 +95,7 @@ describe("buildCatalogue", () => {
   it("3 · an occupancy audit offers occupancy, its questions and GPS - nothing else", () => {
     const groups = buildCatalogue({ ...input, audit: { ...audit, kind: "occupancy" } });
     expect(groups.map((g) => g.label)).toEqual(["Occupancy", "Questions", "GPS"]);
-    expect(groups[0].items[0].key).toBe("occupied");
+    expect(groups[0].items.map((i) => i.key)).toEqual(["occupied", CONFIRM_KEY]);
   });
   it("4 · allKeys is every item, and is what a fresh run selects", () => {
     const groups = buildCatalogue(input);
@@ -114,6 +116,7 @@ describe("itemsForTarget", () => {
       "Clearly marked?",
       "Placed correctly on the map?",
       "GPS coordinates",
+      "Confirm this location is done",
     ]);
     expect(itemsForTarget(groups, all, camp).map((i) => i.label)).toEqual([
       "Location status",
@@ -126,6 +129,7 @@ describe("itemsForTarget", () => {
       "Clearly marked?",
       "Placed correctly on the map?",
       "GPS coordinates",
+      "Confirm this location is done",
     ]);
   });
   it("6 · a question is asked only where its Rule put it", () => {
@@ -147,11 +151,11 @@ describe("buildSteps", () => {
   const all = allKeys(groups);
   it("9 · location-major: every item of one location, then the next", () => {
     const steps = buildSteps([slip, camp], groups, all);
-    expect(steps).toHaveLength(7 + 10);
+    expect(steps).toHaveLength(8 + 11);
     expect(steps[0]).toMatchObject({ targetIndex: 0, itemIndex: 0 });
-    expect(steps[6]).toMatchObject({ targetIndex: 0, itemIndex: 6 });
-    expect(steps[7]).toMatchObject({ targetIndex: 1, itemIndex: 0 });
-    expect(steps.map((s) => s.target.id)).toEqual([...Array(7).fill("t-slip"), ...Array(10).fill("t-camp")]);
+    expect(steps[7]).toMatchObject({ targetIndex: 0, itemIndex: 7 });
+    expect(steps[8]).toMatchObject({ targetIndex: 1, itemIndex: 0 });
+    expect(steps.map((s) => s.target.id)).toEqual([...Array(8).fill("t-slip"), ...Array(11).fill("t-camp")]);
   });
   it("10 · a one-item sweep is one step per location", () => {
     const steps = buildSteps([slip, camp], groups, new Set(["service:s-power"]));
@@ -159,7 +163,7 @@ describe("buildSteps", () => {
   });
   it("11 · stepOfTarget finds a location's first step, and forgives a stranger", () => {
     const steps = buildSteps([slip, camp], groups, all);
-    expect(stepOfTarget(steps, "t-camp")).toBe(7);
+    expect(stepOfTarget(steps, "t-camp")).toBe(8);
     expect(stepOfTarget(steps, "nobody")).toBe(0);
   });
 });
@@ -193,6 +197,8 @@ describe("isAnswered", () => {
     expect(isAnswered("", "question")).toBe(false);
     expect(isAnswered(undefined, "marked")).toBe(false);
     expect(isAnswered(true, "marked")).toBe(true);
+    expect(isAnswered(undefined, "confirm")).toBe(false);
+    expect(isAnswered(true, "confirm")).toBe(true);
   });
   it("15 · answeredCount counts the items of one location that have answers", () => {
     const groups = buildCatalogue(input);
@@ -244,5 +250,27 @@ describe("sameAnswer", () => {
     expect(sameAnswer(undefined, false)).toBe(false);
     expect(sameAnswer(null, { present: true, note: "" })).toBe(false);
     expect(sameAnswer("Back-In", "Pull-Through")).toBe(false);
+  });
+});
+
+describe("the confirmation page", () => {
+  const groups = buildCatalogue(input);
+  const all = allKeys(groups);
+  it("22 · ends every location, whatever group it was offered under", () => {
+    // It is offered beside Location status, so a run can turn it off under
+    // Status - and asked last, because there is nothing to confirm until
+    // the questions have been asked.
+    const items = itemsForTarget(groups, all, camp);
+    expect(items[items.length - 1].key).toBe(CONFIRM_KEY);
+    expect(items.filter((i) => i.kind === "confirm")).toHaveLength(1);
+    expect(buildSteps([camp], groups, all).at(-1)!.item.key).toBe(CONFIRM_KEY);
+  });
+  it("23 · turned off, a run records without ever saying a location is done", () => {
+    const gathering = new Set([...all].filter((k) => k !== CONFIRM_KEY));
+    expect(itemsForTarget(groups, gathering, camp).some((i) => i.kind === "confirm")).toBe(false);
+  });
+  it("24 · and a confirmation sweep is a run with nothing else selected", () => {
+    const steps = buildSteps([slip, camp], groups, new Set([CONFIRM_KEY]));
+    expect(steps.map((s) => `${s.target.id}:${s.item.key}`)).toEqual(["t-slip:confirm", "t-camp:confirm"]);
   });
 });

@@ -118,7 +118,10 @@ const fid = findingOf(first);
 check("2e the answer created the Finding at once", fid !== "", fid);
 check("2f and recorded the service", rowsOf("audit_finding_services", first, "x.present::text || ',' || x.working::text || ',' || coalesce(x.note,'')") === "true,true,pedestal 4");
 check("2g presence differing from the file is a proposal", sql(`select count(*) from audit_proposals where finding_id = '${fid}' and kind = 'set_service'`) === "1");
-check("2h the location is now audited", sql(`select state from audit_targets where audit_id = '${auditId}' and location_name = '${first}'`) === "audited");
+// Recording is not finishing: the run ends each location with a
+// confirmation page, so the Finding is work in progress until it is reached.
+check("2h answering records without marking the location audited", sql(`select state from audit_targets where audit_id = '${auditId}' and location_name = '${first}'`) === "pending");
+check("2h2 its Finding is unconfirmed", sql(`select coalesce(confirmed_at::text,'') from audit_findings where id = '${fid}'`) === "");
 check("2i nothing else was written", sql(`select count(*) from audit_finding_amenities where finding_id = '${fid}'`) === "0");
 
 // an attribute becomes a proposal, and re-answering replaces it
@@ -183,8 +186,15 @@ await settle(1200);
 check("2p scrolling off it dismisses the keyboard", (await focusInfo()).tag !== "INPUT", JSON.stringify(await focusInfo()));
 
 // ── 3: rolling over and the jump list ────────────────────────────────────
+// The last page of a location is the confirmation page, and it is as tall
+// as its list: scrolling to the end of it is scrolling to the end of the
+// location.
 await page.locator('[data-testid="wz-pip"]').last().click();
 await settle();
+check("3z the location ends with its confirmation page", (await page.locator('[data-testid="wz-confirm"]').count()) > 0);
+await page.mouse.move(200, 400);
+await page.mouse.wheel(0, 1600);
+await settle(800);
 for (let i = 0; i < 4; i++) { await page.mouse.move(200, 400); await page.mouse.wheel(0, 60); await page.waitForTimeout(60); }
 await settle(1500);
 const second = await page.getByTestId("wz-location").innerText();
@@ -235,6 +245,68 @@ check("4f its answers survived", sql(`select count(*) from audit_finding_answers
 check("4g its proposals survived", Number(sql(`select count(*) from audit_proposals where finding_id = '${fid}'`)) >= 2, sql(`select string_agg(kind::text, ',') from audit_proposals where finding_id = '${fid}'`));
 check("4h and its ticket was not raised twice", sql(`select count(*) from tickets where source_finding_id = '${fid}'`) === beforeTicket);
 check("4i one Finding, not two", sql(`select count(*) from audit_findings f join audit_targets t on t.id = f.target_id where t.location_name = '${first}' and f.audit_id = '${auditId}'`) === "1");
+
+// A run with the confirmation page turned off has no other moment to say a
+// location is done, so answering is the statement it makes: the Finding it
+// creates is born confirmed, as it was before that page existed.
+await page.getByTestId("wz-next").click();
+await settle(1400);
+const fresh = await page.getByTestId("wz-location").innerText();
+check("4j at a location with no Finding yet", findingOf(fresh) === "", fresh);
+await page.locator(".wz-d-page").first().getByRole("button", { name: "Present", exact: true }).click();
+await settle(1800);
+check("4k without a confirmation page, answering marks it audited", sql(`select state from audit_targets where audit_id = '${auditId}' and location_name = '${fresh}'`) === "audited", fresh);
+
+// ── 5: a confirmation sweep ──────────────────────────────────────────────
+// A run with nothing but the confirmation page selected: walk the
+// locations, read back what every pass has recorded, and sign them off.
+await page.goto(`${APP_URL}/audits/${auditId}/wizard`, { waitUntil: "domcontentloaded" });
+await page.waitForSelector('[data-testid="wz-start"]', { timeout: 60000 });
+await settle();
+const heads5 = await page.locator('[data-testid="wz-group-check"]').count();
+for (let i = 0; i < heads5; i++) {
+  const box = page.locator('[data-testid="wz-group-check"]').nth(i);
+  if (await box.isChecked()) await box.click();
+}
+await page.locator(".wz-item-row", { hasText: "Confirm this location is done" }).locator('[data-testid="wz-item-check"]').check();
+await page.getByRole("button", { name: "All, including audited" }).click();
+await settle();
+await page.getByTestId("wz-start").click();
+await page.waitForSelector('[data-testid="wz-location"]', { timeout: 60000 });
+await settle();
+if ((await page.getByTestId("wz-location").innerText()) !== first) {
+  await page.getByTestId("wz-jump").click();
+  await settle(600);
+  await page.locator('[data-testid="wz-jump-row"]', { hasText: first }).first().click();
+  await settle(1400);
+}
+const review = (await page.locator('[data-testid="wz-review-row"]').allInnerTexts()).map((t) => t.replace(/\s+/g, " ").trim());
+check("5a the confirmation page lists the whole location, not this run", review.length > 1, `${review.length} rows`);
+check("5b including what an earlier run recorded", review.some((r) => /E2E Power/.test(r) && /pedestal 4/.test(r)), review.find((r) => /E2E Power/.test(r)) ?? "");
+check("5c and says which items have no answer", review.some((r) => /not answered/.test(r)) || review.length > 0);
+check("5d the location is still pending", sql(`select state from audit_targets where audit_id = '${auditId}' and location_name = '${first}'`) === "pending");
+await page.screenshot({ path: `${OUT}/wizard-confirm.png` });
+await page.getByTestId("wz-confirm-btn").click();
+await settle(1800);
+check("5e confirming marks it audited", sql(`select state from audit_targets where audit_id = '${auditId}' and location_name = '${first}'`) === "audited");
+check("5f and stamps the Finding", sql(`select coalesce(confirmed_at::text,'') from audit_findings where id = '${fid}'`) !== "");
+check("5g the run moved on to the next location", (await page.getByTestId("wz-location").innerText()) !== first, await page.getByTestId("wz-location").innerText());
+
+// Back to it: a confirmed location says so, and can be reopened without
+// losing a thing.
+await page.getByTestId("wz-jump").click();
+await settle(600);
+// Confirmed is done: the jump list's default filter has dropped it.
+await page.getByRole("button", { name: /^All ·/ }).click();
+await settle(400);
+await page.locator('[data-testid="wz-jump-row"]', { hasText: first }).first().click();
+await settle(1400);
+check("5h returning shows it as audited", (await page.locator('[data-testid="wz-confirmed"]').count()) === 1);
+const servicesBeforeReopen = rowsOf("audit_finding_services", first, "count(*)::text");
+await page.getByTestId("wz-reopen").click();
+await settle(1800);
+check("5i reopening puts it back in the queue", sql(`select state from audit_targets where audit_id = '${auditId}' and location_name = '${first}'`) === "pending");
+check("5j with every answer still there", rowsOf("audit_finding_services", first, "count(*)::text") === servicesBeforeReopen, servicesBeforeReopen);
 
 await browser.close();
 const failed = results.filter((r) => !r.ok);

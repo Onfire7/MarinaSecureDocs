@@ -2,7 +2,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useAudit, useAuditQuestions, useAuditTargets } from "../../data/audits";
-import { recordWizardItem, useAuditFindingTargets, useAuditTargetQuestions } from "../../data/auditWizard";
+import {
+  recordWizardItem,
+  useAuditFindingTargets,
+  useAuditTargetQuestions,
+  useFindingAmenitiesForTarget,
+  useFindingAnswersForTarget,
+  useFindingForTarget,
+  useFindingProposalsForTarget,
+  useFindingServicesForTarget,
+} from "../../data/auditWizard";
 import { useLocationStatuses, useTicketStatuses } from "../../data/lookups";
 import { useLeasesForLocation } from "../../data/leases";
 import { useReservationsForTarget } from "../../data/reservations";
@@ -22,6 +31,7 @@ import {
 import {
   allKeys,
   buildCatalogue,
+  CONFIRM_KEY,
   buildSteps,
   itemsForTarget,
   sameAnswer,
@@ -95,9 +105,14 @@ export function AuditWizardPage() {
   const selection = useMemo(() => new Set([...allKeys(groups)].filter((k) => !off.has(k))), [groups, off]);
   const setSelection = (next: Set<string>) => setOff(new Set([...allKeys(groups)].filter((k) => !next.has(k))));
 
-  const withFinding = useMemo(() => new Set(findingTargets.map((f) => f.target_id)), [findingTargets]);
+  // Confirmed, not merely written to: a location with a pass of answers
+  // against it and no confirmation is still in the queue.
+  const confirmedAt = useMemo(
+    () => new Map(findingTargets.filter((f) => f.confirmed_at).map((f) => [f.target_id, f.confirmed_at as string])),
+    [findingTargets],
+  );
   const answeredTarget = (targetId: string) =>
-    withFinding.has(targetId) || [...touched].some((t) => t.startsWith(`${targetId}|`));
+    confirmedAt.has(targetId) || [...touched].some((t) => t.startsWith(`${targetId}|`));
 
   const shownTargets: WizardTarget[] = useMemo(
     () =>
@@ -108,6 +123,7 @@ export function AuditWizardPage() {
           location_id: t.location_id,
           location_name: t.location_name,
           type_name: t.type_name,
+          status_name: t.status_name,
           location_type_id: t.location_type_id,
           state: t.state,
           gps_lat: t.gps_lat,
@@ -134,7 +150,17 @@ export function AuditWizardPage() {
   const locServices = useLocationServices(locationId);
   const locAmenities = useLocationAmenities(locationId);
   const locAttributes = useLocationAttributes(locationId);
-  const settled = [locServices, locAmenities, locAttributes].every((q) => !q.isLoading && !q.isFetching);
+  // What an earlier pass recorded here, so arriving at a location shows its
+  // work rather than a blank page - and so the confirmation page can list
+  // the whole location, not just this run's slice.
+  const findingHere = useFindingForTarget(current_?.target.id);
+  const answersHere = useFindingAnswersForTarget(current_?.target.id);
+  const servicesHere = useFindingServicesForTarget(current_?.target.id);
+  const amenitiesHere = useFindingAmenitiesForTarget(current_?.target.id);
+  const proposalsHere = useFindingProposalsForTarget(current_?.target.id);
+  const settled = [locServices, locAmenities, locAttributes, findingHere, answersHere, servicesHere, amenitiesHere, proposalsHere].every(
+    (q) => !q.isLoading && !q.isFetching,
+  );
   const { data: leases } = useLeasesForLocation(locationId);
   const { data: reservations } = useReservationsForTarget("location", locationId);
 
@@ -154,30 +180,76 @@ export function AuditWizardPage() {
     return null;
   };
 
-  // Seed this location's answers once, from what is on file. Both flags,
-  // because a PowerSync query keeps its previous data across a parameter
-  // change with isLoading still false (CLAUDE.md).
+  // Seed this location's answers once, from what is on file and from what
+  // an earlier pass already recorded. Both settle flags, because a
+  // PowerSync query keeps its previous data across a parameter change with
+  // isLoading still false (CLAUDE.md).
+  //
+  // The seed covers EVERY item the audit asks about this location, not just
+  // the ones this run selected: the confirmation page lists the lot, and a
+  // sweep of one service still has to show the whole location before
+  // anybody signs it off.
   const [seeded, setSeeded] = useState<Set<string>>(new Set());
   const targetId = current_?.target.id;
   useEffect(() => {
     if (!targetId || !current_ || !settled || seeded.has(targetId)) return;
-    const items = itemsForTarget(groups, selection, current_.target);
+    const items = itemsForTarget(groups, allKeys(groups), current_.target);
+    const finding = findingHere.data[0];
+    // What the audit has recorded wins over what is on file: an earlier
+    // pass's answer is waiting in a Proposal, and the Location will go on
+    // saying otherwise until someone approves it.
+    const proposed = proposalsHere.data.map((p) => ({ kind: p.kind, payload: parsePayload(p.payload) }));
     const seed: Record<string, AnswerValue> = {};
     for (const item of items) {
       if (item.kind === "service") {
+        const found = servicesHere.data.find((r) => r.service_id === item.entryId);
         const row = locServices.data.find((r) => r.service_id === item.entryId);
-        seed[item.key] = { present: !!row, working: row ? row.working === 1 : true, note: row?.note ?? "" };
+        seed[item.key] = found
+          ? { present: found.present === 1, working: found.working === 1, note: found.note ?? "" }
+          : { present: !!row, working: row ? row.working === 1 : true, note: row?.note ?? "" };
       } else if (item.kind === "amenity") {
+        const found = amenitiesHere.data.find((r) => r.amenity_id === item.entryId);
         const row = locAmenities.data.find((r) => r.amenity_id === item.entryId);
-        seed[item.key] = { present: !!row, note: row?.note ?? "" };
+        seed[item.key] = found
+          ? { present: found.present === 1, note: found.note ?? "" }
+          : { present: !!row, note: row?.note ?? "" };
       } else if (item.kind === "attribute") {
+        const prop = proposed.find((p) => p.kind === "set_attribute" && p.payload.attribute_id === item.entryId)?.payload;
         const row = locAttributes.data.find((r) => r.attribute_id === item.entryId);
-        seed[item.key] = { value: row?.value != null ? String(row.value) : "", text: row?.value_text ?? "", note: row?.note ?? "" };
+        seed[item.key] = prop
+          ? { value: prop.value != null ? String(prop.value) : "", text: (prop.text as string) ?? "", note: (prop.note as string) ?? "" }
+          : { value: row?.value != null ? String(row.value) : "", text: row?.value_text ?? "", note: row?.note ?? "" };
+      } else if (item.kind === "gps") {
+        const fix = proposed.find((p) => p.kind === "set_gps")?.payload;
+        if (fix) seed[item.key] = fix as unknown as AnswerValue;
+      } else if (item.kind === "question") {
+        const row = answersHere.data.find((r) => r.question_id === item.entryId);
+        if (row) seed[item.key] = parseAnswer(row.value);
+      } else if (item.kind === "marked" && finding?.clearly_marked != null) {
+        seed[item.key] = finding.clearly_marked === 1;
+      } else if (item.kind === "map" && finding?.mapped_correctly != null) {
+        seed[item.key] = finding.mapped_correctly === 1;
+      } else if (item.kind === "occupied" && finding?.occupied != null) {
+        seed[item.key] = finding.occupied === 1;
       }
     }
     setSeeded(new Set([...seeded, targetId]));
     setAnswers((prev) => ({ ...prev, [targetId]: { ...seed, ...(prev[targetId] ?? {}) } }));
-  }, [targetId, current_, settled, seeded, groups, selection, locServices.data, locAmenities.data, locAttributes.data]);
+  }, [
+    targetId,
+    current_,
+    settled,
+    seeded,
+    groups,
+    locServices.data,
+    locAmenities.data,
+    locAttributes.data,
+    findingHere.data,
+    answersHere.data,
+    servicesHere.data,
+    amenitiesHere.data,
+    proposalsHere.data,
+  ]);
 
   if (isLoading || !audit) {
     return (
@@ -233,6 +305,10 @@ export function AuditWizardPage() {
       item,
       value: v,
       actorId: current.user.id,
+      // With a confirmation page in the run, the Finding this creates is
+      // work in progress: the location stays in the queue until the
+      // auditor reaches that page and says otherwise.
+      confirms: selection.has(CONFIRM_KEY),
       expected: {
         hasCurrentLease: leases.some(
           (l) => (!l.start_date || new Date(l.start_date).getTime() <= Date.now()) && (!l.end_date || new Date(l.end_date).getTime() >= Date.now()),
@@ -294,6 +370,8 @@ export function AuditWizardPage() {
     answers,
     setAnswer,
     itemsFor: (t) => itemsForTarget(groups, selection, t),
+    reviewItems: (t) => itemsForTarget(groups, allKeys(groups), t),
+    confirmedAt: (tid) => confirmedAt.get(tid) ?? null,
     statuses: statuses.map((s) => ({ id: s.id, name: s.name })),
     onFile,
     answeredTarget,
@@ -305,6 +383,26 @@ export function AuditWizardPage() {
     },
   };
   return <WizardRun {...props} />;
+}
+
+/** A Proposal's payload: jsonb in Postgres, TEXT on the device. */
+function parsePayload(raw: string): Record<string, unknown> {
+  try {
+    const v = JSON.parse(raw) as unknown;
+    return v && typeof v === "object" ? (v as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** A question's answer as stored: JSON, so `false` survives the round trip
+ *  and a choice is a string rather than a number that looks like one. */
+function parseAnswer(raw: string): AnswerValue {
+  try {
+    return JSON.parse(raw) as AnswerValue;
+  } catch {
+    return raw;
+  }
 }
 
 function SetupScreen({

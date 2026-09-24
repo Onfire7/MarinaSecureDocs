@@ -3,7 +3,13 @@
 // walks. Nothing here touches the database; src/lib/auditWizard.test.ts is
 // the spec.
 
-export type ItemKind = "status" | "occupied" | "attribute" | "service" | "amenity" | "question" | "marked" | "map" | "gps";
+export type ItemKind = "status" | "occupied" | "attribute" | "service" | "amenity" | "question" | "marked" | "map" | "gps" | "confirm";
+
+/** The page that ends a location: everything recorded there, and the button
+ *  that says it is done. Selectable like any other item - a run that only
+ *  gathers information turns it off - and always the last page of a
+ *  location, wherever its group sits in the order. */
+export const CONFIRM_KEY = "confirm";
 
 export interface WizardItem {
   /** Stable across renders and runs: `service:<uuid>`, `marked`, … */
@@ -93,11 +99,13 @@ export function buildCatalogue(input: {
   };
   const status = audit.kind === "status";
 
+  const first = status ? "Status" : "Occupancy";
   if (status) {
     add("Status", { key: "status", kind: "status", label: "Location status", group: "Status", entryId: null });
   } else {
     add("Occupancy", { key: "occupied", kind: "occupied", label: "Occupied?", group: "Occupancy", entryId: null });
   }
+  add(first, { key: CONFIRM_KEY, kind: "confirm", label: "Confirm this location is done", group: first, entryId: null });
   if (status && audit.include_attributes === 1)
     for (const a of input.attributes)
       add("Attributes", {
@@ -161,6 +169,8 @@ export interface WizardTarget {
   location_id: string | null;
   location_name: string;
   type_name: string | null;
+  /** What the Location's status is now, for the confirmation page. */
+  status_name?: string | null;
   location_type_id: string | null;
   state: "pending" | "audited" | "not_audited";
   gps_lat: number | null;
@@ -170,15 +180,23 @@ export interface WizardTarget {
 /** The selected items that actually apply to this target, in group order. */
 export function itemsForTarget(groups: ItemGroup[], selection: Set<string>, t: WizardTarget): WizardItem[] {
   const out: WizardItem[] = [];
+  let confirm: WizardItem | null = null;
   for (const g of groups)
     for (const item of g.items) {
       if (!selection.has(item.key)) continue;
+      // Last, whatever group it was offered under: there is nothing to
+      // confirm before the questions have been asked.
+      if (item.kind === "confirm") {
+        confirm = item;
+        continue;
+      }
       if (item.typeIds && (!t.location_type_id || !item.typeIds.has(t.location_type_id))) continue;
       if (item.targetIds && !item.targetIds.has(t.id)) continue;
       // A location that already has a pin is not asked for one again.
       if (item.kind === "gps" && t.gps_lat !== null && t.gps_lng !== null) continue;
       out.push(item);
     }
+  if (confirm) out.push(confirm);
   return out;
 }
 

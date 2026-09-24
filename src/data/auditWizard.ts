@@ -32,6 +32,10 @@ export interface WizardWrite {
   item: Pick<WizardItem, "key" | "kind" | "entryId">;
   value: AnswerValue;
   actorId: string;
+  /** Does this run end each location with a confirmation page? If it does,
+   *  the Finding it creates starts unconfirmed and the location stays in
+   *  the queue until the auditor says otherwise. */
+  confirms?: boolean;
   /** Occupancy only: what the lease and reservations on file say. */
   expected?: { hasCurrentLease: boolean; hasActiveReservation: boolean };
 }
@@ -69,15 +73,29 @@ export function recordWizardItem(w: WizardWrite): Promise<string> {
       case "gps":
         await writeGps(tx, w, findingId);
         break;
+      case "confirm":
+        // The whole point of the column: the location is audited exactly
+        // while this is set, and a database trigger keeps the target in
+        // step. Reopening one hands it back to the queue with every answer
+        // already recorded still there.
+        await update(tx, "audit_findings", findingId, {
+          confirmed_at: w.value === true ? stamp() : null,
+          updated_at: stamp(),
+        });
+        break;
     }
     return findingId;
   });
 }
 
 /** The Finding a run writes into: one per target, made on the first answer.
- *  Creating it is what marks the Location audited (a database trigger does
- *  that), which is why a run that answers one item still counts - the pills
- *  on the audit page are what say the rest is unanswered. */
+ *
+ *  It is born unconfirmed when the run ends its locations with a
+ *  confirmation page, and confirmed when it does not - a run with that page
+ *  turned off has no other moment to say the location is done, and
+ *  answering is the only statement it makes. An existing Finding is left as
+ *  it is either way: a second pass over a confirmed location does not
+ *  reopen it. */
 async function ensureFinding(tx: LockContext, w: WizardWrite): Promise<string> {
   const row = await tx.getOptional<{ id: string }>("SELECT id FROM audit_findings WHERE target_id = ?", [w.targetId]);
   if (row) return row.id;
@@ -87,6 +105,7 @@ async function ensureFinding(tx: LockContext, w: WizardWrite): Promise<string> {
     recorded_by_id: w.actorId,
     recorded_at: stamp(),
     updated_at: stamp(),
+    confirmed_at: w.confirms ? null : stamp(),
     unexpected_occupancy: 0,
     is_current: 1,
   });
@@ -258,26 +277,81 @@ export function useAuditTargetQuestions(auditId: string | undefined) {
   );
 }
 
-/** Which targets already have a Finding: the run dims them, and the
- *  "still to do" filter drops them. */
+/** Which targets have a Finding, and which of those have been confirmed
+ *  done. The jump list reads the second: a location with answers against it
+ *  and no confirmation is still in the queue. */
 export function useAuditFindingTargets(auditId: string | undefined) {
-  return useQuery<{ target_id: string }>(
-    "SELECT target_id FROM audit_findings WHERE audit_id = ? AND target_id IS NOT NULL",
+  return useQuery<{ target_id: string; confirmed_at: string | null }>(
+    "SELECT target_id, confirmed_at FROM audit_findings WHERE audit_id = ? AND target_id IS NOT NULL",
     [auditId ?? ""],
   );
 }
 
-/** Everything a wizard run has already recorded for a target, so reopening
- *  one shows what is there rather than starting blank. */
+/** What is already recorded against a target's Finding, so arriving at a
+ *  location a previous pass touched shows that work rather than a blank
+ *  page - and so the confirmation page can list it. */
 export function useFindingForTarget(targetId: string | undefined) {
   return useQuery<{
     finding_id: string;
     clearly_marked: number | null;
     mapped_correctly: number | null;
     occupied: number | null;
+    confirmed_at: string | null;
   }>(
-    `SELECT id AS finding_id, clearly_marked, mapped_correctly, occupied
+    `SELECT id AS finding_id, clearly_marked, mapped_correctly, occupied, confirmed_at
        FROM audit_findings WHERE target_id = ?`,
+    [targetId ?? ""],
+  );
+}
+
+/** That Finding's question answers. Joined on `id`, the only real column a
+ *  PowerSync view has (CLAUDE.md). */
+export function useFindingAnswersForTarget(targetId: string | undefined) {
+  return useQuery<{ question_id: string; value: string }>(
+    `SELECT a.question_id, a.value
+       FROM audit_finding_answers a
+       JOIN audit_findings f ON f.id = a.finding_id
+      WHERE f.target_id = ?`,
+    [targetId ?? ""],
+  );
+}
+
+/**
+ * The Services and Amenities that Finding recorded.
+ *
+ * What the audit found is not what is on file: a Service found present
+ * where the marina has none is a Proposal, and the Location keeps saying
+ * "absent" until someone approves it. Seeding a later pass from the
+ * Location alone therefore showed the auditor "absent" for a pedestal the
+ * morning's pass had recorded as working - and the confirmation page,
+ * which exists to read back what has been recorded, said the same.
+ */
+export function useFindingServicesForTarget(targetId: string | undefined) {
+  return useQuery<{ service_id: string; present: number; working: number; note: string | null }>(
+    `SELECT s.service_id, s.present, s.working, s.note
+       FROM audit_finding_services s
+       JOIN audit_findings f ON f.id = s.finding_id
+      WHERE f.target_id = ?`,
+    [targetId ?? ""],
+  );
+}
+export function useFindingAmenitiesForTarget(targetId: string | undefined) {
+  return useQuery<{ amenity_id: string; present: number; note: string | null }>(
+    `SELECT a.amenity_id, a.present, a.note
+       FROM audit_finding_amenities a
+       JOIN audit_findings f ON f.id = a.finding_id
+      WHERE f.target_id = ?`,
+    [targetId ?? ""],
+  );
+}
+/** And its undecided Proposals - where an Attribute value or a GPS fix an
+ *  earlier pass recorded is waiting, since neither applies until finalize. */
+export function useFindingProposalsForTarget(targetId: string | undefined) {
+  return useQuery<{ kind: string; payload: string }>(
+    `SELECT p.kind, p.payload
+       FROM audit_proposals p
+       JOIN audit_findings f ON f.id = p.finding_id
+      WHERE f.target_id = ? AND p.decision IS NULL`,
     [targetId ?? ""],
   );
 }

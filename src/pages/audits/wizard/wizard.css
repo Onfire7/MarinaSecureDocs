@@ -443,3 +443,67 @@
   border-top: 1px solid var(--line-lt);
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
 }
+
+/* ── the confirmation page ───────────────────────────────────────────── */
+/* The page that ends a location is the one page that is not screen-sized:
+   it lists everything the audit asks about the location, and a long list
+   scrolls in the column like any other content. A snap area taller than
+   the scroller only snaps at its edges, so this stays readable rather than
+   being dragged back to the top. */
+.wz-d-page.wz-d-confirm {
+  height: auto;
+  min-height: 100%;
+  justify-content: flex-start;
+}
+.wz-c-review {
+  width: 100%;
+  max-width: 560px;
+  text-align: left;
+}
+.wz-c-review-group {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--mute);
+  font-weight: 650;
+  margin: 12px 0 4px;
+}
+.wz-c-review-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line-lt);
+}
+.wz-c-review-label {
+  flex: 1 1 auto;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.wz-c-review-value {
+  flex: 0 1 auto;
+  text-align: right;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+/* A gap says so rather than showing an empty column: the point of the page
+   is to notice one before signing the location off. */
+.wz-c-review-row.missing .wz-c-review-value {
+  color: var(--mute);
+  font-style: italic;
+}
+.wz-c-review-tag {
+  flex: 0 0 auto;
+}
+.wz-c-review-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  text-align: center;
+}
+.wz-c-review-foot .btn-primary {
+  font-size: 1rem;
+  padding: 14px 22px;
+}

@@ -5,7 +5,7 @@
 -- passes every denial test (CLAUDE.md).
 create extension if not exists pgtap;
 begin;
-select plan(38);
+select plan(44);
 
 -- Rows affected by an UPDATE run as the current role, so RLS is exercised
 -- from the caller's side. A data-modifying CTE cannot sit inside is().
@@ -57,10 +57,10 @@ insert into audit_targets (id, audit_id, location_id, location_name, position) v
 
 -- Alice's findings: S1 (retire + GPS proposals), S4 (retire), and a proposed
 -- new location with a ticket already raised against the stand-in parent S3.
-insert into audit_findings (id, audit_id, target_id, recorded_by_id) values
-  ('ffff0000-0000-4000-8000-0000000000f1','eeee0000-0000-4000-8000-0000000000a1','eeee1111-0000-4000-8000-000000000001','11111111-0000-4000-8000-000000000001'),
-  ('ffff0000-0000-4000-8000-0000000000f2','eeee0000-0000-4000-8000-0000000000a1','eeee1111-0000-4000-8000-000000000004','11111111-0000-4000-8000-000000000001'),
-  ('ffff0000-0000-4000-8000-0000000000f4','eeee0000-0000-4000-8000-0000000000a1', null,                                   '11111111-0000-4000-8000-000000000001');
+insert into audit_findings (id, audit_id, target_id, recorded_by_id, confirmed_at) values
+  ('ffff0000-0000-4000-8000-0000000000f1','eeee0000-0000-4000-8000-0000000000a1','eeee1111-0000-4000-8000-000000000001','11111111-0000-4000-8000-000000000001', now()),
+  ('ffff0000-0000-4000-8000-0000000000f2','eeee0000-0000-4000-8000-0000000000a1','eeee1111-0000-4000-8000-000000000004','11111111-0000-4000-8000-000000000001', now()),
+  ('ffff0000-0000-4000-8000-0000000000f4','eeee0000-0000-4000-8000-0000000000a1', null,                                   '11111111-0000-4000-8000-000000000001', now());
 insert into audit_proposals (id, finding_id, kind, payload) values
   ('99990000-0000-4000-8000-0000000000b1','ffff0000-0000-4000-8000-0000000000f1','retire_location','{}'),
   ('99990000-0000-4000-8000-0000000000b2','ffff0000-0000-4000-8000-0000000000f1','set_gps','{"lat": 33.1, "lng": -96.2}'),
@@ -125,12 +125,12 @@ insert into audit_targets (id, audit_id, location_id, location_name, position) v
   ('eeee1111-0000-4000-8000-000000000007','eeee0000-0000-4000-8000-0000000000a3','dddd0000-0000-4000-8000-000000000083','AF-S3',0);
 select set_config('request.jwt.claims', '{"sub":"user_bob"}', true);
 set local role authenticated;
-insert into audit_findings (id, audit_id, target_id, recorded_by_id) values
+insert into audit_findings (id, audit_id, target_id, recorded_by_id, confirmed_at) values
   ('ffff0000-0000-4000-8000-0000000000f5','eeee0000-0000-4000-8000-0000000000a3',
-   'eeee1111-0000-4000-8000-000000000007','11111111-0000-4000-8000-000000000002');
+   'eeee1111-0000-4000-8000-000000000007','11111111-0000-4000-8000-000000000002', now());
 reset role;
 select is((select status::text from audits where id = 'eeee0000-0000-4000-8000-0000000000a3'), 'closed',
-  'a finding on the only pending target closes the audit');
+  'a confirmed finding on the only pending target closes the audit');
 select set_config('request.jwt.claims', '{"sub":"user_bob"}', true);
 set local role authenticated;
 select lives_ok(
@@ -207,8 +207,8 @@ select ok((select not is_current from audit_findings where id = 'ffff0000-0000-4
 insert into attributes (id, name, unit) values ('aaaa0000-0000-4000-8000-0000000000a1','Fixture Max Boat Length','ft');
 insert into attribute_location_types (attribute_id, location_type_id)
   values ('aaaa0000-0000-4000-8000-0000000000a1','cccc0000-0000-4000-8000-000000000080');
-insert into audit_findings (id, audit_id, target_id, recorded_by_id) values
-  ('ffff0000-0000-4000-8000-0000000000f6','eeee0000-0000-4000-8000-0000000000a2','eeee1111-0000-4000-8000-000000000005','11111111-0000-4000-8000-000000000001');
+insert into audit_findings (id, audit_id, target_id, recorded_by_id, confirmed_at) values
+  ('ffff0000-0000-4000-8000-0000000000f6','eeee0000-0000-4000-8000-0000000000a2','eeee1111-0000-4000-8000-000000000005','11111111-0000-4000-8000-000000000001', now());
 insert into audit_proposals (finding_id, kind, payload) values
   ('ffff0000-0000-4000-8000-0000000000f6','set_attribute',
    '{"attribute_id":"aaaa0000-0000-4000-8000-0000000000a1","value":35,"note":null}');
@@ -233,8 +233,8 @@ insert into audits (id, name, kind, status, launched_by_id) values
   ('eeee0000-0000-4000-8000-0000000000a4','Fixture Audit Four','status','open','11111111-0000-4000-8000-000000000001');
 insert into audit_targets (id, audit_id, location_id, location_name, position) values
   ('eeee1111-0000-4000-8000-000000000008','eeee0000-0000-4000-8000-0000000000a4','dddd0000-0000-4000-8000-000000000081','AF-S1',0);
-insert into audit_findings (id, audit_id, target_id, recorded_by_id) values
-  ('ffff0000-0000-4000-8000-0000000000f8','eeee0000-0000-4000-8000-0000000000a4','eeee1111-0000-4000-8000-000000000008','11111111-0000-4000-8000-000000000001');
+insert into audit_findings (id, audit_id, target_id, recorded_by_id, confirmed_at) values
+  ('ffff0000-0000-4000-8000-0000000000f8','eeee0000-0000-4000-8000-0000000000a4','eeee1111-0000-4000-8000-000000000008','11111111-0000-4000-8000-000000000001', now());
 insert into audit_proposals (finding_id, kind, payload) values
   ('ffff0000-0000-4000-8000-0000000000f8','set_attribute',
    '{"attribute_id":"aaaa0000-0000-4000-8000-0000000000a1","value":null,"note":null}');
@@ -265,8 +265,8 @@ insert into audits (id, name, kind, status, launched_by_id) values
   ('eeee0000-0000-4000-8000-0000000000a5','Fixture Audit Five','status','open','11111111-0000-4000-8000-000000000001');
 insert into audit_targets (id, audit_id, location_id, location_name, position) values
   ('eeee1111-0000-4000-8000-000000000009','eeee0000-0000-4000-8000-0000000000a5','dddd0000-0000-4000-8000-000000000081','AF-S1',0);
-insert into audit_findings (id, audit_id, target_id, recorded_by_id) values
-  ('ffff0000-0000-4000-8000-0000000000f9','eeee0000-0000-4000-8000-0000000000a5','eeee1111-0000-4000-8000-000000000009','11111111-0000-4000-8000-000000000001');
+insert into audit_findings (id, audit_id, target_id, recorded_by_id, confirmed_at) values
+  ('ffff0000-0000-4000-8000-0000000000f9','eeee0000-0000-4000-8000-0000000000a5','eeee1111-0000-4000-8000-000000000009','11111111-0000-4000-8000-000000000001', now());
 insert into audit_proposals (finding_id, kind, decision, decided_by_id, payload) values
   ('ffff0000-0000-4000-8000-0000000000f9','set_attribute','approved','11111111-0000-4000-8000-000000000001',
    '{"attribute_id":"aaaa0000-0000-4000-8000-0000000000a2","value":null,"text":"Pull-through","note":null}');
@@ -284,6 +284,56 @@ select throws_ok(
     values ('dddd0000-0000-4000-8000-000000000083','aaaa0000-0000-4000-8000-0000000000a2', 3, 'Back-in')$$,
   '23514', null,
   'a Location Attribute holds a number or a choice, never both');
+
+-- ── confirmation: a location is audited when the auditor says so ────────
+-- A wizard run is a slice - the power pedestals today, the fire rings on
+-- Thursday - so recording an answer cannot be what says the location is
+-- done. The Finding accumulates unconfirmed; confirming it is the event.
+insert into locations (id, name, location_type_id) values
+  ('dddd0000-0000-4000-8000-000000000085','AF-S5','cccc0000-0000-4000-8000-000000000080'),
+  ('dddd0000-0000-4000-8000-000000000086','AF-S6','cccc0000-0000-4000-8000-000000000080');
+insert into audits (id, name, kind, status, launched_by_id) values
+  ('eeee0000-0000-4000-8000-0000000000a6','Fixture Audit Six','status','open','11111111-0000-4000-8000-000000000001');
+insert into audit_targets (id, audit_id, location_id, location_name, position) values
+  ('eeee1111-0000-4000-8000-00000000000a','eeee0000-0000-4000-8000-0000000000a6','dddd0000-0000-4000-8000-000000000085','AF-S5',0),
+  ('eeee1111-0000-4000-8000-00000000000b','eeee0000-0000-4000-8000-0000000000a6','dddd0000-0000-4000-8000-000000000086','AF-S6',1);
+
+select set_config('request.jwt.claims', '{"sub":"user_bob"}', true);
+set local role authenticated;
+insert into audit_findings (id, audit_id, target_id, recorded_by_id) values
+  ('ffff0000-0000-4000-8000-0000000000fa','eeee0000-0000-4000-8000-0000000000a6',
+   'eeee1111-0000-4000-8000-00000000000a','11111111-0000-4000-8000-000000000002');
+reset role;
+select is((select state::text from audit_targets where id = 'eeee1111-0000-4000-8000-00000000000a'), 'pending',
+  'an unconfirmed finding leaves its location in the queue');
+
+select set_config('request.jwt.claims', '{"sub":"user_bob"}', true);
+set local role authenticated;
+select is(pg_temp.upd_count($u$update audit_findings set confirmed_at = now()
+            where id = 'ffff0000-0000-4000-8000-0000000000fa'$u$), 1,
+  'the auditor who recorded it is the one who says it is done');
+reset role;
+select is((select state::text from audit_targets where id = 'eeee1111-0000-4000-8000-00000000000a'), 'audited',
+  'confirming is what marks the location audited');
+select is((select status::text from audits where id = 'eeee0000-0000-4000-8000-0000000000a6'), 'open',
+  'and the audit stays open while another location is unconfirmed');
+
+select set_config('request.jwt.claims', '{"sub":"user_bob"}', true);
+set local role authenticated;
+update audit_findings set confirmed_at = null where id = 'ffff0000-0000-4000-8000-0000000000fa';
+reset role;
+select is((select state::text from audit_targets where id = 'eeee1111-0000-4000-8000-00000000000a'), 'pending',
+  'reopening a location puts it back in the queue, its answers untouched');
+
+select set_config('request.jwt.claims', '{"sub":"user_bob"}', true);
+set local role authenticated;
+insert into audit_findings (id, audit_id, target_id, recorded_by_id, confirmed_at) values
+  ('ffff0000-0000-4000-8000-0000000000fb','eeee0000-0000-4000-8000-0000000000a6',
+   'eeee1111-0000-4000-8000-00000000000b','11111111-0000-4000-8000-000000000002', now());
+update audit_findings set confirmed_at = now() where id = 'ffff0000-0000-4000-8000-0000000000fa';
+reset role;
+select is((select status::text from audits where id = 'eeee0000-0000-4000-8000-0000000000a6'), 'closed',
+  'the audit closes when the last location is confirmed, not when its last answer lands');
 
 select * from finish();
 rollback;
