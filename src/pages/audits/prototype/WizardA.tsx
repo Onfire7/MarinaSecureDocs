@@ -3,7 +3,7 @@
 // auditor never chooses what to look at - they look at what is shown.
 import { useState } from "react";
 import { ItemControl } from "./ItemControl";
-import { JumpSheet } from "./JumpSheet";
+import { JumpBody } from "./JumpBody";
 import { answeredCount, isAnswered, stepOfTarget, type RunProps } from "./wizardModel";
 
 export const name = "Queue";
@@ -74,15 +74,21 @@ export function WizardA(p: RunProps) {
       </div>
 
       {jump && (
-        <JumpSheet
-          {...p}
-          currentTargetId={step.target.id}
-          onPick={(t) => {
-            p.setIndex(stepOfTarget(p.steps, t.id));
-            setJump(false);
-          }}
-          onClose={() => setJump(false)}
-        />
+        <div className="wz-sheet-backdrop" onClick={() => setJump(false)}>
+          <div className="wz-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="wz-sheet-head">
+              <b>Jump to a location</b>
+            </div>
+            <JumpBody
+              {...p}
+              currentTargetId={step.target.id}
+              onPick={(x) => {
+                p.setIndex(stepOfTarget(p.steps, x.id));
+                setJump(false);
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

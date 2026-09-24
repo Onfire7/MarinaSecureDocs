@@ -1,7 +1,13 @@
 // PROTOTYPE — throwaway. One item's control, the same markup the Finding
 // form uses. Shared by every variant on purpose: the question under test is
 // the *stepping*, not the field.
-import type { CSSProperties } from "react";
+//
+// Answering moves focus to the next logical field rather than always to the
+// next item (owner, 2026-09-23): a Service answered Present reveals its
+// working box and note and focuses the note, so the auditor can type one or
+// press Next to skip it; answers with nothing to follow move straight on.
+import { useRef, type CSSProperties } from "react";
+import { useNoteSuggestions } from "../../../data/services";
 import type { AmenityAnswer, AttributeAnswer, AnswerValue, ServiceAnswer, WizardItem } from "./wizardModel";
 
 export function ItemControl({
@@ -19,17 +25,29 @@ export function ItemControl({
   onChange: (v: AnswerValue) => void;
   /** One-item-per-screen variants render the control larger. */
   big?: boolean;
-  /** Move to the next item. Given by the variants that step one at a time:
-   *  a choice that opens no follow-up moves on by itself, and a number
-   *  field's Enter/Next key does the same. An answer that DOES open a
-   *  follow-up (a Service that is present, and so wants working and a note)
-   *  stays put - advancing there would skip the thing just revealed. */
+  /** Move to the next item. */
   advance?: () => void;
   /** The field the page focuses when it lands on this item. */
   autoFocus?: boolean;
 }) {
   const cls = big ? "wz-big" : "";
   const onward = () => advance?.();
+  // The note input mounts only once an answer reveals it, so focusing it is
+  // a callback ref that fires on mount, not a call into the past.
+  const noteRef = useRef<HTMLInputElement | null>(null);
+  const wantNote = useRef(false);
+  const attachNote = (el: HTMLInputElement | null) => {
+    noteRef.current = el;
+    if (el && wantNote.current) {
+      wantNote.current = false;
+      el.focus();
+    }
+  };
+  const focusNote = () => {
+    if (noteRef.current) noteRef.current.focus();
+    else wantNote.current = true;
+  };
+
   switch (item.kind) {
     case "service": {
       const v = (value as ServiceAnswer) ?? { present: null, working: true, note: "" };
@@ -41,19 +59,28 @@ export function ItemControl({
             big={big}
             onChange={(present) => {
               onChange({ ...v, present });
-              if (!present) onward();
+              if (present) focusNote();
+              else onward();
             }}
           />
           {v.present === true && (
             <>
               <label className="muted small wz-inline">
-                <input type="checkbox" checked={v.working} onChange={(e) => onChange({ ...v, working: e.target.checked })} /> working
+                <input
+                  type="checkbox"
+                  checked={v.working}
+                  onChange={(e) => {
+                    onChange({ ...v, working: e.target.checked });
+                    focusNote();
+                  }}
+                />{" "}
+                working
               </label>
-              <TextField
-                className="input wz-note"
-                placeholder="note"
+              <NoteField
+                kind="service"
+                entryId={item.entryId}
                 value={v.note}
-                autoFocus={autoFocus}
+                inputRef={attachNote}
                 onChange={(note) => onChange({ ...v, note })}
                 onEnter={onward}
               />
@@ -72,11 +99,19 @@ export function ItemControl({
             big={big}
             onChange={(present) => {
               onChange({ ...v, present });
-              if (!present) onward();
+              if (present) focusNote();
+              else onward();
             }}
           />
           {v.present === true && (
-            <TextField className="input wz-note" placeholder="note" value={v.note} autoFocus={autoFocus} onChange={(note) => onChange({ ...v, note })} onEnter={onward} />
+            <NoteField
+              kind="amenity"
+              entryId={item.entryId}
+              value={v.note}
+              inputRef={attachNote}
+              onChange={(note) => onChange({ ...v, note })}
+              onEnter={onward}
+            />
           )}
         </div>
       );
@@ -94,7 +129,7 @@ export function ItemControl({
                   className={`chip ${big ? "wz-chip-big" : ""} ${v.text === c ? "tree-match" : ""}`}
                   onClick={() => {
                     onChange({ ...v, text: c, value: "" });
-                    onward();
+                    focusNote();
                   }}
                 >
                   {c}
@@ -110,12 +145,19 @@ export function ItemControl({
                 value={v.value}
                 autoFocus={autoFocus}
                 onChange={(next) => onChange({ ...v, value: next, text: "" })}
-                onEnter={onward}
+                onEnter={focusNote}
               />
               {item.unit && <span className="muted">{item.unit}</span>}
             </>
           )}
-          <input className="input wz-note" placeholder="note" value={v.note} onChange={(e) => onChange({ ...v, note: e.target.value })} />
+          <NoteField
+            kind="attribute"
+            entryId={item.entryId}
+            value={v.note}
+            inputRef={attachNote}
+            onChange={(note) => onChange({ ...v, note })}
+            onEnter={onward}
+          />
         </div>
       );
     }
@@ -236,6 +278,52 @@ export function ItemControl({
   }
 }
 
+/** A note, with the suggestions the Finding form offers - the distinct
+ *  notes already recorded for this entry, most-used first. Next moves on. */
+function NoteField({
+  kind,
+  entryId,
+  value,
+  inputRef,
+  onChange,
+  onEnter,
+}: {
+  kind: "service" | "amenity" | "attribute";
+  entryId: string | null;
+  value: string;
+  inputRef: (el: HTMLInputElement | null) => void;
+  onChange: (v: string) => void;
+  onEnter: () => void;
+}) {
+  const suggestions = useNoteSuggestions(kind, entryId ?? undefined);
+  const listId = `wz-notes-${kind}-${entryId}`;
+  return (
+    <form
+      className="wz-field-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onEnter();
+      }}
+    >
+      <input
+        className="input wz-note"
+        ref={inputRef}
+        list={listId}
+        placeholder="note (optional)"
+        enterKeyHint="next"
+        value={value}
+        data-testid="wz-note"
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <datalist id={listId}>
+        {suggestions.map((s) => (
+          <option key={s} value={s} />
+        ))}
+      </datalist>
+    </form>
+  );
+}
+
 /** Enter (or the phone keyboard's Next) moves on, so a numeric answer is
  *  type-type-next without reaching for the screen. */
 function NumberField({
@@ -278,6 +366,7 @@ function NumberField({
     </form>
   );
 }
+
 function TextField({
   className,
   value,

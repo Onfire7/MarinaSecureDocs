@@ -1,40 +1,64 @@
 // PROTOTYPE — throwaway. Variant D: the filmstrip, as the owner described
-// it on 2026-09-23. Two axes of *scroll* rather than two sets of buttons:
+// it on 2026-09-23 and refined the same day.
 //
+// On a phone, two axes of *scroll*:
 //   · every item of a location is its own screen-sized page, stacked
-//     vertically - swipe up and down, or turn the wheel, to move through
-//     them; a deliberate move (a tapped answer, an arrow, Enter) tweens
-//     there over 500ms, and free scrolling snaps;
-//   · locations sit side by side - moving to one slides horizontally over
-//     500ms, however far away it is;
-//   · the pips are a thin rail down the left edge, capped with the arrows
-//     that say the page scrolls;
-//   · answering a choice moves on by itself, fields take focus on arrival,
-//     and a number field's Next key advances;
-//   · the bottom bar is C's pager and jump sheet, tinted green from the
-//     left with how much of the run is done.
-import { useEffect, useRef, useState } from "react";
+//     vertically - swipe or turn the wheel to move through them; a
+//     deliberate move tweens there over 500ms, free scrolling snaps;
+//   · locations sit side by side, and moving between them slides
+//     horizontally over 500ms, however far apart they are;
+//   · scrolling past the last item rolls into the next location, and past
+//     the first rolls back into the previous one, landing on its last item;
+//   · the pips are a rail down the left edge, capped with the arrows that
+//     say the page scrolls;
+//   · answering moves to the next logical field - a Service answered
+//     Present focuses its note so it can be typed or skipped with Next;
+//   · the bottom bar is tinted green from the left with the run's progress.
+//
+// On a desktop the whole location is one page and the right-hand sidebar is
+// the jump list with the pager at its foot: there is no reason to scroll a
+// screen at a time on a machine that can show the lot.
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ItemControl } from "./ItemControl";
-import { JumpSheet } from "./JumpSheet";
-import { isAnswered, stepOfTarget, type RunProps, type Step } from "./wizardModel";
+import { JumpBody } from "./JumpBody";
+import { isAnswered, stepOfTarget, type RunProps, type Step, type WizardTarget } from "./wizardModel";
 
 export const name = "Filmstrip";
 
 const SLIDE_MS = 500;
+/** How much overscroll at an edge rolls into the next location. */
+const EDGE = 120;
 
 export function WizardD(p: RunProps) {
+  const wide = useWide();
   const [jump, setJump] = useState(false);
   const [slide, setSlide] = useState<{ from: number; dir: 1 | -1 } | null>(null);
   const colRef = useRef<HTMLDivElement | null>(null);
   const fromScroll = useRef(false);
+  const justSlid = useRef(false);
+  const overscroll = useRef(0);
+  const cooling = useRef(false);
+  const touchY = useRef<number | null>(null);
   const step = p.steps[p.index];
   const firstOf = (ti: number) => p.steps.findIndex((s) => s.targetIndex === ti);
+  const lastOf = (ti: number) => {
+    const first = firstOf(ti);
+    if (first === -1) return -1;
+    let i = first;
+    while (p.steps[i + 1]?.targetIndex === ti) i += 1;
+    return i;
+  };
 
-  // Land on the current item: tween unless the auditor's own scrolling is
-  // what moved us, in which case the browser's snap has already done it.
+  // Land on the current item. A slide has already put the new column where
+  // it belongs, and the auditor's own scrolling needs no help.
   useEffect(() => {
     const el = colRef.current;
-    if (!el || !step) return;
+    if (!el || !step || wide) return;
+    if (justSlid.current) {
+      justSlid.current = false;
+      focusActive(el, step.itemIndex);
+      return;
+    }
     if (fromScroll.current) {
       fromScroll.current = false;
       focusActive(el, step.itemIndex);
@@ -46,7 +70,7 @@ export function WizardD(p: RunProps) {
       return;
     }
     tween(el, to, SLIDE_MS, () => focusActive(el, step.itemIndex));
-  }, [p.index, step]);
+  }, [p.index, step, wide]);
 
   if (!step) return null;
   const t = step.target;
@@ -57,28 +81,64 @@ export function WizardD(p: RunProps) {
   const done = p.steps.filter((s) => p.touched(s.target.id, s.item.key)).length;
   const pct = p.steps.length ? Math.round((done / p.steps.length) * 100) : 0;
 
-  const goLocation = (targetIndex: number) => {
-    const at = firstOf(targetIndex);
+  const goLocation = (targetIndex: number, land: "first" | "last" = "first") => {
+    const at = land === "last" ? lastOf(targetIndex) : firstOf(targetIndex);
     if (at === -1 || targetIndex === step.targetIndex) return;
+    justSlid.current = true;
     setSlide({ from: step.targetIndex, dir: targetIndex > step.targetIndex ? 1 : -1 });
     p.setIndex(at);
     window.setTimeout(() => setSlide(null), SLIDE_MS);
   };
   const goItem = (itemIndex: number) => {
     if (itemIndex < 0) {
-      if (prev !== -1) goLocation(step.targetIndex - 1);
+      goLocation(step.targetIndex - 1, "last");
       return;
     }
     if (itemIndex >= items.length) {
-      // The end of a location's stack rolls into the next one.
-      if (next !== -1) goLocation(step.targetIndex + 1);
+      goLocation(step.targetIndex + 1);
       return;
     }
     p.setIndex(firstOf(step.targetIndex) + itemIndex);
   };
 
-  // A horizontal drag moves locations; vertical is the scroller's own.
-  const drag = useRef<{ x: number; y: number } | null>(null);
+  /** Pushing past either end of the stack rolls into the neighbouring
+   *  location - the ribbon has no walls, only corners. */
+  const edgeNudge = (dy: number) => {
+    const el = colRef.current;
+    if (!el || cooling.current) return;
+    const atTop = el.scrollTop <= 2;
+    const atBottom = el.scrollTop >= el.scrollHeight - el.clientHeight - 2;
+    if ((dy < 0 && atTop) || (dy > 0 && atBottom)) {
+      overscroll.current += dy;
+      if (Math.abs(overscroll.current) >= EDGE) {
+        const forward = overscroll.current > 0;
+        overscroll.current = 0;
+        cooling.current = true;
+        window.setTimeout(() => (cooling.current = false), SLIDE_MS + 200);
+        if (forward) goLocation(step.targetIndex + 1);
+        else goLocation(step.targetIndex - 1, "last");
+      }
+    } else {
+      overscroll.current = 0;
+    }
+  };
+  const pager = (
+    <div className="wz-c-pager">
+      <button type="button" className="btn" disabled={prev === -1} onClick={() => goLocation(step.targetIndex - 1)}>
+        ◀
+      </button>
+      <button type="button" className="wz-c-now" data-testid="wz-jump" onClick={() => !wide && setJump(true)}>
+        <span data-testid="wz-location">{t.location_name}</span>
+        <div className="muted small">
+          {step.targetIndex + 1} of {p.targets.length}
+          {wide ? "" : " · tap to jump"}
+        </div>
+      </button>
+      <button type="button" className="btn btn-primary" data-testid="wz-next" disabled={next === -1} onClick={() => goLocation(step.targetIndex + 1)}>
+        ▶
+      </button>
+    </div>
+  );
 
   return (
     <div className="wz-layer">
@@ -87,113 +147,176 @@ export function WizardD(p: RunProps) {
           ✕ Exit
         </button>
         <span className="muted small">{p.auditName}</span>
-        <span className="badge badge-accent">{pct}%</span>
+        <span className="badge badge-accent" data-testid="wz-pct">{pct}%</span>
       </div>
 
-      <div
-        className="wz-d-wrap"
-        onPointerDown={(e) => (drag.current = { x: e.clientX, y: e.clientY })}
-        onPointerUp={(e) => {
-          const d = drag.current;
-          drag.current = null;
-          if (!d) return;
-          const dx = e.clientX - d.x;
-          if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(e.clientY - d.y)) {
-            goLocation(step.targetIndex + (dx < 0 ? 1 : -1));
-          }
-        }}
-      >
-        <div className="wz-d-rail" aria-hidden>
-          <button type="button" className="wz-d-arrow" data-testid="wz-up" onClick={() => goItem(step.itemIndex - 1)}>
-            ▲
-          </button>
-          <div className="wz-d-pips">
-            {items.map((it, i) => (
-              <button
-                key={it.key}
-                type="button"
-                title={it.label}
-                data-testid="wz-pip"
-                className={`wz-d-pip ${i === step.itemIndex ? "now" : p.touched(t.id, it.key) ? "done" : isAnswered(answers?.[it.key], it.kind) ? "onfile" : ""}`}
-                onClick={() => goItem(i)}
-              />
-            ))}
+      {wide ? (
+        <div className="wz-d-desk">
+          <div className={`wz-d-main ${slide ? (slide.dir === 1 ? "wz-in-right" : "wz-in-left") : ""}`} key={step.targetIndex}>
+            <LocationPage t={t} p={p} items={items} answers={answers} onAdvance={() => goItem(step.itemIndex + 1)} />
           </div>
-          <button type="button" className="wz-d-arrow" data-testid="wz-down" onClick={() => goItem(step.itemIndex + 1)}>
-            ▼
-          </button>
-        </div>
-
-        {slide && (
-          <Column
-            key={`out-${slide.from}`}
-            className={`wz-d-col ${slide.dir === 1 ? "wz-out-left" : "wz-out-right"}`}
-            steps={p.steps}
-            targetIndex={slide.from}
-            p={p}
-          />
-        )}
-        <Column
-          key={step.targetIndex}
-          className={`wz-d-col ${slide ? (slide.dir === 1 ? "wz-in-right" : "wz-in-left") : ""}`}
-          steps={p.steps}
-          targetIndex={step.targetIndex}
-          p={p}
-          activeIndex={step.itemIndex}
-          scrollRef={colRef}
-          onScrollItem={(i) => {
-            if (i === step.itemIndex) return;
-            fromScroll.current = true;
-            p.setIndex(firstOf(step.targetIndex) + i);
-          }}
-          onAdvance={() => goItem(step.itemIndex + 1)}
-        />
-      </div>
-
-      <div
-        className="wz-footer wz-d-footer"
-        style={{ background: `linear-gradient(90deg, var(--good-bg) ${pct}%, var(--panel) ${pct}%)` }}
-        data-testid="wz-progress-bar"
-      >
-        <div className="wz-c-pager">
-          <button type="button" className="btn" disabled={prev === -1} onClick={() => goLocation(step.targetIndex - 1)}>
-            ◀
-          </button>
-          <button type="button" className="wz-c-now" data-testid="wz-jump" onClick={() => setJump(true)}>
-            <span data-testid="wz-location">{t.location_name}</span>
-            <div className="muted small">
-              {step.targetIndex + 1} of {p.targets.length} · tap to jump
+          <aside className="wz-d-side">
+            <div className="wz-d-side-list">
+              <JumpBody {...p} currentTargetId={t.id} onPick={(x) => goLocation(p.steps[stepOfTarget(p.steps, x.id)].targetIndex)} />
             </div>
-          </button>
-          <button type="button" className="btn btn-primary" data-testid="wz-next" disabled={next === -1} onClick={() => goLocation(step.targetIndex + 1)}>
-            ▶
-          </button>
+            <div className="wz-d-side-nav" style={{ background: `linear-gradient(90deg, var(--good-bg) ${pct}%, transparent ${pct}%)` }} data-testid="wz-progress-bar">
+              {pager}
+            </div>
+          </aside>
         </div>
-      </div>
+      ) : (
+        <>
+          <div
+            className="wz-d-wrap"
+            onWheel={(e) => edgeNudge(e.deltaY)}
+            onTouchStart={(e) => (touchY.current = e.touches[0]?.clientY ?? null)}
+            onTouchMove={(e) => {
+              const y = e.touches[0]?.clientY ?? null;
+              if (touchY.current !== null && y !== null) edgeNudge(touchY.current - y);
+              touchY.current = y;
+            }}
+            onTouchEnd={() => {
+              touchY.current = null;
+              overscroll.current = 0;
+            }}
+          >
+            <div className="wz-d-rail">
+              <button type="button" className="wz-d-arrow" data-testid="wz-up" aria-label="previous item" onClick={() => goItem(step.itemIndex - 1)}>
+                ▲
+              </button>
+              <div className="wz-d-pips">
+                {items.map((it, i) => (
+                  <button
+                    key={it.key}
+                    type="button"
+                    title={it.label}
+                    aria-label={it.label}
+                    data-testid="wz-pip"
+                    className={`wz-d-pip ${i === step.itemIndex ? "now" : p.touched(t.id, it.key) ? "done" : isAnswered(answers?.[it.key], it.kind) ? "onfile" : ""}`}
+                    onClick={() => goItem(i)}
+                  />
+                ))}
+              </div>
+              <button type="button" className="wz-d-arrow" data-testid="wz-down" aria-label="next item" onClick={() => goItem(step.itemIndex + 1)}>
+                ▼
+              </button>
+            </div>
 
-      {jump && (
-        <JumpSheet
-          {...p}
-          currentTargetId={t.id}
-          onPick={(x) => {
-            const at = stepOfTarget(p.steps, x.id);
-            goLocation(p.steps[at].targetIndex);
-            setJump(false);
-          }}
-          onClose={() => setJump(false)}
-        />
+            {slide && (
+              <Column
+                key={`out-${slide.from}`}
+                className={`wz-d-col ${slide.dir === 1 ? "wz-out-left" : "wz-out-right"}`}
+                steps={p.steps}
+                targetIndex={slide.from}
+                p={p}
+              />
+            )}
+            <Column
+              key={step.targetIndex}
+              className={`wz-d-col ${slide ? (slide.dir === 1 ? "wz-in-right" : "wz-in-left") : ""}`}
+              steps={p.steps}
+              targetIndex={step.targetIndex}
+              p={p}
+              activeIndex={step.itemIndex}
+              startAt={justSlid.current ? step.itemIndex : undefined}
+              scrollRef={colRef}
+              onScrollItem={(i) => {
+                if (i === step.itemIndex) return;
+                fromScroll.current = true;
+                p.setIndex(firstOf(step.targetIndex) + i);
+              }}
+              onAdvance={() => goItem(step.itemIndex + 1)}
+            />
+          </div>
+
+          <div
+            className="wz-footer wz-d-footer"
+            style={{ background: `linear-gradient(90deg, var(--good-bg) ${pct}%, var(--panel) ${pct}%)` }}
+            data-testid="wz-progress-bar"
+          >
+            {pager}
+          </div>
+        </>
+      )}
+
+      {jump && !wide && (
+        <div className="wz-sheet-backdrop" onClick={() => setJump(false)}>
+          <div className="wz-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="wz-sheet-head">
+              <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                <b>Jump to a location</b>
+                <button type="button" className="btn btn-sm btn-bare" style={{ marginLeft: "auto" }} onClick={() => setJump(false)}>
+                  ✕
+                </button>
+              </div>
+            </div>
+            <JumpBody
+              {...p}
+              currentTargetId={t.id}
+              onPick={(x) => {
+                goLocation(p.steps[stepOfTarget(p.steps, x.id)].targetIndex);
+                setJump(false);
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
-/** One location: its items stacked as full-height, snapping pages. */
+/** The desktop pane: one location, every selected item at once. */
+function LocationPage({
+  t,
+  p,
+  items,
+  answers,
+  onAdvance,
+}: {
+  t: WizardTarget;
+  p: RunProps;
+  items: ReturnType<RunProps["itemsFor"]>;
+  answers: RunProps["answers"][string] | undefined;
+  onAdvance: () => void;
+}) {
+  let group = "";
+  return (
+    <div className="wz-d-page-wide">
+      <div className="wz-b-head">
+        <h2 data-testid="wz-location-wide">{t.location_name}</h2>
+        <span className="muted small">{t.type_name}</span>
+      </div>
+      {items.map((item) => {
+        const head = item.group !== group ? item.group : null;
+        group = item.group;
+        const value = answers?.[item.key];
+        const onFile = p.onFile(t, item);
+        return (
+          <div key={item.key}>
+            {head && <div className="wz-b-group">{head}</div>}
+            <div className={`wz-b-row ${p.touched(t.id, item.key) ? "done" : ""}`}>
+              <div className="wz-b-row-label">
+                {item.label}
+                {onFile && <span className="muted small" style={{ fontWeight: 400 }}> · on file: {onFile}</span>}
+              </div>
+              <ItemControl item={item} value={value} statuses={p.statuses} advance={onAdvance} onChange={(v) => p.setAnswer(t.id, item.key, v)} />
+            </div>
+          </div>
+        );
+      })}
+      <p className="muted small">{p.savedNote}</p>
+    </div>
+  );
+}
+
+/** One location on a phone: its items stacked as full-height, snapping pages. */
 function Column({
   className,
   steps,
   targetIndex,
   p,
   activeIndex,
+  startAt,
   scrollRef,
   onScrollItem,
   onAdvance,
@@ -203,10 +326,19 @@ function Column({
   targetIndex: number;
   p: RunProps;
   activeIndex?: number;
+  /** Arriving backwards lands on the last item, without animating there. */
+  startAt?: number;
   scrollRef?: React.MutableRefObject<HTMLDivElement | null>;
   onScrollItem?: (i: number) => void;
   onAdvance?: () => void;
 }) {
+  const own = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const el = own.current;
+    if (el && startAt) el.scrollTop = startAt * el.clientHeight;
+    // Only on mount: later moves are the parent's business.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const target = steps.find((s) => s.targetIndex === targetIndex)?.target;
   if (!target) return null;
   const items = p.itemsFor(target);
@@ -214,7 +346,10 @@ function Column({
   return (
     <div
       className={className}
-      ref={scrollRef}
+      ref={(el) => {
+        own.current = el;
+        if (scrollRef) scrollRef.current = el;
+      }}
       onScroll={(e) => {
         const el = e.currentTarget;
         if (!onScrollItem || el.clientHeight === 0) return;
@@ -251,6 +386,17 @@ function Column({
       })}
     </div>
   );
+}
+
+function useWide(px = 900) {
+  const [wide, setWide] = useState(() => typeof window !== "undefined" && window.matchMedia(`(min-width:${px}px)`).matches);
+  useEffect(() => {
+    const m = window.matchMedia(`(min-width:${px}px)`);
+    const on = () => setWide(m.matches);
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, [px]);
+  return wide;
 }
 
 /** A fixed-duration scroll, because the browser's own smooth scrolling has

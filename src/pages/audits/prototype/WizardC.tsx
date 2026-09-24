@@ -5,7 +5,7 @@
 // around a dock rather than walking it in order.
 import { useState } from "react";
 import { ItemControl } from "./ItemControl";
-import { JumpSheet } from "./JumpSheet";
+import { JumpBody } from "./JumpBody";
 import { answeredCount, isAnswered, stepOfTarget, type RunProps } from "./wizardModel";
 
 export const name = "Two axes";
@@ -81,15 +81,21 @@ export function WizardC(p: RunProps) {
       </div>
 
       {jump && (
-        <JumpSheet
-          {...p}
-          currentTargetId={t.id}
-          onPick={(x) => {
-            p.setIndex(stepOfTarget(p.steps, x.id));
-            setJump(false);
-          }}
-          onClose={() => setJump(false)}
-        />
+        <div className="wz-sheet-backdrop" onClick={() => setJump(false)}>
+          <div className="wz-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="wz-sheet-head">
+              <b>Jump to a location</b>
+            </div>
+            <JumpBody
+              {...p}
+              currentTargetId={t.id}
+              onPick={(x) => {
+                p.setIndex(stepOfTarget(p.steps, x.id));
+                setJump(false);
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
