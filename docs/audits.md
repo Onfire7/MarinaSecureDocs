@@ -425,6 +425,11 @@ at today.
 Location because a phone slept, or because a thumb found Back, is worse
 here than on the Finding form, which at least holds one Location's work.
 
+**An item that changed nothing writes nothing**, so walking through a
+Location without answering anything leaves it Pending. The first answer
+creates the Finding, and the Finding is what marks the Location Audited;
+scrolling past is not auditing.
+
 Each write touches **only the item it was given**. A run that asks about
 Power leaves the amenities an earlier run recorded exactly as they were -
 `saveFinding()` rewrites a Finding's parts wholesale and would erase them,

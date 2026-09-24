@@ -357,7 +357,7 @@ function LocationPage({
                 {item.label}
                 {onFile && <span className="muted small" style={{ fontWeight: 400 }}> · on file: {onFile}</span>}
               </div>
-              <ItemControl item={item} value={value} statuses={p.statuses} advance={onAdvance} onChange={(v, immediate) => p.setAnswer(t.id, item.key, v, immediate)} />
+              <ItemControl item={item} value={value} statuses={p.statuses} advance={onAdvance} onChange={(v, mode) => p.setAnswer(t.id, item.key, v, mode)} />
             </div>
           </div>
         );
@@ -433,7 +433,7 @@ function Column({
               big
               autoFocus={i === activeIndex}
               advance={onAdvance}
-              onChange={(v, immediate) => p.setAnswer(target.id, item.key, v, immediate)}
+              onChange={(v, mode) => p.setAnswer(target.id, item.key, v, mode)}
             />
             {onFile && <div className="wz-a-prefill">On file: {onFile}</div>}
             <div className="muted small">

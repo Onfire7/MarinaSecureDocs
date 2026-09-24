@@ -8,6 +8,7 @@
 import { useRef, type CSSProperties } from "react";
 import { useNoteSuggestions } from "../../../data/services";
 import type { AmenityAnswer, AttributeAnswer, AnswerValue, ServiceAnswer, WizardItem } from "../../../lib/auditWizard";
+import type { AnswerMode } from "./runProps";
 
 export function ItemControl({
   item,
@@ -21,11 +22,12 @@ export function ItemControl({
   item: WizardItem;
   value: AnswerValue | undefined;
   statuses: { id: string; name: string }[];
-  /** `immediate` false while a field is being typed in: the page holds the
-   *  value and writes it when the field is committed. A write per keystroke
-   *  is ten overlapping transactions for one note, and the last one to land
-   *  wins - which is not the one the auditor typed. */
-  onChange: (v: AnswerValue, immediate?: boolean) => void;
+  /** `typing` while a field is being edited: the page holds the value and
+   *  writes it when the field commits. A write per keystroke is ten
+   *  overlapping transactions for one note, and the last to land wins -
+   *  which is not the one the auditor typed. A `commit` that changed
+   *  nothing is not written at all. */
+  onChange: (v: AnswerValue, mode?: AnswerMode) => void;
   /** One-item-per-screen variants render the control larger. */
   big?: boolean;
   /** Move to the next item. */
@@ -84,8 +86,8 @@ export function ItemControl({
                 entryId={item.entryId}
                 value={v.note}
                 inputRef={attachNote}
-                onChange={(note) => onChange({ ...v, note }, false)}
-                onCommit={(note) => onChange({ ...v, note }, true)}
+                onChange={(note) => onChange({ ...v, note }, "typing")}
+                onCommit={(note) => onChange({ ...v, note }, "commit")}
                 onEnter={onward}
               />
             </>
@@ -113,8 +115,8 @@ export function ItemControl({
               entryId={item.entryId}
               value={v.note}
               inputRef={attachNote}
-              onChange={(note) => onChange({ ...v, note }, false)}
-              onCommit={(note) => onChange({ ...v, note }, true)}
+              onChange={(note) => onChange({ ...v, note }, "typing")}
+              onCommit={(note) => onChange({ ...v, note }, "commit")}
               onEnter={onward}
             />
           )}
@@ -149,8 +151,8 @@ export function ItemControl({
                 style={big ? undefined : { width: 100 }}
                 value={v.value}
                 autoFocus={autoFocus}
-                onChange={(next) => onChange({ ...v, value: next, text: "" }, false)}
-                onCommit={(next) => onChange({ ...v, value: next, text: "" }, true)}
+                onChange={(next) => onChange({ ...v, value: next, text: "" }, "typing")}
+                onCommit={(next) => onChange({ ...v, value: next, text: "" }, "commit")}
                 onEnter={focusNote}
               />
               {item.unit && <span className="muted">{item.unit}</span>}
@@ -161,8 +163,8 @@ export function ItemControl({
             entryId={item.entryId}
             value={v.note}
             inputRef={attachNote}
-            onChange={(note) => onChange({ ...v, note }, false)}
-            onCommit={(note) => onChange({ ...v, note }, true)}
+            onChange={(note) => onChange({ ...v, note }, "typing")}
+            onCommit={(note) => onChange({ ...v, note }, "commit")}
             onEnter={onward}
           />
         </div>
@@ -210,8 +212,8 @@ export function ItemControl({
               className={`input ${big ? "wz-input-big" : "select-inline"}`}
               value={typeof value === "number" ? String(value) : ""}
               autoFocus={autoFocus}
-              onChange={(next) => onChange(next === "" ? null : Number(next), false)}
-              onCommit={(next) => onChange(next === "" ? null : Number(next), true)}
+              onChange={(next) => onChange(next === "" ? null : Number(next), "typing")}
+              onCommit={(next) => onChange(next === "" ? null : Number(next), "commit")}
               onEnter={onward}
             />
           </div>
@@ -222,8 +224,8 @@ export function ItemControl({
             className={`input ${big ? "wz-input-big" : ""}`}
             value={typeof value === "string" ? value : ""}
             autoFocus={autoFocus}
-            onChange={(next) => onChange(next, false)}
-            onCommit={(next) => onChange(next, true)}
+            onChange={(next) => onChange(next, "typing")}
+            onCommit={(next) => onChange(next, "commit")}
             onEnter={onward}
           />
         </div>

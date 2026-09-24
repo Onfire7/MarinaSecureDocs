@@ -27,7 +27,8 @@ variants; this is D).
 ## Running — phone
 
 - **One item per screen**, headed by the location: its name as the page's
-  `h1`, the type under it, then a hairline that fades out at both ends,
+  `h1`, the type under it, then a rule in the text colour that fades out at
+  both ends,
   then the item's group and the item -
   which location is being edited should never be in doubt, and the pager at
   the foot is too far from the question to answer it. The items of a
@@ -104,6 +105,13 @@ variants; this is D).
 - **Every answer is written as it is made**, through
   `src/data/auditWizard.ts`, which merges: only the item just answered is
   touched. The footer says *Saved as you go*, or what went wrong.
+- **A page that changed nothing writes nothing.** A tap always counts -
+  answering that a Service is present is a confirmation even when it
+  already was - but a field only writes what differs from what it held when
+  the run arrived. The run focuses a field when it lands on its item and
+  blurs it on the way out, so without that rule, scrolling through a
+  location would commit every number back to itself, and the first write is
+  what creates the Finding. Scrolling is not auditing.
 - The first answer at a location creates its Finding, which marks it
   audited. Partial runs are expected; the audit page's unanswered pills are
   what say the rest is open.

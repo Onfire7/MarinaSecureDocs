@@ -307,12 +307,14 @@
   color: var(--mute);
 }
 /* Where the location ends and the question begins. Faded at both ends so
-   it reads as a separation rather than a box. */
+   it reads as a separation rather than a box - but in the text colour, not
+   the line colour, or on a phone in daylight it is not there at all. */
 .wz-d-rule {
-  width: min(260px, 62%);
-  height: 1px;
-  margin: 10px 0 8px;
-  background: linear-gradient(90deg, transparent, var(--line), transparent);
+  width: min(320px, 78%);
+  height: 2px;
+  border-radius: 1px;
+  margin: 12px 0 10px;
+  background: linear-gradient(90deg, transparent, var(--mute) 22%, var(--mute) 78%, transparent);
 }
 .wz-d-group {
   font-size: 0.72rem;

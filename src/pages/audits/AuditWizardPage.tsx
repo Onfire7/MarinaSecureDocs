@@ -24,6 +24,7 @@ import {
   buildCatalogue,
   buildSteps,
   itemsForTarget,
+  sameAnswer,
   type Answers,
   type AnswerValue,
   type ItemGroup,
@@ -31,7 +32,7 @@ import {
   type WizardTarget,
 } from "../../lib/auditWizard";
 import { WizardRun } from "./wizard/WizardRun";
-import type { RunProps } from "./wizard/runProps";
+import type { AnswerMode, RunProps } from "./wizard/runProps";
 import "./wizard/wizard.css";
 
 // The audit wizard (AuditWizardPage.spec.md; docs/audits.md § The wizard).
@@ -71,8 +72,9 @@ export function AuditWizardPage() {
   const [answers, setAnswers] = useState<Answers>({});
   const [touched, setTouched] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
-  /** A value being typed in, not yet written. */
-  const pending = useRef<{ tid: string; key: string; v: AnswerValue } | null>(null);
+  /** A value being typed in, not yet written, and what the field held
+   *  before the typing started. */
+  const pending = useRef<{ tid: string; key: string; v: AnswerValue; from: AnswerValue | undefined } | null>(null);
 
   const groups: ItemGroup[] = useMemo(() => {
     if (!audit) return [];
@@ -118,7 +120,9 @@ export function AuditWizardPage() {
   const flush = () => {
     const held = pending.current;
     pending.current = null;
-    if (held) write(held.tid, held.key, held.v);
+    if (!held || sameAnswer(held.v, held.from)) return;
+    setTouched((prev) => new Set(prev).add(`${held.tid}|${held.key}`));
+    write(held.tid, held.key, held.v);
   };
   const steps = useMemo(() => buildSteps(walked, groups, selection), [walked, groups, selection]);
   const current_ = steps[Math.min(index, Math.max(0, steps.length - 1))];
@@ -193,16 +197,25 @@ export function AuditWizardPage() {
     );
   }
 
-  const setAnswer = (tid: string, key: string, v: AnswerValue, immediate = true) => {
-    setAnswers((prev) => ({ ...prev, [tid]: { ...(prev[tid] ?? {}), [key]: v } }));
-    setTouched((prev) => new Set(prev).add(`${tid}|${key}`));
-    if (!immediate) {
-      // Being typed in. Held until the field commits, or until the run
-      // leaves the item - whichever comes first.
-      pending.current = { tid, key, v };
+  const setAnswer = (tid: string, key: string, v: AnswerValue, mode: AnswerMode = "tap") => {
+    const current = answers[tid]?.[key];
+    if (mode === "typing") {
+      // Held until the field commits, along with what it held on arrival.
+      const held = pending.current;
+      pending.current =
+        held && held.tid === tid && held.key === key ? { ...held, v } : { tid, key, v, from: current };
+      setAnswers((prev) => ({ ...prev, [tid]: { ...(prev[tid] ?? {}), [key]: v } }));
       return;
     }
+    const held = pending.current;
+    const from = held && held.tid === tid && held.key === key ? held.from : current;
     pending.current = null;
+    setAnswers((prev) => ({ ...prev, [tid]: { ...(prev[tid] ?? {}), [key]: v } }));
+    // A field the run merely landed on and left again is not an answer.
+    // The first write at a location creates its Finding, and a Finding is
+    // what marks it audited - so scrolling past must write nothing.
+    if (mode === "commit" && sameAnswer(v, from)) return;
+    setTouched((prev) => new Set(prev).add(`${tid}|${key}`));
     write(tid, key, v);
   };
 

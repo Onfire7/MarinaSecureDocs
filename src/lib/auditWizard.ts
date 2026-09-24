@@ -280,3 +280,23 @@ export function visiblePageHeight(
   // otherwise leave a page too short to hold its own control.
   return Math.max(160, Math.min(wrap.height, Math.round(visibleBottom - wrap.top)));
 }
+
+/**
+ * Is this the same answer as that one?
+ *
+ * Used to tell a real change from a field that was merely landed on: the
+ * run focuses a field when it arrives at its item and the field commits
+ * when it loses focus, so scrolling past a number would otherwise write
+ * its own value back - and the first write at a Location is what creates
+ * the Finding, which is what marks it audited. Scrolling is not auditing.
+ */
+export function sameAnswer(a: AnswerValue | undefined, b: AnswerValue | undefined): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return a == null && b == null;
+  if (typeof a !== "object" || typeof b !== "object") return false;
+  const x = a as unknown as Record<string, unknown>;
+  const y = b as unknown as Record<string, unknown>;
+  const keys = new Set([...Object.keys(x), ...Object.keys(y)]);
+  for (const k of keys) if (x[k] !== y[k]) return false;
+  return true;
+}

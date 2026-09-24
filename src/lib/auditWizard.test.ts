@@ -6,6 +6,7 @@ import {
   buildSteps,
   filterTargets,
   isAnswered,
+  sameAnswer,
   itemsForTarget,
   stepOfTarget,
   visiblePageHeight,
@@ -223,5 +224,25 @@ describe("visiblePageHeight", () => {
   it("19 · never taller than the scroller, never shorter than a control", () => {
     expect(visiblePageHeight(wrap, { offsetTop: 0, height: 5000 })).toBe(700);
     expect(visiblePageHeight(wrap, { offsetTop: 0, height: 20 })).toBe(160);
+  });
+});
+
+describe("sameAnswer", () => {
+  it("20 · a field landed on and left is not a change", () => {
+    expect(sameAnswer({ value: "38", text: "", note: "" }, { value: "38", text: "", note: "" })).toBe(true);
+    expect(sameAnswer({ present: true, working: true, note: "" }, { present: true, working: true, note: "" })).toBe(true);
+    expect(sameAnswer(undefined, undefined)).toBe(true);
+    expect(sameAnswer(null, null)).toBe(true);
+    expect(sameAnswer("Back-In", "Back-In")).toBe(true);
+    expect(sameAnswer(false, false)).toBe(true);
+  });
+  it("21 · anything actually typed or tapped is", () => {
+    expect(sameAnswer({ value: "38", text: "", note: "" }, { value: "36", text: "", note: "" })).toBe(false);
+    expect(sameAnswer({ present: true, working: true, note: "" }, { present: true, working: false, note: "" })).toBe(false);
+    expect(sameAnswer({ present: true, working: true, note: "" }, { present: true, working: true, note: "dead" })).toBe(false);
+    expect(sameAnswer(true, false)).toBe(false);
+    expect(sameAnswer(undefined, false)).toBe(false);
+    expect(sameAnswer(null, { present: true, note: "" })).toBe(false);
+    expect(sameAnswer("Back-In", "Pull-Through")).toBe(false);
   });
 });

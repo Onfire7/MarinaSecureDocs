@@ -81,6 +81,20 @@ await settle();
 check("2a starts at the first location", (await page.getByTestId("wz-location").innerText()) === first, first);
 check("2b no Finding exists yet", findingOf(first) === "");
 
+// Scrolling through a location - which focuses each field it lands on, and
+// blurs it again on the way out - must not record anything. A Finding is
+// what marks a location audited.
+for (let i = 0; i < 4; i++) {
+  await page.mouse.move(200, 400);
+  await page.mouse.wheel(0, 780);
+  await page.waitForTimeout(500);
+}
+await settle(1500);
+check("2b2 scrolling through a location records nothing", findingOf(first) === "", findingOf(first) || "no finding");
+check("2b3 and leaves it pending", sql(`select state from audit_targets where audit_id = '${auditId}' and location_name = '${first}'`) === "pending");
+await page.locator('[data-testid="wz-pip"]').first().click();
+await settle();
+
 // the first item is the location status: tapping it advances
 const labels = await page.locator('[data-testid="wz-pip"]').evaluateAll((els) => els.map((e) => e.getAttribute("title")));
 console.log("items:", labels.join(" | "));
