@@ -273,6 +273,8 @@ export interface RunProps {
   onFile: (t: WizardTarget, item: WizardItem) => string | null;
   /** A target with a Finding, or one this run has answered. */
   answeredTarget: (id: string) => boolean;
+  /** Set by THIS run, as opposed to pre-filled from what is on file. */
+  touched: (targetId: string, itemKey: string) => boolean;
   /** The prototype writes nothing; this stands in for the save indicator. */
   savedNote: string;
   onExit: () => void;

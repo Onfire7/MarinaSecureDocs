@@ -1,6 +1,7 @@
 // PROTOTYPE — throwaway. One item's control, the same markup the Finding
 // form uses. Shared by every variant on purpose: the question under test is
 // the *stepping*, not the field.
+import type { CSSProperties } from "react";
 import type { AmenityAnswer, AttributeAnswer, AnswerValue, ServiceAnswer, WizardItem } from "./wizardModel";
 
 export function ItemControl({
@@ -9,6 +10,8 @@ export function ItemControl({
   statuses,
   onChange,
   big,
+  advance,
+  autoFocus,
 }: {
   item: WizardItem;
   value: AnswerValue | undefined;
@@ -16,8 +19,17 @@ export function ItemControl({
   onChange: (v: AnswerValue) => void;
   /** One-item-per-screen variants render the control larger. */
   big?: boolean;
+  /** Move to the next item. Given by the variants that step one at a time:
+   *  a choice that opens no follow-up moves on by itself, and a number
+   *  field's Enter/Next key does the same. An answer that DOES open a
+   *  follow-up (a Service that is present, and so wants working and a note)
+   *  stays put - advancing there would skip the thing just revealed. */
+  advance?: () => void;
+  /** The field the page focuses when it lands on this item. */
+  autoFocus?: boolean;
 }) {
   const cls = big ? "wz-big" : "";
+  const onward = () => advance?.();
   switch (item.kind) {
     case "service": {
       const v = (value as ServiceAnswer) ?? { present: null, working: true, note: "" };
@@ -27,18 +39,23 @@ export function ItemControl({
             value={v.present}
             labels={["Present", "Absent"]}
             big={big}
-            onChange={(present) => onChange({ ...v, present })}
+            onChange={(present) => {
+              onChange({ ...v, present });
+              if (!present) onward();
+            }}
           />
           {v.present === true && (
             <>
               <label className="muted small wz-inline">
                 <input type="checkbox" checked={v.working} onChange={(e) => onChange({ ...v, working: e.target.checked })} /> working
               </label>
-              <input
+              <TextField
                 className="input wz-note"
                 placeholder="note"
                 value={v.note}
-                onChange={(e) => onChange({ ...v, note: e.target.value })}
+                autoFocus={autoFocus}
+                onChange={(note) => onChange({ ...v, note })}
+                onEnter={onward}
               />
             </>
           )}
@@ -49,9 +66,17 @@ export function ItemControl({
       const v = (value as AmenityAnswer) ?? { present: null, note: "" };
       return (
         <div className={`wz-control ${cls}`}>
-          <YesNo value={v.present} labels={["Present", "Absent"]} big={big} onChange={(present) => onChange({ ...v, present })} />
+          <YesNo
+            value={v.present}
+            labels={["Present", "Absent"]}
+            big={big}
+            onChange={(present) => {
+              onChange({ ...v, present });
+              if (!present) onward();
+            }}
+          />
           {v.present === true && (
-            <input className="input wz-note" placeholder="note" value={v.note} onChange={(e) => onChange({ ...v, note: e.target.value })} />
+            <TextField className="input wz-note" placeholder="note" value={v.note} autoFocus={autoFocus} onChange={(note) => onChange({ ...v, note })} onEnter={onward} />
           )}
         </div>
       );
@@ -63,21 +88,29 @@ export function ItemControl({
           {item.choices && item.choices.length > 0 ? (
             <div className="chip-row" style={{ marginBottom: 0 }}>
               {item.choices.map((c) => (
-                <button key={c} type="button" className={`chip ${big ? "wz-chip-big" : ""} ${v.text === c ? "tree-match" : ""}`} onClick={() => onChange({ ...v, text: c, value: "" })}>
+                <button
+                  key={c}
+                  type="button"
+                  className={`chip ${big ? "wz-chip-big" : ""} ${v.text === c ? "tree-match" : ""}`}
+                  onClick={() => {
+                    onChange({ ...v, text: c, value: "" });
+                    onward();
+                  }}
+                >
                   {c}
                 </button>
               ))}
             </div>
           ) : (
             <>
-              <input
+              <NumberField
                 className={`input ${big ? "wz-input-big" : "select-inline"}`}
-                type="number"
-                step="any"
                 placeholder="none"
                 style={big ? undefined : { width: 100 }}
                 value={v.value}
-                onChange={(e) => onChange({ ...v, value: e.target.value, text: "" })}
+                autoFocus={autoFocus}
+                onChange={(next) => onChange({ ...v, value: next, text: "" })}
+                onEnter={onward}
               />
               {item.unit && <span className="muted">{item.unit}</span>}
             </>
@@ -94,7 +127,10 @@ export function ItemControl({
               value={typeof value === "boolean" ? value : null}
               labels={["Yes", item.ticketOnNo ? "No (raises a ticket)" : "No"]}
               big={big}
-              onChange={(v) => onChange(v)}
+              onChange={(v) => {
+                onChange(v);
+                onward();
+              }}
             />
           </div>
         );
@@ -103,7 +139,15 @@ export function ItemControl({
           <div className={`wz-control ${cls}`}>
             <div className="chip-row" style={{ marginBottom: 0 }}>
               {(item.choices ?? []).map((c) => (
-                <button key={c} type="button" className={`chip ${big ? "wz-chip-big" : ""} ${value === c ? "tree-match" : ""}`} onClick={() => onChange(c)}>
+                <button
+                  key={c}
+                  type="button"
+                  className={`chip ${big ? "wz-chip-big" : ""} ${value === c ? "tree-match" : ""}`}
+                  onClick={() => {
+                    onChange(c);
+                    onward();
+                  }}
+                >
                   {c}
                 </button>
               ))}
@@ -113,18 +157,24 @@ export function ItemControl({
       if (item.questionKind === "meter_reading")
         return (
           <div className={`wz-control ${cls}`}>
-            <input
+            <NumberField
               className={`input ${big ? "wz-input-big" : "select-inline"}`}
-              type="number"
-              step="any"
-              value={typeof value === "number" ? value : ""}
-              onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
+              value={typeof value === "number" ? String(value) : ""}
+              autoFocus={autoFocus}
+              onChange={(next) => onChange(next === "" ? null : Number(next))}
+              onEnter={onward}
             />
           </div>
         );
       return (
         <div className={`wz-control ${cls}`}>
-          <input className={`input ${big ? "wz-input-big" : ""}`} value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value)} />
+          <TextField
+            className={`input ${big ? "wz-input-big" : ""}`}
+            value={typeof value === "string" ? value : ""}
+            autoFocus={autoFocus}
+            onChange={(next) => onChange(next)}
+            onEnter={onward}
+          />
         </div>
       );
     }
@@ -137,7 +187,10 @@ export function ItemControl({
             value={typeof value === "boolean" ? value : null}
             labels={item.kind === "occupied" ? ["Occupied", "Vacant"] : ["Yes", "No"]}
             big={big}
-            onChange={(v) => onChange(v)}
+            onChange={(v) => {
+              onChange(v);
+              onward();
+            }}
           />
           {item.kind === "map" && <span className="muted small wz-inline">the map would be shown here</span>}
         </div>
@@ -147,7 +200,15 @@ export function ItemControl({
         <div className={`wz-control ${cls}`}>
           <div className="chip-row" style={{ marginBottom: 0 }}>
             {statuses.map((s) => (
-              <button key={s.id} type="button" className={`chip ${big ? "wz-chip-big" : ""} ${value === s.id ? "tree-match" : ""}`} onClick={() => onChange(s.id)}>
+              <button
+                key={s.id}
+                type="button"
+                className={`chip ${big ? "wz-chip-big" : ""} ${value === s.id ? "tree-match" : ""}`}
+                onClick={() => {
+                  onChange(s.id);
+                  onward();
+                }}
+              >
                 {s.name}
               </button>
             ))}
@@ -157,7 +218,14 @@ export function ItemControl({
     case "gps":
       return (
         <div className={`wz-control ${cls}`}>
-          <button type="button" className={`btn ${big ? "btn-primary wz-btn-big" : "btn-sm"}`} onClick={() => onChange("captured")}>
+          <button
+            type="button"
+            className={`btn ${big ? "btn-primary wz-btn-big" : "btn-sm"}`}
+            onClick={() => {
+              onChange("captured");
+              onward();
+            }}
+          >
             {value === "captured" ? "✓ Captured" : "Use my position"}
           </button>
           <span className="muted small wz-inline">the real block checks accuracy first</span>
@@ -166,6 +234,83 @@ export function ItemControl({
     default:
       return null;
   }
+}
+
+/** Enter (or the phone keyboard's Next) moves on, so a numeric answer is
+ *  type-type-next without reaching for the screen. */
+function NumberField({
+  className,
+  value,
+  placeholder,
+  style,
+  autoFocus,
+  onChange,
+  onEnter,
+}: {
+  className: string;
+  value: string;
+  placeholder?: string;
+  style?: CSSProperties;
+  autoFocus?: boolean;
+  onChange: (v: string) => void;
+  onEnter: () => void;
+}) {
+  return (
+    <form
+      className="wz-field-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onEnter();
+      }}
+    >
+      <input
+        className={className}
+        type="number"
+        step="any"
+        inputMode="decimal"
+        enterKeyHint="next"
+        placeholder={placeholder}
+        style={style}
+        value={value}
+        data-autofocus={autoFocus ? "" : undefined}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </form>
+  );
+}
+function TextField({
+  className,
+  value,
+  placeholder,
+  autoFocus,
+  onChange,
+  onEnter,
+}: {
+  className: string;
+  value: string;
+  placeholder?: string;
+  autoFocus?: boolean;
+  onChange: (v: string) => void;
+  onEnter: () => void;
+}) {
+  return (
+    <form
+      className="wz-field-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onEnter();
+      }}
+    >
+      <input
+        className={className}
+        enterKeyHint="next"
+        placeholder={placeholder}
+        value={value}
+        data-autofocus={autoFocus ? "" : undefined}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </form>
+  );
 }
 
 function YesNo({

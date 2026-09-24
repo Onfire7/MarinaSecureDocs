@@ -318,3 +318,115 @@
 .wz-jump-row:hover { background: var(--fill); }
 .wz-jump-row.now { background: var(--accent-soft); }
 .wz-jump-row .muted { margin-left: auto; font-size: 0.8rem; }
+
+/* ── D: the filmstrip ────────────────────────────────────────────────── */
+.wz-d-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+.wz-d-col {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+}
+.wz-d-col::-webkit-scrollbar {
+  display: none;
+}
+.wz-d-page {
+  height: 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px 20px 24px 52px;
+  text-align: center;
+}
+.wz-d-page .wz-control {
+  justify-content: center;
+}
+.wz-d-where {
+  position: absolute;
+  top: 10px;
+  left: 52px;
+  right: 14px;
+  text-align: left;
+  font-size: 0.9rem;
+}
+.wz-d-label {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.25;
+  max-width: 22ch;
+}
+
+/* the rail: pips down the left edge, capped with the scroll arrows */
+.wz-d-rail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 38px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(90deg, var(--fill), transparent);
+}
+.wz-d-pips {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+.wz-d-pip {
+  width: 5px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: var(--line);
+  cursor: pointer;
+}
+.wz-d-pip.onfile { background: var(--mute); opacity: 0.45; }
+.wz-d-pip.done { background: var(--good); }
+.wz-d-pip.now { background: var(--accent); height: 30px; }
+.wz-d-arrow {
+  font: inherit;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--mute);
+  background: none;
+  border: 0;
+  padding: 4px;
+  cursor: pointer;
+}
+
+/* locations slide, 500ms, however far apart they are */
+@keyframes wz-in-right { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes wz-in-left { from { transform: translateX(-100%); } to { transform: none; } }
+@keyframes wz-out-left { from { transform: none; } to { transform: translateX(-100%); } }
+@keyframes wz-out-right { from { transform: none; } to { transform: translateX(100%); } }
+.wz-in-right { animation: wz-in-right 500ms ease; }
+.wz-in-left { animation: wz-in-left 500ms ease; }
+.wz-out-left { animation: wz-out-left 500ms ease both; }
+.wz-out-right { animation: wz-out-right 500ms ease both; }
+@media (prefers-reduced-motion: reduce) {
+  .wz-in-right, .wz-in-left, .wz-out-left, .wz-out-right { animation-duration: 1ms; }
+}
+
+.wz-d-footer {
+  transition: background 300ms linear;
+}
+.wz-field-form {
+  display: contents;
+}

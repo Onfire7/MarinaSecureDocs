@@ -44,18 +44,20 @@ import {
 import { WizardA, name as nameA } from "./WizardA";
 import { WizardB, name as nameB } from "./WizardB";
 import { WizardC, name as nameC } from "./WizardC";
+import { WizardD, name as nameD } from "./WizardD";
 import "./wizard.css";
 
 const VARIANTS = [
   { key: "A", name: nameA },
   { key: "B", name: nameB },
   { key: "C", name: nameC },
+  { key: "D", name: nameD },
 ];
 
 export function AuditWizardPrototypePage() {
   const { id } = useParams();
   const [params] = useSearchParams();
-  const variant = params.get("variant") ?? "A";
+  const variant = params.get("variant") ?? "D";
   const { audit } = useAudit(id);
   const { data: targets } = useAuditTargets(id);
   const { data: questions } = useAuditQuestions(id);
@@ -77,6 +79,10 @@ export function AuditWizardPrototypePage() {
   const [scope, setScope] = useState<"pending" | "all">("pending");
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Answers>({});
+  // What this run has actually set. A pre-filled value is not an answer
+  // yet - it is what the marina already believed - so progress counts
+  // these, not "has a value".
+  const [touched, setTouched] = useState<Set<string>>(new Set());
 
   const groups: ItemGroup[] = useMemo(() => {
     if (!audit) return [];
@@ -99,7 +105,8 @@ export function AuditWizardPrototypePage() {
   const setSelection = (next: Set<string>) => setOff(new Set([...allKeys(groups)].filter((k) => !next.has(k))));
 
   const withFinding = useMemo(() => new Set(findingTargets.map((f) => f.target_id)), [findingTargets]);
-  const answeredTarget = (targetId: string) => withFinding.has(targetId) || Object.keys(answers[targetId] ?? {}).length > 0;
+  const answeredTarget = (targetId: string) =>
+    withFinding.has(targetId) || [...touched].some((t) => t.startsWith(`${targetId}|`));
 
   const shownTargets: WizardTarget[] = useMemo(
     () =>
@@ -177,8 +184,10 @@ export function AuditWizardPrototypePage() {
     );
   }
 
-  const setAnswer = (tid: string, key: string, v: AnswerValue) =>
+  const setAnswer = (tid: string, key: string, v: AnswerValue) => {
     setAnswers((prev) => ({ ...prev, [tid]: { ...(prev[tid] ?? {}), [key]: v } }));
+    setTouched((prev) => new Set(prev).add(`${tid}|${key}`));
+  };
 
   if (phase === "setup") {
     return (
@@ -214,12 +223,21 @@ export function AuditWizardPrototypePage() {
     statuses: statuses.map((s) => ({ id: s.id, name: s.name })),
     onFile,
     answeredTarget,
+    touched: (tid, key) => touched.has(`${tid}|${key}`),
     savedNote: "PROTOTYPE · nothing is saved",
     onExit: () => setPhase("setup"),
   };
   return (
     <>
-      {variant === "B" ? <WizardB {...props} /> : variant === "C" ? <WizardC {...props} /> : <WizardA {...props} />}
+      {variant === "A" ? (
+        <WizardA {...props} />
+      ) : variant === "B" ? (
+        <WizardB {...props} />
+      ) : variant === "C" ? (
+        <WizardC {...props} />
+      ) : (
+        <WizardD {...props} />
+      )}
       <PrototypeSwitcher variants={VARIANTS} />
     </>
   );
@@ -270,10 +288,7 @@ function SetupScreen({
       </div>
       <div className="wz-body">
         <div className="wz-setup">
-          <p className="muted">
-            What are you checking on this run? Everything is on by default - turn a group off to sweep a single item across
-            the property, and run the wizard again for the next one.
-          </p>
+          <p className="muted">What are you checking on this run?</p>
           {groups.map((g) => {
             const on = g.items.filter((i) => selection.has(i.key)).length;
             return (
