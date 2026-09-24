@@ -419,12 +419,12 @@ function Column({
         const onFile = p.onFile(target, item);
         return (
           <section className="wz-d-page" key={item.key} data-page={i}>
-            <div className="wz-d-where">
-              <b>{target.location_name}</b>
-              <span className="muted small"> · {target.type_name}</span>
-            </div>
-            <div>
-              <div className="muted small">{item.group}</div>
+            <div className="wz-d-heading">
+              <h1 className="wz-d-loc">
+                {target.location_name}
+                {target.type_name && <span className="muted"> {target.type_name}</span>}
+              </h1>
+              <div className="wz-d-group">{item.group}</div>
               <div className="wz-d-label">{item.label}</div>
             </div>
             <ItemControl
@@ -514,18 +514,23 @@ function tween(el: HTMLElement, to: number, ms: number, done: () => void) {
  * keyboard is dismissed rather than left standing over a page of buttons
  * because the page before it had a note.
  *
- * Only focus belonging to a page we have LEFT is blurred. A note being
- * typed into sits on the current page, and this runs again whenever the
- * queries re-emit - which a write does - so blurring indiscriminately
- * would close the keyboard under the auditor's thumb.
+ * Focus already inside this page is left exactly where it is. This runs
+ * again on every re-render, and a write causes one: without the guard,
+ * pressing Next to move from a number to its note was undone a moment
+ * later by the page taking focus back to the number.
+ *
+ * Focus belonging to a page the run has LEFT is dropped, which is what
+ * dismisses the keyboard.
  */
 function focusActive(el: HTMLElement, index: number) {
   const page = el.querySelector<HTMLElement>(`[data-page="${index}"]`);
+  const active = document.activeElement;
+  const here = active instanceof HTMLElement && el.contains(active);
+  if (here && page?.contains(active)) return;
   const field = page?.querySelector<HTMLInputElement>("[data-autofocus]");
   if (field) {
     field.focus();
     return;
   }
-  const active = document.activeElement;
-  if (active instanceof HTMLElement && el.contains(active) && !page?.contains(active)) active.blur();
+  if (here) (active as HTMLElement).blur();
 }

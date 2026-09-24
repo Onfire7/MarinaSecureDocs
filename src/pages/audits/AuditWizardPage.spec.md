@@ -26,8 +26,12 @@ variants; this is D).
 
 ## Running — phone
 
-- **One item per screen.** The items of a location are screen-sized pages
-  stacked vertically; locations sit side by side.
+- **One item per screen**, headed by the location: its name as the page's
+  `h1` with the type beside it, then the item's group, then the item -
+  which location is being edited should never be in doubt, and the pager at
+  the foot is too far from the question to answer it. The items of a
+  location are screen-sized pages stacked vertically; locations sit side by
+  side.
 - **Vertical moves** — swipe, wheel, the rail's arrows, a tapped answer —
   land on a page over **500ms**, easing. Free scrolling snaps a page at a
   time. Mandatory scroll-snap re-snaps every frame a programmatic scroll
@@ -52,9 +56,13 @@ variants; this is D).
   for the screen. Numbers use a decimal keyboard; every field's Enter key is
   `next`. **A page with nothing to type into takes focus away**, so the
   keyboard goes rather than standing over a page of buttons because the
-  page before it had a note. Only focus belonging to a page the run has
-  left is dropped: a note being typed into is on the current page, and this
-  runs again on every re-render.
+  page before it had a note.
+  - Focus already inside the current page is **left alone**. This runs again
+    on every re-render and a write causes one, so without that guard, Next
+    from a number to its note was undone a moment later by the page taking
+    focus back to the number.
+  - Focus belonging to a page the run has left is dropped, which is what
+    dismisses the keyboard.
 - **The keyboard does not resize the viewport.** It is allowed to cover the
   pager - there is nothing to do down there while typing. What it must not
   cover is the question, so **the scroller ends where the keyboard starts**:

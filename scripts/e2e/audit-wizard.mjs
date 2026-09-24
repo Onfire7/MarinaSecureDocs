@@ -140,6 +140,22 @@ await page.locator('[data-testid="wz-pip"]').nth(qIndex).click();
 await settle();
 check("2n arriving at a page with nothing to type into lets the keyboard go", (await focusInfo()).tag !== "INPUT", JSON.stringify(await focusInfo()));
 
+// Next from a number moves to its note - and stays there. A write causes a
+// re-render, and the page used to take focus back to the number.
+await page.locator('[data-testid="wz-pip"]').nth(attrIndex).click();
+await settle();
+await page.locator(".wz-d-page").nth(attrIndex).locator("input[inputmode=decimal]").press("Enter");
+await settle(400);
+check("2q Next from a number moves to its note", (await focusInfo()).tag === "INPUT" && (await focusInfo()).mode === null, JSON.stringify(await focusInfo()));
+await settle(1600);
+check("2r and focus stays there", (await focusInfo()).mode === null, JSON.stringify(await focusInfo()));
+check("2s without having moved off the item", (await at()).page === attrIndex, JSON.stringify(await at()));
+
+// The location leads the page, above the question.
+const heading = await page.locator(".wz-d-page").nth(attrIndex).locator(".wz-d-heading").innerText();
+check("2t the location heads the page, above the item", heading.split("\n")[0].startsWith(first), heading.replace(/\n/g, " | "));
+check("2u and it is the page's h1", (await page.locator(".wz-d-page").nth(attrIndex).locator("h1").innerText()).startsWith(first));
+
 // The case that matters: scrolling away from a note, with no tap to move
 // focus for us.
 await page.locator('[data-testid="wz-pip"]').nth(svcIndex).click();

@@ -285,19 +285,36 @@
 .wz-d-page .wz-control {
   justify-content: center;
 }
-.wz-d-where {
-  position: absolute;
-  top: 10px;
-  left: 52px;
-  right: 14px;
-  text-align: left;
-  font-size: 0.9rem;
+/* Which location, then which item, then the answer - in that order and
+   in one block, so there is never a doubt about what is being edited. */
+.wz-d-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+}
+.wz-d-loc {
+  font-size: 1.5rem;
+  font-weight: 720;
+  line-height: 1.15;
+  margin: 0;
+}
+.wz-d-loc .muted {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+.wz-d-group {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 650;
+  color: var(--mute);
 }
 .wz-d-label {
-  font-size: 1.35rem;
-  font-weight: 700;
+  font-size: 1.3rem;
+  font-weight: 650;
   line-height: 1.25;
-  max-width: 22ch;
+  max-width: 24ch;
 }
 
 /* the rail: pips down the left edge, capped with the scroll arrows */
