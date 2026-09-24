@@ -1,6 +1,6 @@
 import { Suspense, lazy } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { missingConfig } from "./lib/config";
+import { canonicalTarget, missingConfig } from "./lib/config";
 import { ErrorBoundary } from "./layout/ErrorBoundary";
 import { Splash } from "./layout/Splash";
 import { ConfigMissingPage } from "./pages/shared/ConfigMissingPage";
@@ -16,6 +16,14 @@ export default function App() {
   const missing = missingConfig();
   if (missing.length > 0) {
     return <ConfigMissingPage missing={missing} />;
+  }
+  // A share link that arrived on another address goes home before it
+  // renders - see canonicalTarget(). Done here, at the top of the public
+  // branch, so nothing of the report is fetched at the wrong origin.
+  const home = canonicalTarget(window.location.origin, window.location.pathname + window.location.search);
+  if (home) {
+    window.location.replace(home);
+    return <Splash />;
   }
   if (window.location.pathname.startsWith("/r/")) {
     return (

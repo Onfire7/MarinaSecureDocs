@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { publicOrigin } from "./config";
+import { canonicalTarget, publicOrigin } from "./config";
 
 // What goes into a link somebody else opens (src/lib/config.ts). The bug
 // this exists for: a share link built from window.location.origin carries
@@ -18,5 +18,31 @@ describe("publicOrigin", () => {
     expect(publicOrigin("", "http://localhost:5173")).toBe("http://localhost:5173");
     // Netlify leaves $URL empty on some contexts; a bare host is not an origin
     expect(publicOrigin("beta2.marinasecure.com", "http://localhost:5173")).toBe("http://localhost:5173");
+  });
+});
+
+describe("canonicalTarget", () => {
+  const WANT = "https://beta2.marinasecure.com";
+  it("3 · a share link on another address is sent home, path and key intact", () => {
+    expect(canonicalTarget("https://marinasecure2.netlify.app", "/r/abc-123", WANT)).toBe(
+      "https://beta2.marinasecure.com/r/abc-123",
+    );
+    expect(canonicalTarget("https://beta2--marinasecure2.netlify.app", "/r/abc?x=1", WANT)).toBe(
+      "https://beta2.marinasecure.com/r/abc?x=1",
+    );
+  });
+  it("4 · and cannot match itself, so it cannot loop", () => {
+    expect(canonicalTarget(WANT, "/r/abc-123", WANT)).toBe(null);
+    expect(canonicalTarget(WANT + "/", "/r/abc-123", WANT + "/")).toBe(null);
+  });
+  it("5 · only the public report moves; the app stays reachable anywhere", () => {
+    // Branch deploys and the netlify.app name are how a wrong-origin bug
+    // gets tested at all - moving the whole app would end that.
+    expect(canonicalTarget("https://marinasecure2.netlify.app", "/audits/123", WANT)).toBe(null);
+    expect(canonicalTarget("https://marinasecure2.netlify.app", "/", WANT)).toBe(null);
+  });
+  it("6 · unconfigured, nothing moves - which is what localhost wants", () => {
+    expect(canonicalTarget("http://localhost:5173", "/r/abc", undefined)).toBe(null);
+    expect(canonicalTarget("http://localhost:5173", "/r/abc", "")).toBe(null);
   });
 });

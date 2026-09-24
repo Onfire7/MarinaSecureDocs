@@ -66,27 +66,22 @@
   # last thing standing between a pasted secret and a published bundle.
   SECRETS_SCAN_OMIT_KEYS = "VITE_CLERK_PUBLISHABLE_KEY,VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,VITE_POWERSYNC_URL"
 
-# The marina has ONE address, and a link that went out on another must not
-# stay broken. `marinasecure2.netlify.app` serves the same build, so a
-# report link on it works - but it is not the address anybody should be
-# sent, and a link one character away from it (`beta.marinasecure.com`)
-# lands on the OTHER site, which has no /r/ route and asks the recipient to
-# sign in. Anything arriving on the netlify.app name is sent to the primary
-# domain, path and all, before react-router sees it.
+# A share link that went out on the wrong host is sent home by the page
+# itself (src/lib/config.ts, canonicalTarget) rather than from here.
 #
-# The host in `from` is what scopes this: the `beta` site builds the same
-# file and never matches it. Branch deploys
-# (`beta2--marinasecure2.netlify.app`) are a different host and stay
-# reachable, which is what lets a wrong-origin fix be tested at all.
+# The obvious rule belongs in this file and does not work:
 #
-# It must come BEFORE the catch-all: first match wins, and `force` is what
-# beats the 200 below.
-[[redirects]]
-  from = "https://marinasecure2.netlify.app/*"
-  to = "https://beta2.marinasecure.com/:splat"
-  status = 301
-  force = true
-
+#   from = "https://marinasecure2.netlify.app/*"
+#   to   = "https://beta2.marinasecure.com/:splat"
+#   status = 301, force = true
+#
+# Deployed and measured, requests to that host still came back 200 from the
+# origin - the full-URL form does not match this site's DEFAULT netlify.app
+# subdomain, whatever it does for a domain alias. Redirecting in the page
+# is narrower anyway: it moves a `/r/` link and leaves branch deploys and
+# the netlify.app name usable for testing the app, which is how the
+# wrong-origin fix was tested in the first place.
+#
 # Single-page app: react-router owns all paths (including /checkin/:guidUrl
 # deep links from NFC tags/QR codes), so every URL serves index.html.
 [[redirects]]

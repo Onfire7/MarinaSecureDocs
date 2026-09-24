@@ -48,6 +48,37 @@ export function publicOrigin(configured: string | undefined = PUBLIC_URL, here?:
   return /^https?:\/\//.test(trimmed) ? trimmed : fallback;
 }
 
+/**
+ * Where a page open on the wrong host should send itself, or null to stay.
+ *
+ * A share link is pasted, forwarded and typed by hand, and it only takes
+ * one of those for it to arrive on an address that is not the marina's.
+ * Some of those addresses serve this same build and work; the one a
+ * character away - `beta.marinasecure.com` - is a different build with no
+ * `/r/` route, which asks the recipient to sign in. This only moves the
+ * public report: the app itself stays reachable on a branch deploy or the
+ * netlify.app name, which is what makes a wrong-origin bug testable.
+ *
+ * Returns null when there is nothing to do, so the caller renders. The
+ * comparison is exact and the destination is the configured origin, so the
+ * redirected page cannot match again.
+ */
+export function canonicalTarget(
+  here: string,
+  pathAndQuery: string,
+  configured: string | undefined = PUBLIC_URL,
+): string | null {
+  // Both sides normalised, or a trailing slash on one of them is an
+  // infinite redirect: the destination would never equal the origin it
+  // just arrived from.
+  const trim = (s: string) => s.trim().replace(/\/+$/, "");
+  const want = trim(configured ?? "");
+  if (!/^https?:\/\//.test(want)) return null;
+  if (trim(here) === want) return null;
+  if (!pathAndQuery.startsWith("/r/")) return null;
+  return want + pathAndQuery;
+}
+
 export function missingConfig(): string[] {
   const missing: string[] = [];
   if (!CLERK_PUBLISHABLE_KEY) missing.push("VITE_CLERK_PUBLISHABLE_KEY");
