@@ -251,9 +251,18 @@
 }
 .wz-d-col {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* Only as tall as the keyboard leaves visible. A scroller that carried on
+     underneath it would put half of every gesture in a region you have to
+     pan to before anything scrolls. */
+  height: var(--wz-page-h, 100%);
+  transition: height 250ms ease;
   overflow-y: auto;
   overflow-x: hidden;
+  /* A flick that reaches the end of the run must not become a page scroll. */
+  overscroll-behavior: contain;
   scroll-snap-type: y mandatory;
   scrollbar-width: none;
 }
@@ -261,11 +270,8 @@
   display: none;
 }
 .wz-d-page {
-  /* The scroller's height, less whatever the on-screen keyboard covers.
-     Animated so the question slides into the middle of what is left rather
-     than jumping there (AuditWizardPage.spec.md § Running - phone). */
-  height: var(--wz-page-h, 100%);
-  transition: height 250ms ease;
+  /* The scroller's height, which is what the keyboard leaves visible. */
+  height: 100%;
   scroll-snap-align: start;
   scroll-snap-stop: always;
   display: flex;
@@ -299,7 +305,10 @@
   position: absolute;
   left: 0;
   top: 0;
-  bottom: 0;
+  /* Centred in what is visible, not in what exists: with the keyboard up,
+     a rail measured against the whole layer centres itself behind it. */
+  height: var(--wz-page-h, 100%);
+  transition: height 250ms ease;
   width: 38px;
   z-index: 3;
   display: flex;
@@ -349,7 +358,7 @@
 .wz-out-right { animation: wz-out-right 500ms ease both; }
 @media (prefers-reduced-motion: reduce) {
   .wz-in-right, .wz-in-left, .wz-out-left, .wz-out-right { animation-duration: 1ms; }
-  .wz-d-page { transition-duration: 1ms; }
+  .wz-d-col, .wz-d-rail { transition-duration: 1ms; }
 }
 
 .wz-d-footer {

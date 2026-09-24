@@ -92,6 +92,18 @@ export function WizardRun(p: RunProps) {
   // stays centred in what is left.
   useVisiblePageHeight(wrapRef, useCallback((px: number) => setPageHeight((was) => (was === px ? was : px)), []));
 
+  // Nothing outside the run scrolls while it is open. A document that can
+  // scroll is a document the browser will scroll when the keyboard opens,
+  // and the first swipe afterwards goes into putting it back.
+  useEffect(() => {
+    const root = document.documentElement;
+    const was = root.style.overflow;
+    root.style.overflow = "hidden";
+    return () => {
+      root.style.overflow = was;
+    };
+  }, []);
+
   // While the pages animate to their new height, every page moves. Hold the
   // one being answered against the top of the scroller for the length of it,
   // with snapping out of the way as ever.
