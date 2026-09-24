@@ -520,7 +520,6 @@ Link, or - later - attached to an email. It contains, in order:
      Service, Amenity, Question, Marked, Map, Change, Ticket - with Result
      and Note; the Area column follows the same rule.
      The "every place where Water is absent" view.
-7. A legend for `-`, `*` and `!`.
 
 **Left out, on purpose.** Contact names and details, boat and vehicle names
 and registrations, GPS coordinates (a captured fix shows only as a change),

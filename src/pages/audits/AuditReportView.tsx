@@ -268,9 +268,6 @@ export function AuditReportView({ report: r, inApp }: { report: AuditReport; inA
               </tbody>
             </table>
           </div>
-          <p className="muted small" style={{ marginTop: 6 }}>
-            {DASH} not recorded · <b>*</b> proposed by this audit · <b>!</b> does not match what is on file
-          </p>
         </>
       ) : (
         <div className="report-scroll">
