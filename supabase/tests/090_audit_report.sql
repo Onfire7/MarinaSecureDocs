@@ -5,7 +5,7 @@
 -- everyone passes every denial test (CLAUDE.md).
 create extension if not exists pgtap;
 begin;
-select plan(37);
+select plan(52);
 
 -- ── fixtures (as owner, which bypasses RLS; triggers still run) ──────────
 insert into users (id, name, clerk_user_id, active) values
@@ -183,6 +183,160 @@ set local role authenticated;
 select lives_ok($$select public.revoke_audit_share((select id from audit_shares where label = 'forever'))$$, 'revoking again is harmless');
 reset role;
 select is((select revoked_at from audit_shares where label = 'forever'), (select revoked_at from stamp), 'and never clears or moves the stamp');
+
+-- ── a link can show less (docs/audits.md § A link can show less) ─────────
+-- Its own audit, its own catalogue: the filter tests need two Services to
+-- tell "hide one" from "hide the category", and the fixture above asserts
+-- on a one-Service column list.
+insert into location_types (id, name, tracks_status) values
+  ('cccc0000-0000-4000-8000-000000000094','Filter Fixture Site', true);
+insert into locations (id, name, location_type_id) values
+  ('dddd0000-0000-4000-8000-000000000095','FF-Loop','cccc0000-0000-4000-8000-000000000094');
+insert into locations (id, name, location_type_id, parent_id) values
+  ('dddd0000-0000-4000-8000-000000000096','FF-1','cccc0000-0000-4000-8000-000000000094','dddd0000-0000-4000-8000-000000000095'),
+  ('dddd0000-0000-4000-8000-000000000097','FF-2','cccc0000-0000-4000-8000-000000000094','dddd0000-0000-4000-8000-000000000095'),
+  ('dddd0000-0000-4000-8000-000000000098','FF-3','cccc0000-0000-4000-8000-000000000094','dddd0000-0000-4000-8000-000000000095');
+insert into services (id, name) values
+  ('55550000-0000-4000-8000-000000000094','Filter Power'),
+  ('55550000-0000-4000-8000-000000000095','Filter Water');
+insert into service_location_types (service_id, location_type_id) values
+  ('55550000-0000-4000-8000-000000000094','cccc0000-0000-4000-8000-000000000094'),
+  ('55550000-0000-4000-8000-000000000095','cccc0000-0000-4000-8000-000000000094');
+insert into amenities (id, name) values ('66660000-0000-4000-8000-000000000094','Filter WiFi');
+insert into amenity_location_types (amenity_id, location_type_id) values
+  ('66660000-0000-4000-8000-000000000094','cccc0000-0000-4000-8000-000000000094');
+insert into attributes (id, name, unit) values ('aaaa0000-0000-4000-8000-000000000094','Filter Length','ft');
+insert into attribute_location_types (attribute_id, location_type_id) values
+  ('aaaa0000-0000-4000-8000-000000000094','cccc0000-0000-4000-8000-000000000094');
+
+insert into audits (id, name, kind, launched_by_id) values
+  ('eeee0000-0000-4000-8000-0000000000b3','Filter Fixture','status','22222222-0000-4000-8000-000000000001');
+insert into audit_rules (id, audit_id, position) values
+  ('11110000-0000-4000-8000-000000000094','eeee0000-0000-4000-8000-0000000000b3',0);
+insert into audit_questions (id, rule_id, position, prompt) values
+  ('22220000-0000-4000-8000-000000000094','11110000-0000-4000-8000-000000000094',0,'Is the fire ring clear?');
+insert into audit_targets (id, audit_id, location_id, location_name, position) values
+  ('eeee2222-0000-4000-8000-000000000011','eeee0000-0000-4000-8000-0000000000b3','dddd0000-0000-4000-8000-000000000096','FF-1',0),
+  ('eeee2222-0000-4000-8000-000000000012','eeee0000-0000-4000-8000-0000000000b3','dddd0000-0000-4000-8000-000000000097','FF-2',1),
+  ('eeee2222-0000-4000-8000-000000000013','eeee0000-0000-4000-8000-0000000000b3','dddd0000-0000-4000-8000-000000000098','FF-3',2);
+insert into audit_findings (id, audit_id, target_id, recorded_by_id, clearly_marked, mapped_correctly, confirmed_at) values
+  ('ffff0000-0000-4000-8000-0000000000e4','eeee0000-0000-4000-8000-0000000000b3','eeee2222-0000-4000-8000-000000000011','22222222-0000-4000-8000-000000000001', true, true, now()),
+  ('ffff0000-0000-4000-8000-0000000000e5','eeee0000-0000-4000-8000-0000000000b3','eeee2222-0000-4000-8000-000000000012','22222222-0000-4000-8000-000000000001', false, true, now()),
+  ('ffff0000-0000-4000-8000-0000000000e6','eeee0000-0000-4000-8000-0000000000b3','eeee2222-0000-4000-8000-000000000013','22222222-0000-4000-8000-000000000001', true, true, now());
+insert into audit_finding_services (finding_id, service_id, present, working, note) values
+  ('ffff0000-0000-4000-8000-0000000000e4','55550000-0000-4000-8000-000000000094', true, true, null),
+  ('ffff0000-0000-4000-8000-0000000000e4','55550000-0000-4000-8000-000000000095', true, false, 'tap drips'),
+  ('ffff0000-0000-4000-8000-0000000000e5','55550000-0000-4000-8000-000000000094', true, true, null);
+insert into audit_finding_amenities (finding_id, amenity_id, present, note) values
+  ('ffff0000-0000-4000-8000-0000000000e4','66660000-0000-4000-8000-000000000094', true, null);
+insert into audit_finding_answers (finding_id, question_id, value) values
+  ('ffff0000-0000-4000-8000-0000000000e4','22220000-0000-4000-8000-000000000094','false'::jsonb);
+insert into audit_proposals (id, finding_id, kind, structural, payload, decision, decided_by_id) values
+  ('99990000-0000-4000-8000-0000000000c4','ffff0000-0000-4000-8000-0000000000e4','set_gps', false,
+   '{"lat":33.8,"lng":-96.6,"accuracy":4}', 'approved','22222222-0000-4000-8000-000000000001'),
+  ('99990000-0000-4000-8000-0000000000c5','ffff0000-0000-4000-8000-0000000000e4','set_attribute', false,
+   '{"attribute_id":"aaaa0000-0000-4000-8000-000000000094","value":38,"text":null}', 'approved','22222222-0000-4000-8000-000000000001'),
+  ('99990000-0000-4000-8000-0000000000c6','ffff0000-0000-4000-8000-0000000000e5','rename', true,
+   '{"name":"FF-2A"}', 'approved','22222222-0000-4000-8000-000000000001');
+insert into tickets (id, title, status_id, location_id, source_finding_id) values
+  ('77770000-0000-4000-8000-0000000000d4','Tap drips at FF-1','bbbb0000-0000-4000-8000-000000000090',
+   'dddd0000-0000-4000-8000-000000000096','ffff0000-0000-4000-8000-0000000000e4');
+update audits set status = 'closed', closed_at = now() where id = 'eeee0000-0000-4000-8000-0000000000b3';
+
+select set_config('request.jwt.claims', '{"sub":"user_rita"}', true);
+set local role authenticated;
+create temp table fkeys as
+select
+  (public.create_audit_share('eeee0000-0000-4000-8000-0000000000b3','plain', null, '{}'::jsonb)).key           as plain,
+  (public.create_audit_share('eeee0000-0000-4000-8000-0000000000b3','no services', null,
+     '{"categories":["services"]}'::jsonb)).key                                                                as no_svc,
+  (public.create_audit_share('eeee0000-0000-4000-8000-0000000000b3','no water', null,
+     '{"services":["55550000-0000-4000-8000-000000000095"]}'::jsonb)).key                                      as no_water,
+  (public.create_audit_share('eeee0000-0000-4000-8000-0000000000b3','no question', null,
+     '{"questions":["22220000-0000-4000-8000-000000000094"]}'::jsonb)).key                                     as no_q,
+  (public.create_audit_share('eeee0000-0000-4000-8000-0000000000b3','no marked', null,
+     '{"categories":["marked"]}'::jsonb)).key                                                                  as no_marked,
+  (public.create_audit_share('eeee0000-0000-4000-8000-0000000000b3','no gps', null,
+     '{"categories":["gps"]}'::jsonb)).key                                                                     as no_gps,
+  (public.create_audit_share('eeee0000-0000-4000-8000-0000000000b3','two sites', null,
+     '{"targets":["eeee2222-0000-4000-8000-000000000011","eeee2222-0000-4000-8000-000000000012"]}'::jsonb)).key as two,
+  (public.create_audit_share('eeee0000-0000-4000-8000-0000000000b3','renamed later', null,
+     '{"services":["55550000-0000-4000-8000-000000000095"]}'::jsonb)).key                                      as renamed;
+reset role;
+grant select on fkeys to anon, authenticated;
+
+-- 19 · an empty filter changes nothing
+select is(
+  (select public.audit_report((select plain from fkeys)) #- '{asOf}'),
+  (select public.audit_report_for('eeee0000-0000-4000-8000-0000000000b3') #- '{asOf}'),
+  'an empty filter is the whole report');
+
+-- 20 · a hidden category takes its column, its flag and every entry
+select is(
+  (select public.audit_report((select no_svc from fkeys)) -> 'columns' -> 'services'), '[]'::jsonb,
+  'hiding Services empties the column list');
+select is(
+  (select (public.audit_report((select no_svc from fkeys)) -> 'audit' ->> 'includeServices')::boolean), false,
+  'and clears the flag, so the reader cannot tell it was asked');
+select is(
+  (select jsonb_array_length(jsonb_path_query_array(public.audit_report((select no_svc from fkeys)), '$.targets[*].services[*]'))),
+  0, 'and no location carries a service');
+
+-- 21 · one entry, not the category
+select is(
+  (select public.audit_report((select no_water from fkeys)) -> 'columns' -> 'services'), '["Filter Power"]'::jsonb,
+  'hiding one Service leaves the other in the columns');
+select is(
+  (select jsonb_path_query_array(public.audit_report((select no_water from fkeys)), '$.targets[*].services[*].name')),
+  '["Filter Power","Filter Power"]'::jsonb,
+  'and leaves it on every location that recorded it');
+
+-- 22 · a question goes from the columns and from every answer
+select is(
+  (select public.audit_report((select no_q from fkeys)) -> 'columns' -> 'questions'), '[]'::jsonb,
+  'hiding a Question empties the column list');
+select is(
+  (select jsonb_array_length(jsonb_path_query_array(public.audit_report((select no_q from fkeys)), '$.targets[*].answers[*]'))),
+  0, 'and takes its answers with it');
+
+-- 23 · marked is a finding field, not a column
+select is(
+  (select jsonb_path_query_array(public.audit_report((select no_marked from fkeys)), '$.targets[*].finding.clearlyMarked')),
+  '[null, null, null]'::jsonb, 'hiding Marked nulls it on every finding');
+select is(
+  (select (public.audit_report((select no_marked from fkeys)) -> 'audit' ->> 'includeMarked')::boolean), false,
+  'and clears the flag');
+
+-- 24 · GPS is the set_gps changes, and only those
+select is(
+  (select jsonb_path_query_array(public.audit_report((select no_gps from fkeys)), '$.targets[*].proposals[*].kind')),
+  '["set_attribute","rename"]'::jsonb,
+  'hiding GPS drops the fix and leaves every other change');
+
+-- 25 · locations, and the totals are of that subset
+select is(
+  (select jsonb_path_query_array(public.audit_report((select two from fkeys)), '$.targets[*].name')),
+  '["FF-1","FF-2"]'::jsonb, 'a link narrowed to two locations carries two');
+
+-- 26 · ids, not names: a rename must not un-hide what was hidden
+update services set name = 'Filter Water (potable)' where id = '55550000-0000-4000-8000-000000000095';
+select is(
+  (select public.audit_report((select renamed from fkeys)) -> 'columns' -> 'services'), '["Filter Power"]'::jsonb,
+  'renaming a hidden Service does not un-hide it');
+update services set name = 'Filter Water' where id = '55550000-0000-4000-8000-000000000095';
+
+-- 27 · the in-app report is the audit itself
+select is(
+  (select jsonb_array_length(public.audit_report_for('eeee0000-0000-4000-8000-0000000000b3') -> 'columns' -> 'services')),
+  2, 'the in-app report is never filtered');
+
+-- 28 · a filtered link is still a link
+select set_config('request.jwt.claims', '{"sub":"user_rita"}', true);
+set local role authenticated;
+select public.revoke_audit_share((select id from audit_shares where label = 'no gps'));
+reset role;
+select is((select public.audit_report((select no_gps from fkeys))), null,
+  'revoking a filtered link refuses it like any other');
 
 select * from finish();
 rollback;

@@ -696,12 +696,60 @@ every open, with what is still to visit counted. Each link is its own row
 - a **label** naming who it went to ("Ownership group", "Bob");
 - **expires** - 90 days by default, or never;
 - **revoked** - immediate and permanent; to re-share, make a new one;
-- **views** and **last viewed**, bumped on every successful open.
+- **views** and **last viewed**, bumped on every successful open;
+- a **filter**: what this link leaves out (§ A link can show less).
 
 The audit page lists its links with those facts, *Copy link* and *Revoke*.
 Expired, revoked and unknown keys all land on the same neutral page -
 *This report link is no longer active. Ask the marina for a new one.* - so
 a key cannot be probed for existence.
+
+### A link can show less
+
+Different readers need different parts. The ownership group wants the
+condition of the property; a contractor wants the sites they are quoting
+and nothing else; nobody outside the office needs the GPS fixes. So a
+Share Link carries a **filter**, chosen when the link is made, and what it
+hides is hidden **as if the Audit had never asked**.
+
+That last part is the whole requirement, and it is why the filter is not a
+checkbox on the page. **The filter is applied in the database**, to the
+compiled document, before it is sent: `audit_report(key)` hands what it
+loaded to `filter_audit_report(doc, filter)`. The recipient's copy simply
+does not contain the hidden parts - not in the tables, not in the export,
+not in the page source, and not in the numbers, because every number in
+the report is derived from that document by the client. A report with
+Services filtered out says nothing about services anywhere: no column, no
+*not working* tile, no sentence in the summary, no line in *Needs
+attention*, and `includeServices` reads false, so the reader cannot tell
+the Audit ever asked.
+
+A filter names two things, and an empty filter shows everything:
+
+- **Items**, by category and by entry. Whole categories - Occupancy,
+  Attributes, Services, Amenities, Questions, *Marked*, *Map*, GPS,
+  Changes, Tickets - or single entries within one: keep Services but drop
+  *Sewer*, keep Questions but drop one prompt. GPS is the `set_gps`
+  Changes, which is the only place a fix appears in a report; hiding
+  Changes hides those too.
+- **Locations**. Empty means every target. Otherwise only those targets
+  appear, and the totals are of that subset - the link reads as an audit
+  of the campground, not as an audit of the marina with most of it
+  missing.
+
+Entries are stored **by id and resolved to names when the report is
+built**, never stored as names. The document identifies a Service by its
+name, so a filter written as text would stop matching the day somebody
+renames it - and a privacy filter that stops matching fails by *showing*
+what was meant to be hidden. Ids are resolved in the same breath as the
+document is compiled, so a rename moves both sides together.
+
+The filter is fixed when the link is made. To change what somebody sees,
+revoke and make another - a link's meaning never changes under the person
+holding it. The creator checks what a link shows by opening it.
+
+The in-app report at `/audits/:id/report` is **never** filtered: it is the
+Audit itself, for people who may already see all of it.
 
 ### Live, then static
 

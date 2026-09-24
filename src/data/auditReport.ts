@@ -1,5 +1,6 @@
 import { supabase } from "../lib/db/supabase";
 import type { AuditReport } from "../lib/auditReport";
+import type { ShareFilter, ShareOptions } from "../lib/auditShareFilter";
 
 // The Audit Report in-app and its Share Links (docs/audits.md § Sharing
 // the results; docs/api-structure.md § Public report links). The public
@@ -28,6 +29,9 @@ export interface AuditShareRow {
   revoked_at: string | null;
   view_count: number;
   last_viewed_at: string | null;
+  /** What this link leaves out; `{}` is everything. Enforced in the
+   *  database - see docs/audits.md § A link can show less. */
+  filter: ShareFilter | null;
 }
 
 /** Read under RLS: only a manage_audits holder sees any rows. */
@@ -37,11 +41,29 @@ export async function listAuditShares(auditId: string): Promise<AuditShareRow[]>
   return (data ?? []) as AuditShareRow[];
 }
 
-/** `expiresAt` null means never. The trigger refuses an open audit. */
-export async function createAuditShare(auditId: string, label: string, expiresAt: string | null): Promise<AuditShareRow> {
-  const { data, error } = await supabase.rpc("create_audit_share", { p_audit: auditId, p_label: label, p_expires_at: expiresAt });
+/** `expiresAt` null means never; an empty filter means the whole report. */
+export async function createAuditShare(
+  auditId: string,
+  label: string,
+  expiresAt: string | null,
+  filter: ShareFilter = {},
+): Promise<AuditShareRow> {
+  const { data, error } = await supabase.rpc("create_audit_share", {
+    p_audit: auditId,
+    p_label: label,
+    p_expires_at: expiresAt,
+    p_filter: filter,
+  });
   if (error) throw error;
   return data as AuditShareRow;
+}
+
+/** What the share form offers: exactly what this audit asked about, by id,
+ *  which is what a filter stores. */
+export async function fetchShareOptions(auditId: string): Promise<ShareOptions | null> {
+  const { data, error } = await supabase.rpc("audit_share_options", { p_audit: auditId });
+  if (error) throw error;
+  return (data as ShareOptions | null) ?? null;
 }
 
 export async function revokeAuditShare(shareId: string): Promise<void> {

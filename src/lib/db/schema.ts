@@ -386,6 +386,7 @@ const audit_shares = new Table(
     revoked_at: column.text,
     view_count: column.integer,
     last_viewed_at: column.text,
+    filter: column.text,
   },
   {
     indexes: {
@@ -1713,6 +1714,7 @@ export const STRUCTURED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   audit_questions: ["choices"],
   audit_report_snapshots: ["document"],
   audit_rules: ["conditions"],
+  audit_shares: ["filter"],
   checklist_instance_items: ["result"],
   checklist_template_items: ["config"],
   checklist_template_sections: ["trigger_config", "due_by"],

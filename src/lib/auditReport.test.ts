@@ -308,3 +308,30 @@ describe("toCsv", () => {
     expect(toCsv(["a", "b"], [["plain", 3], ['say "hi", now', "two\nlines"]])).toBe('a,b\nplain,3\n"say ""hi"", now","two\nlines"');
   });
 });
+
+describe("a filtered document", () => {
+  // Test 11 of the list approved 2026-09-24. The filter is applied in the
+  // database (docs/audits.md § A link can show less); what this guards is
+  // the other half of the promise - that the DERIVED numbers carry the
+  // omission too, because every one of them is computed from the document.
+  // A reader must not be able to tell the audit ever asked.
+  const withoutServices: AuditReport = {
+    ...statusAudit,
+    audit: { ...statusAudit.audit, includeServices: false },
+    columns: { ...statusAudit.columns, services: [] },
+    targets: statusAudit.targets.map((t) => ({ ...t, services: [] })),
+  };
+  it("9c · the summary counts only what the document still contains", () => {
+    expect(summarize(statusAudit).broken.length).toBeGreaterThan(0);
+    expect(summarize(withoutServices).broken).toEqual([]);
+    expect(summarize(withoutServices).services).toEqual([]);
+    expect(narrative(withoutServices, summarize(withoutServices)).join(" ")).not.toMatch(/not working/i);
+  });
+  it("9d · no column, and nothing in Needs attention, to give it away", () => {
+    expect(wideHeaders(statusAudit)).toContain("Power");
+    expect(wideHeaders(withoutServices)).not.toContain("Power");
+    expect(attention(statusAudit.targets[2])).toContain("Power not working - pedestal dead");
+    expect(attention({ ...statusAudit.targets[2], services: [] })).not.toContain("Power not working - pedestal dead");
+    expect(itemRows(withoutServices).some((r) => r.category === "Service")).toBe(false);
+  });
+});

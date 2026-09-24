@@ -1969,3 +1969,33 @@ h3 {
     overflow: visible;
   }
 }
+
+/* ---------- Share link filter (docs/audits.md § A link can show less) ---------- */
+.share-filter {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--line-lt);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.share-filter-col {
+  min-width: 0;
+  /* A long audit's location list is the one thing here that can run away. */
+  max-height: 320px;
+  overflow-y: auto;
+}
+.share-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.share-filter-row.indent {
+  padding-left: 22px;
+  color: var(--mute);
+}

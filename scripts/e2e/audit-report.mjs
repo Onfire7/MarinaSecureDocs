@@ -140,6 +140,70 @@ await page.reload({ waitUntil: "domcontentloaded" });
 await page.waitForSelector('[data-testid="share-row"]', { timeout: 60000 });
 check("18c the revoked link stays listed, struck through", (await page.locator('[data-testid="share-row"]').filter({ hasText: LABEL }).evaluate((el) => getComputedStyle(el).textDecorationLine)) === "line-through");
 
+// ── 19: a filtered link (docs/audits.md § A link can show less) ──────────
+// Tests 12-14 of the list approved 2026-09-24. The point is not that the
+// page hides things - it is that the document never had them, so there is
+// nothing to find in the source, the export, or the numbers.
+await page.goto(`${APP_URL}/audits/${auditId}`, { waitUntil: "domcontentloaded" });
+await page.waitForSelector('[data-testid="create-share"]', { timeout: 120000 });
+await page.waitForSelector('[data-testid="share-filter-toggle"]', { timeout: 30000 });
+await page.waitForTimeout(1500);
+await page.getByTestId("share-filter-toggle").click();
+await page.waitForSelector('[data-testid="share-filter"]', { timeout: 10000 });
+// hide GPS, hide one Service by name, and keep only the first few locations
+await page.locator('[data-testid="share-cat"][data-cat="gps"]').uncheck();
+const svcRow = page.locator("label.share-filter-row", { hasText: "Shore power 30A" }).first();
+await svcRow.locator('[data-testid="share-entry"]').uncheck();
+const targets = page.locator('[data-testid="share-target"]');
+const targetCount = await targets.count();
+for (let i = 4; i < targetCount; i++) await targets.nth(i).uncheck();
+const shownNow = await page.locator('[data-testid="share-target"]:checked').count();
+await page.locator('input[aria-label="Share label"]').fill(`Filtered ${stamp}`);
+await page.getByTestId("create-share").click();
+await page.waitForSelector('[data-testid="share-url"]', { timeout: 30000 });
+const filteredUrl = (await page.getByTestId("share-url").innerText()).trim();
+// the newest link is the last row: the table is in creation order
+const shows = await page.locator('[data-testid="share-shows"]').last().innerText();
+check("19a the link's row says what it leaves out", /hides GPS, Shore power 30A/.test(shows) && /\d+ of \d+ locations/.test(shows), shows);
+
+const fpub = await browser.newContext();
+const fp = await fpub.newPage();
+await fp.goto(filteredUrl, { waitUntil: "domcontentloaded" });
+await fp.waitForSelector('[data-testid="report-summary"]', { timeout: 60000 });
+await fp.waitForTimeout(1500);
+const body = await fp.locator("body").innerText();
+const html = await fp.content();
+check("19b the hidden Service is nowhere on the page, nor in its source",
+  !/Shore power 30A/.test(body) && !/Shore power 30A/.test(html), (body.match(/Shore power[^\n]*/) ?? ["absent"])[0]);
+check("19c a Service that was not hidden is still there", /Water/.test(body));
+const rowCount = Number((await fp.getByTestId("report-count").innerText()).split(" of ")[1]);
+check("19d only the locations the link covers, and the totals are of that subset",
+  rowCount === shownNow && new RegExp(`\\b${shownNow}\\b`).test(await fp.locator('[data-testid="report-summary"]').innerText()),
+  `${rowCount} rows, link covers ${shownNow}`);
+
+const fdl = [];
+fp.on("download", (d) => fdl.push(d));
+await fp.getByTestId("report-export").click();
+await fp.getByLabel("Rows").selectOption("locations");
+await fp.getByTestId("report-export-run").click();
+await fp.waitForTimeout(2500);
+const fcsv = fdl.find((d) => d.suggestedFilename().endsWith("locations.csv"));
+if (fcsv) {
+  const text = readFileSync(await fcsv.path(), "utf8");
+  check("19e and its export has no column for the hidden Service",
+    !/Shore power 30A/.test(text.split("\n")[0]) && /Water/.test(text.split("\n")[0]), text.split("\n")[0].slice(0, 160));
+} else {
+  check("19e and its export has no column for the hidden Service", false, "no CSV downloaded");
+}
+await fp.screenshot({ path: `${OUT}/report-filtered.png`, fullPage: false });
+await fpub.close();
+
+// 14 · the in-app report is the audit itself
+await page.goto(`${APP_URL}/audits/${auditId}/report`, { waitUntil: "domcontentloaded" });
+await page.waitForSelector('[data-testid="report-summary"]', { timeout: 60000 });
+await page.waitForTimeout(1500);
+check("19f the in-app report still shows everything", /Shore power 30A/.test(await page.locator("body").innerText()));
+
 await browser.close();
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} passed`);

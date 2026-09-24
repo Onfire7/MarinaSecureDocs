@@ -39,8 +39,18 @@
   something names the categories: "no answer for services, map".
 - *+ propose a new location* while open.
 - **Report and sharing**, on every audit. *View report* opens
-  `/audits/:id/report`. `manage_audits` also sees **Share**: a label and an
-  expiry (90 days, or never) make a link, and the URL is copied on creation.
+  `/audits/:id/report`. `manage_audits` also sees **Share**: a label, an
+  expiry (90 days, or never) and *What this link shows* make a link, and
+  the URL is copied on creation.
+  - **What this link shows** is collapsed by default and reads "everything"
+    until touched. Open, it lists every category the audit asked about with
+    its entries beneath - Services with each Service, Questions with each
+    prompt - each a checkbox, all ticked; and a Locations section, by area,
+    ticked the same way. Unticking is the filter, and it is applied in the
+    database, not on the page (`docs/audits.md` § A link can show less). A
+    link's row then says what it leaves out ("hides GPS, Sewer · 24 of 76
+    locations"), because a list of links that all look alike is a way to
+    send the wrong one.
   Below it, every link the audit has - label, created, expires, views, last
   viewed - each with *Copy link* and *Revoke*; a revoked or expired one is
   shown struck through and stays listed. Spec: `docs/audits.md` § Sharing
