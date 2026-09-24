@@ -292,6 +292,9 @@
   flex-direction: column;
   gap: 2px;
   align-items: center;
+  /* Full width of the page, or the rule's width would resolve against the
+     length of the location's name. */
+  align-self: stretch;
 }
 .wz-d-loc {
   font-size: 1.5rem;
@@ -299,9 +302,17 @@
   line-height: 1.15;
   margin: 0;
 }
-.wz-d-loc .muted {
-  font-size: 0.95rem;
-  font-weight: 500;
+.wz-d-type {
+  font-size: 0.9rem;
+  color: var(--mute);
+}
+/* Where the location ends and the question begins. Faded at both ends so
+   it reads as a separation rather than a box. */
+.wz-d-rule {
+  width: min(260px, 62%);
+  height: 1px;
+  margin: 10px 0 8px;
+  background: linear-gradient(90deg, transparent, var(--line), transparent);
 }
 .wz-d-group {
   font-size: 0.72rem;

@@ -27,7 +27,8 @@ variants; this is D).
 ## Running — phone
 
 - **One item per screen**, headed by the location: its name as the page's
-  `h1` with the type beside it, then the item's group, then the item -
+  `h1`, the type under it, then a hairline that fades out at both ends,
+  then the item's group and the item -
   which location is being edited should never be in doubt, and the pager at
   the foot is too far from the question to answer it. The items of a
   location are screen-sized pages stacked vertically; locations sit side by

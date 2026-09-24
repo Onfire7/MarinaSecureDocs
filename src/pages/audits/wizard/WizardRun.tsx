@@ -420,10 +420,9 @@ function Column({
         return (
           <section className="wz-d-page" key={item.key} data-page={i}>
             <div className="wz-d-heading">
-              <h1 className="wz-d-loc">
-                {target.location_name}
-                {target.type_name && <span className="muted"> {target.type_name}</span>}
-              </h1>
+              <h1 className="wz-d-loc">{target.location_name}</h1>
+              {target.type_name && <div className="wz-d-type">{target.type_name}</div>}
+              <div className="wz-d-rule" aria-hidden />
               <div className="wz-d-group">{item.group}</div>
               <div className="wz-d-label">{item.label}</div>
             </div>
