@@ -63,6 +63,14 @@ export function WizardRun(p: RunProps) {
 
   // Land on the current item. A slide has already put the new column where
   // it belongs, and the auditor's own scrolling needs no help.
+  //
+  // The dependency is the INDEX, never `step`. `step` is rebuilt whenever
+  // buildSteps() runs, which is whenever any of the queries behind the
+  // catalogue re-emits - and a PowerSync query re-emits every time anything
+  // it touches changes, which includes the answer just written. Depending on
+  // its identity ran this effect mid-swipe with the index unchanged, and
+  // since the scroller was then between two pages, it tweened back to the
+  // one being left: the scroll fought the thumb, several times per swipe.
   useEffect(() => {
     const el = colRef.current;
     if (!el || !step || wide) return;
@@ -86,7 +94,9 @@ export function WizardRun(p: RunProps) {
       tweening.current = false;
       focusActive(el, step.itemIndex);
     });
-  }, [p.index, step, wide]);
+    // `step` and the refs are read at run time and deliberately not deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p.index, wide]);
 
   // A keyboard opening does not resize the viewport here - the pager is
   // meant to go under it - so the pages give way instead, and the question
@@ -158,11 +168,26 @@ export function WizardRun(p: RunProps) {
     p.setIndex(firstOf(step.targetIndex) + itemIndex);
   };
 
+  /** Is this gesture the confirmation page's review list's business? The
+   *  run sits at the bottom of its stack whenever that page is showing, so
+   *  without this every swipe over the review counted as overscroll and
+   *  rolled into the next location - the review itself never moved. Once
+   *  the list is at its end the gesture is the run's again. */
+  const innerScroller = (target: EventTarget | null, dy: number) => {
+    const el = target instanceof Element ? target.closest<HTMLElement>(".wz-c-review-list") : null;
+    if (!el || el.scrollHeight <= el.clientHeight) return false;
+    return dy > 0 ? el.scrollTop < el.scrollHeight - el.clientHeight - 1 : el.scrollTop > 1;
+  };
+
   /** Pushing past either end of the stack rolls into the neighbouring
    *  location - the ribbon has no walls, only corners. */
-  const edgeNudge = (dy: number) => {
+  const edgeNudge = (dy: number, target: EventTarget | null = null) => {
     const el = colRef.current;
     if (!el || cooling.current) return;
+    if (innerScroller(target, dy)) {
+      overscroll.current = 0;
+      return;
+    }
     const atTop = el.scrollTop <= 2;
     const atBottom = el.scrollTop >= el.scrollHeight - el.clientHeight - 2;
     if ((dy < 0 && atTop) || (dy > 0 && atBottom)) {
@@ -234,11 +259,11 @@ export function WizardRun(p: RunProps) {
             className="wz-d-wrap"
             ref={wrapRef}
             style={pageHeight === null ? undefined : ({ "--wz-page-h": `${pageHeight}px` } as CSSProperties)}
-            onWheel={(e) => edgeNudge(e.deltaY)}
+            onWheel={(e) => edgeNudge(e.deltaY, e.target)}
             onTouchStart={(e) => (touchY.current = e.touches[0]?.clientY ?? null)}
             onTouchMove={(e) => {
               const y = e.touches[0]?.clientY ?? null;
-              if (touchY.current !== null && y !== null) edgeNudge(touchY.current - y);
+              if (touchY.current !== null && y !== null) edgeNudge(touchY.current - y, e.target);
               touchY.current = y;
             }}
             onTouchEnd={() => {

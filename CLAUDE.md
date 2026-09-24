@@ -170,6 +170,30 @@ Screenshots or it didn't happen.
   "checkpoint.id": {...} }` returns rows with `checkpoint: undefined`
   unless the query also includes `checkpoint: {}`. This silently broke tour
   progress once; a type cast had hidden it.
+- **An effect that positions a scroller must key on a number, not an
+  object.** The wizard's "land on the current item" effect depended on
+  `[p.index, step, wide]`, and `step` is rebuilt whenever `buildSteps()`
+  runs - which is whenever any query behind it re-emits, which PowerSync
+  does on every change to anything those queries touch, including the
+  answer just written. So a write landing mid-swipe re-ran the effect with
+  the index unchanged, found the scroller between two pages, and tweened it
+  back: the page was hauled out from under the thumb, several times per
+  swipe, and it got worse with every live query added to the page. Measured
+  before and after with a CDP touch drag held mid-page while an UPDATE
+  landed: 245px of drift and 21 tween frames became 0 and 0
+  (`scripts/e2e/audit-wizard.mjs` § 6). Headless `mouse.wheel` models none
+  of this - it lands the whole delta in one frame and oscillates against
+  mandatory snapping whatever the code does. Use
+  `Input.dispatchTouchEvent`.
+- **A scroll-snap page that is not a screen tall is a page the run cannot
+  rest on.** The wizard's confirmation page was briefly `height: auto`, on
+  the theory that an oversized snap area only snaps at its edges. What it
+  actually produced: one swipe crossed the whole page and tripped the
+  roll-over into the next location, and `pageTop()` / `nearestPage()` /
+  the keyboard pinning - all of which assume a page is a screen - had a
+  page they could not land on. Long content scrolls *inside* a page, with
+  `overscroll-behavior: contain`, and the roll-over stands down while that
+  inner scroller still has somewhere to go.
 - **Never build a `db.useQuery` argument from a moving value.** A query
   whose *value* differs every render resubscribes, pushes a snapshot, and
   re-renders — an infinite loop React kills with "Maximum update depth

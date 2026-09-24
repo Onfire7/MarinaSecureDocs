@@ -308,6 +308,99 @@ await settle(1800);
 check("5i reopening puts it back in the queue", sql(`select state from audit_targets where audit_id = '${auditId}' and location_name = '${first}'`) === "pending");
 check("5j with every answer still there", rowsOf("audit_finding_services", first, "count(*)::text") === servicesBeforeReopen, servicesBeforeReopen);
 
+// ── 6: the scroller belongs to the thumb ─────────────────────────────────
+// Both halves of this were real: a write landing mid-swipe tweened the page
+// back out from under the finger, and the confirmation page - briefly taller
+// than the scroller - could not be rested in, so one swipe crossed it and
+// rolled into the next location. Touch, not the wheel: headless wheel
+// deltas land in one frame and model nothing.
+const cdp = await ctx.newCDPSession(page);
+const touch = (type, y) =>
+  cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x: 195, y }] });
+const watch = () =>
+  page.evaluate(() => {
+    window.__trace = [];
+    const col = document.querySelector(".wz-d-col:not([class*=wz-out])");
+    const list = document.querySelector(".wz-c-review-list");
+    window.__iv = setInterval(
+      () => window.__trace.push([Math.round(col.scrollTop), col.style.scrollSnapType === "none" ? 1 : 0, list ? Math.round(list.scrollTop) : -1]),
+      25,
+    );
+  });
+const stop = () => page.evaluate(() => { clearInterval(window.__iv); return window.__trace; });
+const drag = async (from, to) => {
+  await touch("touchStart", from);
+  const step = from > to ? -20 : 20;
+  for (let y = from + step; (step < 0 ? y >= to : y <= to); y += step) { await touch("touchMove", y); await page.waitForTimeout(12); }
+  await touch("touchEnd", to);
+};
+
+await page.goto(`${APP_URL}/audits/${auditId}/wizard`, { waitUntil: "domcontentloaded" });
+await page.waitForSelector('[data-testid="wz-start"]', { timeout: 60000 });
+await settle();
+await page.getByRole("button", { name: "All, including audited" }).click();
+await page.getByTestId("wz-start").click();
+await page.waitForSelector('[data-testid="wz-pip"]', { timeout: 60000 });
+await settle(1800);
+
+const heights = await page.evaluate(() => {
+  const col = document.querySelector(".wz-d-col:not([class*=wz-out])");
+  return { col: col.clientHeight, pages: [...col.querySelectorAll("[data-page]")].map((el) => Math.round(el.getBoundingClientRect().height)) };
+});
+check(
+  "6a every page is one screen, the confirmation page included",
+  heights.pages.length > 1 && heights.pages.every((h) => Math.abs(h - heights.col) <= 1),
+  `col ${heights.col}, pages ${[...new Set(heights.pages)].join("/")}`,
+);
+
+// A write lands while the thumb is still down. Nothing may move.
+await watch();
+await touch("touchStart", 640);
+for (let y = 620; y >= 380; y -= 20) { await touch("touchMove", y); await page.waitForTimeout(12); }
+const held = await page.evaluate(() => Math.round(document.querySelector(".wz-d-col:not([class*=wz-out])").scrollTop));
+sql(`update audit_targets set displaced_note = 'e2e scroll probe' where audit_id = '${auditId}'`);
+await settle(1600);
+const during = await page.evaluate(() => Math.round(document.querySelector(".wz-d-col:not([class*=wz-out])").scrollTop));
+await touch("touchEnd", 380);
+await settle(1200);
+const midTrace = await stop();
+sql(`update audit_targets set displaced_note = null where audit_id = '${auditId}'`);
+check(
+  "6b a write landing mid-swipe does not pull the page out from under the thumb",
+  held > 20 && during === held && midTrace.filter((t) => t[1]).length === 0,
+  `held ${held}, then ${during}, ${midTrace.filter((t) => t[1]).length} tween frames`,
+);
+
+// The confirmation page's review scrolls inside the page, and only when it
+// has nothing left does the run move on.
+await page.locator('[data-testid="wz-pip"]').last().click();
+await settle(1800);
+const box = await page.evaluate(() => {
+  const l = document.querySelector(".wz-c-review-list");
+  if (!l) return null;
+  const b = l.getBoundingClientRect();
+  return { mid: Math.round(b.top + b.height * 0.75), top: Math.round(b.top + 40), scrollable: l.scrollHeight > l.clientHeight };
+});
+if (box?.scrollable) {
+  await watch();
+  await drag(box.mid, box.top);
+  await settle(1500);
+  const t = await stop();
+  check(
+    "6c a swipe over the review scrolls the review, not the run",
+    t.at(-1)[2] > t[0][2] && t.at(-1)[0] === t[0][0],
+    `list ${t[0][2]}→${t.at(-1)[2]}, run ${t[0][0]}→${t.at(-1)[0]}`,
+  );
+  await watch();
+  await drag(box.mid, box.top);
+  await settle(1500);
+  const t2 = await stop();
+  check("6d and with the review read out, the next swipe moves the run on", t2.at(-1)[0] !== t2[0][0], `run ${t2[0][0]}→${t2.at(-1)[0]}`);
+} else {
+  check("6c a swipe over the review scrolls the review, not the run", false, "the review did not overflow — widen the fixture");
+  check("6d and with the review read out, the next swipe moves the run on", false, "skipped");
+}
+
 await browser.close();
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} passed`);

@@ -38,7 +38,12 @@ variants; this is D).
   location are screen-sized pages stacked vertically; locations sit side by
   side.
 - **Vertical moves** — swipe, wheel, the rail's arrows, a tapped answer —
-  land on a page over **500ms**, easing. Free scrolling snaps a page at a
+  land on a page over **500ms**, easing. That landing is keyed to the step
+  **index**, never to the identity of the step object: the object is rebuilt
+  whenever any query behind the catalogue re-emits, which a PowerSync query
+  does every time anything it touches changes - including the answer just
+  written. Keyed to identity, a write landing mid-swipe tweened the page
+  back out from under the thumb, several times per swipe. Free scrolling snaps a page at a
   time. Mandatory scroll-snap re-snaps every frame a programmatic scroll
   writes, so snapping is suspended for the length of a tween (CLAUDE.md).
 - **Horizontal moves** — the pager, the jump list, rolling off either end —
@@ -98,7 +103,13 @@ variants; this is D).
 
 ## Confirming a location
 
-- **The last page of a location is the location.** Every item this audit
+- **The last page of a location is the location** — a page like every
+  other, one screen tall, with the review scrolling **inside** it and the
+  sign-off pinned under it. A swipe over the review scrolls the review;
+  when it has nothing left, the next swipe moves the run on. (Made taller
+  than the screen it could not be rested in: one swipe crossed the whole
+  review and rolled into the next location, and every piece of arithmetic
+  here assumes a page is a screen.) Every item this audit
   asks about it — not just the ones this run selected — with what is
   recorded against each: this run's answer, else the earlier pass's, else
   what is on file. An item with nothing behind it reads *not answered*, in

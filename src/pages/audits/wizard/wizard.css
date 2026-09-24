@@ -445,20 +445,34 @@
 }
 
 /* ── the confirmation page ───────────────────────────────────────────── */
-/* The page that ends a location is the one page that is not screen-sized:
-   it lists everything the audit asks about the location, and a long list
-   scrolls in the column like any other content. A snap area taller than
-   the scroller only snaps at its edges, so this stays readable rather than
-   being dragged back to the top. */
+/* It is a page like every other - one screen, one snap area - and the
+   review scrolls INSIDE it.
+   
+   It was briefly `height: auto`, taller than the scroller, on the theory
+   that an oversized snap area only snaps at its edges. What that actually
+   bought was a page the run could not rest in: one swipe crossed the whole
+   review and tripped the roll-over into the next location, and the pinning
+   and page-landing arithmetic - all of which assumes a page is a screen -
+   had a page it could not land on. `overscroll-behavior: contain` keeps a
+   swipe inside the list until it reaches the end, so the run moves on only
+   when the auditor swipes again. */
 .wz-d-page.wz-d-confirm {
-  height: auto;
-  min-height: 100%;
   justify-content: flex-start;
 }
 .wz-c-review {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   width: 100%;
   max-width: 560px;
   text-align: left;
+}
+.wz-c-review-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .wz-c-review-group {
   font-size: 0.72rem;
@@ -495,7 +509,10 @@
 .wz-c-review-tag {
   flex: 0 0 auto;
 }
+/* The sign-off stays put while the review scrolls: it is the one thing on
+   the page that must never be hunted for. */
 .wz-c-review-foot {
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
