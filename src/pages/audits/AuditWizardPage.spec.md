@@ -51,6 +51,15 @@ variants; this is D).
 - **Fields take focus on arrival**, so a number is typed without reaching
   for the screen. Numbers use a decimal keyboard; every field's Enter key is
   `next`.
+- **The keyboard does not resize the viewport.** It is allowed to cover the
+  pager - there is nothing to do down there while typing. What it must not
+  cover is the question, so the *pages* give way instead: each takes the
+  height of whatever the scroller still has on screen
+  (`visiblePageHeight()`, from `window.visualViewport`), animated over
+  **250ms**, and the question stays centred in what is left. The page being
+  answered is held against the top of the scroller for the length of that
+  animation, snapping suspended, or every page moving at once would carry it
+  off. A keyboard smaller than the pager costs the pages nothing.
 - The bottom bar is the pager: ◀, the location name (tap to jump), ▶, over a
   background tinted green from the left with the run's progress.
 

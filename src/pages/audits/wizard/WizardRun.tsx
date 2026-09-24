@@ -19,13 +19,16 @@
 // On a desktop the whole location is one page and the right-hand sidebar is
 // the jump list with the pager at its foot: there is no reason to scroll a
 // screen at a time on a machine that can show the lot.
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { ItemControl } from "./ItemControl";
 import { JumpBody } from "./JumpBody";
+import { useVisiblePageHeight } from "./useVisiblePageHeight";
 import { isAnswered, stepOfTarget, type Step, type WizardTarget } from "../../../lib/auditWizard";
 import type { RunProps } from "./runProps";
 
 const SLIDE_MS = 500;
+/** Pages give way to the keyboard over this long; see wizard.css. */
+const RESIZE_MS = 250;
 /** How much overscroll at an edge rolls into the next location. */
 const EDGE = 120;
 
@@ -42,6 +45,10 @@ export function WizardRun(p: RunProps) {
    *  event. Letting those move the index means the tween chases a target
    *  that is being rewritten under it, and it lands a page early. */
   const tweening = useRef(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  /** How tall a page is: the whole scroller, less whatever the keyboard
+   *  covers. Null until first measured, when it is simply 100%. */
+  const [pageHeight, setPageHeight] = useState<number | null>(null);
   const touchY = useRef<number | null>(null);
   const step = p.steps[p.index];
   const firstOf = (ti: number) => p.steps.findIndex((s) => s.targetIndex === ti);
@@ -79,6 +86,35 @@ export function WizardRun(p: RunProps) {
       focusActive(el, step.itemIndex);
     });
   }, [p.index, step, wide]);
+
+  // A keyboard opening does not resize the viewport here - the pager is
+  // meant to go under it - so the pages give way instead, and the question
+  // stays centred in what is left.
+  useVisiblePageHeight(wrapRef, useCallback((px: number) => setPageHeight((was) => (was === px ? was : px)), []));
+
+  // While the pages animate to their new height, every page moves. Hold the
+  // one being answered against the top of the scroller for the length of it,
+  // with snapping out of the way as ever.
+  const itemIndexRef = useRef(0);
+  itemIndexRef.current = step?.itemIndex ?? 0;
+  useEffect(() => {
+    const el = colRef.current;
+    if (el === null || pageHeight === null) return;
+    el.style.scrollSnapType = "none";
+    const start = performance.now();
+    let frame = 0;
+    const pin = (now: number) => {
+      const to = pageTop(el, itemIndexRef.current);
+      if (to !== null) el.scrollTop = to;
+      if (now - start < RESIZE_MS + 40) frame = requestAnimationFrame(pin);
+      else el.style.scrollSnapType = "";
+    };
+    frame = requestAnimationFrame(pin);
+    return () => {
+      cancelAnimationFrame(frame);
+      el.style.scrollSnapType = "";
+    };
+  }, [pageHeight]);
 
   if (!step) return null;
   const t = step.target;
@@ -176,6 +212,8 @@ export function WizardRun(p: RunProps) {
         <>
           <div
             className="wz-d-wrap"
+            ref={wrapRef}
+            style={pageHeight === null ? undefined : ({ "--wz-page-h": `${pageHeight}px` } as CSSProperties)}
             onWheel={(e) => edgeNudge(e.deltaY)}
             onTouchStart={(e) => (touchY.current = e.touches[0]?.clientY ?? null)}
             onTouchMove={(e) => {

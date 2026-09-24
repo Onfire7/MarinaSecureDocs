@@ -410,6 +410,10 @@ field: an answer that reveals something - a Service found Present, which
 wants its working flag and note - moves into that, and one that reveals
 nothing moves to the next item.
 
+The on-screen keyboard is allowed to cover the pager, and never the
+question: the pages shrink to what is still visible, over 250ms, and the
+question stays centred in it.
+
 The run reports progress as **what it has touched**, not what has a value:
 a Location pre-filled from six months ago is not a Location anyone looked
 at today.

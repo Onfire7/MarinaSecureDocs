@@ -261,7 +261,11 @@
   display: none;
 }
 .wz-d-page {
-  height: 100%;
+  /* The scroller's height, less whatever the on-screen keyboard covers.
+     Animated so the question slides into the middle of what is left rather
+     than jumping there (AuditWizardPage.spec.md § Running - phone). */
+  height: var(--wz-page-h, 100%);
+  transition: height 250ms ease;
   scroll-snap-align: start;
   scroll-snap-stop: always;
   display: flex;
@@ -345,6 +349,7 @@
 .wz-out-right { animation: wz-out-right 500ms ease both; }
 @media (prefers-reduced-motion: reduce) {
   .wz-in-right, .wz-in-left, .wz-out-left, .wz-out-right { animation-duration: 1ms; }
+  .wz-d-page { transition-duration: 1ms; }
 }
 
 .wz-d-footer {

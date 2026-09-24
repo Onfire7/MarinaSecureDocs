@@ -256,3 +256,27 @@ export function answeredCount(items: WizardItem[], answers: TargetAnswers | unde
   if (!answers) return 0;
   return items.filter((i) => isAnswered(answers[i.key], i.kind)).length;
 }
+
+/**
+ * How much of the run's scroller is actually on screen.
+ *
+ * The wizard deliberately does NOT shrink the viewport when the keyboard
+ * opens - the location pager is allowed to go under it. What must not
+ * happen is the question scrolling out of sight: each item's page is a
+ * screen, and a screen has just got shorter. This returns the height a
+ * page should take, so the question stays centred in what is left.
+ *
+ * `wrap` is the scroller in layout coordinates (getBoundingClientRect);
+ * `view` is the visual viewport, whose height excludes the keyboard and
+ * whose offsetTop is how far it has been scrolled inside the layout
+ * viewport - iOS moves it, Android does not.
+ */
+export function visiblePageHeight(
+  wrap: { top: number; height: number },
+  view: { offsetTop: number; height: number },
+): number {
+  const visibleBottom = view.offsetTop + view.height;
+  // Never collapse to nothing: a freak measurement mid-rotation would
+  // otherwise leave a page too short to hold its own control.
+  return Math.max(160, Math.min(wrap.height, Math.round(visibleBottom - wrap.top)));
+}

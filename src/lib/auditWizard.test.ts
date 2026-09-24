@@ -8,6 +8,7 @@ import {
   isAnswered,
   itemsForTarget,
   stepOfTarget,
+  visiblePageHeight,
   type ItemGroup,
   type WizardTarget,
 } from "./auditWizard";
@@ -203,5 +204,24 @@ describe("isAnswered", () => {
         marked: true,
       }),
     ).toBe(2);
+  });
+});
+
+describe("visiblePageHeight", () => {
+  const wrap = { top: 44, height: 700 };
+  it("16 · no keyboard: the page is the whole scroller", () => {
+    expect(visiblePageHeight(wrap, { offsetTop: 0, height: 800 })).toBe(700);
+  });
+  it("17 · a keyboard takes the bottom, and the page gives way by that much", () => {
+    // 800 tall, 300 of keyboard: visible bottom is 500, the scroller starts
+    // at 44, so 456 of it is on screen.
+    expect(visiblePageHeight(wrap, { offsetTop: 0, height: 500 })).toBe(456);
+  });
+  it("18 · iOS scrolls the visual viewport, which moves the visible bottom", () => {
+    expect(visiblePageHeight(wrap, { offsetTop: 60, height: 500 })).toBe(516);
+  });
+  it("19 · never taller than the scroller, never shorter than a control", () => {
+    expect(visiblePageHeight(wrap, { offsetTop: 0, height: 5000 })).toBe(700);
+    expect(visiblePageHeight(wrap, { offsetTop: 0, height: 20 })).toBe(160);
   });
 });
