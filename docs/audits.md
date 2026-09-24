@@ -35,7 +35,7 @@ have them today.
 |---|---|
 | Create or edit an Audit Template | `manage_audits` |
 | Launch, close an Audit | `manage_audits` |
-| Record a Finding | assignment (a User or one of their Roles is an assignee). Row-level: any active marina user may insert; assignment is enforced in the UI and the data layer, matching how ticket creation is ungated. |
+| Record a Finding, by form or by wizard | assignment (a User or one of their Roles is an assignee). Row-level: any active marina user may insert; assignment is enforced in the UI and the data layer, matching how ticket creation is ungated. |
 | Approve or reject a Proposal about Service or Amenity presence, or GPS | `manage_audits` |
 | Approve or reject a structural Proposal (new, retired, renamed, retyped, reparented, re-placed Location) | `manage_locations` |
 | Finalize | `manage_audits`; **and** `manage_locations` when any structural Proposal exists |
@@ -366,6 +366,87 @@ radius).
   the capture button enables. The prompt never assumes they are.
 - The capture is a **Proposal** (see above), recorded with the fix and its
   accuracy.
+
+## The wizard
+
+Settled with the owner on 2026-09-23, by prototype (branch
+`prototype/audit-wizard`, four variants; the chosen one is D, the owner's
+own design). The Finding form asks everything about one Location at once,
+which is right when you are standing at one Location and wrong when you
+are walking fifty. The **wizard** is the walking tool: pick what this run
+asks about, then go through the Locations answering one thing at a time.
+
+It is repeatable and exitable, and it is **an aid, not the audit**. Nothing
+it records differs from what the Finding form would have recorded, and
+either may be used on the same Location. A sweep of one item across the
+property is simply another run with one item selected.
+
+### Starting a run
+
+*Wizard* sits on an Open Audit's page, and on the Audits section when it
+shows a single Audit - a guard in the field may never open the audit page.
+It is open to anyone who may record a Finding; a Closed Audit has none to
+record and says so.
+
+The first screen is the **item list**: every entry this Audit could ask
+about, grouped - Status (or Occupancy), Attributes, Services, Amenities,
+Questions, Checks, GPS - each group headed by a checkbox that takes the
+whole group, and **everything selected**. Most runs want everything; a
+sweep turns the rest off. Under it, the **Locations** the run walks:
+*Still to do* by default, or all of them including those already audited.
+The foot of the screen counts what was chosen - "12 locations · 147 steps".
+
+### Walking it
+
+A run is **location-major**: every selected item of one Location, then the
+next. Items that do not apply are never shown - a Service the Location's
+type does not have, a Question no Rule attached to it, GPS on a Location
+that already has a pin.
+
+Each item opens **pre-filled from what the marina already records**, with
+an *On file:* line saying what that is, so the auditor is confirming
+rather than entering (§ Field work). Answering moves to the next logical
+field: an answer that reveals something - a Service found Present, which
+wants its working flag and note - moves into that, and one that reveals
+nothing moves to the next item.
+
+The run reports progress as **what it has touched**, not what has a value:
+a Location pre-filled from six months ago is not a Location anyone looked
+at today.
+
+### Saving
+
+**Every answer is written the moment it is made.** Losing four-fifths of a
+Location because a phone slept, or because a thumb found Back, is worse
+here than on the Finding form, which at least holds one Location's work.
+
+Each write touches **only the item it was given**. A run that asks about
+Power leaves the amenities an earlier run recorded exactly as they were -
+`saveFinding()` rewrites a Finding's parts wholesale and would erase them,
+so the wizard has its own writer (`src/data/auditWizard.ts`). Re-answering
+an item replaces the Proposal it made rather than adding a second one, and
+answering back to what is on file withdraws the Proposal entirely.
+
+The first answer at a Location **creates its Finding**, which marks the
+Location Audited even when the run asked about one item. That is
+deliberate: the unanswered-category pills (§ Confirming an Audit is
+complete) are what say the rest is still open.
+
+What applies at once and what waits for approval is unchanged
+(§ What applies immediately). A Yes/No Question that raises a Ticket on No
+raises it here too, once.
+
+### Jumping about
+
+The locations are a filterable list - search, and *Still to do* / *Done* /
+*All* with counts - reached from the bottom bar on a phone and always
+visible in the sidebar on a desktop. Picking one goes there. Next and
+Previous move a Location at a time.
+
+Nothing about a run is stored: the selection and the position live for as
+long as the screen does. Switching devices means starting a run, which
+costs a few taps and is the honest answer for a tool that is navigation
+rather than record.
 
 ## Closing
 

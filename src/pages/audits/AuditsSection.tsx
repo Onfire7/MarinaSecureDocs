@@ -93,6 +93,11 @@ export function AuditsSection({
           {!full && (collapsed ? " · show" : " · hide")}
         </span>
       </button>
+      {!collapsed && audits.size === 1 && (
+        <Link to={`/audits/${[...audits][0]}/wizard`} className="btn btn-sm btn-primary" data-testid="section-wizard" style={{ marginTop: 8 }}>
+          Start the wizard
+        </Link>
+      )}
       {!collapsed && (
         <div className="stack" style={{ gap: 6, marginTop: 8 }}>
           {shown.map((t) => (

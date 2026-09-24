@@ -15,9 +15,10 @@ Run `pnpm run test:coverage` then `pnpm run coverage:check`.
 `contacts.ts` · `detId.ts` · `geo.ts` · `permissions.ts` · `search.ts` ·
 `shiftReport.ts` · `data/attachments.ts` · `data/sql.ts` — 100%.
 
-`auditRules.ts` and `audits.ts` — the rule evaluator and the Finding
-decisions behind `docs/audits.md`, written test-first; the uncovered lines
-are unreachable verb branches after the `switch` on subject.
+`auditRules.ts`, `audits.ts` and `auditWizard.ts` — the rule evaluator, the
+Finding decisions and the wizard's model behind `docs/audits.md`, written
+test-first; the uncovered lines are unreachable verb branches after the
+`switch` on subject.
 
 `permissions.ts` matters most: its assertions are the executable
 specification for the `effective_permissions` SQL view that replaces it (see
@@ -29,6 +30,7 @@ specification for the `effective_permissions` SQL view that replaces it (see
 
 | File | Note |
 |---|---|
+| `data/auditWizard.ts` | The wizard's per-item writer. Its decisions are SQL against the Finding it is merging into, so what matters is the merge itself: `scripts/e2e/audit-wizard.mjs` runs two wizards over one location and asserts the first run's answers survive the second. The pure half is `lib/auditWizard.ts`, fully covered. |
 | `data/sharedReport.ts` | The public report page's one anon RPC. Covered by `supabase/tests/090_audit_report.sql` (the function) and `scripts/e2e/audit-report.mjs` (the call, signed out). |
 | `data/auditReport.ts` | Four RPC/PostgREST calls for the Audit Report and its Share Links, all online by design. The functions behind them are covered by `supabase/tests/090_audit_report.sql`; the calls themselves by `scripts/e2e/audit-report.mjs`. |
 | `data/activity.ts` | Feed queries + the activity write. |

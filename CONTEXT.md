@@ -170,6 +170,13 @@ A marina-defined question attached to an Audit Rule, answered per Location:
 Yes/No (optionally raising a Ticket on No), Choice, Text, or Meter Reading.
 The built-in questions of an Audit's kind are not Audit Questions.
 
+**Wizard**:
+A run through an Audit's Locations that asks one item at a time, from a
+list of items chosen when the run starts. Repeatable, exitable, and an aid
+to recording Findings rather than a second way of holding them - every
+answer is written as it is made, and only the items the run asked about.
+_Avoid_: walkthrough, survey mode, quick audit
+
 **Finding**:
 What one User recorded about one Location in one Audit: the built-in
 answers, the Audit Question answers, and any Proposals.

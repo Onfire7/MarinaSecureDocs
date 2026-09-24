@@ -89,6 +89,11 @@ export function AuditDetailPage() {
           </div>
         </div>
         <div className="row">
+          {audit.status === "open" && (
+            <Link to={`/audits/${audit.id}/wizard`} className="btn btn-sm btn-primary" data-testid="start-wizard">
+              Wizard
+            </Link>
+          )}
           {audit.status === "open" && canManage && (
             <button type="button" className="btn btn-sm" disabled={busy} onClick={() => window.confirm("Close this audit early? Remaining locations are marked Not Audited.") && void run(() => closeAudit(audit.id))}>
               Close early

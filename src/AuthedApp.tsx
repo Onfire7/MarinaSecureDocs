@@ -63,6 +63,7 @@ import { AdminServicesPage } from "./pages/admin/AdminServicesPage";
 import { AdminAuditTemplatesPage } from "./pages/admin/AdminAuditTemplatesPage";
 import { ShiftReportPage } from "./pages/reports/ShiftReportPage";
 import { AuditReportInAppPage } from "./pages/audits/AuditReportPage";
+import { AuditWizardPage } from "./pages/audits/AuditWizardPage";
 import { Splash } from "./layout/Splash";
 
 // The signed-in application: Clerk, PowerSync, the shell and every route
@@ -134,6 +135,7 @@ export default function AuthedApp() {
                 <Route path="/audits/:id" element={<AuditDetailPage />} />
                 <Route path="/audits/:id/propose" element={<FindingPage />} />
                 <Route path="/audits/:id/report" element={<AuditReportInAppPage />} />
+                <Route path="/audits/:id/wizard" element={<AuditWizardPage />} />
                 <Route path="/audits/:id/targets/:targetId" element={<FindingPage />} />
                 <Route path="/admin" element={<AdminHomePage />} />
                 <Route path="/admin/users" element={<AdminUsersPage />} />

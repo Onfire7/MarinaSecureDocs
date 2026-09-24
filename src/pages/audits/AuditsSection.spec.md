@@ -17,5 +17,8 @@ full on the Audits page.
   target is at the top of the screen.
 - A target carrying a **displaced note** ("Expected X, found at Y") shows it as
   a warning badge.
+- **Start the wizard** appears when every pending target belongs to one
+  audit - the common case in the field, and the only one where a single
+  button is unambiguous (docs/audits.md § The wizard).
 - Renders nothing when there is nothing to audit, except on the Audits page,
   where it says so.

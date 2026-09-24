@@ -2,8 +2,9 @@
 
 `/audits/:id`. Progress while open; the finalize screen once closed.
 
-- **Header** names the audit, its kind and status. `manage_audits` sees
-  *Close early* while open and *Finalize* while closed.
+- **Header** names the audit, its kind and status. While the audit is open
+  everyone who can see it gets **Wizard** (`/audits/:id/wizard`);
+  `manage_audits` also sees *Close early*, and *Finalize* once closed.
 - **Finalize is enabled** only when every proposal has a decision and, if any
   approved proposal is structural, the user also holds `manage_locations`.
   The disabled button's tooltip says which.
