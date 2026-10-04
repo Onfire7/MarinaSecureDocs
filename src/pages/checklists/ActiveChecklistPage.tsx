@@ -319,13 +319,60 @@ export function ChecklistItemsPanel({
         })
       : null;
 
+  // Same rule the per-section chevrons use: an override wins, otherwise a
+  // finished section starts collapsed. The all-sections button reads off it,
+  // so it can only ever disagree with the headings by being stale.
+  const collapsibleSections = !sectionId && visibleSections.length > 1;
+  const sectionCollapsed = (sec: (typeof visibleSections)[number]) =>
+    sectionOverride[sec.id] ??
+    (sec.items.length > 0 && sec.items.every((i) => isDone(i)));
+  const anySectionExpanded =
+    collapsibleSections && visibleSections.some((sec) => !sectionCollapsed(sec));
+  const toggleAllSections = () =>
+    setSectionOverride(
+      Object.fromEntries(visibleSections.map((sec) => [sec.id, anySectionExpanded])),
+    );
+  const allSectionsToggle = collapsibleSections && (
+    <button
+      type="button"
+      className="btn btn-sm btn-quiet disclosure-toggle"
+      aria-expanded={anySectionExpanded}
+      aria-label={anySectionExpanded ? "Collapse all sections" : "Expand all sections"}
+      title={anySectionExpanded ? "Collapse all sections" : "Expand all sections"}
+      onClick={toggleAllSections}
+    >
+      <svg
+        className="disclosure-caret"
+        viewBox="0 0 20 20"
+        width="18"
+        height="18"
+        aria-hidden="true"
+      >
+        <path
+          d="M5 3.5 10 8.5 15 3.5M5 8.5 10 13.5 15 8.5M5 13.5 10 18.5 15 13.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
+  );
+
   return (
     <div>
       {compact ? (
         <div className="spread" style={{ alignItems: "baseline" }}>
-          <div className="section-title" style={{ marginBottom: 0 }}>
-            {title}
-            {sectionLabel ? ` — ${sectionLabel}` : ""}
+          <div
+            className="section-title row"
+            style={{ marginBottom: 0, gap: 6, minWidth: 0 }}
+          >
+            {allSectionsToggle}
+            <span>
+              {title}
+              {sectionLabel ? ` — ${sectionLabel}` : ""}
+            </span>
           </div>
           {shownItems.length > 0 && (
             <span className="muted small">
@@ -336,7 +383,10 @@ export function ChecklistItemsPanel({
       ) : (
         <div className="page-head">
           <div>
-            <h1 className="page-title">{title}</h1>
+            <h1 className="page-title row" style={{ gap: 6 }}>
+              {allSectionsToggle}
+              <span>{title}</span>
+            </h1>
             {shownItems.length > 0 && (
               <div className="page-sub">
                 {shownItems.length - remainingShown} of {shownItems.length} complete
@@ -398,8 +448,7 @@ export function ChecklistItemsPanel({
             // section and a heading to click; a reorder in progress needs its
             // rows on screen whatever the section's state.
             const collapsible = showSectionHeadings;
-            const collapsed =
-              collapsible && (sectionOverride[section.id] ?? sectionDone);
+            const collapsed = collapsible && sectionCollapsed(section);
             if (showSectionHeadings) {
               nodes.push(
                 <div
