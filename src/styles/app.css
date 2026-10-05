@@ -1571,6 +1571,15 @@ h3 {
   font-weight: 650;
   text-align: center;
   white-space: nowrap;
+  /* A map label is scaled with the map, not with the UI: it may be 4px
+     and read by pinching in. Android Chrome otherwise inflates small text
+     (font boosting, and the accessibility text-scaling setting) without
+     the box following, so the name is painted larger than its rectangle,
+     start-aligned and clipped at the far end - "the labels are not
+     centred" (owner, 2026-10-04). Desktop never inflates, so this does
+     not reproduce anywhere but a phone. */
+  text-size-adjust: none;
+  -webkit-text-size-adjust: none;
   border: 1.5px solid var(--line);
   border-radius: 4px;
   cursor: pointer;
@@ -1585,6 +1594,9 @@ h3 {
   position: absolute;
   transform: translate(-50%, -50%);
   font: inherit;
+  /* Same reason as .map-rect: a pin is scaled with the map. */
+  text-size-adjust: none;
+  -webkit-text-size-adjust: none;
   font-size: 0.72rem;
   font-weight: 650;
   border: 1.5px solid var(--line);
