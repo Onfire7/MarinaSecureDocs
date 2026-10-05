@@ -102,6 +102,25 @@
 .wz-note {
   max-width: 200px;
 }
+/* On a section row the note shares the line with the buttons: it grows
+   into what is left and gives way before the buttons do. */
+.wz-b-row .wz-control {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+.wz-b-row .wz-control .wz-note {
+  flex: 1 1 90px;
+  min-width: 70px;
+  max-width: 220px;
+}
+.wz-b-row .wz-control .chip-row {
+  flex: 0 0 auto;
+}
+@media (max-width: 420px) {
+  .wz-b-row .wz-control {
+    flex-wrap: wrap;
+  }
+}
 .wz-inline {
   white-space: nowrap;
 }

@@ -83,11 +83,14 @@ variants; this is D).
   for a value that is only what is on file, green for what this run
   answered, accent for where you are — capped with ▲ and ▼, which are both
   the affordance and buttons. Tapping a pip goes to its item.
-- **Answering moves to the next logical field.** A Service found *Present*
-  reveals its working box and note and focuses the note; toggling *working*
-  does the same; a choice Attribute focuses its note; a number field's Next
-  moves to the note and the note's Next moves to the next item. An answer
-  with nothing behind it — *Absent*, a Yes/No, a status — moves straight on.
+- **Answering does not move focus on a section row.** A Service found
+  *Present* reveals its working box and note on the same line, after the
+  buttons, and nothing takes focus: the note is usually left empty, and a
+  keyboard rising on every tap was a cost paid every time for a field used
+  now and then (owner, 2026-10-05, reversing 2026-09-23). A number field's
+  Enter still moves to its note, and the note's Enter to the next item. An
+  answer with nothing behind it — *Absent*, a Yes/No, a status — moves
+  straight on.
 - **The map page shows the map, and the question under it.** The Finding
   form's placement check: the map the location is plotted on, its anchor
   dot and label highlighted, every other label muted, and the device's own

@@ -1,10 +1,10 @@
 // One item's control inside the wizard, the same markup the Finding form
 // uses (AuditWizardPage.spec.md).
 //
-// Answering moves focus to the next logical field rather than always to the
-// next item (owner, 2026-09-23): a Service answered Present reveals its
-// working box and note and focuses the note, so the auditor can type one or
-// press Next to skip it; answers with nothing to follow move straight on.
+// A Service answered Present reveals its working box and note on the same
+// line, and nothing takes focus (owner, 2026-10-05, reversing 2026-09-23's
+// focus-the-note: the note is usually left empty). Enter in a number field
+// still reaches the note; answers with nothing to follow move straight on.
 import { useRef, useState, type CSSProperties } from "react";
 import { useLocationMap, useMapFit } from "../../../data/maps";
 import { placementOf } from "../../../data/locations";
@@ -75,8 +75,10 @@ export function ItemControl({
             big={big}
             onChange={(present) => {
               onChange({ ...v, present });
-              if (present) focusNote();
-              else onward();
+              // The note is not focused: it is usually left empty, and a
+              // keyboard rising on every Present is a cost paid every
+              // time for a field used now and then (owner, 2026-10-05).
+              if (!present) onward();
             }}
           />
           {v.present === true && (
@@ -85,10 +87,7 @@ export function ItemControl({
                 <input
                   type="checkbox"
                   checked={v.working}
-                  onChange={(e) => {
-                    onChange({ ...v, working: e.target.checked });
-                    focusNote();
-                  }}
+                  onChange={(e) => onChange({ ...v, working: e.target.checked })}
                 />{" "}
                 working
               </label>
@@ -116,8 +115,10 @@ export function ItemControl({
             big={big}
             onChange={(present) => {
               onChange({ ...v, present });
-              if (present) focusNote();
-              else onward();
+              // The note is not focused: it is usually left empty, and a
+              // keyboard rising on every Present is a cost paid every
+              // time for a field used now and then (owner, 2026-10-05).
+              if (!present) onward();
             }}
           />
           {v.present === true && (
@@ -145,10 +146,7 @@ export function ItemControl({
                   key={c}
                   type="button"
                   className={`chip ${big ? "wz-chip-big" : ""} ${v.text === c ? "tree-match" : ""}`}
-                  onClick={() => {
-                    onChange({ ...v, text: c, value: "" });
-                    focusNote();
-                  }}
+                  onClick={() => onChange({ ...v, text: c, value: "" })}
                 >
                   {c}
                 </button>
