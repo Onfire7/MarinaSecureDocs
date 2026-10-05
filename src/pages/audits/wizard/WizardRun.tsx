@@ -509,7 +509,7 @@ function LocationPage({
             {head && <div className="wz-b-group">{head}</div>}
             <div className={`wz-b-row ${p.touched(t.id, item.key) ? "done" : ""}`}>
               <div className="wz-b-row-label">
-                {item.label}
+                {item.kind === "map" ? "On the map" : item.label}
                 {onFile && <span className="muted small" style={{ fontWeight: 400 }}> · on file: {onFile}</span>}
               </div>
               <ItemControl item={item} target={t} value={value} statuses={p.statuses} advance={onAdvance} onChange={(v, mode) => p.setAnswer(t.id, item.key, v, mode)} />
@@ -577,7 +577,7 @@ function Column({
               {target.type_name && <div className="wz-d-type">{target.type_name}</div>}
               <div className="wz-d-rule" aria-hidden />
               <div className="wz-d-group">{page.kind === "section" ? `${page.items.length} to check` : item.group}</div>
-              <div className="wz-d-label">{page.label}</div>
+              <div className="wz-d-label">{pageHeading(page)}</div>
             </div>
             {page.kind === "section" ? (
               <SectionPage page={page} target={target} p={p} answers={answers} onAdvance={() => onAdvance?.()} />
@@ -649,6 +649,13 @@ function SectionPage({
       </div>
     </div>
   );
+}
+
+/** What a page is headed. The map page's item is "Placed correctly on the
+ *  map?" on the setup screen, but the page asks that under the map, and
+ *  only when there is a placement to ask about. */
+function pageHeading(page: WizardPage): string {
+  return page.kind === "item" && page.items[0].kind === "map" ? "On the map" : page.label;
 }
 
 function useWide(px = 900) {
