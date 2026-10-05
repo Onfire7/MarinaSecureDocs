@@ -3,6 +3,7 @@ import { publicOrigin } from "../../lib/config";
 import type { ReactNode } from "react";
 import { compareNames, placementStyle } from "../../lib/locations";
 import { MapLabelEditor } from "../shared/MapLabelEditor";
+import { LocationMapSettings } from "./LocationMapSettings";
 import { DeviceDot } from "../shared/DeviceDot";
 import { useDevicePosition } from "../shared/useDevicePosition";
 import { useMapFit } from "../../data/maps";
@@ -951,6 +952,9 @@ function LocationRow({
                     onCommit={(gpsLng) => update({ gpsLng })}
                   />
                 </div>
+                {/* The device's position, and the location's anchor and
+                    label on the map (docs/maps.md). */}
+                <LocationMapSettings location={location} onGps={(gpsLat, gpsLng) => update({ gpsLat, gpsLng })} />
               </div>
 
               {typeAllowsLeases && (
