@@ -89,8 +89,14 @@ export function MapLabelEditor({
   const [port, setPort] = useState({ w: 0, h: 0 });
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const gesture = useRef<{ kind: "pan" | "label" | "anchor" | "pinch"; moved: boolean; last: { x: number; y: number }; dist: number } | null>(null);
+  // The view the gesture maths reads is the ref, written synchronously:
+  // two pointer moves land between one render and the next, and a zoom
+  // factor applied to a stale state is a zoom that drifts.
   const viewRef = useRef(view);
-  viewRef.current = view;
+  const commit = (v: View) => {
+    viewRef.current = v;
+    setView(v);
+  };
   const draftRef = useRef(draft);
   draftRef.current = draft;
   const toolRef = useRef(tool);
@@ -121,11 +127,11 @@ export function MapLabelEditor({
     framed.current = true;
     const fitScale = Math.min(port.w / layerW, port.h / layerH);
     const close = Math.min(MAX_ZOOM, Math.max(fitScale, fitScale * 3));
-    if (shape) setView(centreOn(mode === "anchor" ? { x: shape.cx, y: shape.cy } : labelCentre(shape), close, layerW, layerH, port, 0.5));
+    if (shape) commit(centreOn(mode === "anchor" ? { x: shape.cx, y: shape.cy } : labelCentre(shape), close, layerW, layerH, port, 0.5));
     else if (fit && device) {
       const at = fit.toMap(device.lat, device.lng);
-      setView(centreOn({ x: at.cx, y: at.cy }, close, layerW, layerH, port, 0.5));
-    } else setView({ s: fitScale, tx: (port.w - layerW * fitScale) / 2, ty: (port.h - layerH * fitScale) / 2 });
+      commit(centreOn({ x: at.cx, y: at.cy }, close, layerW, layerH, port, 0.5));
+    } else commit({ s: fitScale, tx: (port.w - layerW * fitScale) / 2, ty: (port.h - layerH * fitScale) / 2 });
   }, [layerH, layerW, port, shape, mode, fit, device]);
 
   // Nothing beneath the editor scrolls or zooms while it is up - and
@@ -164,7 +170,7 @@ export function MapLabelEditor({
     const v = viewRef.current;
     const s = Math.min(MAX_ZOOM, Math.max(0.2, v.s * k));
     const kk = s / v.s;
-    setView(clampView({ s, tx: at.x - (at.x - v.tx) * kk, ty: at.y - (at.y - v.ty) * kk }));
+    commit(clampView({ s, tx: at.x - (at.x - v.tx) * kk, ty: at.y - (at.y - v.ty) * kk }));
   };
   const pct = (n: number) => +Math.max(0, Math.min(100, n)).toFixed(2);
   const toPercent = (x: number, y: number) => {
@@ -178,6 +184,16 @@ export function MapLabelEditor({
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     const p = local(e);
+    // A primary pointer is the first finger of a NEW touch sequence: every
+    // finger before it has lifted, whether or not its pointerup reached
+    // us. A finger left in the set made every later one-finger move a
+    // pinch against a frozen point - the map zoomed when the thumb moved,
+    // and only ever in the direction away from the ghost (owner,
+    // 2026-10-05).
+    if (e.isPrimary) {
+      pointers.current.clear();
+      gesture.current = null;
+    }
     pointers.current.set(e.pointerId, p);
     viewportRef.current?.setPointerCapture(e.pointerId);
     if (pointers.current.size === 2) {
@@ -200,10 +216,11 @@ export function MapLabelEditor({
       const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
       const v = viewRef.current;
-      const k = g.dist > 0 ? dist / g.dist : 1;
+      // Fingers almost touching give a ratio that is all noise.
+      const k = g.dist > 12 && dist > 12 ? dist / g.dist : 1;
       const s = Math.min(MAX_ZOOM, Math.max(0.2, v.s * k));
       const kk = s / v.s;
-      setView(clampView({ s, tx: mid.x - (mid.x - v.tx) * kk + (mid.x - g.last.x), ty: mid.y - (mid.y - v.ty) * kk + (mid.y - g.last.y) }));
+      commit(clampView({ s, tx: mid.x - (mid.x - v.tx) * kk + (mid.x - g.last.x), ty: mid.y - (mid.y - v.ty) * kk + (mid.y - g.last.y) }));
       g.last = mid;
       g.dist = dist;
       return;
@@ -219,7 +236,7 @@ export function MapLabelEditor({
     const ddy = (dy / (layerH * v.s)) * 100;
     if (g.kind === "label" && d) setDraft({ ...d, dx: +((d.dx ?? 0) + ddx).toFixed(2), dy: +((d.dy ?? 0) + ddy).toFixed(2) });
     else if (g.kind === "anchor" && d) setDraft(reanchored(d, pct(d.cx + ddx), pct(d.cy + ddy)));
-    else setView({ ...v, tx: v.tx + dx, ty: v.ty + dy });
+    else commit({ ...v, tx: v.tx + dx, ty: v.ty + dy });
   };
   const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
     const p = pointers.current.get(e.pointerId);
@@ -253,7 +270,7 @@ export function MapLabelEditor({
     const next = tool === t ? null : t;
     setTool(next);
     const d = draftRef.current;
-    if (next && next !== "label" && next !== "anchor" && d) setView(centreOn(labelCentre(d), Math.max(viewRef.current.s, 2), layerW, layerH, port, 0.3));
+    if (next && next !== "label" && next !== "anchor" && d) commit(centreOn(labelCentre(d), Math.max(viewRef.current.s, 2), layerW, layerH, port, 0.3));
   };
   const active = TOOLS.find((t) => t.key === tool && t.key !== "label" && t.key !== "anchor");
   const value = (k: Slider) => draft?.[k] ?? DEFAULT_LABEL_STYLE[k];
@@ -294,6 +311,7 @@ export function MapLabelEditor({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        onLostPointerCapture={onPointerUp}
         onWheel={onWheel}
       >
         <div className="mle-map" style={{ width: layerW, height: layerH || undefined, transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.s})` }}>
