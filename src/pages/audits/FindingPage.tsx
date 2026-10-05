@@ -654,7 +654,10 @@ function FindingForm({
                   locationName={target.location_name}
                   editable={editable}
                   proposed={placement}
-                  onPropose={setPlacement}
+                  onPropose={(p, correct) => {
+                    setPlacement(p);
+                    if (correct !== undefined) setMappedCorrectly(correct);
+                  }}
                   answer={mappedCorrectly}
                   onAnswer={setMappedCorrectly}
                 />

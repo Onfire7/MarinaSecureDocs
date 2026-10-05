@@ -487,7 +487,7 @@ function MapControl({
         editable
         big={big}
         proposed={v.placement as React.ComponentProps<typeof PlacementCheck>["proposed"]}
-        onPropose={(p) => onChange({ ...v, placement: p ? { map_id: p.map_id, placement: { ...p.placement } } : null })}
+        onPropose={(p, correct) => onChange({ ...v, placement: p ? { map_id: p.map_id, placement: { ...p.placement } } : null, ...(correct === undefined ? {} : { correct }) })}
         answer={v.correct}
         onAnswer={(correct) => {
           onChange({ ...v, correct });

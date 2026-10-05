@@ -38,7 +38,11 @@ export function PlacementCheck({
   locationName: string;
   editable: boolean;
   proposed: ProposedPlacement | null;
-  onPropose: (p: ProposedPlacement | null) => void;
+  /** A new placement, and - when moving a label that was on the map - the
+   *  answer No that comes with it, in ONE call: two calls from the same
+   *  event each rebuilt the caller's state from what it held before the
+   *  other, and the second wiped out the first (2026-10-05). */
+  onPropose: (p: ProposedPlacement | null, answer?: boolean) => void;
   /** The answer to "placed correctly?", asked only when it is placed. */
   answer: boolean | null;
   onAnswer: (v: boolean) => void;
@@ -147,11 +151,10 @@ export function PlacementCheck({
             }
             // Finishing where it already is proposes nothing.
             if (ownShape && sameShape(shape, ownShape) && !proposed) return;
-            onPropose({ map_id: map.id, placement: shape });
             // Moving a label that was on the map says it was not placed
             // correctly. Placing one that was not on the map says nothing:
             // the question was never asked.
-            if (ownShape) onAnswer(false);
+            onPropose({ map_id: map.id, placement: shape }, ownShape ? false : undefined);
           }}
         />
       )}
