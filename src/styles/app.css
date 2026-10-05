@@ -1630,13 +1630,23 @@ h3 {
   cursor: pointer;
   list-style: none;
   margin-bottom: 0;
+  /* A row: the title (and any action beside it) then the chevron. A
+     floated chevron dropped to its own line whenever the title was a
+     flex box, which doubled the height of every collapsed section. */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-collapse > summary > * {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .section-collapse > summary::-webkit-details-marker {
   display: none;
 }
 .section-collapse > summary::after {
   content: "▸";
-  float: right;
+  flex: 0 0 auto;
   color: var(--mute);
 }
 .section-collapse[open] > summary::after {
