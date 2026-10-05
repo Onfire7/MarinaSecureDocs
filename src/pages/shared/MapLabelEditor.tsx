@@ -87,7 +87,7 @@ export function MapLabelEditor({
   const [img, setImg] = useState<{ w: number; h: number } | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [port, setPort] = useState({ w: 0, h: 0 });
-  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const touch = useRef({ start: (_e: TouchEvent) => {}, move: (_e: TouchEvent) => {}, end: (_e: TouchEvent) => {} });
   const gesture = useRef<{ kind: "pan" | "label" | "anchor" | "pinch"; moved: boolean; last: { x: number; y: number }; dist: number } | null>(null);
   // The view the gesture maths reads is the ref, written synchronously:
   // two pointer moves land between one render and the next, and a zoom
@@ -147,18 +147,32 @@ export function MapLabelEditor({
     const was = root.style.overflow;
     root.style.overflow = "hidden";
     const el = layerRef.current;
+    const vp = viewportRef.current;
+    // Two fingers anywhere on the layer - a bar included - must not zoom
+    // the page; on the map every touch is ours.
     const twoFingers = (e: TouchEvent) => {
       if (e.touches.length > 1) e.preventDefault();
     };
     const refuse = (e: Event) => e.preventDefault();
+    const start = (e: TouchEvent) => touch.current.start(e);
+    const move = (e: TouchEvent) => touch.current.move(e);
+    const end = (e: TouchEvent) => touch.current.end(e);
     el?.addEventListener("touchmove", twoFingers, { passive: false });
     el?.addEventListener("touchstart", twoFingers, { passive: false });
     el?.addEventListener("gesturestart", refuse);
+    vp?.addEventListener("touchstart", start, { passive: false });
+    vp?.addEventListener("touchmove", move, { passive: false });
+    vp?.addEventListener("touchend", end);
+    vp?.addEventListener("touchcancel", end);
     return () => {
       root.style.overflow = was;
       el?.removeEventListener("touchmove", twoFingers);
       el?.removeEventListener("touchstart", twoFingers);
       el?.removeEventListener("gesturestart", refuse);
+      vp?.removeEventListener("touchstart", start);
+      vp?.removeEventListener("touchmove", move);
+      vp?.removeEventListener("touchend", end);
+      vp?.removeEventListener("touchcancel", end);
     };
   }, []);
 
@@ -177,54 +191,47 @@ export function MapLabelEditor({
     const v = viewRef.current;
     return { cx: pct(((x - v.tx) / (layerW * v.s)) * 100), cy: pct(((y - v.ty) / (layerH * v.s)) * 100) };
   };
-  const local = (e: ReactPointerEvent | ReactWheelEvent) => {
+  type Pt = { x: number; y: number };
+  const localXY = (clientX: number, clientY: number): Pt => {
     const r = viewportRef.current!.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
+    return { x: clientX - r.left, y: clientY - r.top };
+  };
+  const local = (e: ReactPointerEvent | ReactWheelEvent) => localXY(e.clientX, e.clientY);
+  const kindAt = (target: EventTarget | null): "anchor" | "label" | "pan" => {
+    const el = target instanceof Element ? target : null;
+    return el?.closest("[data-anchor]") ? "anchor" : el?.closest("[data-subject]") && mode === "label" ? "label" : "pan";
   };
 
-  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const p = local(e);
-    // A primary pointer is the first finger of a NEW touch sequence: every
-    // finger before it has lifted, whether or not its pointerup reached
-    // us. A finger left in the set made every later one-finger move a
-    // pinch against a frozen point - the map zoomed when the thumb moved,
-    // and only ever in the direction away from the ghost (owner,
-    // 2026-10-05).
-    if (e.isPrimary) {
-      pointers.current.clear();
-      gesture.current = null;
-    }
-    pointers.current.set(e.pointerId, p);
-    viewportRef.current?.setPointerCapture(e.pointerId);
-    if (pointers.current.size === 2) {
-      const [a, b] = [...pointers.current.values()];
-      gesture.current = { kind: "pinch", moved: true, last: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, dist: Math.hypot(a.x - b.x, a.y - b.y) };
-      return;
-    }
-    const el = e.target instanceof Element ? e.target : null;
-    const kind = el?.closest("[data-anchor]") ? "anchor" : el?.closest("[data-subject]") && mode === "label" ? "label" : "pan";
+  // ── the gesture, whoever delivers it ────────────────────────────────
+  // Fingers come from TOUCH events, where the browser hands over the whole
+  // list of fingers on every event: there is no set of our own to fall out
+  // of step with it, so a finger that lifted cannot linger as a ghost and
+  // turn the next one-finger move into a pinch (owner, 2026-10-05, after
+  // the pointer-id version did exactly that twice). The mouse comes from
+  // pointer events, one at a time.
+  const begin = (kind: "anchor" | "label" | "pan", p: Pt) => {
     gesture.current = { kind, moved: false, last: p, dist: 0 };
   };
-  const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!pointers.current.has(e.pointerId)) return;
-    const p = local(e);
-    pointers.current.set(e.pointerId, p);
+  const beginPinch = (a: Pt, b: Pt) => {
+    gesture.current = { kind: "pinch", moved: true, last: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, dist: Math.hypot(a.x - b.x, a.y - b.y) };
+  };
+  const movePinch = (a: Pt, b: Pt) => {
     const g = gesture.current;
-    if (!g) return;
-    if (g.kind === "pinch" && pointers.current.size >= 2) {
-      const [a, b] = [...pointers.current.values()];
-      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      const dist = Math.hypot(a.x - b.x, a.y - b.y);
-      const v = viewRef.current;
-      // Fingers almost touching give a ratio that is all noise.
-      const k = g.dist > 12 && dist > 12 ? dist / g.dist : 1;
-      const s = Math.min(MAX_ZOOM, Math.max(0.2, v.s * k));
-      const kk = s / v.s;
-      commit(clampView({ s, tx: mid.x - (mid.x - v.tx) * kk + (mid.x - g.last.x), ty: mid.y - (mid.y - v.ty) * kk + (mid.y - g.last.y) }));
-      g.last = mid;
-      g.dist = dist;
-      return;
-    }
+    if (!g || g.kind !== "pinch") return;
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const dist = Math.hypot(a.x - b.x, a.y - b.y);
+    const v = viewRef.current;
+    // Fingers almost touching give a ratio that is all noise.
+    const k = g.dist > 12 && dist > 12 ? dist / g.dist : 1;
+    const s = Math.min(MAX_ZOOM, Math.max(0.2, v.s * k));
+    const kk = s / v.s;
+    commit(clampView({ s, tx: mid.x - (mid.x - v.tx) * kk + (mid.x - g.last.x), ty: mid.y - (mid.y - v.ty) * kk + (mid.y - g.last.y) }));
+    g.last = mid;
+    g.dist = dist;
+  };
+  const moveOne = (p: Pt) => {
+    const g = gesture.current;
+    if (!g || g.kind === "pinch") return;
     const dx = p.x - g.last.x;
     const dy = p.y - g.last.y;
     if (!g.moved && Math.hypot(dx, dy) < 4) return;
@@ -238,26 +245,70 @@ export function MapLabelEditor({
     else if (g.kind === "anchor" && d) setDraft(reanchored(d, pct(d.cx + ddx), pct(d.cy + ddy)));
     else commit({ ...v, tx: v.tx + dx, ty: v.ty + dy });
   };
-  const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const p = pointers.current.get(e.pointerId);
-    pointers.current.delete(e.pointerId);
+  const release = (tapAt: Pt | null) => {
     const g = gesture.current;
-    if (pointers.current.size === 0) gesture.current = null;
-    else if (g?.kind === "pinch" && pointers.current.size === 1) {
-      const [rest] = [...pointers.current.values()];
-      gesture.current = { kind: "pan", moved: true, last: rest, dist: 0 };
-    }
-    if (!g || g.kind === "pinch" || g.moved || !p) return;
+    gesture.current = null;
+    if (!g || g.kind === "pinch" || g.moved || !tapAt) return;
     // A tap. With the Anchor tool on (or no placement yet), it is where the
     // location is; with the Label tool on, it is where the label goes.
     const d = draftRef.current;
     const t = toolRef.current;
-    const at = toPercent(p.x, p.y);
+    const at = toPercent(tapAt.x, tapAt.y);
     if (!d) {
       setDraft(newPlacement(at.cx, at.cy, loadLabelStyle()));
       if (mode === "label") setTool(null);
     } else if (t === "anchor") setDraft(reanchored(d, at.cx, at.cy));
     else if (t === "label") setDraft({ ...d, dx: +(at.cx - d.cx).toFixed(2), dy: +(at.cy - d.cy).toFixed(2) });
+  };
+
+  // Touch: registered natively (non-passive, so the page never pans or
+  // zooms under us) and read through a ref so the listeners are added once.
+  const pts = (list: TouchList): Pt[] => [...list].map((t) => localXY(t.clientX, t.clientY));
+  touch.current = {
+    start: (e) => {
+      e.preventDefault();
+      const t = pts(e.touches);
+      if (t.length >= 2) beginPinch(t[0], t[1]);
+      else if (t.length === 1) begin(kindAt(e.target), t[0]);
+    },
+    move: (e) => {
+      e.preventDefault();
+      const t = pts(e.touches);
+      const g = gesture.current;
+      if (t.length >= 2) {
+        if (!g || g.kind !== "pinch") beginPinch(t[0], t[1]);
+        else movePinch(t[0], t[1]);
+      } else if (t.length === 1) {
+        if (!g) begin("pan", t[0]);
+        else if (g.kind === "pinch") gesture.current = { kind: "pan", moved: true, last: t[0], dist: 0 };
+        else moveOne(t[0]);
+      }
+    },
+    end: (e) => {
+      const t = pts(e.touches);
+      if (t.length === 0) {
+        const c = e.changedTouches[0];
+        release(c ? localXY(c.clientX, c.clientY) : null);
+      } else if (t.length === 1) {
+        // One finger of a pinch lifted: the other carries on as a pan.
+        gesture.current = { kind: "pan", moved: true, last: t[0], dist: 0 };
+      }
+    },
+  };
+
+  // The mouse (and a pen): one pointer, captured for the drag.
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "touch") return;
+    viewportRef.current?.setPointerCapture(e.pointerId);
+    begin(kindAt(e.target), local(e));
+  };
+  const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "touch") return;
+    moveOne(local(e));
+  };
+  const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "touch") return;
+    release(local(e));
   };
   const onWheel = (e: ReactWheelEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -311,7 +362,6 @@ export function MapLabelEditor({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        onLostPointerCapture={onPointerUp}
         onWheel={onWheel}
       >
         <div className="mle-map" style={{ width: layerW, height: layerH || undefined, transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.s})` }}>

@@ -108,24 +108,39 @@ export function labelCentre(p: PlacementShape): { x: number; y: number } {
   return { x: p.cx + (p.dx ?? 0), y: p.cy + (p.dy ?? 0) };
 }
 
+/** The size a label is laid out at before being scaled to its stored size.
+ *  A dense map stores labels at 4px, and a phone browser paints text that
+ *  small larger than it lays it out - the name spilled out of the top-left
+ *  of its box on the owner's phone twice (2026-10-04, 2026-10-05), and the
+ *  text-size opt-out did not stop it. Laid out at a readable size and
+ *  scaled down with a transform, paint and layout cannot disagree. */
+export const LABEL_LAYOUT_PX = 12;
+
 /** CSS for an intrinsically-sized, rotated map-rect label — shared by the editor and every viewer. */
 export function placementStyle(p: PlacementShape): {
   left: string;
   top: string;
   fontSize: string;
   padding: string;
+  maxWidth: string;
   transform: string;
 } {
   const fontSize = p.fontSize ?? DEFAULT_PLACEMENT_STYLE.fontSize;
   const paddingX = p.paddingX ?? DEFAULT_PLACEMENT_STYLE.paddingX;
   const paddingY = p.paddingY ?? DEFAULT_PLACEMENT_STYLE.paddingY;
   const at = labelCentre(p);
+  // Small labels are laid out at LABEL_LAYOUT_PX and scaled down; a label
+  // already that size or larger is laid out as it is.
+  const base = Math.max(LABEL_LAYOUT_PX, fontSize);
+  const k = fontSize / base;
+  const r = 1 / k;
   return {
     left: `${at.x}%`,
     top: `${at.y}%`,
-    fontSize: `${fontSize}px`,
-    padding: `${paddingY}px ${paddingX}px`,
-    transform: `translate(-50%, -50%) rotate(${p.rotation ?? 0}deg)`,
+    fontSize: `${base}px`,
+    padding: `${paddingY * r}px ${paddingX * r}px`,
+    maxWidth: `${220 * r}px`,
+    transform: `translate(-50%, -50%) rotate(${p.rotation ?? 0}deg) scale(${k})`,
   };
 }
 

@@ -1587,8 +1587,16 @@ h3 {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.map-rect:hover {
-  outline: 2px solid var(--accent);
+/* Hover only where there is a hover: on a touch screen :hover sticks to
+   the last thing tapped and drew a second ring around the label being
+   edited (owner, 2026-10-05). */
+@media (hover: hover) {
+  .map-rect:hover {
+    outline: 2px solid var(--accent);
+  }
+}
+.mle-map .map-rect:hover {
+  outline: none;
 }
 .map-pin {
   position: absolute;
@@ -2097,12 +2105,10 @@ h3 {
 .mle-subject {
   background: var(--warn-bg);
   border-color: var(--warn);
+  border-width: 2px;
   color: var(--ink);
   font-weight: 700;
   cursor: move;
-  /* Twice the border, so a 4px label can still be seen - and grabbed. */
-  outline: 2px solid var(--warn);
-  outline-offset: 2px;
 }
 .mle-hint {
   position: absolute;

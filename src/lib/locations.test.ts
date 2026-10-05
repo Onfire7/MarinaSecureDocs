@@ -47,4 +47,14 @@ describe("placementStyle", () => {
     expect(placementStyle({ cx: 40, cy: 60, rotation: 0, dx: 5, dy: -2.5 })).toMatchObject({ left: "45%", top: "57.5%" });
     expect(labelCentre({ cx: 40, cy: 60, rotation: 0, dx: 5 })).toEqual({ x: 45, y: 60 });
   });
+  it("lays a small label out at a readable size and scales it down; a large one is laid out as it is", () => {
+    const small = placementStyle({ cx: 0, cy: 0, rotation: -42, fontSize: 4, paddingX: 2, paddingY: 1 });
+    expect(small.fontSize).toBe("12px");
+    expect(small.padding).toBe("3px 6px");
+    expect(small.transform).toBe("translate(-50%, -50%) rotate(-42deg) scale(0.3333333333333333)");
+    const large = placementStyle({ cx: 0, cy: 0, rotation: 0, fontSize: 22, paddingX: 8, paddingY: 4 });
+    expect(large.fontSize).toBe("22px");
+    expect(large.padding).toBe("4px 8px");
+    expect(large.transform).toBe("translate(-50%, -50%) rotate(0deg) scale(1)");
+  });
 });
