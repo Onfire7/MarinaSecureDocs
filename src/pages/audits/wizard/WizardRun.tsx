@@ -36,9 +36,9 @@ const RESIZE_MS = 250;
  *  of thumb carries a whole page, and the page stops there whatever the
  *  thumb does next. */
 const GAIN = 5;
-/** Past this fraction of a page on release, the page is turned; short of
- *  it, it is put back. */
-const TURN_AT = 0.4;
+/** On release the page nearest the thumb wins: past half way it turns,
+ *  short of that it goes back. At GAIN that is ~75px of thumb. */
+const TURN_AT = 0.5;
 /** Thumb pixels pushed against the end of the column, beyond where the
  *  page stopped, that roll into the next location. */
 const EDGE = 60;

@@ -45,8 +45,9 @@ variants; this is D).
   and see if it feels better".)
   - **A swipe carries the page with the thumb at 5×** - a fifth of a screen
     of thumb is a whole page - and **stops dead at the next page**, whatever
-    the thumb does afterwards. On release, past 40% of the way the page
-    turns; short of that it goes back. One swipe is one page, never two.
+    the thumb does afterwards. On release the nearest page wins: past half
+    way (about 75px of thumb) the page turns, short of that it goes back.
+    One swipe is one page, never two.
   - **A wheel burst is one page.** There is no release to decide on, so the
     first 40 units of delta turn the page and the rest of the burst is
     ignored for 250ms.
