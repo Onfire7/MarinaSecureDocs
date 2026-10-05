@@ -4,6 +4,8 @@ import type { LockContext } from "@powersync/web";
 import { insert, remove, transact, update } from "./sql";
 import { recordActivity } from "./activity";
 import { unexpectedOccupancy } from "../lib/audits";
+import type { PlacementShape } from "../lib/locations";
+import { loadLabelStyle, newPlacement, reanchored } from "../lib/mapLabelStyle";
 import type { AnswerValue, AmenityAnswer, AttributeAnswer, GpsAnswer, MapAnswer, ServiceAnswer, WizardItem } from "../lib/auditWizard";
 
 // The wizard's writes (docs/audits.md § The wizard). One item at a time,
@@ -235,11 +237,34 @@ async function writeMap(tx: LockContext, w: WizardWrite, findingId: string) {
 
 /** A fix is a set_gps Proposal; anything that is not a fix clears it. The
  *  shape check matters: the first wizard wrote the string "captured" here
- *  and produced Proposals with no coordinates in them. */
+ *  and produced Proposals with no coordinates in them.
+ *
+ *  The fix may carry an ANCHOR - the spot on the map the auditor tapped as
+ *  "I am here" (docs/maps.md). That is a move_placement Proposal like the
+ *  map page's: the location's existing placement re-anchored, label offset
+ *  and style kept, or a new one in the remembered label style. The map
+ *  page then has a label to ask about. A fix without an anchor leaves any
+ *  placement Proposal as it was. */
 async function writeGps(tx: LockContext, w: WizardWrite, findingId: string) {
   const fix = w.value as Partial<GpsAnswer> | string | boolean | null;
   const real = typeof fix === "object" && fix !== null && typeof fix.lat === "number" && typeof fix.lng === "number";
   await replaceProposal(tx, findingId, "set_gps", null, real ? { lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy ?? null } : null);
+  if (!real || !fix.anchor) return;
+  const { map_id, cx, cy } = fix.anchor;
+  const existing = w.locationId
+    ? await tx.getOptional<{ placement: string }>("SELECT placement FROM location_map_placements WHERE location_id = ? AND map_id = ?", [w.locationId, map_id])
+    : null;
+  const shape = existing ? reanchored(parseShape(existing.placement), cx, cy) : newPlacement(cx, cy, loadLabelStyle());
+  await replaceProposal(tx, findingId, "move_placement", null, { map_id, placement: shape });
+}
+
+function parseShape(raw: string): PlacementShape {
+  try {
+    const v = JSON.parse(raw) as PlacementShape;
+    return v && typeof v === "object" ? v : { cx: 50, cy: 50, rotation: 0 };
+  } catch {
+    return { cx: 50, cy: 50, rotation: 0 };
+  }
 }
 
 /**

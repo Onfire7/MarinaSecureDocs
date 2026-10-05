@@ -79,10 +79,19 @@ export function statusMapColors(status: string | null | undefined): {
 // image); everything about the rectangle's own size is intrinsic to its
 // label instead, so a rotated label rotates a normally-proportioned box
 // rather than stretching two independently-percent axes against each other.
+/** A location's place on a map (docs/maps.md). `cx, cy` is the ANCHOR -
+ *  where the location IS, in percent of the image, and the point its GPS
+ *  coordinates are tied to. The label hangs off it by `dx, dy`, also in
+ *  percent, so a label can sit beside a slip rather than on top of it and
+ *  a whole dock's labels can share one offset. A shape without an offset
+ *  draws the label on the anchor, which is what every placement made
+ *  before 2026-10-04 is. */
 export interface PlacementShape {
   cx: number;
   cy: number;
   rotation: number;
+  dx?: number;
+  dy?: number;
   fontSize?: number;
   paddingX?: number;
   paddingY?: number;
@@ -93,6 +102,11 @@ export const DEFAULT_PLACEMENT_STYLE = {
   paddingX: 8,
   paddingY: 4,
 } as const;
+
+/** Where the label is drawn: the anchor plus the offset. */
+export function labelCentre(p: PlacementShape): { x: number; y: number } {
+  return { x: p.cx + (p.dx ?? 0), y: p.cy + (p.dy ?? 0) };
+}
 
 /** CSS for an intrinsically-sized, rotated map-rect label — shared by the editor and every viewer. */
 export function placementStyle(p: PlacementShape): {
@@ -105,9 +119,10 @@ export function placementStyle(p: PlacementShape): {
   const fontSize = p.fontSize ?? DEFAULT_PLACEMENT_STYLE.fontSize;
   const paddingX = p.paddingX ?? DEFAULT_PLACEMENT_STYLE.paddingX;
   const paddingY = p.paddingY ?? DEFAULT_PLACEMENT_STYLE.paddingY;
+  const at = labelCentre(p);
   return {
-    left: `${p.cx}%`,
-    top: `${p.cy}%`,
+    left: `${at.x}%`,
+    top: `${at.y}%`,
     fontSize: `${fontSize}px`,
     padding: `${paddingY}px ${paddingX}px`,
     transform: `translate(-50%, -50%) rotate(${p.rotation ?? 0}deg)`,

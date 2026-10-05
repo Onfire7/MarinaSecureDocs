@@ -47,6 +47,9 @@ import { LocationPicker } from "../shared/LocationPicker";
 import { NoteDialog } from "../shared/NoteDialog";
 import { PlacementCheck, type ProposedPlacement } from "./PlacementCheck";
 import { GpsCapture } from "./GpsCapture";
+import { MapLabelEditor } from "../shared/MapLabelEditor";
+import { useLocationMap, useMapFit } from "../../data/maps";
+import { placementOf } from "../../data/locations";
 
 // The Finding form (docs/audits.md § Field work). One screen for one target:
 // the built-in questions of the audit's kind, the target's own questions,
@@ -195,6 +198,9 @@ function FindingForm({
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [gpsCapture, setGpsCapture] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
   const [placement, setPlacement] = useState<ProposedPlacement | null>(null);
+  const [anchoring, setAnchoring] = useState(false);
+  const anchorMap = useLocationMap(target?.location_id, placement?.map_id ?? null);
+  const anchorFit = useMapFit(anchorMap.map?.id);
   const [retire, setRetire] = useState(false);
   const [rename, setRename] = useState("");
   const [showChanges, setShowChanges] = useState(false);
@@ -599,6 +605,37 @@ function FindingForm({
         </div>
       )}
 
+      {/* GPS before the map (owner, 2026-10-04): a captured fix is tied to
+          the map by tapping where you are, and the map card then has an
+          anchor to show. */}
+      <GpsCapture
+        locationName={target?.location_name ?? (name || "this location")}
+        pin={target && target.gps_lat !== null && target.gps_lng !== null ? { lat: target.gps_lat, lng: target.gps_lng } : null}
+        radius={settings.auditGpsRadius}
+        accuracyLimit={settings.auditGpsAccuracy}
+        captured={gpsCapture}
+        editable={editable}
+        onCapture={(f) => {
+          setGpsCapture(f);
+          if (f && target?.location_id && anchorMap.map) setAnchoring(true);
+        }}
+      />
+      {anchoring && target?.location_id && anchorMap.map && (
+        <MapLabelEditor
+          map={anchorMap.map}
+          placements={anchorMap.placements}
+          subject={{ locationId: target.location_id, name: target.location_name }}
+          shape={placement && placement.map_id === anchorMap.map.id ? placement.placement : anchorMap.own ? placementOf(anchorMap.own) : null}
+          mode="anchor"
+          fit={anchorFit}
+          onCancel={() => setAnchoring(false)}
+          onDone={(shape) => {
+            setAnchoring(false);
+            if (shape && anchorMap.map) setPlacement({ map_id: anchorMap.map.id, placement: shape });
+          }}
+        />
+      )}
+
       {(showMarked || showMap) && (
         <div className="card" style={{ marginBottom: 12 }}>
           {showMarked && (
@@ -636,15 +673,6 @@ function FindingForm({
         </div>
       )}
 
-      <GpsCapture
-        locationName={target?.location_name ?? (name || "this location")}
-        pin={target && target.gps_lat !== null && target.gps_lng !== null ? { lat: target.gps_lat, lng: target.gps_lng } : null}
-        radius={settings.auditGpsRadius}
-        accuracyLimit={settings.auditGpsAccuracy}
-        captured={gpsCapture}
-        editable={editable}
-        onCapture={setGpsCapture}
-      />
 
       {target && (
         <div className="card" style={{ marginBottom: 12 }}>

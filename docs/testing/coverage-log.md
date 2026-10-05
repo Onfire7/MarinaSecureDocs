@@ -48,6 +48,7 @@ specification for the `effective_permissions` SQL view that replaces it (see
 | `data/incidents.ts` | Incidents, comments, the author-edit window. |
 | `data/leases.ts` | Leases, lessees, documents, comments. |
 | `data/locations.ts` | Locations, types, maps, placements. |
+| `data/maps.ts` | Two hooks over the queries above: which map a location belongs on, and the map's GPS fit. The fit itself is `lib/mapFit.ts`, fully covered. |
 | `data/lookups.ts` | The admin-defined status and type tables. |
 | `data/notes.ts` | Notes on a target. |
 | `data/reservations.ts` | Bookings, conflicts, check-in/out. |

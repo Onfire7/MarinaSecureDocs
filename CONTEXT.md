@@ -49,6 +49,12 @@ An admin-uploaded schematic of a Location's layout, onto which its child
 Locations are plotted. Not a real-world geographic map.
 _Avoid_: site plan, diagram
 
+**Anchor**:
+Where a Location *is* on a Marina Map, as a point; its label hangs off it
+by an offset. A GPS fix captured in an Audit is tied to the map by tapping
+the anchor, and every anchored, pinned Location is a control point for the
+map's GPS fit (`docs/maps.md`).
+
 **Reservable**:
 A Location or Asset that accepts Reservations — a capability its type
 permits and its own settings enable.

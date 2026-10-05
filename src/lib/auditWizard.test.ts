@@ -78,7 +78,7 @@ const camp = target({ id: "t-camp", location_type_id: CAMP });
 describe("buildCatalogue", () => {
   it("1 · groups in order, attributes before services, every item present", () => {
     const groups = buildCatalogue(input);
-    expect(groups.map((g) => g.label)).toEqual(["Status", "Attributes", "Services", "Amenities", "Questions", "Checks", "GPS"]);
+    expect(groups.map((g) => g.label)).toEqual(["Status", "Attributes", "Services", "Amenities", "Questions", "GPS", "Checks"]);
     expect(groups.find((g) => g.label === "Attributes")!.items.map((i) => i.label)).toEqual(["Max boat length", "Access"]);
     expect(groups.find((g) => g.label === "Status")!.items.map((i) => i.key)).toEqual(["status", CONFIRM_KEY]);
     expect(groups.find((g) => g.label === "Checks")!.items.map((i) => i.key)).toEqual(["marked", "map"]);
@@ -114,9 +114,9 @@ describe("itemsForTarget", () => {
       "Max boat length",
       "Power",
       "Is the breaker labelled?",
+      "GPS coordinates",
       "Clearly marked?",
       "Placed correctly on the map?",
-      "GPS coordinates",
       "Confirm this location is done",
     ]);
     expect(itemsForTarget(groups, all, camp).map((i) => i.label)).toEqual([
@@ -127,9 +127,9 @@ describe("itemsForTarget", () => {
       "WiFi",
       "Is the breaker labelled?",
       "Fire ring condition",
+      "GPS coordinates",
       "Clearly marked?",
       "Placed correctly on the map?",
-      "GPS coordinates",
       "Confirm this location is done",
     ]);
   });
@@ -170,9 +170,9 @@ describe("buildSteps", () => {
       "section:Amenities",
       "item:Is the breaker labelled?",
       "item:Fire ring condition",
+      "item:GPS coordinates",
       "item:Clearly marked?",
       "item:Placed correctly on the map?",
-      "item:GPS coordinates",
       "item:Confirm this location is done",
     ]);
     expect(pages[2].items.map((i) => i.label)).toEqual(["Power", "Water"]);

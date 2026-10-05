@@ -137,9 +137,13 @@ root locations carry overview maps), `image_attachment_id → attachments`.
 
 `map_id → marina_maps`, `location_id → locations`, `placement jsonb`.
 
-The blob is `{cx, cy, rotation, fontSize?, paddingX?, paddingY?}` — centre
-point as percentages of the map image. Stays `jsonb`: it is opaque
-presentation state read only by the map renderer.
+The blob is `{cx, cy, dx?, dy?, rotation, fontSize?, paddingX?, paddingY?}`
+— `cx, cy` is the **anchor**, where the location is, as percentages of the
+map image; the label is drawn at `cx + dx, cy + dy` (`docs/maps.md`). A
+blob without `dx, dy` draws the label on the anchor. The anchor paired with
+the location's GPS coordinates is a control point for the map's GPS fit.
+Stays `jsonb`: it is opaque presentation state read only by the map
+renderer.
 
 #### `checkpoints` — Tier 0 / `manage_locations` · sync: always
 

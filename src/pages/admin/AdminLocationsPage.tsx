@@ -3,6 +3,9 @@ import { publicOrigin } from "../../lib/config";
 import type { ReactNode } from "react";
 import { compareNames, placementStyle } from "../../lib/locations";
 import { MapLabelEditor } from "../shared/MapLabelEditor";
+import { DeviceDot } from "../shared/DeviceDot";
+import { useDevicePosition } from "../shared/useDevicePosition";
+import { useMapFit } from "../../data/maps";
 import {
   bulkUpdateLocations,
   createPlacement,
@@ -1652,9 +1655,12 @@ function MapPlotter({
   const [addLocationId, setAddLocationId] = useState("");
 
   const { data: rows } = usePlacements(map.id);
+  const fit = useMapFit(map.id);
+  const device = useDevicePosition();
   // The stored shape is jsonb, so it arrives as text; parsed once per row here
   // rather than at each of the half-dozen places that read a coordinate.
   const placements = rows.map((p) => ({ ...p, shape: placementOf(p) }));
+  const residuals = fit ? fit.residuals() : [];
   const plottedIds = new Set(placements.map((p) => p.location_id));
   const imageUrl = attachmentUrl(map.image_path);
   const editingShape = editing?.placementId ? (placements.find((p) => p.id === editing.placementId)?.shape ?? null) : null;
@@ -1666,6 +1672,10 @@ function MapPlotter({
             zoomed (shared/MapLabelEditor.tsx). Tap a label to open it. */}
         <div className="map-canvas map-schematic">
           {imageUrl && <img src={imageUrl} alt={map.name} className="map-image" draggable={false} />}
+          <DeviceDot fit={fit} position={device} />
+          {placements.map((p) => (
+            <span key={`a-${p.id}`} className="map-anchor" style={{ left: `${p.shape.cx}%`, top: `${p.shape.cy}%` }} aria-hidden />
+          ))}
           {placements.map((p) => (
             <button
               key={p.id}
@@ -1686,8 +1696,38 @@ function MapPlotter({
           ))}
         </div>
         <p className="muted small" style={{ marginTop: 6 }}>
-          Tap a label to move, size or rotate it on a zoomable map.
+          Tap a label to move, size or rotate it on a zoomable map. The dot under each label is its anchor - where the location is.
         </p>
+        {/* How well this map knows where things are (docs/maps.md): every
+            anchored AND pinned location is a control point, and each one's
+            leave-one-out error names a wrong pin rather than averaging it
+            away. */}
+        <div className="card" style={{ marginTop: 10 }}>
+          <div className="card-kicker">
+            <span>GPS fit</span>
+            <span>{fit ? `${fit.points.length} control points` : "not calibrated"}</span>
+          </div>
+          {fit ? (
+            <>
+              <p className="muted small" style={{ margin: "4px 0 8px" }}>
+                Worst {Math.round(residuals[0]?.errorMeters ?? 0)} m · typical {Math.round(residuals[Math.floor(residuals.length / 2)]?.errorMeters ?? 0)} m. A location far
+                above the rest is pinned or anchored in the wrong place.
+              </p>
+              <ul className="muted small" style={{ margin: 0, paddingLeft: 18 }} data-testid="map-residuals">
+                {residuals.slice(0, 8).map((r) => (
+                  <li key={r.point.label ?? `${r.point.cx},${r.point.cy}`}>
+                    {r.point.label ?? "?"} · {Number.isFinite(r.errorMeters) ? `${Math.round(r.errorMeters)} m` : "cannot be checked"}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="muted small" style={{ margin: "4px 0 0" }}>
+              Three locations that are both on this map and have GPS coordinates are needed before the map can show where anyone is. Audits add them: capture a fix,
+              then tap where you are.
+            </p>
+          )}
+        </div>
       </div>
 
       <div>
@@ -1728,6 +1768,7 @@ function MapPlotter({
           placements={rows}
           subject={{ locationId: editing.locationId, name: editing.name }}
           shape={editingShape}
+          fit={fit}
           removable={editing.placementId !== null}
           removeLabel="Unplot from this map"
           onCancel={() => setEditing(null)}

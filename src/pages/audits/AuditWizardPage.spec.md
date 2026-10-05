@@ -14,8 +14,9 @@ variants; this is D).
 ## Setup
 
 - **Every item, grouped, all selected.** Status (or Occupancy), Attributes,
-  Services, Amenities, Questions, Checks, GPS — the order the rest of the
-  app uses. Each group's heading is a checkbox that takes the whole group
+  Services, Amenities, Questions, GPS, Checks — the order the rest of the
+  app uses, with GPS before the Checks (owner, 2026-10-04) because a
+  captured fix is also where the location is anchored on the map. Each group's heading is a checkbox that takes the whole group
   and goes indeterminate when part of it is on.
 - *Confirm this location is done* is one of those items, offered under
   Status (Occupancy on an occupancy audit) and turned off like any other.
@@ -88,23 +89,27 @@ variants; this is D).
   moves to the note and the note's Next moves to the next item. An answer
   with nothing behind it — *Absent*, a Yes/No, a status — moves straight on.
 - **The map page shows the map, and the question under it.** The Finding
-  form's placement check: the map the location is plotted on, its
-  rectangle highlighted, every other one muted; under it *Is it placed
+  form's placement check: the map the location is plotted on, its anchor
+  dot and label highlighted, every other label muted, and the device's own
+  position when the map's fit can place it; under it *Is it placed
   correctly on the map?* - asked **only when it is on the map**. A location
   that is not on any map yet gets no question, just *Place it on the map*
   (owner, 2026-10-04). Yes moves on. No opens the editor, since No is
   answered by moving it; so does tapping the map.
   - **The editor is fullscreen and zooms** (`shared/MapLabelEditor.tsx`,
     also the Finding form's and the admin plotter's): pinch or wheel to
-    zoom, one finger pans, the label drags, or a tap places it when it is
-    not on the map yet. The bar under the map is one icon per setting -
-    Move, Size, Width, Height, Angle - and tapping one shows its slider
+    zoom, one finger pans, the label and the anchor dot drag, or a tap
+    places it when it is not on the map yet. The bar under the map is one
+    icon per setting - Label (the offset from the anchor), Anchor, Size,
+    Width, Height, Angle - and tapping one shows its slider
     alone, with the label brought into the top third of the screen so the
     slider's effect is seen while the thumb is on it. *Done* keeps the
     label; *Cancel* changes nothing.
   - **The style a label is finished with is remembered on this device**
     (`lib/mapLabelStyle.ts`, local storage - the owner's choice over a
-    marina setting), and the next label placed starts in it.
+    marina setting), offset included, and the next label placed starts in
+    it. A label for a location whose anchor was just tapped starts on that
+    anchor, saved or not.
   - A move of a label that was on the map is a `move_placement` Proposal,
     written with the answer, replaced by the next move and removed by
     *discard* - every other user navigates by that map, so it waits for
@@ -118,6 +123,12 @@ variants; this is D).
   fix is a `set_gps` Proposal; *discard* removes it. (Before 2026-10-04 a
   pinned location was skipped, and the page itself was a stub that wrote
   the word "captured" as the Proposal.)
+  - **Capturing opens the map in anchor mode: zoom in, tap where you are.**
+    The tap ties the fix to the map (`docs/maps.md`); it rides on the
+    answer and is written as a `move_placement` Proposal beside the
+    `set_gps` one - the existing placement re-anchored with its label kept,
+    or a new one in the remembered label style. Cancel keeps the fix and
+    ties nothing; *Tap where I am on the map* offers it again.
 - **No Next button under a field** (owner, 2026-10-04, reversing the same
   morning's addition): the keyboard's Next key, a swipe and the rail move
   on. The one Next is at the foot of a section page's list.

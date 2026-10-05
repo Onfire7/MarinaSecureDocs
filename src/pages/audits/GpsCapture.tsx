@@ -9,8 +9,9 @@
 // shows it always (`always`), because a page in a run cannot be
 // conditionally empty, and because an auditor standing at a pinned location
 // may know the pin is wrong when the device does not.
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { gpsPrompt } from "../../lib/audits";
+import { useDevicePosition } from "../shared/useDevicePosition";
 
 export interface GpsFix {
   lat: number;
@@ -41,17 +42,8 @@ export function GpsCapture({
   /** The wizard's one-item-per-screen size. */
   big?: boolean;
 }) {
-  const [device, setDevice] = useState<GpsFix | null>(null);
+  const device = useDevicePosition();
   const [standing, setStanding] = useState(false);
-  useEffect(() => {
-    if (!("geolocation" in navigator)) return;
-    const id = navigator.geolocation.watchPosition(
-      (pos) => setDevice({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
-      () => setDevice(null),
-      { enableHighAccuracy: true, timeout: 15_000 },
-    );
-    return () => navigator.geolocation.clearWatch(id);
-  }, []);
   const decision = gpsPrompt({ location: pin, device, radius, accuracyLimit });
   if (!always && !decision.prompt && !captured) return null;
 

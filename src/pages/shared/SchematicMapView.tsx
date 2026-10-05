@@ -7,6 +7,9 @@ import {
   type MarinaMapRow,
 } from "../../data/locations";
 import { attachmentUrl } from "../../data/files";
+import { useMapFit } from "../../data/maps";
+import { DeviceDot } from "./DeviceDot";
+import { useDevicePosition } from "./useDevicePosition";
 
 // Shared schematic-map renderer: a marina map image with a rectangle per
 // plotted location, a root-map chooser, and drill-down into scoped detail maps.
@@ -56,6 +59,9 @@ export function SchematicMapView({
 
   const active =
     mapStack.at(-1) ?? (rootMaps.length === 1 ? rootMaps[0] : undefined);
+  // Where the viewer is, when this map can say (docs/maps.md).
+  const fit = useMapFit(active?.id);
+  const device = useDevicePosition();
 
   // Multi-property marina: choose which root overview map to open first.
   if (!active) {
@@ -110,6 +116,7 @@ export function SchematicMapView({
         {imageUrl && (
           <img src={imageUrl} alt={active.name} className="map-image" />
         )}
+        <DeviceDot fit={fit} position={device} />
         {placements.map((p) => {
           if (include && !include(p.location_id)) return null;
           const colors = colorFor(p.location_id);

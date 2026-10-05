@@ -1,23 +1,24 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { placementStyle, type PlacementShape } from "../../lib/locations";
-import { placementOf, useLocations, useMarinaMaps, usePlacements } from "../../data/locations";
+import { placementOf } from "../../data/locations";
+import { useLocationMap, useMapFit } from "../../data/maps";
 import { attachmentUrl } from "../../data/files";
 import { MapLabelEditor } from "../shared/MapLabelEditor";
+import { DeviceDot } from "../shared/DeviceDot";
+import { useDevicePosition } from "../shared/useDevicePosition";
 
 // "Is it placed correctly on the map?" needs the map in front of the person
-// answering. This shows the map the location is plotted on with its
-// rectangle highlighted and every other one muted; the question sits UNDER
-// the map, and only when there is a placement to ask about - a location
-// that is not on the map yet is simply placed (owner, 2026-10-04). Tapping
-// the map, answering No, or *Place it on the map* opens the fullscreen
-// editor (shared/MapLabelEditor.tsx), which zooms.
+// answering. This shows the map the location is plotted on with its anchor
+// and label highlighted and every other label muted, and the device's own
+// position when the map can place it; the question sits UNDER the map, and
+// only when there is a placement to ask about - a location that is not on
+// the map yet is simply placed (owner, 2026-10-04). Tapping the map,
+// answering No, or *Place it on the map* opens the fullscreen editor
+// (shared/MapLabelEditor.tsx), which zooms.
 //
 // What comes back from the editor is a move_placement Proposal (docs/audits.md
 // § What becomes a Proposal), never a write: every other user navigates by
-// that map. Making one answers No.
-//
-// A location plotted on no map offers the map of its nearest ancestor that
-// has one, so a slip added in the field can be placed on its dock's map.
+// that map. Moving a label that was there answers No.
 
 export interface ProposedPlacement {
   map_id: string;
@@ -45,33 +46,16 @@ export function PlacementCheck({
   /** The wizard's one-item-per-screen size. */
   big?: boolean;
 }) {
-  const { data: maps } = useMarinaMaps();
-  const { data: placements } = usePlacements();
-  const { data: locations } = useLocations();
   const [chosenMapId, setChosenMapId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const { maps, map, own, placements } = useLocationMap(locationId, proposed?.map_id ?? chosenMapId);
+  const fit = useMapFit(map?.id);
+  const device = useDevicePosition();
 
-  const own = placements.find((p) => p.location_id === locationId) ?? null;
-  // The map to show: the one it's on, the one proposed, or the nearest
-  // ancestor's map so an unplotted location can be placed.
-  const fallbackMap = useMemo(() => {
-    const byId = new Map(locations.map((l) => [l.id, l]));
-    let cursor = byId.get(locationId)?.parent_id ?? null;
-    let guard = 0;
-    while (cursor && guard++ < 32) {
-      const m = maps.find((x) => x.scope_id === cursor);
-      if (m) return m;
-      cursor = byId.get(cursor)?.parent_id ?? null;
-    }
-    return maps.find((m) => !m.scope_parent_id) ?? null;
-  }, [locations, maps, locationId]);
-  const activeMapId = proposed?.map_id ?? chosenMapId ?? own?.map_id ?? fallbackMap?.id ?? null;
-  const map = maps.find((m) => m.id === activeMapId) ?? null;
   const imageUrl = map ? attachmentUrl(map.image_path) : null;
-  const shown = placements.filter((p) => p.map_id === activeMapId);
-  const ownShape = own && own.map_id === activeMapId ? placementOf(own) : null;
+  const ownShape = own ? placementOf(own) : null;
   /** Where it is, as far as this check knows: the proposal wins. */
-  const current: PlacementShape | null = proposed && proposed.map_id === activeMapId ? proposed.placement : ownShape;
+  const current: PlacementShape | null = proposed && map && proposed.map_id === map.id ? proposed.placement : ownShape;
   const placed = current !== null;
 
   if (!map) {
@@ -96,7 +80,7 @@ export function PlacementCheck({
   return (
     <div className="pc">
       <div className="pc-status">
-        <span className="muted small">{own ? `Plotted on ${map.scope_name ?? map.name}` : "Not on any map yet."}</span>
+        <span className="muted small">{own ? `On ${map.scope_name ?? map.name}` : proposed ? "Placed in this audit - waits for approval" : "Not on any map yet."}</span>
         {maps.length > 1 && editable && !own && !proposed && (
           <select className="select select-inline" value={map.id} onChange={(e) => setChosenMapId(e.target.value)} aria-label="Which map">
             {maps.map((m) => (
@@ -115,44 +99,23 @@ export function PlacementCheck({
         aria-label={editable ? "Open the map" : undefined}
       >
         {imageUrl && <img src={imageUrl} alt={map.name} className="map-image" />}
-        {shown.map((p) => {
+        {placements.map((p) => {
           const mine = p.location_id === locationId;
-          if (mine && proposed) return null;
+          if (mine) return null;
           return (
-            <span
-              key={p.id}
-              className="map-rect"
-              style={{
-                ...placementStyle(placementOf(p)),
-                opacity: mine ? 1 : 0.45,
-                background: mine ? "var(--accent-soft)" : "var(--panel)",
-                borderColor: mine ? "var(--accent)" : "var(--line)",
-                borderWidth: 1,
-                color: "var(--ink)",
-                fontWeight: mine ? 700 : 400,
-                pointerEvents: "none",
-              }}
-            >
+            <span key={p.id} className="map-rect pc-other" style={placementStyle(placementOf(p))}>
               {p.location_name}
             </span>
           );
         })}
-        {proposed && proposed.map_id === map.id && (
-          <span
-            className="map-rect"
-            style={{
-              ...placementStyle(proposed.placement),
-              background: "var(--warn-bg)",
-              borderColor: "var(--warn)",
-              borderWidth: 1,
-              color: "var(--ink)",
-              fontWeight: 700,
-              pointerEvents: "none",
-            }}
-            title="Proposed placement — waits for approval"
-          >
-            {locationName}
-          </span>
+        <DeviceDot fit={fit} position={device} />
+        {current && (
+          <>
+            <span className={`map-rect pc-mine ${proposed ? "pc-proposed-label" : ""}`} style={placementStyle(current)} title={proposed ? "Proposed placement — waits for approval" : undefined}>
+              {locationName}
+            </span>
+            <span className="map-anchor" style={{ left: `${current.cx}%`, top: `${current.cy}%` }} title={`${locationName} is here`} data-testid="pc-anchor" />
+          </>
         )}
         {editable && <span className="pc-zoom-hint">tap to zoom</span>}
       </div>
@@ -188,9 +151,10 @@ export function PlacementCheck({
       {editing && editable && (
         <MapLabelEditor
           map={map}
-          placements={shown}
+          placements={placements}
           subject={{ locationId, name: locationName }}
           shape={current}
+          fit={fit}
           removable={proposed !== null}
           removeLabel="Discard the proposal"
           onCancel={() => setEditing(false)}
@@ -215,6 +179,6 @@ export function PlacementCheck({
 }
 
 function sameShape(a: PlacementShape, b: PlacementShape): boolean {
-  const keys = ["cx", "cy", "rotation", "fontSize", "paddingX", "paddingY"] as const;
+  const keys = ["cx", "cy", "dx", "dy", "rotation", "fontSize", "paddingX", "paddingY"] as const;
   return keys.every((k) => (a[k] ?? null) === (b[k] ?? null));
 }

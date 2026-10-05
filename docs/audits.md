@@ -233,7 +233,9 @@ changes what isn't, rather than entering a Location from scratch.
 
 **Both kinds**: the **GPS prompt**, shown only when the Location has no
 coordinates, or the device is farther from them than the marina's *audit
-GPS radius* setting. See *GPS capture*.
+GPS radius* setting, and shown **before** the Marked/Map section: a
+captured fix is tied to the map by tapping where you are (`docs/maps.md`).
+See *GPS capture*.
 
 Every Finding also offers *raise a Ticket*, *log an Incident* (subject to
 `create_incidents`), and *record a Note* against the Location.
@@ -404,6 +406,9 @@ radius).
   the capture button enables. The prompt never assumes they are.
 - The capture is a **Proposal** (see above), recorded with the fix and its
   accuracy.
+- Capturing opens the map in anchor mode: zoom in, tap where you are. The
+  tap is a `move_placement` Proposal that anchors the Location there,
+  label kept or defaulted, so the fix and the map agree (`docs/maps.md`).
 
 ## The wizard
 
@@ -428,7 +433,7 @@ record and says so.
 
 The first screen is the **item list**: every entry this Audit could ask
 about, grouped - Status (or Occupancy), Attributes, Services, Amenities,
-Questions, Checks, GPS - each group headed by a checkbox that takes the
+Questions, GPS, Checks - each group headed by a checkbox that takes the
 whole group, and **everything selected**. Most runs want everything; a
 sweep turns the rest off. Under it, the **Locations** the run walks:
 *Still to do* by default, or all of them including those already audited.

@@ -5,7 +5,10 @@
 // next item (owner, 2026-09-23): a Service answered Present reveals its
 // working box and note and focuses the note, so the auditor can type one or
 // press Next to skip it; answers with nothing to follow move straight on.
-import { useRef, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties } from "react";
+import { useLocationMap, useMapFit } from "../../../data/maps";
+import { placementOf } from "../../../data/locations";
+import { MapLabelEditor } from "../../shared/MapLabelEditor";
 import { useNoteSuggestions } from "../../../data/services";
 import { useMarinaSettings } from "../../../data/settings";
 import type { AmenityAnswer, AttributeAnswer, AnswerValue, GpsAnswer, MapAnswer, ServiceAnswer, WizardItem, WizardTarget } from "../../../lib/auditWizard";
@@ -486,7 +489,11 @@ function MapControl({
 }
 
 /** The GPS page: where the pin is, how far the device is from it, and the
- *  capture under the same rules as the Finding form. Shown pin or no pin. */
+ *  capture under the same rules as the Finding form. Shown pin or no pin.
+ *  Capturing a fix opens the map in anchor mode - "tap where you are" -
+ *  which ties the coordinates to the map (docs/maps.md); the anchor rides
+ *  on the answer and becomes a move_placement Proposal. Cancelling keeps
+ *  the fix and ties nothing. */
 function GpsControl({
   target,
   value,
@@ -499,7 +506,12 @@ function GpsControl({
   onChange: (v: AnswerValue, mode?: AnswerMode) => void;
 }) {
   const settings = useMarinaSettings();
+  const [anchoring, setAnchoring] = useState(false);
   const fix = value && typeof value === "object" && "lat" in value ? (value as GpsAnswer) : null;
+  const { map, own, placements } = useLocationMap(target.location_id, fix?.anchor?.map_id ?? null);
+  const fit = useMapFit(map?.id);
+  const ownShape = own ? placementOf(own) : null;
+  const shape = fix?.anchor && map && fix.anchor.map_id === map.id ? { ...(ownShape ?? { rotation: 0 }), cx: fix.anchor.cx, cy: fix.anchor.cy } : ownShape;
   return (
     <div className={`wz-control ${big ? "wz-big" : ""}`}>
       <GpsCapture
@@ -511,8 +523,34 @@ function GpsControl({
         editable
         always
         big={big}
-        onCapture={(f) => onChange(f)}
+        onCapture={(f) => {
+          onChange(f);
+          if (f && map && target.location_id) setAnchoring(true);
+        }}
       />
+      {fix && map && target.location_id && (
+        <div className="muted small" style={{ textAlign: "center" }}>
+          {fix.anchor ? "Tied to the map." : "Not tied to the map yet."}{" "}
+          <button type="button" className="btn btn-sm" data-testid="gps-anchor" onClick={() => setAnchoring(true)}>
+            {fix.anchor ? "Move where I am" : "Tap where I am on the map"}
+          </button>
+        </div>
+      )}
+      {anchoring && fix && map && target.location_id && (
+        <MapLabelEditor
+          map={map}
+          placements={placements}
+          subject={{ locationId: target.location_id, name: target.location_name }}
+          shape={shape}
+          mode="anchor"
+          fit={fit}
+          onCancel={() => setAnchoring(false)}
+          onDone={(next) => {
+            setAnchoring(false);
+            onChange({ ...fix, anchor: next ? { map_id: map.id, cx: next.cx, cy: next.cy } : null });
+          }}
+        />
+      )}
     </div>
   );
 }

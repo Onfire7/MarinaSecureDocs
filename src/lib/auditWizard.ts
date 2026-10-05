@@ -35,8 +35,11 @@ export interface ItemGroup {
 }
 
 /** Attributes first, then Services, Amenities - the order the Finding form,
- *  the location panel and the Admin catalogue all use. */
-export const GROUP_ORDER = ["Occupancy", "Status", "Attributes", "Services", "Amenities", "Questions", "Checks", "GPS"] as const;
+ *  the location panel and the Admin catalogue all use. GPS comes before
+ *  the Checks (owner, 2026-10-04): capturing a fix is also where the
+ *  location is anchored on the map, and the map page then has something
+ *  to show. */
+export const GROUP_ORDER = ["Occupancy", "Status", "Attributes", "Services", "Amenities", "Questions", "GPS", "Checks"] as const;
 
 export interface AuditShape {
   kind: "occupancy" | "status";
@@ -286,7 +289,14 @@ export interface MapAnswer {
   correct: boolean | null;
   placement: { map_id: string; placement: Record<string, unknown> } | null;
 }
-export interface GpsAnswer { lat: number; lng: number; accuracy: number }
+/** A captured fix, and the spot on the map the auditor tapped as "I am
+ *  here" - the anchor that ties the coordinates to the map. */
+export interface GpsAnswer {
+  lat: number;
+  lng: number;
+  accuracy: number;
+  anchor?: { map_id: string; cx: number; cy: number } | null;
+}
 export type AnswerValue = ServiceAnswer | AmenityAnswer | AttributeAnswer | MapAnswer | GpsAnswer | boolean | string | number | null;
 export type TargetAnswers = Record<string, AnswerValue>;
 export type Answers = Record<string, TargetAnswers>;

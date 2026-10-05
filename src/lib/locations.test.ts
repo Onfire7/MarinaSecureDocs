@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { breadcrumb, compareNames } from "./locations";
+import { breadcrumb, compareNames, labelCentre, placementStyle } from "./locations";
 import { aLocation } from "../test/fixtures";
 
 describe("compareNames", () => {
@@ -38,5 +38,13 @@ describe("breadcrumb", () => {
     const b = aLocation({ id: "b", name: "B", parent_id: "a" });
     const byId = new Map([a, b].map((l) => [l.id, l]));
     expect(breadcrumb("a", byId)).toHaveLength(20);
+  });
+});
+
+describe("placementStyle", () => {
+  it("draws the label on the anchor when there is no offset, and off it by the offset when there is", () => {
+    expect(placementStyle({ cx: 40, cy: 60, rotation: 0 })).toMatchObject({ left: "40%", top: "60%" });
+    expect(placementStyle({ cx: 40, cy: 60, rotation: 0, dx: 5, dy: -2.5 })).toMatchObject({ left: "45%", top: "57.5%" });
+    expect(labelCentre({ cx: 40, cy: 60, rotation: 0, dx: 5 })).toEqual({ x: 45, y: 60 });
   });
 });
