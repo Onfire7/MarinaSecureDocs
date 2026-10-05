@@ -192,8 +192,9 @@ export function itemsForTarget(groups: ItemGroup[], selection: Set<string>, t: W
       }
       if (item.typeIds && (!t.location_type_id || !item.typeIds.has(t.location_type_id))) continue;
       if (item.targetIds && !item.targetIds.has(t.id)) continue;
-      // A location that already has a pin is not asked for one again.
-      if (item.kind === "gps" && t.gps_lat !== null && t.gps_lng !== null) continue;
+      // GPS is asked everywhere, pin or no pin (owner, 2026-10-04): the
+      // auditor standing at a pinned location may know the pin is wrong
+      // when the device cannot tell, and the page shows the distance.
       out.push(item);
     }
   if (confirm) out.push(confirm);
@@ -246,7 +247,14 @@ export function filterTargets(
 export interface ServiceAnswer { present: boolean | null; working: boolean; note: string }
 export interface AmenityAnswer { present: boolean | null; note: string }
 export interface AttributeAnswer { value: string; text: string; note: string }
-export type AnswerValue = ServiceAnswer | AmenityAnswer | AttributeAnswer | boolean | string | number | null;
+/** "Placed correctly on the map?" - the answer, and the move_placement
+ *  Proposal the auditor made while looking at it, if any. */
+export interface MapAnswer {
+  correct: boolean | null;
+  placement: { map_id: string; placement: Record<string, unknown> } | null;
+}
+export interface GpsAnswer { lat: number; lng: number; accuracy: number }
+export type AnswerValue = ServiceAnswer | AmenityAnswer | AttributeAnswer | MapAnswer | GpsAnswer | boolean | string | number | null;
 export type TargetAnswers = Record<string, AnswerValue>;
 export type Answers = Record<string, TargetAnswers>;
 
@@ -265,6 +273,8 @@ export function isAnswered(v: AnswerValue | undefined, kind: ItemKind): boolean 
     }
     case "question":
       return v !== "" ;
+    case "map":
+      return typeof v === "boolean" || (v as MapAnswer).correct !== null;
     default:
       return true;
   }

@@ -8,7 +8,7 @@
 // not touched are what is on file; rows it has are marked as such; rows
 // with nothing behind them say so, so a gap is visible before the sign-off
 // rather than afterwards on the audit page.
-import { CONFIRM_KEY, type AnswerValue, type AttributeAnswer, type AmenityAnswer, type ServiceAnswer, type WizardItem, type WizardTarget } from "../../../lib/auditWizard";
+import { CONFIRM_KEY, type AnswerValue, type AttributeAnswer, type AmenityAnswer, type MapAnswer, type ServiceAnswer, type WizardItem, type WizardTarget } from "../../../lib/auditWizard";
 import type { RunProps } from "./runProps";
 
 export function ConfirmPage({ t, p, onDone }: { t: WizardTarget; p: RunProps; onDone?: () => void }) {
@@ -25,7 +25,7 @@ export function ConfirmPage({ t, p, onDone }: { t: WizardTarget; p: RunProps; on
   let group = "";
   return (
     <div className="wz-c-review" data-testid="wz-confirm">
-      <div className="wz-c-review-list">
+      <div className="wz-c-review-list wz-d-inner">
         {items.map((item) => {
           const head = item.group !== group ? item.group : null;
           group = item.group;
@@ -91,8 +91,12 @@ function shown(item: WizardItem, v: AnswerValue | undefined, t: WizardTarget, p:
     case "question":
       if (v === undefined || v === null || v === "") return gap;
       return { text: typeof v === "boolean" ? (v ? "Yes" : "No") : String(v), missing: false };
+    case "map": {
+      const m = typeof v === "boolean" ? { correct: v, placement: null } : (v as MapAnswer | undefined);
+      if (!m || m.correct === null) return gap;
+      return { text: `${m.correct ? "Yes" : "No"}${m.placement ? " - new placement proposed" : ""}`, missing: false };
+    }
     case "marked":
-    case "map":
     case "occupied":
       if (typeof v !== "boolean") return gap;
       return { text: v ? "Yes" : "No", missing: false };

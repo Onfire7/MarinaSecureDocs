@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { gpsPrompt, mergeSearchMatch, unexpectedOccupancy } from "../../lib/audits";
+import { mergeSearchMatch, unexpectedOccupancy } from "../../lib/audits";
 import {
   saveFinding,
   setAnswerTicket,
@@ -46,6 +46,7 @@ import type { AttachmentTarget } from "../../data/attachments";
 import { LocationPicker } from "../shared/LocationPicker";
 import { NoteDialog } from "../shared/NoteDialog";
 import { PlacementCheck, type ProposedPlacement } from "./PlacementCheck";
+import { GpsCapture } from "./GpsCapture";
 
 // The Finding form (docs/audits.md § Field work). One screen for one target:
 // the built-in questions of the audit's kind, the target's own questions,
@@ -640,7 +641,7 @@ function FindingForm({
         </div>
       )}
 
-      <GpsBlock
+      <GpsCapture
         locationName={target?.location_name ?? (name || "this location")}
         pin={target && target.gps_lat !== null && target.gps_lng !== null ? { lat: target.gps_lat, lng: target.gps_lng } : null}
         radius={settings.auditGpsRadius}
@@ -790,78 +791,6 @@ function QuestionField({
       {q.kind === "text" && <input className="input" value={typeof v === "string" ? v : ""} disabled={!editable} onChange={(e) => onChange(e.target.value)} />}
       {q.kind === "meter_reading" && (
         <input className="input select-inline" type="number" step="any" value={typeof v === "number" ? v : ""} disabled={!editable} onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))} />
-      )}
-    </div>
-  );
-}
-
-function GpsBlock({
-  locationName,
-  pin,
-  radius,
-  accuracyLimit,
-  captured,
-  editable,
-  onCapture,
-}: {
-  locationName: string;
-  pin: { lat: number; lng: number } | null;
-  radius: number;
-  accuracyLimit: number;
-  captured: { lat: number; lng: number; accuracy: number } | null;
-  editable: boolean;
-  onCapture: (fix: { lat: number; lng: number; accuracy: number } | null) => void;
-}) {
-  const [device, setDevice] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
-  const [standing, setStanding] = useState(false);
-  useEffect(() => {
-    if (!("geolocation" in navigator)) return;
-    const id = navigator.geolocation.watchPosition(
-      (pos) => setDevice({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
-      () => setDevice(null),
-      { enableHighAccuracy: true, timeout: 15_000 },
-    );
-    return () => navigator.geolocation.clearWatch(id);
-  }, []);
-  const decision = gpsPrompt({ location: pin, device, radius, accuracyLimit });
-  if (!decision.prompt && !captured) return null;
-  return (
-    <div className="card" style={{ marginBottom: 12, borderLeft: "4px solid var(--accent)" }}>
-      <div className="card-kicker">
-        <span>GPS</span>
-        <span>
-          {decision.accuracyMeters !== null ? `accuracy ${Math.round(decision.accuracyMeters)} m` : "no fix yet"}
-        </span>
-      </div>
-      {captured ? (
-        <div className="row" style={{ alignItems: "center", gap: 8 }}>
-          <span className="badge badge-good">Coordinates captured (±{Math.round(captured.accuracy)} m) - waits for approval</span>
-          {editable && (
-            <button type="button" className="btn btn-sm btn-bare" onClick={() => onCapture(null)}>
-              discard
-            </button>
-          )}
-        </div>
-      ) : (
-        <>
-          <div className="muted small" style={{ marginBottom: 6 }}>
-            {decision.reason === "missing"
-              ? `${locationName} has no coordinates yet.`
-              : `You are ${Math.round(decision.distanceMeters ?? 0)} m from where ${locationName} is pinned.`}
-            {!decision.captureEnabled && decision.accuracyMeters !== null && ` GPS accuracy ${Math.round(decision.accuracyMeters)} m - move into the open and try again.`}
-          </div>
-          <label style={{ display: "block", marginBottom: 6 }}>
-            <input type="checkbox" checked={standing} disabled={!editable} onChange={(e) => setStanding(e.target.checked)} /> I am standing directly at {locationName}
-          </label>
-          <button
-            type="button"
-            className="btn btn-sm btn-primary"
-            disabled={!editable || !standing || !decision.captureEnabled || !device}
-            onClick={() => device && onCapture(device)}
-          >
-            Use my position
-          </button>
-        </>
       )}
     </div>
   );

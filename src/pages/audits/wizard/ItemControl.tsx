@@ -7,11 +7,15 @@
 // press Next to skip it; answers with nothing to follow move straight on.
 import { useRef, type CSSProperties } from "react";
 import { useNoteSuggestions } from "../../../data/services";
-import type { AmenityAnswer, AttributeAnswer, AnswerValue, ServiceAnswer, WizardItem } from "../../../lib/auditWizard";
+import { useMarinaSettings } from "../../../data/settings";
+import type { AmenityAnswer, AttributeAnswer, AnswerValue, GpsAnswer, MapAnswer, ServiceAnswer, WizardItem, WizardTarget } from "../../../lib/auditWizard";
+import { GpsCapture } from "../GpsCapture";
+import { PlacementCheck } from "../PlacementCheck";
 import type { AnswerMode } from "./runProps";
 
 export function ItemControl({
   item,
+  target,
   value,
   statuses,
   onChange,
@@ -20,6 +24,8 @@ export function ItemControl({
   autoFocus,
 }: {
   item: WizardItem;
+  /** Whose item: the map and GPS pages need the location itself. */
+  target: WizardTarget;
   value: AnswerValue | undefined;
   statuses: { id: string; name: string }[];
   /** `typing` while a field is being edited: the page holds the value and
@@ -248,7 +254,6 @@ export function ItemControl({
       );
     }
     case "marked":
-    case "map":
     case "occupied":
       return (
         <div className={`wz-control ${cls}`}>
@@ -261,9 +266,12 @@ export function ItemControl({
               onward();
             }}
           />
-          {item.kind === "map" && <span className="muted small wz-inline">the map would be shown here</span>}
         </div>
       );
+    case "map":
+      return <MapControl target={target} value={value} big={big} onChange={onChange} onward={onward} nextButton={nextButton} />;
+    case "gps":
+      return <GpsControl target={target} value={value} big={big} onChange={onChange} nextButton={nextButton} />;
     case "status":
       return (
         <div className={`wz-control ${cls}`}>
@@ -282,22 +290,6 @@ export function ItemControl({
               </button>
             ))}
           </div>
-        </div>
-      );
-    case "gps":
-      return (
-        <div className={`wz-control ${cls}`}>
-          <button
-            type="button"
-            className={`btn ${big ? "btn-primary wz-btn-big" : "btn-sm"}`}
-            onClick={() => {
-              onChange("captured");
-              onward();
-            }}
-          >
-            {value === "captured" ? "✓ Captured" : "Use my position"}
-          </button>
-          <span className="muted small wz-inline">the real block checks accuracy first</span>
         </div>
       );
     default:
@@ -466,6 +458,90 @@ function YesNo({
       <button type="button" className={`chip ${big ? "wz-chip-big" : ""} ${value === false ? "tree-match" : ""}`} onClick={() => onChange(false)}>
         {labels[1]}
       </button>
+    </div>
+  );
+}
+
+/** "Placed correctly on the map?" with the map in front of the person
+ *  answering, the same component the Finding form uses. Yes moves on; No
+ *  stays, because No is answered by moving it - the tap is a move_placement
+ *  Proposal, and making one answers No for you. */
+function MapControl({
+  target,
+  value,
+  big,
+  onChange,
+  onward,
+  nextButton,
+}: {
+  target: WizardTarget;
+  value: AnswerValue | undefined;
+  big?: boolean;
+  onChange: (v: AnswerValue, mode?: AnswerMode) => void;
+  onward: () => void;
+  nextButton: React.ReactNode;
+}) {
+  const v: MapAnswer = typeof value === "boolean" ? { correct: value, placement: null } : ((value as MapAnswer | undefined) ?? { correct: null, placement: null });
+  return (
+    <div className={`wz-control ${big ? "wz-big" : ""} wz-map`}>
+      <YesNo
+        value={v.correct}
+        labels={["Yes", "No"]}
+        big={big}
+        onChange={(correct) => {
+          onChange({ ...v, correct });
+          if (correct) onward();
+        }}
+      />
+      {target.location_id ? (
+        <div className="wz-map-canvas">
+          <PlacementCheck
+            locationId={target.location_id}
+            locationName={target.location_name}
+            editable
+            proposed={v.placement as React.ComponentProps<typeof PlacementCheck>["proposed"]}
+            onPropose={(p) => onChange({ correct: p ? false : v.correct, placement: p ? { map_id: p.map_id, placement: { ...p.placement } } : null })}
+          />
+        </div>
+      ) : (
+        <span className="muted small">Not a location on file, so it has no place on the map yet.</span>
+      )}
+      {nextButton}
+    </div>
+  );
+}
+
+/** The GPS page: where the pin is, how far the device is from it, and the
+ *  capture under the same rules as the Finding form. Shown pin or no pin. */
+function GpsControl({
+  target,
+  value,
+  big,
+  onChange,
+  nextButton,
+}: {
+  target: WizardTarget;
+  value: AnswerValue | undefined;
+  big?: boolean;
+  onChange: (v: AnswerValue, mode?: AnswerMode) => void;
+  nextButton: React.ReactNode;
+}) {
+  const settings = useMarinaSettings();
+  const fix = value && typeof value === "object" && "lat" in value ? (value as GpsAnswer) : null;
+  return (
+    <div className={`wz-control ${big ? "wz-big" : ""}`}>
+      <GpsCapture
+        locationName={target.location_name}
+        pin={target.gps_lat !== null && target.gps_lng !== null ? { lat: target.gps_lat, lng: target.gps_lng } : null}
+        radius={settings.auditGpsRadius}
+        accuracyLimit={settings.auditGpsAccuracy}
+        captured={fix}
+        editable
+        always
+        big={big}
+        onCapture={(f) => onChange(f)}
+      />
+      {nextButton}
     </div>
   );
 }

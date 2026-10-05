@@ -202,13 +202,14 @@ export function WizardRun(p: RunProps) {
     p.setIndex(firstOf(step.targetIndex) + itemIndex);
   };
 
-  /** Is this gesture the confirmation page's review list's business? The
-   *  run sits at the bottom of its stack whenever that page is showing, so
-   *  without this every swipe over the review counted as overscroll and
-   *  rolled into the next location - the review itself never moved. Once
-   *  the list is at its end the gesture is the run's again. */
+  /** Is this gesture an inner scroller's business - the confirmation
+   *  page's review, the map page? The run sits at the bottom of its stack
+   *  whenever such a page is showing, so without this every swipe over the
+   *  list counted as overscroll and rolled into the next location - the
+   *  list itself never moved. Once it is at its end the gesture is the
+   *  run's again. */
   const innerScroller = (target: EventTarget | null, dy: number) => {
-    const el = target instanceof Element ? target.closest<HTMLElement>(".wz-c-review-list") : null;
+    const el = target instanceof Element ? target.closest<HTMLElement>(".wz-d-inner") : null;
     if (!el || el.scrollHeight <= el.clientHeight) return false;
     return dy > 0 ? el.scrollTop < el.scrollHeight - el.clientHeight - 1 : el.scrollTop > 1;
   };
@@ -265,7 +266,7 @@ export function WizardRun(p: RunProps) {
       const el = colRef.current;
       const y = e.touches[0]?.clientY;
       if (!el || y === undefined) return;
-      const list = e.target instanceof Element ? e.target.closest<HTMLElement>(".wz-c-review-list") : null;
+      const list = e.target instanceof Element ? e.target.closest<HTMLElement>(".wz-d-inner") : null;
       // Over the review list, the first move decides whose gesture it is.
       if (list && list.scrollHeight > list.clientHeight) drag.current = { inner: true, y0: y, decided: false };
       else begin(el, y);
@@ -508,7 +509,7 @@ function LocationPage({
                 {item.label}
                 {onFile && <span className="muted small" style={{ fontWeight: 400 }}> · on file: {onFile}</span>}
               </div>
-              <ItemControl item={item} value={value} statuses={p.statuses} advance={onAdvance} onChange={(v, mode) => p.setAnswer(t.id, item.key, v, mode)} />
+              <ItemControl item={item} target={t} value={value} statuses={p.statuses} advance={onAdvance} onChange={(v, mode) => p.setAnswer(t.id, item.key, v, mode)} />
             </div>
           </div>
         );
@@ -565,7 +566,7 @@ function Column({
       {items.map((item, i) => {
         const onFile = p.onFile(target, item);
         return (
-          <section className={`wz-d-page ${item.kind === "confirm" ? "wz-d-confirm" : ""}`} key={item.key} data-page={i}>
+          <section className={`wz-d-page ${item.kind === "confirm" ? "wz-d-confirm" : item.kind === "map" ? "wz-d-tall" : ""}`} key={item.key} data-page={i}>
             <div className="wz-d-heading">
               <h1 className="wz-d-loc">{target.location_name}</h1>
               {target.type_name && <div className="wz-d-type">{target.type_name}</div>}
@@ -576,9 +577,12 @@ function Column({
             {item.kind === "confirm" ? (
               <ConfirmPage t={target} p={p} onDone={onConfirmed} />
             ) : (
-              <>
+              // A page taller than the screen - the map - scrolls inside
+              // itself, like the confirmation page's review.
+              <div className={item.kind === "map" ? "wz-d-inner" : "wz-d-body"}>
                 <ItemControl
                   item={item}
+                  target={target}
                   value={answers?.[item.key]}
                   statuses={p.statuses}
                   big
@@ -587,7 +591,7 @@ function Column({
                   onChange={(v, mode) => p.setAnswer(target.id, item.key, v, mode)}
                 />
                 {onFile && <div className="wz-a-prefill">On file: {onFile}</div>}
-              </>
+              </div>
             )}
             <div className="muted small">
               {i + 1} of {items.length} here · {p.savedNote}

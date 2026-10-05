@@ -227,8 +227,13 @@ export function AuditWizardPage() {
         if (row) seed[item.key] = parseAnswer(row.value);
       } else if (item.kind === "marked" && finding?.clearly_marked != null) {
         seed[item.key] = finding.clearly_marked === 1;
-      } else if (item.kind === "map" && finding?.mapped_correctly != null) {
-        seed[item.key] = finding.mapped_correctly === 1;
+      } else if (item.kind === "map") {
+        const move = proposed.find((p) => p.kind === "move_placement")?.payload;
+        if (finding?.mapped_correctly != null || move)
+          seed[item.key] = {
+            correct: finding?.mapped_correctly == null ? null : finding.mapped_correctly === 1,
+            placement: move ? { map_id: String(move.map_id), placement: (move.placement as Record<string, unknown>) ?? {} } : null,
+          };
       } else if (item.kind === "occupied" && finding?.occupied != null) {
         seed[item.key] = finding.occupied === 1;
       }

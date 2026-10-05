@@ -436,8 +436,10 @@ The foot of the screen counts what was chosen - "12 locations · 147 steps".
 
 A run is **location-major**: every selected item of one Location, then the
 next. Items that do not apply are never shown - a Service the Location's
-type does not have, a Question no Rule attached to it, GPS on a Location
-that already has a pin.
+type does not have, a Question no Rule attached to it. GPS is asked at
+every Location, pinned or not (owner, 2026-10-04): the page says how far
+the device is from the pin, and an auditor standing there may know the
+pin is wrong when the device cannot tell.
 
 Each item opens **pre-filled from what the marina already records**, with
 an *On file:* line saying what that is, so the auditor is confirming

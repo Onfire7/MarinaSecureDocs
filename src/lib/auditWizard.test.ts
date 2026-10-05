@@ -135,9 +135,9 @@ describe("itemsForTarget", () => {
   it("6 · a question is asked only where its Rule put it", () => {
     expect(itemsForTarget(groups, all, slip).some((i) => i.key === "question:q-ring")).toBe(false);
   });
-  it("7 · a location that already has a pin is not asked for one", () => {
+  it("7 · a location that already has a pin is still asked, so a wrong pin can be fixed", () => {
     const pinned = { ...slip, gps_lat: 33.8, gps_lng: -96.6 };
-    expect(itemsForTarget(groups, all, pinned).some((i) => i.kind === "gps")).toBe(false);
+    expect(itemsForTarget(groups, all, pinned).some((i) => i.kind === "gps")).toBe(true);
   });
   it("8 · deselecting items drops them, and a group can be swept alone", () => {
     const onlyPower = new Set(["service:s-power"]);

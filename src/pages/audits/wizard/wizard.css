@@ -463,14 +463,37 @@
   max-width: 560px;
   text-align: left;
 }
-.wz-c-review-list {
+/* Anything that scrolls inside a page: the review, the map. Its own scroll
+   container, so the column's touch-action does not reach it - a swipe here
+   is the list's until it runs out of room (WizardRun.tsx). */
+.wz-d-inner {
   flex: 1 1 auto;
   min-height: 0;
+  width: 100%;
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* Its own scroll container, so the column's touch-action does not reach
-     it: a swipe here is the list's until it runs out of room. */
   touch-action: pan-y;
+}
+.wz-d-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+.wz-d-page.wz-d-tall {
+  justify-content: flex-start;
+}
+/* The map page: the answer beside the question, the map under it, full
+   width of what the rail leaves. The map's own controls are the Finding
+   form's and read left to right. */
+.wz-map {
+  flex-direction: column;
+  width: 100%;
+}
+.wz-map-canvas {
+  width: 100%;
+  text-align: left;
 }
 .wz-c-review-group {
   font-size: 0.72rem;

@@ -4,7 +4,7 @@ import type { LockContext } from "@powersync/web";
 import { insert, remove, transact, update } from "./sql";
 import { recordActivity } from "./activity";
 import { unexpectedOccupancy } from "../lib/audits";
-import type { AnswerValue, AmenityAnswer, AttributeAnswer, ServiceAnswer, WizardItem } from "../lib/auditWizard";
+import type { AnswerValue, AmenityAnswer, AttributeAnswer, GpsAnswer, MapAnswer, ServiceAnswer, WizardItem } from "../lib/auditWizard";
 
 // The wizard's writes (docs/audits.md § The wizard). One item at a time,
 // the moment it is answered.
@@ -65,7 +65,7 @@ export function recordWizardItem(w: WizardWrite): Promise<string> {
         await update(tx, "audit_findings", findingId, { clearly_marked: boolValue(w.value), updated_at: stamp() });
         break;
       case "map":
-        await update(tx, "audit_findings", findingId, { mapped_correctly: boolValue(w.value), updated_at: stamp() });
+        await writeMap(tx, w, findingId);
         break;
       case "occupied":
         await writeOccupied(tx, w, findingId);
@@ -222,9 +222,24 @@ async function writeOccupied(tx: LockContext, w: WizardWrite, findingId: string)
   });
 }
 
+/** The answer goes on the Finding; the move, if the auditor made one on
+ *  the map, is a move_placement Proposal like the Finding form's - every
+ *  other user navigates by that map, so it waits for approval. */
+async function writeMap(tx: LockContext, w: WizardWrite, findingId: string) {
+  const v = w.value as MapAnswer | boolean | null;
+  const correct = typeof v === "boolean" ? v : (v?.correct ?? null);
+  const placement = typeof v === "object" && v !== null ? v.placement : null;
+  await update(tx, "audit_findings", findingId, { mapped_correctly: correct === null ? null : correct ? 1 : 0, updated_at: stamp() });
+  await replaceProposal(tx, findingId, "move_placement", null, placement ? { map_id: placement.map_id, placement: placement.placement } : null);
+}
+
+/** A fix is a set_gps Proposal; anything that is not a fix clears it. The
+ *  shape check matters: the first wizard wrote the string "captured" here
+ *  and produced Proposals with no coordinates in them. */
 async function writeGps(tx: LockContext, w: WizardWrite, findingId: string) {
-  const fix = w.value as { lat: number; lng: number; accuracy: number } | null;
-  await replaceProposal(tx, findingId, "set_gps", null, fix ? { lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy } : null);
+  const fix = w.value as Partial<GpsAnswer> | string | boolean | null;
+  const real = typeof fix === "object" && fix !== null && typeof fix.lat === "number" && typeof fix.lng === "number";
+  await replaceProposal(tx, findingId, "set_gps", null, real ? { lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy ?? null } : null);
 }
 
 /**
@@ -236,7 +251,7 @@ async function writeGps(tx: LockContext, w: WizardWrite, findingId: string) {
 async function replaceProposal(
   tx: LockContext,
   findingId: string,
-  kind: "set_service" | "amenity" | "set_amenity" | "set_attribute" | "set_gps",
+  kind: "set_service" | "amenity" | "set_amenity" | "set_attribute" | "set_gps" | "move_placement",
   entryId: string | null,
   payload: Record<string, unknown> | null,
 ) {

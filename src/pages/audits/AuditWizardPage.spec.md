@@ -82,6 +82,23 @@ variants; this is D).
   does the same; a choice Attribute focuses its note; a number field's Next
   moves to the note and the note's Next moves to the next item. An answer
   with nothing behind it — *Absent*, a Yes/No, a status — moves straight on.
+- **The map page shows the map.** *Placed correctly on the map?* is the
+  Yes/No beside the Finding form's placement check: the map the location
+  is plotted on, its rectangle highlighted, every other one muted, and
+  *Move it on the map* / *Adjust the label*. Yes moves on. No stays, since
+  No is answered by moving it, and a move answers No for you. The move is
+  a `move_placement` Proposal, written with the answer, replaced by the
+  next move and removed by *discard* - every other user navigates by that
+  map, so it waits for approval. The page is taller than the screen and
+  scrolls inside itself, like the review.
+- **The GPS page is asked at every location, pin or no pin**, and it is
+  the Finding form's capture: the device's accuracy, where the pin is and
+  how far the device is from it (or that there is none), the *I am
+  standing directly at …* tick, and *Use my position*, enabled under the
+  same rules — accuracy within the marina's limit, the tick ticked. The
+  fix is a `set_gps` Proposal; *discard* removes it. (Before 2026-10-04 a
+  pinned location was skipped, and the page itself was a stub that wrote
+  the word "captured" as the Proposal.)
 - **Every page with something to type into has a Next button under it**,
   which moves to the next item. The keyboard's Next key does the same thing
   for the field that has it, but a thumb that has just typed a number should
