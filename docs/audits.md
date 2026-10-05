@@ -871,7 +871,7 @@ Built 2026-09-22 on `beta2`. Where the code lives:
   is a local write that syncs.
 - `src/pages/audits/` — the section, home, launch, detail/finalize and
   Finding pages, and the rule-tree editor. `src/pages/admin/AdminServicesPage`
-  and `AdminAuditTemplatesPage`. `src/pages/locations/LocationServicesPanel`.
+  and `AdminAuditTemplatesPage`. `src/pages/shared/LocationServicesPanel`.
 - `supabase/migrations/20260922000{2,3,4,7,8,9}00_*.sql`; `supabase/tests/080_audits.sql`.
 - `scripts/e2e/audits.mjs` drives tests 35–42 of the approved list against
   a running app.
