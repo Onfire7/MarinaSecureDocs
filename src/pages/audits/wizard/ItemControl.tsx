@@ -9,6 +9,8 @@ import { useRef, useState, type CSSProperties } from "react";
 import { useLocationMap, useMapFit } from "../../../data/maps";
 import { placementOf } from "../../../data/locations";
 import { MapLabelEditor } from "../../shared/MapLabelEditor";
+import { MapPreview } from "../../shared/MapPreview";
+import { useDevicePosition } from "../../shared/useDevicePosition";
 import { useNoteSuggestions } from "../../../data/services";
 import { useMarinaSettings } from "../../../data/settings";
 import type { AmenityAnswer, AttributeAnswer, AnswerValue, GpsAnswer, MapAnswer, ServiceAnswer, WizardItem, WizardTarget } from "../../../lib/auditWizard";
@@ -510,8 +512,17 @@ function GpsControl({
   const fix = value && typeof value === "object" && "lat" in value ? (value as GpsAnswer) : null;
   const { map, own, placements } = useLocationMap(target.location_id, fix?.anchor?.map_id ?? null);
   const fit = useMapFit(map?.id);
+  const device = useDevicePosition();
   const ownShape = own ? placementOf(own) : null;
   const shape = fix?.anchor && map && fix.anchor.map_id === map.id ? { ...(ownShape ?? { rotation: 0 }), cx: fix.anchor.cx, cy: fix.anchor.cy } : ownShape;
+  const pinned = target.gps_lat !== null && target.gps_lng !== null;
+  // What the map can say about this page: where you are, where the pin on
+  // file is, where the fix just captured is - each only when the fit can
+  // place it (owner, 2026-10-05).
+  const marks = [
+    ...(pinned ? [{ lat: target.gps_lat!, lng: target.gps_lng!, kind: "pin" as const, title: `${target.location_name}, as pinned` }] : []),
+    ...(fix ? [{ lat: fix.lat, lng: fix.lng, kind: "fix" as const, title: "The fix just captured" }] : []),
+  ];
   return (
     <div className={`wz-control ${big ? "wz-big" : ""}`}>
       <GpsCapture
@@ -528,6 +539,20 @@ function GpsControl({
           if (f && map && target.location_id) setAnchoring(true);
         }}
       />
+      {map && target.location_id && (
+        <MapPreview
+          map={map}
+          placements={placements}
+          subject={{ locationId: target.location_id, name: target.location_name }}
+          shape={shape}
+          proposed={!!fix?.anchor}
+          fit={fit}
+          device={device}
+          marks={marks}
+          onOpen={fix ? () => setAnchoring(true) : undefined}
+          testId="gps-map"
+        />
+      )}
       {fix && map && target.location_id && (
         <div className="muted small" style={{ textAlign: "center" }}>
           {fix.anchor ? "Tied to the map." : "Not tied to the map yet."}{" "}

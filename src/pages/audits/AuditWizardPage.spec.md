@@ -123,6 +123,11 @@ variants; this is D).
   fix is a `set_gps` Proposal; *discard* removes it. (Before 2026-10-04 a
   pinned location was skipped, and the page itself was a stub that wrote
   the word "captured" as the Proposal.)
+  - **The map is on the page**, under the capture, when the location has
+    one: its label and anchor, where you are (the blue dot), where it is
+    pinned (grey marker) and the fix just captured (green marker) - each
+    position only when the map's fit can place it. Tapping it, once a fix
+    is captured, opens the anchor editor.
   - **Capturing opens the map in anchor mode: zoom in, tap where you are.**
     The tap ties the fix to the map (`docs/maps.md`); it rides on the
     answer and is written as a `move_placement` Proposal beside the

@@ -2331,3 +2331,26 @@ h3 {
   padding-top: 10px;
   border-top: 1px solid var(--line-lt);
 }
+
+/* A recorded GPS position on a map (MapPreview): the pin on file, or a
+   fix just captured. Where the device is now is the blue dot. */
+.map-mark {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50% 50% 50% 0;
+  transform: translate(-50%, -100%) rotate(-45deg);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  z-index: 3;
+}
+.map-mark-pin {
+  background: var(--mute);
+}
+.map-mark-fix {
+  background: var(--good);
+}
+.map-mark.outside {
+  opacity: 0.6;
+}

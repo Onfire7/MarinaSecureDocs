@@ -18,6 +18,7 @@ export function MapPreview({
   proposed,
   fit,
   device,
+  marks = [],
   onOpen,
   testId = "map-preview",
 }: {
@@ -30,6 +31,9 @@ export function MapPreview({
   proposed?: boolean;
   fit: MapFit | null;
   device: DevicePosition | null;
+  /** GPS positions to mark through the fit - the pin on file, a fix just
+   *  captured. Drawn only when the fit can place them. */
+  marks?: { lat: number; lng: number; kind: "pin" | "fix"; title: string }[];
   onOpen?: () => void;
   testId?: string;
 }) {
@@ -51,6 +55,12 @@ export function MapPreview({
           </span>
         ))}
       <DeviceDot fit={fit} position={device} />
+      {fit &&
+        marks.map((m, i) => {
+          const at = fit.toMap(m.lat, m.lng);
+          if (!Number.isFinite(at.cx) || !Number.isFinite(at.cy)) return null;
+          return <span key={i} className={`map-mark map-mark-${m.kind} ${at.inside ? "" : "outside"}`} style={{ left: `${at.cx}%`, top: `${at.cy}%` }} title={m.title} data-testid={`${testId}-mark-${m.kind}`} />;
+        })}
       {shape && (
         <>
           <span className={`map-rect pc-mine ${proposed ? "pc-proposed-label" : ""}`} style={placementStyle(shape)} title={proposed ? "Proposed placement — waits for approval" : undefined} data-testid={`${testId}-label`}>

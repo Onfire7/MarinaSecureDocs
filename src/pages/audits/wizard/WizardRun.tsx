@@ -569,7 +569,7 @@ function Column({
       {pages.map((page, i) => {
         const item = page.items[0];
         const onFile = page.kind === "item" ? p.onFile(target, item) : null;
-        const tall = page.kind === "section" || item.kind === "map";
+        const tall = page.kind === "section" || item.kind === "map" || item.kind === "gps";
         return (
           <section className={`wz-d-page ${item.kind === "confirm" ? "wz-d-confirm" : tall ? "wz-d-tall" : ""}`} key={page.key} data-page={i}>
             <div className="wz-d-heading">
@@ -586,7 +586,7 @@ function Column({
             ) : (
               // A page taller than the screen - the map - scrolls inside
               // itself, like the confirmation page's review.
-              <div className={item.kind === "map" ? "wz-d-inner" : "wz-d-body"}>
+              <div className={item.kind === "map" || item.kind === "gps" ? "wz-d-inner" : "wz-d-body"}>
                 <ItemControl
                   item={item}
                   target={target}
