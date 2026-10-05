@@ -20,18 +20,19 @@ import {
 import { DraftInput, DraftNumberInput } from "../shared/DraftInput";
 
 // A location's Attributes, Services and Amenities (docs/audits.md
-// § Attributes, Services and Amenities). Everyone sees what is here;
-// manage_locations edits presence, working, metered, notes and values
-// directly — the admin path that does not need an audit's approval. An
-// Attribute is always applicable to a valid type — there is no presence to
-// toggle, only a value, optional and clearable. Once an audit exists for
+// § Attributes, Services and Amenities). Everyone sees what is here on the
+// location page; editing - presence, working, metered, notes and values,
+// directly, without an audit's approval - happens only on the admin
+// location row (owner, 2026-10-05), and needs manage_locations there too.
+// An Attribute is always applicable to a valid type — there is no presence
+// to toggle, only a value, optional and clearable. Once an audit exists for
 // this location, an Attribute's value only changes through an approved
 // Proposal (docs/audits.md), never from here mid-audit and never from a
-// Finding directly — this panel is the "before any audit" and "manager
-// correcting a mistake" path.
-export function LocationServicesPanel({ locationId, typeId }: { locationId: string; typeId: string }) {
+// Finding directly — the editable panel is the "before any audit" and
+// "manager correcting a mistake" path.
+export function LocationServicesPanel({ locationId, typeId, editable = false }: { locationId: string; typeId: string; /** Offer the controls. Still gated by manage_locations. */ editable?: boolean }) {
   const current = useCurrent();
-  const canEdit = current.can("manage_locations");
+  const canEdit = editable && current.can("manage_locations");
   const { data: services } = useServices();
   const { data: amenities } = useAmenities();
   const { data: attributes } = useAttributes();

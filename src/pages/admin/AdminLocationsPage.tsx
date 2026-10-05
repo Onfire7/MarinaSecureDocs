@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { compareNames, placementStyle } from "../../lib/locations";
 import { MapLabelEditor } from "../shared/MapLabelEditor";
 import { LocationMapSettings } from "./LocationMapSettings";
+import { LocationServicesPanel } from "../shared/LocationServicesPanel";
 import { DeviceDot } from "../shared/DeviceDot";
 import { useDevicePosition } from "../shared/useDevicePosition";
 import { useMapFit } from "../../data/maps";
@@ -1034,6 +1035,12 @@ function LocationRow({
                 locationId={location.id}
                 name={location.name}
               />
+              {/* What the location has: edited here and nowhere else
+                  (owner, 2026-10-05); the location page only shows it. */}
+              <div className="section-title">What it has</div>
+              <div className="stack" style={{ gap: 6, marginBottom: 12 }} data-testid="loc-catalogue">
+                <LocationServicesPanel locationId={location.id} typeId={location.location_type_id} editable />
+              </div>
               <div className="section-title spread">
                 <span>Checkpoints</span>
                 <button type="button" className="btn btn-sm" onClick={() => void addCheckpoint()}>
