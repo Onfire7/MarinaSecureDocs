@@ -285,7 +285,7 @@ export function MapLabelEditor({
               {p.location_name}
             </span>
           ))}
-          <DeviceDot fit={fit} position={device} />
+          <DeviceDot fit={fit} position={device} scale={view.s} />
           {draft && mode === "label" && (
             <span className="map-rect mle-subject" data-subject data-testid="mle-subject" style={placementStyle(draft)}>
               {subject.name}
@@ -293,8 +293,15 @@ export function MapLabelEditor({
           )}
           {draft && (
             <>
-              {mode === "label" && (draft.dx || draft.dy) ? <span className="mle-tether" style={tetherStyle(draft)} aria-hidden /> : null}
-              <span className="mle-anchor" data-anchor data-testid="mle-anchor" style={{ left: `${draft.cx}%`, top: `${draft.cy}%` }} title={`${subject.name} is here`} />
+              {mode === "label" && (draft.dx || draft.dy) ? <span className="mle-tether" style={{ ...tetherStyle(draft), borderTopWidth: 1.5 / view.s }} aria-hidden /> : null}
+              {/* Counter-scaled: a dot is a dot at any zoom, not a disc. */}
+              <span
+                className="mle-anchor"
+                data-anchor
+                data-testid="mle-anchor"
+                style={{ left: `${draft.cx}%`, top: `${draft.cy}%`, transform: `translate(-50%, -50%) scale(${1 / view.s})` }}
+                title={`${subject.name} is here`}
+              />
             </>
           )}
         </div>

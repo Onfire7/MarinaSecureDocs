@@ -7,7 +7,7 @@
 import type { MapFit } from "../../lib/mapFit";
 import type { DevicePosition } from "./useDevicePosition";
 
-export function DeviceDot({ fit, position }: { fit: MapFit | null; position: DevicePosition | null }) {
+export function DeviceDot({ fit, position, scale = 1 }: { fit: MapFit | null; position: DevicePosition | null; /** The zoom the map is drawn at, so the dot can stay one size on screen; the ring is in map units and scales with it. */ scale?: number }) {
   if (!fit || !position) return null;
   const at = fit.toMap(position.lat, position.lng);
   if (!Number.isFinite(at.cx) || !Number.isFinite(at.cy)) return null;
@@ -21,7 +21,7 @@ export function DeviceDot({ fit, position }: { fit: MapFit | null; position: Dev
       />
       <span
         className={`map-device-dot ${at.inside ? "" : "outside"}`}
-        style={{ left: `${at.cx}%`, top: `${at.cy}%` }}
+        style={{ left: `${at.cx}%`, top: `${at.cy}%`, transform: `translate(-50%, -50%) scale(${1 / scale})` }}
         data-testid="device-dot"
         data-inside={at.inside ? "1" : "0"}
         title={at.inside ? `You, ±${Math.round(position.accuracy)} m` : "You - outside the part of the map that has been calibrated"}
