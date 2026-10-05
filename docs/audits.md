@@ -219,10 +219,12 @@ Fixed per kind. A template cannot switch them off.
 2. **Services.** For each Service valid for the type: present? working? note.
 3. **Amenities.** For each Amenity valid for the type: present? note.
 4. **Marked.** *Is this Location clearly marked?* Yes/No.
-5. **Map.** *Is this Location placed correctly on the map?* The map it is
-   plotted on is shown with its rectangle highlighted (its nearest
-   ancestor's map when it is plotted nowhere); tapping a new spot is a
-   `move_placement` Proposal and answers No.
+5. **Map.** The map it is plotted on is shown with its rectangle
+   highlighted (its nearest ancestor's map when it is plotted nowhere), and
+   under it *Is this Location placed correctly on the map?* - asked only
+   when it is on the map; one that is not is simply placed. Tapping the
+   map, or No, opens a fullscreen zoomable editor; what comes back is a
+   `move_placement` Proposal, and moving a label that was there answers No.
 
 Every section opens **pre-filled from what the marina already knows** — a
 Service that's on file starts on *Present* with its working flag and note,

@@ -201,21 +201,54 @@ export function itemsForTarget(groups: ItemGroup[], selection: Set<string>, t: W
   return out;
 }
 
-export interface Step {
-  targetIndex: number;
-  itemIndex: number;
-  target: WizardTarget;
-  item: WizardItem;
+/** A screen of the run. Most items are a page of their own; Attributes,
+ *  Services and Amenities are one page per group, every item of it listed
+ *  (owner, 2026-10-04): it is faster to tap them in the order they are seen
+ *  than to find each one as it comes up. */
+export interface WizardPage {
+  /** `item:<item key>` or `section:<group>`. */
+  key: string;
+  kind: "item" | "section";
+  label: string;
+  group: string;
+  items: WizardItem[];
 }
 
-/** One flat queue: every target in order, each with its applicable items.
+export const SECTION_GROUPS: ReadonlySet<string> = new Set(["Attributes", "Services", "Amenities"]);
+
+/** The pages of one location, from its applicable items, in order. */
+export function pagesForTarget(items: WizardItem[]): WizardPage[] {
+  const pages: WizardPage[] = [];
+  for (const item of items) {
+    const last = pages[pages.length - 1];
+    if (SECTION_GROUPS.has(item.group)) {
+      if (last && last.kind === "section" && last.group === item.group) {
+        last.items.push(item);
+        continue;
+      }
+      pages.push({ key: `section:${item.group}`, kind: "section", label: item.group, group: item.group, items: [item] });
+    } else {
+      pages.push({ key: `item:${item.key}`, kind: "item", label: item.label, group: item.group, items: [item] });
+    }
+  }
+  return pages;
+}
+
+export interface Step {
+  targetIndex: number;
+  pageIndex: number;
+  target: WizardTarget;
+  page: WizardPage;
+}
+
+/** One flat queue: every target in order, each with its pages.
  *  Location-major by decision (2026-09-23) - a sweep of one item is just a
  *  run with one item selected. */
 export function buildSteps(targets: WizardTarget[], groups: ItemGroup[], selection: Set<string>): Step[] {
   const steps: Step[] = [];
   targets.forEach((target, targetIndex) => {
-    itemsForTarget(groups, selection, target).forEach((item, itemIndex) => {
-      steps.push({ targetIndex, itemIndex, target, item });
+    pagesForTarget(itemsForTarget(groups, selection, target)).forEach((page, pageIndex) => {
+      steps.push({ targetIndex, pageIndex, target, page });
     });
   });
   return steps;

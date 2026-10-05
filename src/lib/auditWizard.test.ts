@@ -5,6 +5,7 @@ import {
   answeredCount,
   buildCatalogue,
   buildSteps,
+  pagesForTarget,
   filterTargets,
   isAnswered,
   sameAnswer,
@@ -149,17 +150,40 @@ describe("itemsForTarget", () => {
 describe("buildSteps", () => {
   const groups = buildCatalogue(input);
   const all = allKeys(groups);
-  it("9 · location-major: every item of one location, then the next", () => {
+  it("9 · location-major: every page of one location, then the next", () => {
+    // The slip's 8 items make 8 pages: its one attribute and one service
+    // are sections of one. The camp's 11 make 10: Power and Water share
+    // the Services page.
     const steps = buildSteps([slip, camp], groups, all);
-    expect(steps).toHaveLength(8 + 11);
-    expect(steps[0]).toMatchObject({ targetIndex: 0, itemIndex: 0 });
-    expect(steps[7]).toMatchObject({ targetIndex: 0, itemIndex: 7 });
-    expect(steps[8]).toMatchObject({ targetIndex: 1, itemIndex: 0 });
-    expect(steps.map((s) => s.target.id)).toEqual([...Array(8).fill("t-slip"), ...Array(11).fill("t-camp")]);
+    expect(steps).toHaveLength(8 + 10);
+    expect(steps[0]).toMatchObject({ targetIndex: 0, pageIndex: 0 });
+    expect(steps[7]).toMatchObject({ targetIndex: 0, pageIndex: 7 });
+    expect(steps[8]).toMatchObject({ targetIndex: 1, pageIndex: 0 });
+    expect(steps.map((s) => s.target.id)).toEqual([...Array(8).fill("t-slip"), ...Array(10).fill("t-camp")]);
+  });
+  it("9b · Attributes, Services and Amenities are one page per group, in item order", () => {
+    const pages = pagesForTarget(itemsForTarget(groups, all, camp));
+    expect(pages.map((p) => `${p.kind}:${p.label}`)).toEqual([
+      "item:Location status",
+      "section:Attributes",
+      "section:Services",
+      "section:Amenities",
+      "item:Is the breaker labelled?",
+      "item:Fire ring condition",
+      "item:Clearly marked?",
+      "item:Placed correctly on the map?",
+      "item:GPS coordinates",
+      "item:Confirm this location is done",
+    ]);
+    expect(pages[2].items.map((i) => i.label)).toEqual(["Power", "Water"]);
+    expect(pages[3].items.map((i) => i.label)).toEqual(["WiFi"]);
+    expect(pages[1].key).toBe("section:Attributes");
+    expect(pages[0].key).toBe("item:status");
   });
   it("10 · a one-item sweep is one step per location", () => {
     const steps = buildSteps([slip, camp], groups, new Set(["service:s-power"]));
-    expect(steps.map((s) => `${s.target.id}:${s.item.key}`)).toEqual(["t-slip:service:s-power", "t-camp:service:s-power"]);
+    expect(steps.map((s) => `${s.target.id}:${s.page.items[0].key}`)).toEqual(["t-slip:service:s-power", "t-camp:service:s-power"]);
+    expect(steps[0].page).toMatchObject({ kind: "section", label: "Services" });
   });
   it("11 · stepOfTarget finds a location's first step, and forgives a stranger", () => {
     const steps = buildSteps([slip, camp], groups, all);
@@ -263,7 +287,7 @@ describe("the confirmation page", () => {
     const items = itemsForTarget(groups, all, camp);
     expect(items[items.length - 1].key).toBe(CONFIRM_KEY);
     expect(items.filter((i) => i.kind === "confirm")).toHaveLength(1);
-    expect(buildSteps([camp], groups, all).at(-1)!.item.key).toBe(CONFIRM_KEY);
+    expect(buildSteps([camp], groups, all).at(-1)!.page.items[0].key).toBe(CONFIRM_KEY);
   });
   it("23 · turned off, a run records without ever saying a location is done", () => {
     const gathering = new Set([...all].filter((k) => k !== CONFIRM_KEY));
@@ -271,6 +295,6 @@ describe("the confirmation page", () => {
   });
   it("24 · and a confirmation sweep is a run with nothing else selected", () => {
     const steps = buildSteps([slip, camp], groups, new Set([CONFIRM_KEY]));
-    expect(steps.map((s) => `${s.target.id}:${s.item.key}`)).toEqual(["t-slip:confirm", "t-camp:confirm"]);
+    expect(steps.map((s) => `${s.target.id}:${s.page.items[0].key}`)).toEqual(["t-slip:confirm", "t-camp:confirm"]);
   });
 });

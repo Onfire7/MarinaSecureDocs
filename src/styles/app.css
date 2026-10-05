@@ -2018,3 +2018,191 @@ h3 {
   padding-left: 22px;
   color: var(--mute);
 }
+
+/* ---------- The fullscreen map label editor (shared/MapLabelEditor.tsx) ---------- */
+
+.mle-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--ink);
+}
+.mle-top {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  padding-top: calc(8px + env(safe-area-inset-top));
+  background: var(--panel);
+  border-bottom: 1px solid var(--line-lt);
+}
+.mle-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.2;
+}
+.mle-viewport {
+  flex: 1 1 auto;
+  position: relative;
+  overflow: hidden;
+  /* The editor owns every gesture: pinch and pan are its own. */
+  touch-action: none;
+  background: var(--fill);
+  cursor: grab;
+}
+.mle-viewport.mle-placing {
+  cursor: crosshair;
+}
+.mle-map {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.mle-map .map-image {
+  pointer-events: none;
+}
+.mle-other {
+  opacity: 0.5;
+  background: var(--panel);
+  color: var(--ink);
+  pointer-events: none;
+}
+.mle-subject {
+  background: var(--warn-bg);
+  border-color: var(--warn);
+  color: var(--ink);
+  font-weight: 700;
+  cursor: move;
+  /* Twice the border, so a 4px label can still be seen - and grabbed. */
+  outline: 2px solid var(--warn);
+  outline-offset: 2px;
+}
+.mle-hint {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--line-lt);
+  box-shadow: var(--shadow);
+  font-size: 0.86rem;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.mle-bar {
+  flex: 0 0 auto;
+  background: var(--panel);
+  border-top: 1px solid var(--line-lt);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.mle-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 16px 4px;
+}
+.mle-slider input[type="range"] {
+  width: 100%;
+  height: 32px;
+}
+.mle-slider-label {
+  font-size: 0.86rem;
+  color: var(--mute);
+  text-align: center;
+}
+.mle-tools {
+  display: flex;
+  justify-content: space-around;
+  padding: 6px 4px 8px;
+}
+.mle-tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 56px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.mle-tool:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.mle-tool.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.mle-tool-danger {
+  color: var(--bad);
+}
+.mle-tool-icon {
+  font-size: 1.35rem;
+  line-height: 1;
+  font-weight: 700;
+}
+.mle-tool-label {
+  font-size: 0.7rem;
+}
+
+/* ---------- The placement check (audits/PlacementCheck.tsx) ---------- */
+
+.pc {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  align-items: center;
+}
+.pc-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-self: stretch;
+}
+.pc-preview {
+  position: relative;
+  width: 100%;
+}
+.pc-tappable {
+  cursor: zoom-in;
+}
+.pc-zoom-hint {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--mute);
+  font-size: 0.72rem;
+  opacity: 0.9;
+}
+.pc-question {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.pc-proposed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}

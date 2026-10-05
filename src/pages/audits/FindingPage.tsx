@@ -609,22 +609,17 @@ function FindingForm({
           )}
           {showMap && (
             <div className="field">
-              {/* The answer sits beside the question, not under the map: the
-                  map is tall, and the buttons were out of sight by then. */}
-              <div className="row" style={{ alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
-                <span className="field-label" style={{ marginBottom: 0 }}>Is it placed correctly on the map?</span>
-                {yesNo(mappedCorrectly, setMappedCorrectly)}
-              </div>
+              {/* The map, then the question under it - and no question when
+                  the location is not on the map yet (PlacementCheck). */}
               {target?.location_id && (
                 <PlacementCheck
                   locationId={target.location_id}
                   locationName={target.location_name}
                   editable={editable}
                   proposed={placement}
-                  onPropose={(p) => {
-                    setPlacement(p);
-                    if (p) setMappedCorrectly(false);
-                  }}
+                  onPropose={setPlacement}
+                  answer={mappedCorrectly}
+                  onAnswer={setMappedCorrectly}
                 />
               )}
             </div>

@@ -1,12 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import { publicOrigin } from "../../lib/config";
 import type { ReactNode } from "react";
-import {
-  compareNames,
-  DEFAULT_PLACEMENT_STYLE,
-  placementStyle,
-  type PlacementShape,
-} from "../../lib/locations";
+import { compareNames, placementStyle } from "../../lib/locations";
+import { MapLabelEditor } from "../shared/MapLabelEditor";
 import {
   bulkUpdateLocations,
   createPlacement,
@@ -1650,10 +1646,10 @@ function MapPlotter({
   map: MarinaMapRow;
   locations: PickerLocation[];
 }) {
-  const [selected, setSelected] = useState<string | null>(null);
+  // Which label the editor is open on: an existing placement, or a
+  // location being added (no placement yet).
+  const [editing, setEditing] = useState<{ placementId: string | null; locationId: string; name: string } | null>(null);
   const [addLocationId, setAddLocationId] = useState("");
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
 
   const { data: rows } = usePlacements(map.id);
   // The stored shape is jsonb, so it arrives as text; parsed once per row here
@@ -1661,73 +1657,15 @@ function MapPlotter({
   const placements = rows.map((p) => ({ ...p, shape: placementOf(p) }));
   const plottedIds = new Set(placements.map((p) => p.location_id));
   const imageUrl = attachmentUrl(map.image_path);
-
-  const addPlacement = () => {
-    if (!addLocationId) return;
-    // Dropped mid-canvas at the default text size; drag to position.
-    void createPlacement(map.id, addLocationId, { cx: 50, cy: 50, rotation: 0 });
-    setAddLocationId("");
-  };
-
-  const updatePlacement = (placementId: string, patch: Partial<PlacementShape>) => {
-    const existing = placements.find((p) => p.id === placementId);
-    if (!existing) return;
-    void savePlacement(placementId, { ...existing.shape, ...patch });
-  };
-
-  // Percentages of the rendered image, so a placement survives any display size.
-  const pointToPercent = (clientX: number, clientY: number) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return null;
-    return {
-      x: ((clientX - rect.left) / rect.width) * 100,
-      y: ((clientY - rect.top) / rect.height) * 100,
-    };
-  };
-
-  const onPointerDown = (e: React.PointerEvent, p: (typeof placements)[number]) => {
-    e.preventDefault();
-    const pt = pointToPercent(e.clientX, e.clientY);
-    if (!pt) return;
-    setSelected(p.id);
-    dragRef.current = {
-      id: p.id,
-      offsetX: pt.x - p.shape.cx,
-      offsetY: pt.y - p.shape.cy,
-    };
-    (e.target as Element).setPointerCapture(e.pointerId);
-  };
-
-  const onPointerMove = (e: React.PointerEvent) => {
-    const drag = dragRef.current;
-    if (!drag) return;
-    const pt = pointToPercent(e.clientX, e.clientY);
-    if (!pt) return;
-    updatePlacement(drag.id, {
-      cx: clamp(pt.x - drag.offsetX),
-      cy: clamp(pt.y - drag.offsetY),
-    });
-  };
-
-  const onPointerUp = () => {
-    dragRef.current = null;
-  };
-
-  const activePlacement = placements.find((p) => p.id === selected);
+  const editingShape = editing?.placementId ? (placements.find((p) => p.id === editing.placementId)?.shape ?? null) : null;
 
   return (
     <div className="grid-2">
       <div>
-        <div
-          ref={canvasRef}
-          className="map-canvas map-schematic"
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          style={{ touchAction: "none" }}
-        >
-          {imageUrl && (
-            <img src={imageUrl} alt={map.name} className="map-image" draggable={false} />
-          )}
+        {/* A preview; the editing happens fullscreen, where the map can be
+            zoomed (shared/MapLabelEditor.tsx). Tap a label to open it. */}
+        <div className="map-canvas map-schematic">
+          {imageUrl && <img src={imageUrl} alt={map.name} className="map-image" draggable={false} />}
           {placements.map((p) => (
             <button
               key={p.id}
@@ -1737,18 +1675,18 @@ function MapPlotter({
                 ...placementStyle(p.shape),
                 background: "var(--accent-soft)",
                 color: "var(--accent)",
-                borderColor: selected === p.id ? "var(--accent)" : "var(--line)",
-                borderWidth: selected === p.id ? 2.5 : 1.5,
-                cursor: "grab",
+                borderColor: editing?.placementId === p.id ? "var(--accent)" : "var(--line)",
+                borderWidth: editing?.placementId === p.id ? 2.5 : 1.5,
               }}
-              onPointerDown={(e) => onPointerDown(e, p)}
+              title={p.location_name}
+              onClick={() => setEditing({ placementId: p.id, locationId: p.location_id, name: p.location_name })}
             >
               {p.location_name}
             </button>
           ))}
         </div>
         <p className="muted small" style={{ marginTop: 6 }}>
-          Drag a rectangle to position it; select one to size and rotate it.
+          Tap a label to move, size or rotate it on a zoomable map.
         </p>
       </div>
 
@@ -1771,65 +1709,42 @@ function MapPlotter({
             type="button"
             className="btn btn-sm"
             disabled={!addLocationId}
-            onClick={addPlacement}
+            onClick={() => {
+              const loc = locations.find((l) => l.id === addLocationId);
+              if (!loc) return;
+              setEditing({ placementId: null, locationId: loc.id, name: loc.name });
+              setAddLocationId("");
+            }}
           >
             Add
           </button>
         </div>
-
-        {activePlacement ? (
-          <div className="card">
-            <div className="card-title">{activePlacement.location_name}</div>
-            {(
-              [
-                ["fontSize", "Font size (px)", 2, 32, DEFAULT_PLACEMENT_STYLE.fontSize],
-                ["paddingX", "Padding, left/right (px)", 0, 24, DEFAULT_PLACEMENT_STYLE.paddingX],
-                ["paddingY", "Padding, top/bottom (px)", 0, 24, DEFAULT_PLACEMENT_STYLE.paddingY],
-                ["rotation", "Rotation °", -180, 180, 0],
-              ] as const
-            ).map(([key, label, min, max, fallback]) => (
-              <div className="field" key={key}>
-                <span className="field-label">{label}</span>
-                <input
-                  type="range"
-                  min={min}
-                  max={max}
-                  value={activePlacement.shape[key] ?? fallback}
-                  onChange={(e) =>
-                    updatePlacement(activePlacement.id, {
-                      [key]: Number(e.target.value),
-                    } as Partial<PlacementShape>)
-                  }
-                  style={{ width: "100%" }}
-                />
-                <span className="muted small">
-                  {activePlacement.shape[key] ?? fallback}
-                </span>
-              </div>
-            ))}
-            <button
-              type="button"
-              className="btn btn-sm btn-danger"
-              onClick={() => {
-                // Removes just this one placement — the same location stays
-                // plotted on any other map.
-                void deletePlacement(activePlacement.id);
-                setSelected(null);
-              }}
-            >
-              Unplot from this map
-            </button>
-          </div>
-        ) : (
-          <span className="muted small">
-            Select a rectangle on the map to adjust its size and rotation.
-          </span>
-        )}
+        <span className="muted small">A new label is placed with a tap, in the style the last one was finished with.</span>
       </div>
+
+      {editing && (
+        <MapLabelEditor
+          map={map}
+          placements={rows}
+          subject={{ locationId: editing.locationId, name: editing.name }}
+          shape={editingShape}
+          removable={editing.placementId !== null}
+          removeLabel="Unplot from this map"
+          onCancel={() => setEditing(null)}
+          onDone={(shape) => {
+            const id = editing.placementId;
+            setEditing(null);
+            // Removes just this one placement — the same location stays
+            // plotted on any other map.
+            if (!shape) {
+              if (id) void deletePlacement(id);
+              return;
+            }
+            if (id) void savePlacement(id, shape);
+            else void createPlacement(map.id, editing.locationId, shape);
+          }}
+        />
+      )}
     </div>
   );
-}
-
-function clamp(n: number): number {
-  return Math.max(0, Math.min(100, n));
 }

@@ -106,9 +106,13 @@ await page.locator('[data-testid="wz-pip"]').first().click();
 await settle();
 
 // the first item is the location status: tapping it advances
+// Since 2026-10-04 a pip is a PAGE: Attributes, Services and Amenities are
+// one page each, with every item of the group listed on it, so the
+// service and the attribute are rows on a section page rather than pages.
 const labels = await page.locator('[data-testid="wz-pip"]').evaluateAll((els) => els.map((e) => e.getAttribute("title")));
-console.log("items:", labels.join(" | "));
-const svcIndex = labels.findIndex((l) => l === "E2E Power");
+console.log("pages:", labels.join(" | "));
+const svcIndex = labels.findIndex((l) => l === "Services");
+const svcRow = () => page.locator(".wz-d-page").nth(svcIndex).locator('[data-testid="wz-section-row"]', { hasText: "E2E Power" });
 await page.locator('[data-testid="wz-pip"]').nth(svcIndex).click();
 await page.waitForFunction((want) => {
   const col = document.querySelector(".wz-d-col:not([class*=wz-out])");
@@ -118,7 +122,7 @@ await page.waitForFunction((want) => {
 }, "E2E Power", { timeout: 5000 }).catch(() => {});
 check("2c the rail jumps to an item", (await at()).label === "E2E Power", JSON.stringify(await at()));
 
-await page.locator(".wz-d-page").nth(svcIndex).getByRole("button", { name: "Present", exact: true }).click();
+await svcRow().getByRole("button", { name: "Present", exact: true }).click();
 await settle();
 check("2d answering Present focuses the note", (await page.evaluate(() => document.activeElement?.getAttribute("data-testid"))) === "wz-note");
 await page.keyboard.type("pedestal 4");
@@ -144,11 +148,12 @@ check("2h2 its Finding is unconfirmed", sql(`select coalesce(confirmed_at::text,
 check("2i nothing else was written", sql(`select count(*) from audit_finding_amenities where finding_id = '${fid}'`) === "0");
 
 // an attribute becomes a proposal, and re-answering replaces it
-const attrIndex = labels.findIndex((l) => l === "E2E Length");
+const attrIndex = labels.findIndex((l) => l === "Attributes");
+const attrRow = () => page.locator(".wz-d-page").nth(attrIndex).locator('[data-testid="wz-section-row"]', { hasText: "E2E Length" });
 await page.locator('[data-testid="wz-pip"]').nth(attrIndex).click();
 await settle();
-await page.locator(".wz-d-page").nth(attrIndex).locator("input[inputmode=decimal]").fill("32");
-await page.locator(".wz-d-page").nth(attrIndex).locator("input[inputmode=decimal]").press("Enter");
+await attrRow().locator("input[inputmode=decimal]").fill("32");
+await attrRow().locator("input[inputmode=decimal]").press("Enter");
 await settle(1500);
 check("2j an attribute value is one proposal", sql(`select count(*) from audit_proposals where finding_id = '${fid}' and kind = 'set_attribute'`) === "1", sql(`select decision::text || '/' || auto_applied::text || '/' || payload::text from audit_proposals where finding_id = '${fid}' and kind = 'set_attribute'`));
 check("2j2 a first Attribute value is on the Location, not waiting", await until(() => sql(`select value::int from location_attributes la
@@ -157,8 +162,8 @@ check("2j2 a first Attribute value is on the Location, not waiting", await until
          and la.attribute_id = (select id from attributes where name = 'E2E Length')`) === "32"));
 await page.locator('[data-testid="wz-pip"]').nth(attrIndex).click();
 await settle();
-await page.locator(".wz-d-page").nth(attrIndex).locator("input[inputmode=decimal]").fill("36");
-await page.locator(".wz-d-page").nth(attrIndex).locator("input[inputmode=decimal]").press("Enter");
+await attrRow().locator("input[inputmode=decimal]").fill("36");
+await attrRow().locator("input[inputmode=decimal]").press("Enter");
 await settle(1500);
 check("2k re-answering replaces it rather than adding another", sql(`select count(*) from audit_proposals where finding_id = '${fid}' and kind = 'set_attribute'`) === "1" && /36/.test(sql(`select payload::text from audit_proposals where finding_id = '${fid}' and kind = 'set_attribute'`)));
 check("2k2 and the correction reaches the Location too, still unasked", await until(() => sql(`select value::int from location_attributes la
@@ -188,7 +193,7 @@ check("2n arriving at a page with nothing to type into lets the keyboard go", (a
 // re-render, and the page used to take focus back to the number.
 await page.locator('[data-testid="wz-pip"]').nth(attrIndex).click();
 await settle();
-await page.locator(".wz-d-page").nth(attrIndex).locator("input[inputmode=decimal]").press("Enter");
+await attrRow().locator("input[inputmode=decimal]").press("Enter");
 await settle(400);
 check("2q Next from a number moves to its note", (await focusInfo()).tag === "INPUT" && (await focusInfo()).mode === null, JSON.stringify(await focusInfo()));
 await settle(1600);
@@ -204,7 +209,7 @@ check("2u and it is the page's h1", (await page.locator(".wz-d-page").nth(attrIn
 // focus for us.
 await page.locator('[data-testid="wz-pip"]').nth(svcIndex).click();
 await settle();
-await page.locator(".wz-d-page").nth(svcIndex).getByTestId("wz-note").click();
+await svcRow().getByTestId("wz-note").click();
 await settle(400);
 check("2o a note can be focused by hand", (await focusInfo()).tag === "INPUT", JSON.stringify(await focusInfo()));
 await page.mouse.move(200, 400);

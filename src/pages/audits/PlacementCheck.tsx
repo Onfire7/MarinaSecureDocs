@@ -1,21 +1,23 @@
-import { useMemo, useRef, useState } from "react";
-import { DEFAULT_PLACEMENT_STYLE, placementStyle, type PlacementShape } from "../../lib/locations";
+import { useMemo, useState } from "react";
+import { placementStyle, type PlacementShape } from "../../lib/locations";
 import { placementOf, useLocations, useMarinaMaps, usePlacements } from "../../data/locations";
 import { attachmentUrl } from "../../data/files";
+import { MapLabelEditor } from "../shared/MapLabelEditor";
 
 // "Is it placed correctly on the map?" needs the map in front of the person
-// answering. This shows the map the location is plotted on with its rectangle
-// highlighted and every other rectangle muted, and lets the auditor tap where
-// it should be. The tap is a move_placement Proposal (docs/audits.md § What
-// becomes a Proposal), never a write: every other user navigates by that map.
+// answering. This shows the map the location is plotted on with its
+// rectangle highlighted and every other one muted; the question sits UNDER
+// the map, and only when there is a placement to ask about - a location
+// that is not on the map yet is simply placed (owner, 2026-10-04). Tapping
+// the map, answering No, or *Place it on the map* opens the fullscreen
+// editor (shared/MapLabelEditor.tsx), which zooms.
+//
+// What comes back from the editor is a move_placement Proposal (docs/audits.md
+// § What becomes a Proposal), never a write: every other user navigates by
+// that map. Making one answers No.
 //
 // A location plotted on no map offers the map of its nearest ancestor that
 // has one, so a slip added in the field can be placed on its dock's map.
-//
-// The label can be adjusted too — font size, padding, rotation, the same
-// four sliders the admin map editor has — so "placed correctly" can be made
-// true from the field rather than only reported false. Any adjustment is
-// part of the same move_placement Proposal.
 
 export interface ProposedPlacement {
   map_id: string;
@@ -28,19 +30,26 @@ export function PlacementCheck({
   editable,
   proposed,
   onPropose,
+  answer,
+  onAnswer,
+  big,
 }: {
   locationId: string;
   locationName: string;
   editable: boolean;
   proposed: ProposedPlacement | null;
   onPropose: (p: ProposedPlacement | null) => void;
+  /** The answer to "placed correctly?", asked only when it is placed. */
+  answer: boolean | null;
+  onAnswer: (v: boolean) => void;
+  /** The wizard's one-item-per-screen size. */
+  big?: boolean;
 }) {
   const { data: maps } = useMarinaMaps();
   const { data: placements } = usePlacements();
   const { data: locations } = useLocations();
-  const [moving, setMoving] = useState(false);
   const [chosenMapId, setChosenMapId] = useState<string | null>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
+  const [editing, setEditing] = useState(false);
 
   const own = placements.find((p) => p.location_id === locationId) ?? null;
   // The map to show: the one it's on, the one proposed, or the nearest
@@ -60,37 +69,36 @@ export function PlacementCheck({
   const map = maps.find((m) => m.id === activeMapId) ?? null;
   const imageUrl = map ? attachmentUrl(map.image_path) : null;
   const shown = placements.filter((p) => p.map_id === activeMapId);
-  const ownShape = own ? placementOf(own) : null;
+  const ownShape = own && own.map_id === activeMapId ? placementOf(own) : null;
+  /** Where it is, as far as this check knows: the proposal wins. */
+  const current: PlacementShape | null = proposed && proposed.map_id === activeMapId ? proposed.placement : ownShape;
+  const placed = current !== null;
 
   if (!map) {
     return <div className="muted small">No marina map is uploaded, so placement cannot be checked here.</div>;
   }
 
-  const startAdjusting = () => {
-    onPropose({ map_id: map.id, placement: { ...(ownShape ?? { cx: 50, cy: 50, rotation: 0 }) } });
-  };
-  const adjust = (patch: Partial<PlacementShape>) => {
-    if (!proposed) return;
-    onPropose({ ...proposed, placement: { ...proposed.placement, ...patch } });
-  };
-
-  const tap = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!moving || !editable || !imgRef.current) return;
-    const r = imgRef.current.getBoundingClientRect();
-    const cx = Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width) * 100));
-    const cy = Math.max(0, Math.min(100, ((e.clientY - r.top) / r.height) * 100));
-    onPropose({ map_id: map.id, placement: { ...(proposed?.placement ?? ownShape ?? { rotation: 0 }), cx: +cx.toFixed(2), cy: +cy.toFixed(2) } });
-    setMoving(false);
-  };
+  const chip = (v: boolean, text: string) => (
+    <button
+      type="button"
+      className={`chip ${big ? "wz-chip-big" : ""} ${answer === v ? "tree-match" : ""}`}
+      disabled={!editable}
+      data-testid={v ? "placed-yes" : "placed-no"}
+      onClick={() => {
+        onAnswer(v);
+        if (!v) setEditing(true);
+      }}
+    >
+      {text}
+    </button>
+  );
 
   return (
-    <div>
-      <div className="row" style={{ marginBottom: 6, alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <span className="muted small">
-          {own ? `Plotted on ${map.scope_name ?? map.name}` : "Not plotted on any map."}
-        </span>
-        {maps.length > 1 && editable && (
-          <select className="select select-inline" value={map.id} onChange={(e) => setChosenMapId(e.target.value)}>
+    <div className="pc">
+      <div className="pc-status">
+        <span className="muted small">{own ? `Plotted on ${map.scope_name ?? map.name}` : "Not on any map yet."}</span>
+        {maps.length > 1 && editable && !own && !proposed && (
+          <select className="select select-inline" value={map.id} onChange={(e) => setChosenMapId(e.target.value)} aria-label="Which map">
             {maps.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.scope_name ?? m.name}
@@ -100,21 +108,23 @@ export function PlacementCheck({
         )}
       </div>
       <div
-        className="map-canvas map-schematic"
-        onClick={tap}
-        style={{ cursor: moving ? "crosshair" : undefined, outline: moving ? "2px dashed var(--accent)" : undefined }}
+        className={`map-canvas map-schematic pc-preview ${editable ? "pc-tappable" : ""}`}
+        data-testid="pc-preview"
+        onClick={() => editable && setEditing(true)}
+        role={editable ? "button" : undefined}
+        aria-label={editable ? "Open the map" : undefined}
       >
-        {imageUrl && <img ref={imgRef} src={imageUrl} alt={map.name} className="map-image" />}
+        {imageUrl && <img src={imageUrl} alt={map.name} className="map-image" />}
         {shown.map((p) => {
           const mine = p.location_id === locationId;
-          const dimmed = mine && proposed !== null;
+          if (mine && proposed) return null;
           return (
             <span
               key={p.id}
               className="map-rect"
               style={{
                 ...placementStyle(placementOf(p)),
-                opacity: mine ? (dimmed ? 0.35 : 1) : 0.45,
+                opacity: mine ? 1 : 0.45,
                 background: mine ? "var(--accent-soft)" : "var(--panel)",
                 borderColor: mine ? "var(--accent)" : "var(--line)",
                 borderWidth: 1,
@@ -141,76 +151,70 @@ export function PlacementCheck({
             }}
             title="Proposed placement — waits for approval"
           >
-            {/* No "(proposed)" suffix: the amber colour already says so, and
-                the suffix widened the label past what the finished map will
-                actually show. */}
             {locationName}
           </span>
         )}
+        {editable && <span className="pc-zoom-hint">tap to zoom</span>}
       </div>
-      {editable && (
-        <div className="row" style={{ marginTop: 6, gap: 6, alignItems: "center" }}>
-          {moving ? (
-            <>
-              <span className="muted small">Tap where {locationName} actually is.</span>
-              <button type="button" className="btn btn-sm btn-bare" onClick={() => setMoving(false)}>
-                cancel
-              </button>
-            </>
-          ) : proposed ? (
-            <>
-              <span className="badge badge-warn">New placement proposed - waits for approval</span>
-              <button type="button" className="btn btn-sm" onClick={() => setMoving(true)}>
-                Move again
-              </button>
-              <button type="button" className="btn btn-sm btn-bare" onClick={() => onPropose(null)}>
-                discard
-              </button>
-            </>
-          ) : (
-            <>
-              <button type="button" className="btn btn-sm" onClick={() => setMoving(true)}>
-                {own ? "Move it on the map" : "Place it on the map"}
-              </button>
-              {own && (
-                <button type="button" className="btn btn-sm" onClick={startAdjusting}>
-                  Adjust the label
-                </button>
-              )}
-            </>
+
+      {placed ? (
+        <div className="pc-question">
+          <span className={big ? "wz-d-label" : "field-label"} style={{ marginBottom: 0 }}>
+            Is it placed correctly on the map?
+          </span>
+          <div className="chip-row" style={{ marginBottom: 0, justifyContent: big ? "center" : undefined }}>
+            {chip(true, "Yes")}
+            {chip(false, "No")}
+          </div>
+        </div>
+      ) : (
+        editable && (
+          <button type="button" className={`btn btn-primary ${big ? "wz-btn-big" : "btn-sm"}`} data-testid="pc-place" onClick={() => setEditing(true)}>
+            Place it on the map
+          </button>
+        )
+      )}
+      {proposed && (
+        <div className="pc-proposed">
+          <span className="badge badge-warn">New placement proposed - waits for approval</span>
+          {editable && (
+            <button type="button" className="btn btn-sm btn-bare" onClick={() => onPropose(null)}>
+              discard
+            </button>
           )}
         </div>
       )}
-      {editable && proposed && proposed.map_id === map.id && (
-        <div className="card" style={{ marginTop: 8, padding: "8px 12px" }}>
-          <div className="card-kicker">
-            <span>Label</span>
-          </div>
-          {(
-            [
-              ["fontSize", "Font size (px)", 2, 32, DEFAULT_PLACEMENT_STYLE.fontSize],
-              ["paddingX", "Padding, left/right (px)", 0, 24, DEFAULT_PLACEMENT_STYLE.paddingX],
-              ["paddingY", "Padding, top/bottom (px)", 0, 24, DEFAULT_PLACEMENT_STYLE.paddingY],
-              ["rotation", "Rotation °", -180, 180, 0],
-            ] as const
-          ).map(([key, label, min, max, fallback]) => (
-            <div className="field" key={key} style={{ marginBottom: 4 }}>
-              <span className="field-label">
-                {label} · {proposed.placement[key] ?? fallback}
-              </span>
-              <input
-                type="range"
-                min={min}
-                max={max}
-                value={proposed.placement[key] ?? fallback}
-                onChange={(e) => adjust({ [key]: Number(e.target.value) } as Partial<PlacementShape>)}
-                style={{ width: "100%" }}
-                aria-label={label}
-              />
-            </div>
-          ))}
-        </div>
+
+      {editing && editable && (
+        <MapLabelEditor
+          map={map}
+          placements={shown}
+          subject={{ locationId, name: locationName }}
+          shape={current}
+          removable={proposed !== null}
+          removeLabel="Discard the proposal"
+          onCancel={() => setEditing(false)}
+          onDone={(shape) => {
+            setEditing(false);
+            if (!shape) {
+              onPropose(null);
+              return;
+            }
+            // Finishing where it already is proposes nothing.
+            if (ownShape && sameShape(shape, ownShape) && !proposed) return;
+            onPropose({ map_id: map.id, placement: shape });
+            // Moving a label that was on the map says it was not placed
+            // correctly. Placing one that was not on the map says nothing:
+            // the question was never asked.
+            if (ownShape) onAnswer(false);
+          }}
+        />
       )}
     </div>
   );
+}
+
+function sameShape(a: PlacementShape, b: PlacementShape): boolean {
+  const keys = ["cx", "cy", "rotation", "fontSize", "paddingX", "paddingY"] as const;
+  return keys.every((k) => (a[k] ?? null) === (b[k] ?? null));
 }

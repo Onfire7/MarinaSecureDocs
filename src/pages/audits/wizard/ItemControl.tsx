@@ -43,17 +43,6 @@ export function ItemControl({
 }) {
   const cls = big ? "wz-big" : "";
   const onward = () => advance?.();
-  // A visible Next under every page that has something to type into. The
-  // keyboard's own Next key does the same, but a thumb that has just put a
-  // number in should not have to find it. Tapping it blurs the field, which
-  // commits it, and then moves on.
-  const nextButton = big ? (
-    <div className="wz-next-row">
-      <button type="button" className="btn btn-primary wz-btn-big" data-testid="wz-item-next" onClick={onward}>
-        Next
-      </button>
-    </div>
-  ) : null;
   // The note input mounts only once an answer reveals it, so focusing it is
   // a callback ref that fires on mount, not a call into the past.
   const noteRef = useRef<HTMLInputElement | null>(null);
@@ -107,7 +96,6 @@ export function ItemControl({
                 onCommit={(note) => onChange({ ...v, note }, "commit")}
                 onEnter={onward}
               />
-              {nextButton}
             </>
           )}
         </div>
@@ -138,7 +126,6 @@ export function ItemControl({
               onEnter={onward}
             />
           )}
-          {v.present === true && nextButton}
         </div>
       );
     }
@@ -186,7 +173,6 @@ export function ItemControl({
             onCommit={(note) => onChange({ ...v, note }, "commit")}
             onEnter={onward}
           />
-          {nextButton}
         </div>
       );
     }
@@ -236,7 +222,6 @@ export function ItemControl({
               onCommit={(next) => onChange(next === "" ? null : Number(next), "commit")}
               onEnter={onward}
             />
-            {nextButton}
           </div>
         );
       return (
@@ -249,7 +234,6 @@ export function ItemControl({
             onCommit={(next) => onChange(next, "commit")}
             onEnter={onward}
           />
-          {nextButton}
         </div>
       );
     }
@@ -269,9 +253,9 @@ export function ItemControl({
         </div>
       );
     case "map":
-      return <MapControl target={target} value={value} big={big} onChange={onChange} onward={onward} nextButton={nextButton} />;
+      return <MapControl target={target} value={value} big={big} onChange={onChange} onward={onward} />;
     case "gps":
-      return <GpsControl target={target} value={value} big={big} onChange={onChange} nextButton={nextButton} />;
+      return <GpsControl target={target} value={value} big={big} onChange={onChange} />;
     case "status":
       return (
         <div className={`wz-control ${cls}`}>
@@ -463,50 +447,40 @@ function YesNo({
 }
 
 /** "Placed correctly on the map?" with the map in front of the person
- *  answering, the same component the Finding form uses. Yes moves on; No
- *  stays, because No is answered by moving it - the tap is a move_placement
- *  Proposal, and making one answers No for you. */
+ *  answering, the same check the Finding form uses: the map on top, the
+ *  question under it - and no question at all when the location is not on
+ *  the map yet, just *Place it on the map*. Yes moves on; No opens the
+ *  editor, because No is answered by moving it. */
 function MapControl({
   target,
   value,
   big,
   onChange,
   onward,
-  nextButton,
 }: {
   target: WizardTarget;
   value: AnswerValue | undefined;
   big?: boolean;
   onChange: (v: AnswerValue, mode?: AnswerMode) => void;
   onward: () => void;
-  nextButton: React.ReactNode;
 }) {
   const v: MapAnswer = typeof value === "boolean" ? { correct: value, placement: null } : ((value as MapAnswer | undefined) ?? { correct: null, placement: null });
+  if (!target.location_id) return <span className="muted small">Not a location on file, so it has no place on the map yet.</span>;
   return (
     <div className={`wz-control ${big ? "wz-big" : ""} wz-map`}>
-      <YesNo
-        value={v.correct}
-        labels={["Yes", "No"]}
+      <PlacementCheck
+        locationId={target.location_id}
+        locationName={target.location_name}
+        editable
         big={big}
-        onChange={(correct) => {
+        proposed={v.placement as React.ComponentProps<typeof PlacementCheck>["proposed"]}
+        onPropose={(p) => onChange({ ...v, placement: p ? { map_id: p.map_id, placement: { ...p.placement } } : null })}
+        answer={v.correct}
+        onAnswer={(correct) => {
           onChange({ ...v, correct });
           if (correct) onward();
         }}
       />
-      {target.location_id ? (
-        <div className="wz-map-canvas">
-          <PlacementCheck
-            locationId={target.location_id}
-            locationName={target.location_name}
-            editable
-            proposed={v.placement as React.ComponentProps<typeof PlacementCheck>["proposed"]}
-            onPropose={(p) => onChange({ correct: p ? false : v.correct, placement: p ? { map_id: p.map_id, placement: { ...p.placement } } : null })}
-          />
-        </div>
-      ) : (
-        <span className="muted small">Not a location on file, so it has no place on the map yet.</span>
-      )}
-      {nextButton}
     </div>
   );
 }
@@ -518,13 +492,11 @@ function GpsControl({
   value,
   big,
   onChange,
-  nextButton,
 }: {
   target: WizardTarget;
   value: AnswerValue | undefined;
   big?: boolean;
   onChange: (v: AnswerValue, mode?: AnswerMode) => void;
-  nextButton: React.ReactNode;
 }) {
   const settings = useMarinaSettings();
   const fix = value && typeof value === "object" && "lat" in value ? (value as GpsAnswer) : null;
@@ -541,7 +513,6 @@ function GpsControl({
         big={big}
         onCapture={(f) => onChange(f)}
       />
-      {nextButton}
     </div>
   );
 }

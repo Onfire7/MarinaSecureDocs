@@ -546,11 +546,18 @@
   padding: 14px 22px;
 }
 
-/* The Next under a field: its own row beneath the control, so it is
-   found where the thumb already is rather than on the keyboard. */
-.wz-next-row {
-  flex-basis: 100%;
+/* A section page: every item of a group, listed as the Finding form lists
+   them, scrolling inside the page. */
+.wz-section {
+  text-align: left;
+  max-width: 560px;
+  padding-bottom: 8px;
+}
+.wz-section .wz-b-row {
+  margin-bottom: 8px;
+}
+.wz-section-foot {
   display: flex;
   justify-content: center;
-  margin-top: 6px;
+  padding: 10px 0 4px;
 }

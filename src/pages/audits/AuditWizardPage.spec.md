@@ -29,14 +29,19 @@ variants; this is D).
 
 ## Running — phone
 
-- **One item per screen**, headed by the location: its name as the page's
+- **One page per screen**, headed by the location: its name as the page's
   `h1`, the type under it, then a rule in the text colour that fades out at
-  both ends,
-  then the item's group and the item -
-  which location is being edited should never be in doubt, and the pager at
-  the foot is too far from the question to answer it. The items of a
-  location are screen-sized pages stacked vertically; locations sit side by
-  side.
+  both ends, then the page's group and label - which location is being
+  edited should never be in doubt, and the pager at the foot is too far
+  from the question to answer it. The pages of a location are screen-sized,
+  stacked vertically; locations sit side by side.
+- **A page is one item, except Attributes, Services and Amenities, which
+  are one page per group** with every item of it listed, the way the
+  Finding form lists them (owner, 2026-10-04: it is faster to tap them in
+  the order they are seen than to find each one as it comes up). The list
+  scrolls inside the page; a *Next* at its foot moves on, as does a swipe.
+  Progress and the pips count items, not pages: a Services page of six is
+  six taps, and its pip is green once any of them is answered here.
 - **The column is not a scroller the browser drives.** It is
   `overflow: hidden` and the run writes its scroll position itself, so
   there is no fling, no momentum and no snap - and nothing to fight the
@@ -82,15 +87,29 @@ variants; this is D).
   does the same; a choice Attribute focuses its note; a number field's Next
   moves to the note and the note's Next moves to the next item. An answer
   with nothing behind it — *Absent*, a Yes/No, a status — moves straight on.
-- **The map page shows the map.** *Placed correctly on the map?* is the
-  Yes/No beside the Finding form's placement check: the map the location
-  is plotted on, its rectangle highlighted, every other one muted, and
-  *Move it on the map* / *Adjust the label*. Yes moves on. No stays, since
-  No is answered by moving it, and a move answers No for you. The move is
-  a `move_placement` Proposal, written with the answer, replaced by the
-  next move and removed by *discard* - every other user navigates by that
-  map, so it waits for approval. The page is taller than the screen and
-  scrolls inside itself, like the review.
+- **The map page shows the map, and the question under it.** The Finding
+  form's placement check: the map the location is plotted on, its
+  rectangle highlighted, every other one muted; under it *Is it placed
+  correctly on the map?* - asked **only when it is on the map**. A location
+  that is not on any map yet gets no question, just *Place it on the map*
+  (owner, 2026-10-04). Yes moves on. No opens the editor, since No is
+  answered by moving it; so does tapping the map.
+  - **The editor is fullscreen and zooms** (`shared/MapLabelEditor.tsx`,
+    also the Finding form's and the admin plotter's): pinch or wheel to
+    zoom, one finger pans, the label drags, or a tap places it when it is
+    not on the map yet. The bar under the map is one icon per setting -
+    Move, Size, Width, Height, Angle - and tapping one shows its slider
+    alone, with the label brought into the top third of the screen so the
+    slider's effect is seen while the thumb is on it. *Done* keeps the
+    label; *Cancel* changes nothing.
+  - **The style a label is finished with is remembered on this device**
+    (`lib/mapLabelStyle.ts`, local storage - the owner's choice over a
+    marina setting), and the next label placed starts in it.
+  - A move of a label that was on the map is a `move_placement` Proposal,
+    written with the answer, replaced by the next move and removed by
+    *discard* - every other user navigates by that map, so it waits for
+    approval - and it answers No. Placing one that was not on the map
+    proposes the same and answers nothing: the question was never asked.
 - **The GPS page is asked at every location, pin or no pin**, and it is
   the Finding form's capture: the device's accuracy, where the pin is and
   how far the device is from it (or that there is none), the *I am
@@ -99,11 +118,9 @@ variants; this is D).
   fix is a `set_gps` Proposal; *discard* removes it. (Before 2026-10-04 a
   pinned location was skipped, and the page itself was a stub that wrote
   the word "captured" as the Proposal.)
-- **Every page with something to type into has a Next button under it**,
-  which moves to the next item. The keyboard's Next key does the same thing
-  for the field that has it, but a thumb that has just typed a number should
-  not have to find the keyboard's key to leave the page. Tapping it blurs
-  the field, which is what commits it.
+- **No Next button under a field** (owner, 2026-10-04, reversing the same
+  morning's addition): the keyboard's Next key, a swipe and the rail move
+  on. The one Next is at the foot of a section page's list.
 - **Fields take focus on arrival**, so a number is typed without reaching
   for the screen. Numbers use a decimal keyboard; every field's Enter key is
   `next`. **A page with nothing to type into takes focus away**, so the

@@ -26,7 +26,7 @@ import { ConfirmPage } from "./ConfirmPage";
 import { ItemControl } from "./ItemControl";
 import { JumpBody } from "./JumpBody";
 import { useVisiblePageHeight } from "./useVisiblePageHeight";
-import { isAnswered, stepOfTarget, type Step, type WizardTarget } from "../../../lib/auditWizard";
+import { answeredCount, pagesForTarget, stepOfTarget, type Step, type WizardItem, type WizardPage, type WizardTarget } from "../../../lib/auditWizard";
 import type { RunProps } from "./runProps";
 
 const SLIDE_MS = 500;
@@ -91,23 +91,23 @@ export function WizardRun(p: RunProps) {
     if (!el || !step || wide) return;
     if (justSlid.current) {
       justSlid.current = false;
-      focusActive(el, step.itemIndex);
+      focusActive(el, step.pageIndex);
       return;
     }
     if (fromScroll.current) {
       fromScroll.current = false;
-      focusActive(el, step.itemIndex);
+      focusActive(el, step.pageIndex);
       return;
     }
-    const to = pageTop(el, step.itemIndex);
+    const to = pageTop(el, step.pageIndex);
     if (to === null || Math.abs(el.scrollTop - to) < 4) {
-      focusActive(el, step.itemIndex);
+      focusActive(el, step.pageIndex);
       return;
     }
     tweenStop.current?.();
     tweenStop.current = tween(el, to, SLIDE_MS, () => {
       tweenStop.current = null;
-      focusActive(el, step.itemIndex);
+      focusActive(el, step.pageIndex);
     });
     // `step` and the refs are read at run time and deliberately not deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -134,7 +134,7 @@ export function WizardRun(p: RunProps) {
   // one being answered against the top of the scroller for the length of it,
   // with snapping out of the way as ever.
   const itemIndexRef = useRef(0);
-  itemIndexRef.current = step?.itemIndex ?? 0;
+  itemIndexRef.current = step?.pageIndex ?? 0;
   useEffect(() => {
     const el = colRef.current;
     if (el === null || pageHeight === null) return;
@@ -176,11 +176,14 @@ export function WizardRun(p: RunProps) {
   if (!step) return null;
   const t = step.target;
   const items = p.itemsFor(t);
+  const pages = pagesForTarget(items);
   const answers = p.answers[t.id];
   const prev = firstOf(step.targetIndex - 1);
   const next = firstOf(step.targetIndex + 1);
-  const done = p.steps.filter((s) => p.touched(s.target.id, s.item.key)).length;
-  const pct = p.steps.length ? Math.round((done / p.steps.length) * 100) : 0;
+  // Progress is in items, not pages: a Services page of six is six taps.
+  const everyItem = p.steps.flatMap((s) => s.page.items.map((i) => [s.target.id, i.key] as const));
+  const done = everyItem.filter(([tid, key]) => p.touched(tid, key)).length;
+  const pct = everyItem.length ? Math.round((done / everyItem.length) * 100) : 0;
 
   const goLocation = (targetIndex: number, land: "first" | "last" = "first") => {
     const at = land === "last" ? lastOf(targetIndex) : firstOf(targetIndex);
@@ -195,7 +198,7 @@ export function WizardRun(p: RunProps) {
       goLocation(step.targetIndex - 1, "last");
       return;
     }
-    if (itemIndex >= items.length) {
+    if (itemIndex >= pages.length) {
       goLocation(step.targetIndex + 1);
       return;
     }
@@ -234,7 +237,7 @@ export function WizardRun(p: RunProps) {
     tweenStop.current?.();
     tweenStop.current = tween(el, to, SLIDE_MS, () => {
       tweenStop.current = null;
-      if (page === step.itemIndex) focusActive(el, page);
+      if (page === step.pageIndex) focusActive(el, page);
       else {
         fromScroll.current = true;
         p.setIndex(firstOf(step.targetIndex) + page);
@@ -326,7 +329,7 @@ export function WizardRun(p: RunProps) {
     wheelAcc.current = 0;
     cooling.current = true;
     window.setTimeout(() => (cooling.current = false), 250);
-    goItem(step.itemIndex + (forward ? 1 : -1));
+    goItem(step.pageIndex + (forward ? 1 : -1));
   };
   const pager = (
     <div className="wz-c-pager">
@@ -364,7 +367,7 @@ export function WizardRun(p: RunProps) {
               p={p}
               items={items}
               answers={answers}
-              onAdvance={() => goItem(step.itemIndex + 1)}
+              onAdvance={() => goItem(step.pageIndex + 1)}
               onConfirmed={() => goLocation(step.targetIndex + 1)}
             />
           </div>
@@ -386,23 +389,23 @@ export function WizardRun(p: RunProps) {
             onWheel={onWheel}
           >
             <div className="wz-d-rail">
-              <button type="button" className="wz-d-arrow" data-testid="wz-up" aria-label="previous item" onClick={() => goItem(step.itemIndex - 1)}>
+              <button type="button" className="wz-d-arrow" data-testid="wz-up" aria-label="previous item" onClick={() => goItem(step.pageIndex - 1)}>
                 ▲
               </button>
               <div className="wz-d-pips">
-                {items.map((it, i) => (
+                {pages.map((pg, i) => (
                   <button
-                    key={it.key}
+                    key={pg.key}
                     type="button"
-                    title={it.label}
-                    aria-label={it.label}
+                    title={pg.label}
+                    aria-label={pg.label}
                     data-testid="wz-pip"
-                    className={`wz-d-pip ${i === step.itemIndex ? "now" : p.touched(t.id, it.key) ? "done" : isAnswered(answers?.[it.key], it.kind) ? "onfile" : ""}`}
+                    className={`wz-d-pip ${i === step.pageIndex ? "now" : pg.items.some((it) => p.touched(t.id, it.key)) ? "done" : answeredCount(pg.items, answers) === pg.items.length ? "onfile" : ""}`}
                     onClick={() => goItem(i)}
                   />
                 ))}
               </div>
-              <button type="button" className="wz-d-arrow" data-testid="wz-down" aria-label="next item" onClick={() => goItem(step.itemIndex + 1)}>
+              <button type="button" className="wz-d-arrow" data-testid="wz-down" aria-label="next item" onClick={() => goItem(step.pageIndex + 1)}>
                 ▼
               </button>
             </div>
@@ -422,10 +425,10 @@ export function WizardRun(p: RunProps) {
               steps={p.steps}
               targetIndex={step.targetIndex}
               p={p}
-              activeIndex={step.itemIndex}
-              startAt={justSlid.current ? step.itemIndex : undefined}
+              activeIndex={step.pageIndex}
+              startAt={justSlid.current ? step.pageIndex : undefined}
               scrollRef={colRef}
-              onAdvance={() => goItem(step.itemIndex + 1)}
+              onAdvance={() => goItem(step.pageIndex + 1)}
               onConfirmed={() => goLocation(step.targetIndex + 1)}
             />
           </div>
@@ -553,7 +556,7 @@ function Column({
   }, []);
   const target = steps.find((s) => s.targetIndex === targetIndex)?.target;
   if (!target) return null;
-  const items = p.itemsFor(target);
+  const pages = pagesForTarget(p.itemsFor(target));
   const answers = p.answers[target.id];
   return (
     <div
@@ -563,18 +566,22 @@ function Column({
         if (scrollRef) scrollRef.current = el;
       }}
     >
-      {items.map((item, i) => {
-        const onFile = p.onFile(target, item);
+      {pages.map((page, i) => {
+        const item = page.items[0];
+        const onFile = page.kind === "item" ? p.onFile(target, item) : null;
+        const tall = page.kind === "section" || item.kind === "map";
         return (
-          <section className={`wz-d-page ${item.kind === "confirm" ? "wz-d-confirm" : item.kind === "map" ? "wz-d-tall" : ""}`} key={item.key} data-page={i}>
+          <section className={`wz-d-page ${item.kind === "confirm" ? "wz-d-confirm" : tall ? "wz-d-tall" : ""}`} key={page.key} data-page={i}>
             <div className="wz-d-heading">
               <h1 className="wz-d-loc">{target.location_name}</h1>
               {target.type_name && <div className="wz-d-type">{target.type_name}</div>}
               <div className="wz-d-rule" aria-hidden />
-              <div className="wz-d-group">{item.group}</div>
-              <div className="wz-d-label">{item.label}</div>
+              <div className="wz-d-group">{page.kind === "section" ? `${page.items.length} to check` : item.group}</div>
+              <div className="wz-d-label">{page.label}</div>
             </div>
-            {item.kind === "confirm" ? (
+            {page.kind === "section" ? (
+              <SectionPage page={page} target={target} p={p} answers={answers} onAdvance={() => onAdvance?.()} />
+            ) : item.kind === "confirm" ? (
               <ConfirmPage t={target} p={p} onDone={onConfirmed} />
             ) : (
               // A page taller than the screen - the map - scrolls inside
@@ -594,11 +601,52 @@ function Column({
               </div>
             )}
             <div className="muted small">
-              {i + 1} of {items.length} here · {p.savedNote}
+              {i + 1} of {pages.length} here · {p.savedNote}
             </div>
           </section>
         );
       })}
+    </div>
+  );
+}
+
+/** Every item of a group on one page - Attributes, Services, Amenities -
+ *  the way the Finding form lists them: it is faster to tap them in the
+ *  order they are seen than to meet each one on its own screen (owner,
+ *  2026-10-04). The list scrolls inside the page; the button at its foot
+ *  moves on, as does a swipe. */
+function SectionPage({
+  page,
+  target,
+  p,
+  answers,
+  onAdvance,
+}: {
+  page: WizardPage;
+  target: WizardTarget;
+  p: RunProps;
+  answers: RunProps["answers"][string] | undefined;
+  onAdvance: () => void;
+}) {
+  return (
+    <div className="wz-d-inner wz-section" data-testid="wz-section">
+      {page.items.map((item: WizardItem) => {
+        const onFile = p.onFile(target, item);
+        return (
+          <div key={item.key} className={`wz-b-row ${p.touched(target.id, item.key) ? "done" : ""}`} data-testid="wz-section-row">
+            <div className="wz-b-row-label">
+              {item.label}
+              {onFile && <span className="muted small" style={{ fontWeight: 400 }}> · on file: {onFile}</span>}
+            </div>
+            <ItemControl item={item} target={target} value={answers?.[item.key]} statuses={p.statuses} onChange={(v, mode) => p.setAnswer(target.id, item.key, v, mode)} />
+          </div>
+        );
+      })}
+      <div className="wz-section-foot">
+        <button type="button" className="btn btn-primary wz-btn-big" data-testid="wz-section-next" onClick={onAdvance}>
+          Next
+        </button>
+      </div>
     </div>
   );
 }
