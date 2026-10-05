@@ -251,11 +251,30 @@ async function writeGps(tx: LockContext, w: WizardWrite, findingId: string) {
   await replaceProposal(tx, findingId, "set_gps", null, real ? { lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy ?? null } : null);
   if (!real || !fix.anchor) return;
   const { map_id, cx, cy } = fix.anchor;
-  const existing = w.locationId
-    ? await tx.getOptional<{ placement: string }>("SELECT placement FROM location_map_placements WHERE location_id = ? AND map_id = ?", [w.locationId, map_id])
-    : null;
-  const shape = existing ? reanchored(parseShape(existing.placement), cx, cy) : newPlacement(cx, cy, loadLabelStyle());
+  // The audit's own placement first - a label adjusted earlier in this
+  // audit lives in the pending Proposal, and re-anchoring from the row on
+  // file would throw that work away - then the row on file, then a new
+  // one in the remembered style.
+  const pending = await tx.getOptional<{ payload: string }>(
+    "SELECT payload FROM audit_proposals WHERE finding_id = ? AND kind = 'move_placement' AND decision IS NULL",
+    [findingId],
+  );
+  const pendingShape = pending ? pendingPlacement(pending.payload, map_id) : null;
+  const existing =
+    !pendingShape && w.locationId
+      ? await tx.getOptional<{ placement: string }>("SELECT placement FROM location_map_placements WHERE location_id = ? AND map_id = ?", [w.locationId, map_id])
+      : null;
+  const shape = pendingShape ? reanchored(pendingShape, cx, cy) : existing ? reanchored(parseShape(existing.placement), cx, cy) : newPlacement(cx, cy, loadLabelStyle());
   await replaceProposal(tx, findingId, "move_placement", null, { map_id, placement: shape });
+}
+
+function pendingPlacement(raw: string, mapId: string): PlacementShape | null {
+  try {
+    const v = JSON.parse(raw) as { map_id?: string; placement?: PlacementShape };
+    return v && v.map_id === mapId && v.placement && typeof v.placement === "object" ? v.placement : null;
+  } catch {
+    return null;
+  }
 }
 
 function parseShape(raw: string): PlacementShape {

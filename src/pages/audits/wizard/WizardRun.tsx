@@ -26,7 +26,7 @@ import { ConfirmPage } from "./ConfirmPage";
 import { ItemControl } from "./ItemControl";
 import { JumpBody } from "./JumpBody";
 import { useVisiblePageHeight } from "./useVisiblePageHeight";
-import { answeredCount, pagesForTarget, stepOfTarget, type Step, type WizardItem, type WizardPage, type WizardTarget } from "../../../lib/auditWizard";
+import { answeredCount, pagesForTarget, stepOfTarget, type MapAnswer, type Step, type WizardItem, type WizardPage, type WizardTarget } from "../../../lib/auditWizard";
 import type { RunProps } from "./runProps";
 
 const SLIDE_MS = 500;
@@ -512,7 +512,16 @@ function LocationPage({
                 {item.kind === "map" ? "On the map" : item.label}
                 {onFile && <span className="muted small" style={{ fontWeight: 400 }}> · on file: {onFile}</span>}
               </div>
-              <ItemControl item={item} target={t} value={value} statuses={p.statuses} advance={onAdvance} onChange={(v, mode) => p.setAnswer(t.id, item.key, v, mode)} />
+              <ItemControl
+                item={item}
+                target={t}
+                value={value}
+                statuses={p.statuses}
+                advance={onAdvance}
+                onChange={(v, mode) => p.setAnswer(t.id, item.key, v, mode)}
+                auditPlacement={mapAnswerOf(answers).placement}
+                onPlacement={(pl) => p.setAnswer(t.id, "map", { ...mapAnswerOf(answers), placement: pl })}
+              />
             </div>
           </div>
         );
@@ -596,6 +605,8 @@ function Column({
                   autoFocus={i === activeIndex}
                   advance={onAdvance}
                   onChange={(v, mode) => p.setAnswer(target.id, item.key, v, mode)}
+                  auditPlacement={mapAnswerOf(answers).placement}
+                  onPlacement={(pl) => p.setAnswer(target.id, "map", { ...mapAnswerOf(answers), placement: pl })}
                 />
                 {onFile && <div className="wz-a-prefill">On file: {onFile}</div>}
               </div>
@@ -656,6 +667,15 @@ function SectionPage({
  *  only when there is a placement to ask about. */
 function pageHeading(page: WizardPage): string {
   return page.kind === "item" && page.items[0].kind === "map" ? "On the map" : page.label;
+}
+
+/** The run's map answer for a location: where it has the location on the
+ *  map and whether that was called correct. The GPS page re-anchors it
+ *  and the map page edits it, so both see one placement. */
+function mapAnswerOf(answers: RunProps["answers"][string] | undefined): MapAnswer {
+  const v = answers?.map;
+  if (v && typeof v === "object" && "placement" in v) return v as MapAnswer;
+  return { correct: typeof v === "boolean" ? v : null, placement: null };
 }
 
 function useWide(px = 900) {

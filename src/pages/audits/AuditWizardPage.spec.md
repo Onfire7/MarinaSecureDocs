@@ -137,6 +137,13 @@ variants; this is D).
     `set_gps` one - the existing placement re-anchored with its label kept,
     or a new one in the remembered label style. Cancel keeps the fix and
     ties nothing; *Tap where I am on the map* offers it again.
+  - **The run holds one placement per location**, and every page of that
+    location reads and writes it (owner, 2026-10-05): the anchor tapped on
+    the GPS page re-anchors the run's placement with its label kept, and
+    the map page's editor opens on exactly that, saved or not. The anchor
+    write re-anchors the *pending* Proposal before the row on file for the
+    same reason - a label adjusted earlier in the audit must survive a
+    later anchor.
 - **No Next button under a field** (owner, 2026-10-04, reversing the same
   morning's addition): the keyboard's Next key, a swipe and the rail move
   on. The one Next is at the foot of a section page's list.

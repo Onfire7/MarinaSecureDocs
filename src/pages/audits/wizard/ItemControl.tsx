@@ -14,6 +14,7 @@ import { useDevicePosition } from "../../shared/useDevicePosition";
 import { useNoteSuggestions } from "../../../data/services";
 import { useMarinaSettings } from "../../../data/settings";
 import type { AmenityAnswer, AttributeAnswer, AnswerValue, GpsAnswer, MapAnswer, ServiceAnswer, WizardItem, WizardTarget } from "../../../lib/auditWizard";
+import type { PlacementShape } from "../../../lib/locations";
 import { GpsCapture } from "../GpsCapture";
 import { PlacementCheck } from "../PlacementCheck";
 import type { AnswerMode } from "./runProps";
@@ -27,11 +28,20 @@ export function ItemControl({
   big,
   advance,
   autoFocus,
+  auditPlacement,
+  onPlacement,
 }: {
   item: WizardItem;
   /** Whose item: the map and GPS pages need the location itself. */
   target: WizardTarget;
   value: AnswerValue | undefined;
+  /** Where this RUN has the location on the map - the map answer's
+   *  placement - so the GPS page re-anchors the label the run has, not
+   *  the one on file (owner, 2026-10-05). */
+  auditPlacement?: MapAnswer["placement"];
+  /** The GPS page hands a re-anchored placement back through this, which
+   *  is the map answer's write. */
+  onPlacement?: (p: NonNullable<MapAnswer["placement"]>) => void;
   statuses: { id: string; name: string }[];
   /** `typing` while a field is being edited: the page holds the value and
    *  writes it when the field commits. A write per keystroke is ten
@@ -258,7 +268,7 @@ export function ItemControl({
     case "map":
       return <MapControl target={target} value={value} big={big} onChange={onChange} onward={onward} />;
     case "gps":
-      return <GpsControl target={target} value={value} big={big} onChange={onChange} />;
+      return <GpsControl target={target} value={value} big={big} onChange={onChange} auditPlacement={auditPlacement ?? null} onPlacement={onPlacement} />;
     case "status":
       return (
         <div className={`wz-control ${cls}`}>
@@ -499,20 +509,28 @@ function GpsControl({
   value,
   big,
   onChange,
+  auditPlacement,
+  onPlacement,
 }: {
   target: WizardTarget;
   value: AnswerValue | undefined;
   big?: boolean;
   onChange: (v: AnswerValue, mode?: AnswerMode) => void;
+  auditPlacement: MapAnswer["placement"];
+  onPlacement?: (p: NonNullable<MapAnswer["placement"]>) => void;
 }) {
   const settings = useMarinaSettings();
   const [anchoring, setAnchoring] = useState(false);
   const fix = value && typeof value === "object" && "lat" in value ? (value as GpsAnswer) : null;
-  const { map, own, placements } = useLocationMap(target.location_id, fix?.anchor?.map_id ?? null);
+  const { map, own, placements } = useLocationMap(target.location_id, auditPlacement?.map_id ?? fix?.anchor?.map_id ?? null);
   const fit = useMapFit(map?.id);
   const device = useDevicePosition();
   const ownShape = own ? placementOf(own) : null;
-  const shape = fix?.anchor && map && fix.anchor.map_id === map.id ? { ...(ownShape ?? { rotation: 0 }), cx: fix.anchor.cx, cy: fix.anchor.cy } : ownShape;
+  // Where the location is, as this run has it: the run's own placement
+  // (an anchor tapped or a label adjusted on another page of this
+  // location, saved or not), else what is on file.
+  const shape: PlacementShape | null =
+    auditPlacement && map && auditPlacement.map_id === map.id ? (auditPlacement.placement as unknown as PlacementShape) : ownShape;
   const pinned = target.gps_lat !== null && target.gps_lng !== null;
   // What the map can say about this page: where you are, where the pin on
   // file is, where the fix just captured is - each only when the fit can
@@ -571,6 +589,9 @@ function GpsControl({
           onDone={(next) => {
             setAnchoring(false);
             onChange({ ...fix, anchor: next ? { map_id: map.id, cx: next.cx, cy: next.cy } : null });
+            // The run's placement moves with the anchor, label and style
+            // kept, so the map page - and its editor - start from here.
+            if (next) onPlacement?.({ map_id: map.id, placement: { ...next } as unknown as Record<string, unknown> });
           }}
         />
       )}
