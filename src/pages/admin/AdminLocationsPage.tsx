@@ -1673,9 +1673,13 @@ function MapPlotter({
         <div className="map-canvas map-schematic">
           {imageUrl && <img src={imageUrl} alt={map.name} className="map-image" draggable={false} />}
           <DeviceDot fit={fit} position={device} />
-          {placements.map((p) => (
-            <span key={`a-${p.id}`} className="map-anchor" style={{ left: `${p.shape.cx}%`, top: `${p.shape.cy}%` }} aria-hidden />
-          ))}
+          {/* An anchor is drawn only where it is apart from its label; a
+              label sitting on its anchor already marks the spot. */}
+          {placements
+            .filter((p) => p.shape.dx || p.shape.dy)
+            .map((p) => (
+              <span key={`a-${p.id}`} className="map-anchor" style={{ left: `${p.shape.cx}%`, top: `${p.shape.cy}%` }} aria-hidden />
+            ))}
           {placements.map((p) => (
             <button
               key={p.id}
@@ -1696,7 +1700,7 @@ function MapPlotter({
           ))}
         </div>
         <p className="muted small" style={{ marginTop: 6 }}>
-          Tap a label to move, size or rotate it on a zoomable map. The dot under each label is its anchor - where the location is.
+          Tap a label to move, size or rotate it on a zoomable map. A dot beside a label is its anchor - where the location is - when the label has been moved off it.
         </p>
         {/* How well this map knows where things are (docs/maps.md): every
             anchored AND pinned location is a control point, and each one's

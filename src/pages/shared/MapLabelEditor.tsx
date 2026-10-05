@@ -128,13 +128,31 @@ export function MapLabelEditor({
     } else setView({ s: fitScale, tx: (port.w - layerW * fitScale) / 2, ty: (port.h - layerH * fitScale) / 2 });
   }, [layerH, layerW, port, shape, mode, fit, device]);
 
-  // Nothing beneath the editor scrolls or zooms while it is up.
+  // Nothing beneath the editor scrolls or zooms while it is up - and
+  // nothing in it zooms the PAGE. touch-action: none on the whole layer
+  // covers Android; a pinch that begins on the top bar or the tool bar
+  // would otherwise zoom the browser's viewport and carry Cancel and Done
+  // off the screen with it (owner, 2026-10-04). iOS ignores touch-action
+  // for pinch, so a non-passive listener refuses two-finger moves and
+  // gesturestart as well.
+  const layerRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const root = document.documentElement;
     const was = root.style.overflow;
     root.style.overflow = "hidden";
+    const el = layerRef.current;
+    const twoFingers = (e: TouchEvent) => {
+      if (e.touches.length > 1) e.preventDefault();
+    };
+    const refuse = (e: Event) => e.preventDefault();
+    el?.addEventListener("touchmove", twoFingers, { passive: false });
+    el?.addEventListener("touchstart", twoFingers, { passive: false });
+    el?.addEventListener("gesturestart", refuse);
     return () => {
       root.style.overflow = was;
+      el?.removeEventListener("touchmove", twoFingers);
+      el?.removeEventListener("touchstart", twoFingers);
+      el?.removeEventListener("gesturestart", refuse);
     };
   }, []);
 
@@ -256,7 +274,7 @@ export function MapLabelEditor({
         ? "Drag the label, or tap where it should be."
         : null;
   const body = (
-    <div className="mle-layer" role="dialog" aria-label={`${subject.name} on ${map.scope_name ?? map.name}`}>
+    <div className="mle-layer" ref={layerRef} role="dialog" aria-label={`${subject.name} on ${map.scope_name ?? map.name}`}>
       <div className="mle-top">
         <button type="button" className="btn btn-sm btn-bare" onClick={onCancel}>
           Cancel
@@ -286,14 +304,17 @@ export function MapLabelEditor({
             </span>
           ))}
           <DeviceDot fit={fit} position={device} scale={view.s} />
-          {draft && mode === "label" && (
+          {/* With the Anchor tool on, the label is out of the way: the
+              dot is what is being placed, and a label on top of it hides
+              the spot. */}
+          {draft && mode === "label" && tool !== "anchor" && (
             <span className="map-rect mle-subject" data-subject data-testid="mle-subject" style={placementStyle(draft)}>
               {subject.name}
             </span>
           )}
           {draft && (
             <>
-              {mode === "label" && (draft.dx || draft.dy) ? <span className="mle-tether" style={{ ...tetherStyle(draft), borderTopWidth: 1.5 / view.s }} aria-hidden /> : null}
+              {mode === "label" && tool !== "anchor" && (draft.dx || draft.dy) ? <span className="mle-tether" style={{ ...tetherStyle(draft), borderTopWidth: 1.5 / view.s }} aria-hidden /> : null}
               {/* Counter-scaled: a dot is a dot at any zoom, not a disc. */}
               <span
                 className="mle-anchor"

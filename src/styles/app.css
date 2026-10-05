@@ -2029,6 +2029,15 @@ h3 {
   flex-direction: column;
   background: var(--bg);
   color: var(--ink);
+  /* The whole layer, not just the map: a pinch or double-tap that begins
+     on a bar must not zoom the page. */
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+.mle-top .btn,
+.mle-tool,
+.mle-slider input {
+  touch-action: manipulation;
 }
 .mle-top {
   flex: 0 0 auto;

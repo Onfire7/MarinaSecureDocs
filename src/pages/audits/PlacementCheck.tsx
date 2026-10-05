@@ -114,7 +114,9 @@ export function PlacementCheck({
             <span className={`map-rect pc-mine ${proposed ? "pc-proposed-label" : ""}`} style={placementStyle(current)} title={proposed ? "Proposed placement — waits for approval" : undefined}>
               {locationName}
             </span>
-            <span className="map-anchor" style={{ left: `${current.cx}%`, top: `${current.cy}%` }} title={`${locationName} is here`} data-testid="pc-anchor" />
+            {(current.dx || current.dy) ? (
+              <span className="map-anchor" style={{ left: `${current.cx}%`, top: `${current.cy}%` }} title={`${locationName} is here`} data-testid="pc-anchor" />
+            ) : null}
           </>
         )}
         {editable && <span className="pc-zoom-hint">tap to zoom</span>}
