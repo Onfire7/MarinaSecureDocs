@@ -4,8 +4,10 @@
 //
 // On a phone, two axes of *scroll*:
 //   · every item of a location is its own screen-sized page, stacked
-//     vertically - swipe or turn the wheel to move through them; a
-//     deliberate move tweens there over 500ms, free scrolling snaps;
+//     vertically. The column does not scroll natively: the run owns the
+//     touch stream, carries the page with the thumb at 5x, stops it dead
+//     at the next page, and tweens the rest of the way on release. A
+//     wheel burst is one page. A deliberate move tweens over 500ms;
 //   · locations sit side by side, and moving between them slides
 //     horizontally over 500ms, however far apart they are;
 //   · scrolling past the last item rolls into the next location, and past
@@ -30,8 +32,18 @@ import type { RunProps } from "./runProps";
 const SLIDE_MS = 500;
 /** Pages give way to the keyboard over this long; see wizard.css. */
 const RESIZE_MS = 250;
-/** How much overscroll at an edge rolls into the next location. */
-const EDGE = 120;
+/** A page moves this many pixels per pixel of thumb. A fifth of a screen
+ *  of thumb carries a whole page, and the page stops there whatever the
+ *  thumb does next. */
+const GAIN = 5;
+/** Past this fraction of a page on release, the page is turned; short of
+ *  it, it is put back. */
+const TURN_AT = 0.4;
+/** Thumb pixels pushed against the end of the column, beyond where the
+ *  page stopped, that roll into the next location. */
+const EDGE = 60;
+/** Wheel delta that turns one page. */
+const WHEEL_STEP = 40;
 
 export function WizardRun(p: RunProps) {
   const wide = useWide();
@@ -40,17 +52,20 @@ export function WizardRun(p: RunProps) {
   const colRef = useRef<HTMLDivElement | null>(null);
   const fromScroll = useRef(false);
   const justSlid = useRef(false);
-  const overscroll = useRef(0);
   const cooling = useRef(false);
-  /** A tween writes scrollTop every frame, and every frame is a scroll
-   *  event. Letting those move the index means the tween chases a target
-   *  that is being rewritten under it, and it lands a page early. */
-  const tweening = useRef(false);
+  const wheelAcc = useRef(0);
+  /** The tween in flight, if any; a touch cancels it. */
+  const tweenStop = useRef<(() => void) | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   /** How tall a page is: the whole scroller, less whatever the keyboard
    *  covers. Null until first measured, when it is simply 100%. */
   const [pageHeight, setPageHeight] = useState<number | null>(null);
-  const touchY = useRef<number | null>(null);
+  /** The drag in progress. `inner` means the gesture belongs to the
+   *  confirmation page's review list and the run leaves it alone. `spent`
+   *  means it already rolled into another location. */
+  const drag = useRef<
+    { y0: number; top0: number; page: number; lo: number; hi: number; spent: boolean } | { inner: true; y0: number; decided: boolean } | null
+  >(null);
   const step = p.steps[p.index];
   const firstOf = (ti: number) => p.steps.findIndex((s) => s.targetIndex === ti);
   const lastOf = (ti: number) => {
@@ -89,9 +104,9 @@ export function WizardRun(p: RunProps) {
       focusActive(el, step.itemIndex);
       return;
     }
-    tweening.current = true;
-    tween(el, to, SLIDE_MS, () => {
-      tweening.current = false;
+    tweenStop.current?.();
+    tweenStop.current = tween(el, to, SLIDE_MS, () => {
+      tweenStop.current = null;
       focusActive(el, step.itemIndex);
     });
     // `step` and the refs are read at run time and deliberately not deps.
@@ -123,21 +138,40 @@ export function WizardRun(p: RunProps) {
   useEffect(() => {
     const el = colRef.current;
     if (el === null || pageHeight === null) return;
-    el.style.scrollSnapType = "none";
     const start = performance.now();
     let frame = 0;
     const pin = (now: number) => {
       const to = pageTop(el, itemIndexRef.current);
-      if (to !== null) el.scrollTop = to;
+      if (to !== null && drag.current === null) el.scrollTop = to;
       if (now - start < RESIZE_MS + 40) frame = requestAnimationFrame(pin);
-      else el.style.scrollSnapType = "";
     };
     frame = requestAnimationFrame(pin);
-    return () => {
-      cancelAnimationFrame(frame);
-      el.style.scrollSnapType = "";
-    };
+    return () => cancelAnimationFrame(frame);
   }, [pageHeight]);
+
+  // The touch stream, taken natively: React registers touch listeners as
+  // passive, and a passive listener cannot stop iOS from panning the
+  // document - a thing it will do with the pages even though nothing in
+  // the document can scroll. The handlers themselves are below, read
+  // through a ref so this registers once.
+  const touch = useRef({ start: (_e: TouchEvent) => {}, move: (_e: TouchEvent) => {}, end: () => {} });
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const start = (e: TouchEvent) => touch.current.start(e);
+    const move = (e: TouchEvent) => touch.current.move(e);
+    const end = () => touch.current.end();
+    el.addEventListener("touchstart", start, { passive: true });
+    el.addEventListener("touchmove", move, { passive: false });
+    el.addEventListener("touchend", end);
+    el.addEventListener("touchcancel", end);
+    return () => {
+      el.removeEventListener("touchstart", start);
+      el.removeEventListener("touchmove", move);
+      el.removeEventListener("touchend", end);
+      el.removeEventListener("touchcancel", end);
+    };
+  }, [wide]);
 
   if (!step) return null;
   const t = step.target;
@@ -181,28 +215,117 @@ export function WizardRun(p: RunProps) {
 
   /** Pushing past either end of the stack rolls into the neighbouring
    *  location - the ribbon has no walls, only corners. */
-  const edgeNudge = (dy: number, target: EventTarget | null = null) => {
-    const el = colRef.current;
-    if (!el || cooling.current) return;
-    if (innerScroller(target, dy)) {
-      overscroll.current = 0;
-      return;
-    }
-    const atTop = el.scrollTop <= 2;
-    const atBottom = el.scrollTop >= el.scrollHeight - el.clientHeight - 2;
-    if ((dy < 0 && atTop) || (dy > 0 && atBottom)) {
-      overscroll.current += dy;
-      if (Math.abs(overscroll.current) >= EDGE) {
-        const forward = overscroll.current > 0;
-        overscroll.current = 0;
-        cooling.current = true;
-        window.setTimeout(() => (cooling.current = false), SLIDE_MS + 200);
-        if (forward) goLocation(step.targetIndex + 1);
-        else goLocation(step.targetIndex - 1, "last");
+  const rollOver = (forward: boolean) => {
+    if (cooling.current) return;
+    cooling.current = true;
+    window.setTimeout(() => (cooling.current = false), SLIDE_MS + 200);
+    if (forward) goLocation(step.targetIndex + 1);
+    else goLocation(step.targetIndex - 1, "last");
+  };
+
+  /** Land on `page` from wherever the column is, and only then tell the run
+   *  about it: the index change focuses the page's field, and a field
+   *  focused before its page has arrived is one the browser scrolls into
+   *  view itself, against the tween. */
+  const settle = (el: HTMLDivElement, page: number) => {
+    const to = pageTop(el, page);
+    if (to === null) return;
+    tweenStop.current?.();
+    tweenStop.current = tween(el, to, SLIDE_MS, () => {
+      tweenStop.current = null;
+      if (page === step.itemIndex) focusActive(el, page);
+      else {
+        fromScroll.current = true;
+        p.setIndex(firstOf(step.targetIndex) + page);
       }
-    } else {
-      overscroll.current = 0;
-    }
+    });
+  };
+
+  // The gesture. The page follows the thumb at GAIN and stops at the next
+  // page; what the thumb does past that point is pressure on the end of the
+  // column, which rolls the run over, or nothing. Release turns the page or
+  // puts it back. Nothing here is the browser's: there is no fling, no
+  // momentum, no snap, and nothing to fight the tween for scrollTop.
+  const begin = (el: HTMLDivElement, y: number) => {
+    tweenStop.current?.();
+    tweenStop.current = null;
+    const page = nearestPage(el);
+    const here = pageTop(el, page) ?? el.scrollTop;
+    drag.current = {
+      y0: y,
+      top0: here,
+      page,
+      lo: pageTop(el, page - 1) ?? here,
+      hi: pageTop(el, page + 1) ?? here,
+      spent: false,
+    };
+  };
+  touch.current = {
+    start: (e) => {
+      const el = colRef.current;
+      const y = e.touches[0]?.clientY;
+      if (!el || y === undefined) return;
+      const list = e.target instanceof Element ? e.target.closest<HTMLElement>(".wz-c-review-list") : null;
+      // Over the review list, the first move decides whose gesture it is.
+      if (list && list.scrollHeight > list.clientHeight) drag.current = { inner: true, y0: y, decided: false };
+      else begin(el, y);
+    },
+    move: (e) => {
+      let d = drag.current;
+      const el = colRef.current;
+      const y = e.touches[0]?.clientY;
+      if (!d || !el || y === undefined) return;
+      if ("inner" in d) {
+        if (d.decided) return;
+        const dy = d.y0 - y;
+        if (Math.abs(dy) < 4) return;
+        if (innerScroller(e.target, dy)) {
+          // The list's, natively, until the thumb lifts.
+          d.decided = true;
+          return;
+        }
+        // The list has nothing left this way: the run takes the gesture
+        // from here. Nothing native has moved, so it can still be stopped.
+        begin(el, y);
+        d = drag.current;
+        if (!d || "inner" in d) return;
+      }
+      e.preventDefault();
+      if (d.spent) return;
+      const want = d.top0 + (d.y0 - y) * GAIN;
+      const clamped = Math.min(d.hi, Math.max(d.lo, want));
+      el.scrollTop = clamped;
+      // Pressure past the end of the column, in thumb pixels.
+      const excess = (want - clamped) / GAIN;
+      const atEnd = (excess < 0 && d.lo === d.top0) || (excess > 0 && d.hi === d.top0);
+      if (atEnd && Math.abs(excess) >= EDGE) {
+        d.spent = true;
+        rollOver(excess > 0);
+      }
+    },
+    end: () => {
+      const d = drag.current;
+      const el = colRef.current;
+      drag.current = null;
+      if (!d || "inner" in d || !el || d.spent) return;
+      const moved = el.scrollTop - d.top0;
+      const span = moved > 0 ? d.hi - d.top0 : d.top0 - d.lo;
+      const turned = span > 0 && Math.abs(moved) >= span * TURN_AT;
+      settle(el, d.page + (turned ? Math.sign(moved) : 0));
+    },
+  };
+
+  /** A wheel burst turns one page. There is no release to decide on, so
+   *  the first WHEEL_STEP of delta decides and the rest of the burst cools. */
+  const onWheel = (e: React.WheelEvent) => {
+    if (innerScroller(e.target, e.deltaY) || cooling.current || tweenStop.current) return;
+    wheelAcc.current += e.deltaY;
+    if (Math.abs(wheelAcc.current) < WHEEL_STEP) return;
+    const forward = wheelAcc.current > 0;
+    wheelAcc.current = 0;
+    cooling.current = true;
+    window.setTimeout(() => (cooling.current = false), 250);
+    goItem(step.itemIndex + (forward ? 1 : -1));
   };
   const pager = (
     <div className="wz-c-pager">
@@ -259,17 +382,7 @@ export function WizardRun(p: RunProps) {
             className="wz-d-wrap"
             ref={wrapRef}
             style={pageHeight === null ? undefined : ({ "--wz-page-h": `${pageHeight}px` } as CSSProperties)}
-            onWheel={(e) => edgeNudge(e.deltaY, e.target)}
-            onTouchStart={(e) => (touchY.current = e.touches[0]?.clientY ?? null)}
-            onTouchMove={(e) => {
-              const y = e.touches[0]?.clientY ?? null;
-              if (touchY.current !== null && y !== null) edgeNudge(touchY.current - y, e.target);
-              touchY.current = y;
-            }}
-            onTouchEnd={() => {
-              touchY.current = null;
-              overscroll.current = 0;
-            }}
+            onWheel={onWheel}
           >
             <div className="wz-d-rail">
               <button type="button" className="wz-d-arrow" data-testid="wz-up" aria-label="previous item" onClick={() => goItem(step.itemIndex - 1)}>
@@ -311,11 +424,6 @@ export function WizardRun(p: RunProps) {
               activeIndex={step.itemIndex}
               startAt={justSlid.current ? step.itemIndex : undefined}
               scrollRef={colRef}
-              onScrollItem={(i) => {
-                if (tweening.current || i === step.itemIndex) return;
-                fromScroll.current = true;
-                p.setIndex(firstOf(step.targetIndex) + i);
-              }}
               onAdvance={() => goItem(step.itemIndex + 1)}
               onConfirmed={() => goLocation(step.targetIndex + 1)}
             />
@@ -419,7 +527,6 @@ function Column({
   activeIndex,
   startAt,
   scrollRef,
-  onScrollItem,
   onAdvance,
   onConfirmed,
 }: {
@@ -431,7 +538,6 @@ function Column({
   /** Arriving backwards lands on the last item, without animating there. */
   startAt?: number;
   scrollRef?: React.MutableRefObject<HTMLDivElement | null>;
-  onScrollItem?: (i: number) => void;
   onAdvance?: () => void;
   /** Confirming a location is the end of it: the run moves on. */
   onConfirmed?: () => void;
@@ -454,11 +560,6 @@ function Column({
       ref={(el) => {
         own.current = el;
         if (scrollRef) scrollRef.current = el;
-      }}
-      onScroll={(e) => {
-        const el = e.currentTarget;
-        if (!onScrollItem || el.clientHeight === 0) return;
-        onScrollItem(nearestPage(el));
       }}
     >
       {items.map((item, i) => {
@@ -534,29 +635,28 @@ function nearestPage(el: HTMLElement): number {
 }
 
 /** A fixed-duration scroll, because the browser's own smooth scrolling has
- *  no duration we can set - and with mandatory snapping on, every frame we
- *  write is snapped back to the nearest page, so the tween arrives as a
- *  jump. Snapping is suspended for the length of it. */
-function tween(el: HTMLElement, to: number, ms: number, done: () => void) {
+ *  no duration we can set. Returns a stop: a thumb landing mid-tween takes
+ *  the page from wherever it is. */
+function tween(el: HTMLElement, to: number, ms: number, done: () => void): () => void {
   const from = el.scrollTop;
   if (Math.abs(to - from) < 1) {
     done();
-    return;
+    return () => {};
   }
-  el.style.scrollSnapType = "none";
-  const finish = () => {
-    el.style.scrollSnapType = "";
-    done();
-  };
+  let stopped = false;
   const start = performance.now();
   const ease = (x: number) => (x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2);
   const frame = (now: number) => {
+    if (stopped) return;
     const k = Math.min(1, (now - start) / ms);
     el.scrollTop = from + (to - from) * ease(k);
     if (k < 1) requestAnimationFrame(frame);
-    else finish();
+    else done();
   };
   requestAnimationFrame(frame);
+  return () => {
+    stopped = true;
+  };
 }
 
 /**
@@ -580,7 +680,8 @@ function focusActive(el: HTMLElement, index: number) {
   if (here && page?.contains(active)) return;
   const field = page?.querySelector<HTMLInputElement>("[data-autofocus]");
   if (field) {
-    field.focus();
+    // The page is already where it belongs; the browser must not move it.
+    field.focus({ preventScroll: true });
     return;
   }
   if (here) (active as HTMLElement).blur();

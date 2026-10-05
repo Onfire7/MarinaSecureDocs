@@ -247,7 +247,8 @@
   position: relative;
   flex: 1 1 auto;
   overflow: hidden;
-  touch-action: pan-y;
+  /* The run owns the touch stream (WizardRun.tsx): nothing here pans. */
+  touch-action: none;
 }
 .wz-d-col {
   position: absolute;
@@ -259,21 +260,15 @@
      pan to before anything scrolls. */
   height: var(--wz-page-h, 100%);
   transition: height 250ms ease;
-  overflow-y: auto;
-  overflow-x: hidden;
-  /* A flick that reaches the end of the run must not become a page scroll. */
-  overscroll-behavior: contain;
-  scroll-snap-type: y mandatory;
-  scrollbar-width: none;
-}
-.wz-d-col::-webkit-scrollbar {
-  display: none;
+  /* Not a scroller the browser drives. scrollTop is written by the run -
+     from the thumb at 5x during a drag, by a tween the rest of the way -
+     so there is no fling, no snap, and nothing to fight the tween. */
+  overflow: hidden;
+  touch-action: none;
 }
 .wz-d-page {
   /* The scroller's height, which is what the keyboard leaves visible. */
   height: 100%;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -445,8 +440,8 @@
 }
 
 /* ── the confirmation page ───────────────────────────────────────────── */
-/* It is a page like every other - one screen, one snap area - and the
-   review scrolls INSIDE it.
+/* It is a page like every other - one screen - and the review scrolls
+   INSIDE it.
    
    It was briefly `height: auto`, taller than the scroller, on the theory
    that an oversized snap area only snaps at its edges. What that actually
@@ -473,6 +468,9 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* Its own scroll container, so the column's touch-action does not reach
+     it: a swipe here is the list's until it runs out of room. */
+  touch-action: pan-y;
 }
 .wz-c-review-group {
   font-size: 0.72rem;
@@ -523,4 +521,13 @@
 .wz-c-review-foot .btn-primary {
   font-size: 1rem;
   padding: 14px 22px;
+}
+
+/* The Next under a field: its own row beneath the control, so it is
+   found where the thumb already is rather than on the keyboard. */
+.wz-next-row {
+  flex-basis: 100%;
+  display: flex;
+  justify-content: center;
+  margin-top: 6px;
 }

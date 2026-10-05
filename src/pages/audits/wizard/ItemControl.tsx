@@ -37,6 +37,17 @@ export function ItemControl({
 }) {
   const cls = big ? "wz-big" : "";
   const onward = () => advance?.();
+  // A visible Next under every page that has something to type into. The
+  // keyboard's own Next key does the same, but a thumb that has just put a
+  // number in should not have to find it. Tapping it blurs the field, which
+  // commits it, and then moves on.
+  const nextButton = big ? (
+    <div className="wz-next-row">
+      <button type="button" className="btn btn-primary wz-btn-big" data-testid="wz-item-next" onClick={onward}>
+        Next
+      </button>
+    </div>
+  ) : null;
   // The note input mounts only once an answer reveals it, so focusing it is
   // a callback ref that fires on mount, not a call into the past.
   const noteRef = useRef<HTMLInputElement | null>(null);
@@ -90,6 +101,7 @@ export function ItemControl({
                 onCommit={(note) => onChange({ ...v, note }, "commit")}
                 onEnter={onward}
               />
+              {nextButton}
             </>
           )}
         </div>
@@ -120,6 +132,7 @@ export function ItemControl({
               onEnter={onward}
             />
           )}
+          {v.present === true && nextButton}
         </div>
       );
     }
@@ -167,6 +180,7 @@ export function ItemControl({
             onCommit={(note) => onChange({ ...v, note }, "commit")}
             onEnter={onward}
           />
+          {nextButton}
         </div>
       );
     }
@@ -216,6 +230,7 @@ export function ItemControl({
               onCommit={(next) => onChange(next === "" ? null : Number(next), "commit")}
               onEnter={onward}
             />
+            {nextButton}
           </div>
         );
       return (
@@ -228,6 +243,7 @@ export function ItemControl({
             onCommit={(next) => onChange(next, "commit")}
             onEnter={onward}
           />
+          {nextButton}
         </div>
       );
     }

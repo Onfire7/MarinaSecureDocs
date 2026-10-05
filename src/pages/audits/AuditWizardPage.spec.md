@@ -37,15 +37,34 @@ variants; this is D).
   the foot is too far from the question to answer it. The items of a
   location are screen-sized pages stacked vertically; locations sit side by
   side.
-- **Vertical moves** — swipe, wheel, the rail's arrows, a tapped answer —
+- **The column is not a scroller the browser drives.** It is
+  `overflow: hidden` and the run writes its scroll position itself, so
+  there is no fling, no momentum and no snap - and nothing to fight the
+  tween for the position, which is where every scrolling bug before
+  2026-10-04 came from. (Settled with the owner that day: "make the changes
+  and see if it feels better".)
+  - **A swipe carries the page with the thumb at 5×** - a fifth of a screen
+    of thumb is a whole page - and **stops dead at the next page**, whatever
+    the thumb does afterwards. On release, past 40% of the way the page
+    turns; short of that it goes back. One swipe is one page, never two.
+  - **A wheel burst is one page.** There is no release to decide on, so the
+    first 40 units of delta turn the page and the rest of the burst is
+    ignored for 250ms.
+  - Pressure against the end of the column - thumb travel past where the
+    page stopped - rolls into the neighbouring location after 60px.
+  - The index is told about a swipe only **after** the page has landed. The
+    index change is what focuses the page's field, and a field focused
+    before its page arrives is one the browser scrolls into view itself,
+    against the tween. Focus is taken with `preventScroll` for the same
+    reason.
+- **Vertical moves** — the rail's arrows, a tapped answer, a wheel burst —
   land on a page over **500ms**, easing. That landing is keyed to the step
   **index**, never to the identity of the step object: the object is rebuilt
   whenever any query behind the catalogue re-emits, which a PowerSync query
   does every time anything it touches changes - including the answer just
   written. Keyed to identity, a write landing mid-swipe tweened the page
-  back out from under the thumb, several times per swipe. Free scrolling snaps a page at a
-  time. Mandatory scroll-snap re-snaps every frame a programmatic scroll
-  writes, so snapping is suspended for the length of a tween (CLAUDE.md).
+  back out from under the thumb, several times per swipe. A thumb landing
+  mid-tween stops it and takes the page from where it is.
 - **Horizontal moves** — the pager, the jump list, rolling off either end —
   slide over **500ms**, however far apart the locations are; a jump from the
   first to the fortieth is one slide, not thirty-nine.
@@ -62,6 +81,11 @@ variants; this is D).
   does the same; a choice Attribute focuses its note; a number field's Next
   moves to the note and the note's Next moves to the next item. An answer
   with nothing behind it — *Absent*, a Yes/No, a status — moves straight on.
+- **Every page with something to type into has a Next button under it**,
+  which moves to the next item. The keyboard's Next key does the same thing
+  for the field that has it, but a thumb that has just typed a number should
+  not have to find the keyboard's key to leave the page. Tapping it blurs
+  the field, which is what commits it.
 - **Fields take focus on arrival**, so a number is typed without reaching
   for the screen. Numbers use a decimal keyboard; every field's Enter key is
   `next`. **A page with nothing to type into takes focus away**, so the
@@ -105,8 +129,10 @@ variants; this is D).
 
 - **The last page of a location is the location** — a page like every
   other, one screen tall, with the review scrolling **inside** it and the
-  sign-off pinned under it. A swipe over the review scrolls the review;
-  when it has nothing left, the next swipe moves the run on. (Made taller
+  sign-off pinned under it. A swipe over the review scrolls the review,
+  natively - the list is its own scroll container, so the run's
+  `touch-action: none` does not reach it; when it has nothing left in the
+  direction the thumb is going, the run takes the gesture. (Made taller
   than the screen it could not be rested in: one swipe crossed the whole
   review and rolled into the next location, and every piece of arithmetic
   here assumes a page is a screen.) Every item this audit

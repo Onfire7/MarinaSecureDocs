@@ -83,20 +83,13 @@ The code is on `beta2`; the remote still needs, in this order:
 
 ## Design questions to talk out
 
-- [ ] **Drive the wizard's scrolling from the gesture itself.** Today the
-      filmstrip rides the browser's native scrolling with
-      `scroll-snap-type: y mandatory` and `scroll-snap-stop: always`, and
-      tweens with `requestAnimationFrame` when something else moves the
-      index. It behaves, but the fling physics are the browser's: the first
-      swipe from a standing start can carry two pages and bounce ~336px
-      settling, and we cannot tune the feel. Taking the touch stream
-      directly - translate on the column, decide the target page on release,
-      animate it ourselves - would make one swipe mean exactly one page and
-      put the timing under our control. It also retires the snap/tween
-      interference the run has already been bitten by twice (CLAUDE.md).
-      Cost: we would own momentum, rubber-banding at the ends, and the
-      keyboard-resize pinning, all of which native scrolling does for free.
-      Talk out before starting.
+- [x] **Drive the wizard's scrolling from the gesture itself.** Done
+      2026-10-04: the column is `overflow: hidden`, the run owns the touch
+      stream (page follows the thumb at 5×, hard stop at the next page,
+      tween on release), a wheel burst is one page. Snap and native fling
+      are gone, and with them the snap/tween interference. Keyboard-resize
+      pinning survived unchanged since it only ever wrote `scrollTop`.
+      Awaiting the owner's verdict on feel.
 
 - [ ] **Marina Zones.** Nearest-first ordering (manual check-in picker today,
       audit sections once audits exist) uses straight-line distance, which

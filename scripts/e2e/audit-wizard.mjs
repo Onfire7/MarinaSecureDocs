@@ -340,7 +340,10 @@ check("5j with every answer still there", rowsOf("audit_finding_services", first
 // back out from under the finger, and the confirmation page - briefly taller
 // than the scroller - could not be rested in, so one swipe crossed it and
 // rolled into the next location. Touch, not the wheel: headless wheel
-// deltas land in one frame and model nothing.
+// deltas land in one frame and model nothing. Since 2026-10-04 the run
+// owns the touch stream outright (page follows the thumb at 5x, hard stop
+// at the next page), so the "tween frames" column of the trace, which
+// counted snap suspensions, is always 0.
 const cdp = await ctx.newCDPSession(page);
 const touch = (type, y) =>
   cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x: 195, y }] });
