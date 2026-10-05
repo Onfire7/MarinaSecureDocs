@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { distanceMeters } from "../../lib/geo";
+import { useDevicePosition } from "../shared/useDevicePosition";
 import { useCheckpoints } from "../../data/checkpoints";
 import { useCheckpointVisit } from "./useCheckpointVisit";
 import { CheckpointCheckinView } from "./CheckpointCheckinPage";
@@ -30,16 +31,10 @@ export function ManualCheckinDialog({
 
   // Nearest first when the device will say where it is — this dialog gets
   // used in the field, standing at the checkpoint whose tag won't scan.
-  const [here, setHere] = useState<{ lat: number; lng: number } | null>(null);
-  useEffect(() => {
-    if (!("geolocation" in navigator)) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setHere({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      // No location is fine — the full list is the documented fallback.
-      () => setHere(null),
-      { timeout: 10_000 },
-    );
-  }, []);
+  // The app-wide fix (shared/devicePosition.ts): usually already there, so
+  // the list is nearest-first from the moment it opens. No location is
+  // fine — the full list is the documented fallback.
+  const here = useDevicePosition();
 
   const { data: allCheckpoints } = useCheckpoints();
 

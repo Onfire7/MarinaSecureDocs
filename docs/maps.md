@@ -81,6 +81,12 @@ average and wrong at the end of the long dock, and nobody would know.
   predicted by the reduced set's affine fit instead. A wrong pin is then
   the largest residual and names itself; the admin plotter lists them,
   worst first.
+- **The device's position** comes from one app-wide watch
+  (`src/pages/shared/devicePosition.ts`), started when the signed-in app
+  mounts and paused while the tab is hidden, so every map, the GPS capture
+  and the nearest-first lists read the same fix and none of them waits
+  for a first fix of its own (owner, 2026-10-05). A checkpoint check-in
+  still takes its own fresh reading, since that one is a record.
 - **The dot** (`DeviceDot`) is drawn through the fit on every map view: the
   wizard's map page and editor, the Finding form's card, the location list
   map, the admin plotter. Blue with its accuracy ellipse inside the

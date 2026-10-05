@@ -10,6 +10,7 @@ import { useSyncConfigError } from "./lib/auth/syncStatus";
 import { AppShell } from "./layout/AppShell";
 import { ErrorBoundary } from "./layout/ErrorBoundary";
 import { SignInPage } from "./pages/access/SignInPage";
+import { DevicePositionWatcher } from "./pages/shared/DevicePositionWatcher";
 import { UserSwitchPage } from "./pages/access/UserSwitchPage";
 import { DashboardPage } from "./pages/home/DashboardPage";
 import { MorePage } from "./pages/shared/MorePage";
@@ -81,7 +82,16 @@ export default function AuthedApp() {
             <Routes>
               <Route path="/sign-in" element={<SignInPage />} />
               <Route path="/switch-user" element={<UserSwitchPage />} />
-              <Route element={<RequireAuth />}>
+              {/* Signed in: the position watch runs for the whole app from
+                  here (shared/devicePosition.ts). */}
+              <Route
+                element={
+                  <>
+                    <DevicePositionWatcher />
+                    <RequireAuth />
+                  </>
+                }
+              >
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/more" element={<MorePage />} />
                 {/* The NFC/QR deep link. It lives inside the shell like any

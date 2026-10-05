@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useRoleIdsFor } from "../../data/users";
+import { useDevicePosition } from "../shared/useDevicePosition";
 import { useLocations } from "../../data/locations";
 import { useMyPendingTargets, type MyTargetRow } from "../../data/audits";
 import { orderTargets } from "../../lib/audits";
@@ -27,18 +28,11 @@ export function AuditsSection({
   const { data: targets } = useMyPendingTargets(current.user?.id, roleIds, current.can("manage_audits"));
   const { data: locations } = useLocations();
   const [open, setOpen] = useState(full);
-  const [here, setHere] = useState<{ lat: number; lng: number } | null>(null);
+  // The app-wide fix (shared/devicePosition.ts), so nearest-first does
+  // not wait for a fix of its own.
+  const here = useDevicePosition();
   const topRef = useRef<HTMLDivElement>(null);
   const previousCount = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!("geolocation" in navigator)) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setHere({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => setHere(null),
-      { timeout: 10_000 },
-    );
-  }, []);
 
   const shown = useMemo(() => {
     let list: MyTargetRow[] = targets;
