@@ -20,7 +20,7 @@ import {
   useLocations,
 } from "../../data/locations";
 import { useLocationStatuses } from "../../data/lookups";
-import { LocationServicesPanel } from "../shared/LocationServicesPanel";
+import { LocationServicesPanel, useHasCatalogue } from "../shared/LocationServicesPanel";
 import { useCheckpointsForLocation } from "../../data/checkpoints";
 import { useNotesForTarget } from "../../data/notes";
 import { useIncidentsForTarget } from "../../data/incidents";
@@ -43,6 +43,7 @@ export function LocationDetailPage() {
   const [showCheckin, setShowCheckin] = useState(false);
 
   const { location } = useLocationRow(locationId);
+  const hasCatalogue = useHasCatalogue(location?.location_type_id);
   const { data: allLocations } = useLocations();
   const { data: children } = useChildLocations(locationId);
   const { data: checkpoints } = useCheckpointsForLocation(locationId);
@@ -248,9 +249,11 @@ export function LocationDetailPage() {
           {/* Read-only here, and folded away: it is edited on the admin
               location row and rarely wanted on this page (owner,
               2026-10-05). */}
-          <Section title="What it has" isMobile={isMobile} collapsed testId="loc-what-it-has">
-            <LocationServicesPanel locationId={location.id} typeId={location.location_type_id} />
-          </Section>
+          {hasCatalogue && (
+            <Section title="What it has" isMobile={isMobile} collapsed testId="loc-what-it-has">
+              <LocationServicesPanel locationId={location.id} typeId={location.location_type_id} />
+            </Section>
+          )}
 
           {current.can("view_lease") && (
             <div className="field">

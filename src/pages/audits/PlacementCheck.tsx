@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { placementStyle, type PlacementShape } from "../../lib/locations";
+import type { PlacementShape } from "../../lib/locations";
 import { placementOf } from "../../data/locations";
 import { useLocationMap, useMapFit } from "../../data/maps";
-import { attachmentUrl } from "../../data/files";
 import { MapLabelEditor } from "../shared/MapLabelEditor";
-import { DeviceDot } from "../shared/DeviceDot";
+import { MapPreview } from "../shared/MapPreview";
 import { useDevicePosition } from "../shared/useDevicePosition";
 
 // "Is it placed correctly on the map?" needs the map in front of the person
@@ -52,7 +51,6 @@ export function PlacementCheck({
   const fit = useMapFit(map?.id);
   const device = useDevicePosition();
 
-  const imageUrl = map ? attachmentUrl(map.image_path) : null;
   const ownShape = own ? placementOf(own) : null;
   /** Where it is, as far as this check knows: the proposal wins. */
   const current: PlacementShape | null = proposed && map && proposed.map_id === map.id ? proposed.placement : ownShape;
@@ -91,36 +89,17 @@ export function PlacementCheck({
           </select>
         )}
       </div>
-      <div
-        className={`map-canvas map-schematic pc-preview ${editable ? "pc-tappable" : ""}`}
-        data-testid="pc-preview"
-        onClick={() => editable && setEditing(true)}
-        role={editable ? "button" : undefined}
-        aria-label={editable ? "Open the map" : undefined}
-      >
-        {imageUrl && <img src={imageUrl} alt={map.name} className="map-image" />}
-        {placements.map((p) => {
-          const mine = p.location_id === locationId;
-          if (mine) return null;
-          return (
-            <span key={p.id} className="map-rect pc-other" style={placementStyle(placementOf(p))}>
-              {p.location_name}
-            </span>
-          );
-        })}
-        <DeviceDot fit={fit} position={device} />
-        {current && (
-          <>
-            <span className={`map-rect pc-mine ${proposed ? "pc-proposed-label" : ""}`} style={placementStyle(current)} title={proposed ? "Proposed placement — waits for approval" : undefined}>
-              {locationName}
-            </span>
-            {(current.dx || current.dy) ? (
-              <span className="map-anchor" style={{ left: `${current.cx}%`, top: `${current.cy}%` }} title={`${locationName} is here`} data-testid="pc-anchor" />
-            ) : null}
-          </>
-        )}
-        {editable && <span className="pc-zoom-hint">tap to zoom</span>}
-      </div>
+      <MapPreview
+        map={map}
+        placements={placements}
+        subject={{ locationId, name: locationName }}
+        shape={current}
+        proposed={proposed !== null}
+        fit={fit}
+        device={device}
+        onOpen={editable ? () => setEditing(true) : undefined}
+        testId="pc-preview"
+      />
 
       {placed ? (
         <div className="pc-question">

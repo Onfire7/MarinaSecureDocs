@@ -30,6 +30,16 @@ import { DraftInput, DraftNumberInput } from "../shared/DraftInput";
 // Proposal (docs/audits.md), never from here mid-audit and never from a
 // Finding directly — the editable panel is the "before any audit" and
 // "manager correcting a mistake" path.
+/** Does this type have any attribute, service or amenity at all? Both
+ *  pages hide the whole section when it does not (owner, 2026-10-05). */
+export function useHasCatalogue(typeId: string | null | undefined): boolean {
+  const { data: sv } = useServiceValidity();
+  const { data: av } = useAmenityValidity();
+  const { data: atv } = useAttributeValidity();
+  if (!typeId) return false;
+  return sv.some((v) => v.location_type_id === typeId) || av.some((v) => v.location_type_id === typeId) || atv.some((v) => v.location_type_id === typeId);
+}
+
 export function LocationServicesPanel({ locationId, typeId, editable = false }: { locationId: string; typeId: string; /** Offer the controls. Still gated by manage_locations. */ editable?: boolean }) {
   const current = useCurrent();
   const canEdit = editable && current.can("manage_locations");

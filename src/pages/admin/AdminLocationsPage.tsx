@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { compareNames, placementStyle } from "../../lib/locations";
 import { MapLabelEditor } from "../shared/MapLabelEditor";
 import { LocationMapSettings } from "./LocationMapSettings";
-import { LocationServicesPanel } from "../shared/LocationServicesPanel";
+import { LocationServicesPanel, useHasCatalogue } from "../shared/LocationServicesPanel";
 import { Section } from "../shared/Section";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { DeviceDot } from "../shared/DeviceDot";
@@ -846,6 +846,7 @@ function LocationRow({
 }) {
   const { statuses } = useLocationStatuses();
   const isMobile = useIsMobile();
+  const hasCatalogue = useHasCatalogue(location.location_type_id);
   const update = (changes: Partial<LocationInput>) =>
     void saveLocation(location.id, changes);
 
@@ -1001,9 +1002,11 @@ function LocationRow({
             <div className="stack">
               {/* What the location has: edited here and nowhere else
                   (owner, 2026-10-05); the location page only shows it. */}
-              <Section title="What it has" isMobile={isMobile} testId="loc-catalogue">
-                <LocationServicesPanel locationId={location.id} typeId={location.location_type_id} editable />
-              </Section>
+              {hasCatalogue && (
+                <Section title="What it has" isMobile={isMobile} testId="loc-catalogue">
+                  <LocationServicesPanel locationId={location.id} typeId={location.location_type_id} editable />
+                </Section>
+              )}
               <Section
                 title="Checkpoints"
                 isMobile={isMobile}

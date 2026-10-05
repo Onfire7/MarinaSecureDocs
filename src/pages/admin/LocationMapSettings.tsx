@@ -13,6 +13,7 @@ import { useLocationMap, useMapFit } from "../../data/maps";
 import { MapLabelEditor } from "../shared/MapLabelEditor";
 import { useDevicePosition } from "../shared/useDevicePosition";
 import { DraftNumberInput } from "../shared/DraftInput";
+import { MapPreview } from "../shared/MapPreview";
 
 export function LocationMapSettings({
   location,
@@ -111,6 +112,18 @@ export function LocationMapSettings({
           {!pinned && own && <span className="muted small" style={{ display: "block", marginTop: 4 }}>With coordinates as well, it would help place people on this map.</span>}
         </div>
       </div>
+      {map && (
+        <MapPreview
+          map={map}
+          placements={placements}
+          subject={{ locationId: location.id, name: location.name }}
+          shape={shape}
+          fit={fit}
+          device={device}
+          onOpen={() => setEditing(own ? "label" : "anchor")}
+          testId="loc-map-preview"
+        />
+      )}
 
       {editing && map && (
         <MapLabelEditor
