@@ -5,6 +5,8 @@ import { compareNames, placementStyle } from "../../lib/locations";
 import { MapLabelEditor } from "../shared/MapLabelEditor";
 import { LocationMapSettings } from "./LocationMapSettings";
 import { LocationServicesPanel } from "../shared/LocationServicesPanel";
+import { Section } from "../shared/Section";
+import { useIsMobile } from "../../hooks/useIsMobile";
 import { DeviceDot } from "../shared/DeviceDot";
 import { useDevicePosition } from "../shared/useDevicePosition";
 import { useMapFit } from "../../data/maps";
@@ -843,6 +845,7 @@ function LocationRow({
   onSelect: () => void;
 }) {
   const { statuses } = useLocationStatuses();
+  const isMobile = useIsMobile();
   const update = (changes: Partial<LocationInput>) =>
     void saveLocation(location.id, changes);
 
@@ -895,129 +898,24 @@ function LocationRow({
       </button>
 
       {expanded && (
-        <div style={{ marginTop: 12 }}>
+        <div className="loc-edit">
           <div className="grid-2">
-            <div>
-              <div className="field">
-                <span className="field-label">Name</span>
-                <DraftInput
-                  className="input"
-                  value={location.name}
-                  onCommit={(name) => update({ name })}
-                />
-              </div>
-              {/* Containers and roots have no meaningful occupancy, so the
-                  control is absent rather than showing a misleading value. */}
-              {tracksStatus && (
-                <div className="field">
-                  <span className="field-label">Status</span>
-                  <select
-                    className="select select-inline"
-                    value={location.status_id ?? ""}
-                    onChange={(e) => update({ statusId: e.target.value || null })}
-                  >
-                    <option value="">—</option>
-                    {statuses.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+            <div className="stack">
+              <Section title="Details" isMobile={isMobile}>
+                <div className="field-inline">
+                  <span className="field-label">Name</span>
+                  <div className="field-control">
+                    <DraftInput className="input" value={location.name} onCommit={(name) => update({ name })} />
+                  </div>
                 </div>
-              )}
-
-              <div className="field">
-                <span className="field-label">Parent</span>
-                <LocationPicker
-                  locations={allLocations}
-                  value={location.parent_id ?? ""}
-                  excludeId={location.id}
-                  onChange={(parentId) => update({ parentId: parentId || null })}
-                />
-              </div>
-              <div className="field">
-                <span className="field-label">GPS coordinates</span>
-                <div className="row">
-                  <DraftNumberInput
-                    className="input select-inline"
-                    placeholder="lat"
-                    aria-label="Latitude"
-                    value={location.gps_lat}
-                    onCommit={(gpsLat) => update({ gpsLat })}
-                  />
-                  <DraftNumberInput
-                    className="input select-inline"
-                    placeholder="lng"
-                    aria-label="Longitude"
-                    value={location.gps_lng}
-                    onCommit={(gpsLng) => update({ gpsLng })}
-                  />
-                </div>
-                {/* The device's position, and the location's anchor and
-                    label on the map (docs/maps.md). */}
-                <LocationMapSettings location={location} onGps={(gpsLat, gpsLng) => update({ gpsLat, gpsLng })} />
-              </div>
-
-              {typeAllowsLeases && (
-                <div className="field">
-                  <span className="field-label">Leases</span>
-                  <label className="row" style={{ cursor: "pointer" }}>
-                    <input
-                      type="checkbox"
-                      checked={location.lease_enabled === 1}
-                      onChange={(e) => update({ leaseEnabled: e.target.checked })}
-                    />
-                    <span className="small">Can be leased</span>
-                  </label>
-                </div>
-              )}
-
-              {typeAllowsReservations && (
-                <div className="field">
-                  <span className="field-label">Reservations</span>
-                  <label className="row" style={{ cursor: "pointer" }}>
-                    <input
-                      type="checkbox"
-                      checked={location.reservation_enabled === 1}
-                      onChange={(e) =>
-                        update({
-                          reservationEnabled: e.target.checked,
-                          // Seed the post-checkout status only when the
-                          // location has none, and only if the marina has
-                          // defined one by that name.
-                          postReservationStatusId:
-                            e.target.checked && !location.post_reservation_status_id
-                              ? (resolveStatusByName(
-                                  statuses,
-                                  DEFAULT_POST_RESERVATION_STATUS,
-                                )?.id ?? undefined)
-                              : undefined,
-                        })
-                      }
-                    />
-                    <span className="small">Accepts reservations</span>
-                  </label>
-                  {location.reservation_enabled === 1 && (
-                    <div className="row" style={{ marginTop: 6, flexWrap: "wrap" }}>
-                      <select
-                        className="select select-inline"
-                        value={location.reservation_visibility}
-                        onChange={(e) =>
-                          update({ reservationVisibility: e.target.value })
-                        }
-                      >
-                        <option value="public">Defaults to Billable</option>
-                        <option value="internal">Defaults to Non-Billable</option>
-                      </select>
-                      <span className="small muted">after check-out becomes</span>
-                      <select
-                        className="select select-inline"
-                        value={location.post_reservation_status_id ?? ""}
-                        onChange={(e) =>
-                          update({ postReservationStatusId: e.target.value || null })
-                        }
-                      >
-                        <option value="">— unchanged</option>
+                {/* Containers and roots have no meaningful occupancy, so the
+                    control is absent rather than showing a misleading value. */}
+                {tracksStatus && (
+                  <div className="field-inline">
+                    <span className="field-label">Status</span>
+                    <div className="field-control">
+                      <select className="select select-inline" value={location.status_id ?? ""} onChange={(e) => update({ statusId: e.target.value || null })}>
+                        <option value="">—</option>
                         {statuses.map((s) => (
                           <option key={s.id} value={s.id}>
                             {s.name}
@@ -1025,37 +923,105 @@ function LocationRow({
                         ))}
                       </select>
                     </div>
-                  )}
+                  </div>
+                )}
+                <div className="field-inline">
+                  <span className="field-label">Inside</span>
+                  <div className="field-control">
+                    <LocationPicker locations={allLocations} value={location.parent_id ?? ""} excludeId={location.id} onChange={(parentId) => update({ parentId: parentId || null })} />
+                  </div>
                 </div>
+              </Section>
+
+              <Section title="Where it is" isMobile={isMobile}>
+                <LocationMapSettings location={location} onGps={(gpsLat, gpsLng) => update({ gpsLat, gpsLng })} onGpsField={update} />
+              </Section>
+
+              {(typeAllowsLeases || typeAllowsReservations) && (
+                <Section title="Bookings" isMobile={isMobile}>
+                  {typeAllowsLeases && (
+                    <label className="row" style={{ cursor: "pointer" }}>
+                      <input type="checkbox" checked={location.lease_enabled === 1} onChange={(e) => update({ leaseEnabled: e.target.checked })} />
+                      <span>Can be leased</span>
+                    </label>
+                  )}
+                  {typeAllowsReservations && (
+                    <>
+                      <label className="row" style={{ cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={location.reservation_enabled === 1}
+                          onChange={(e) =>
+                            update({
+                              reservationEnabled: e.target.checked,
+                              // Seed the post-checkout status only when the
+                              // location has none, and only if the marina has
+                              // defined one by that name.
+                              postReservationStatusId:
+                                e.target.checked && !location.post_reservation_status_id
+                                  ? (resolveStatusByName(statuses, DEFAULT_POST_RESERVATION_STATUS)?.id ?? undefined)
+                                  : undefined,
+                            })
+                          }
+                        />
+                        <span>Accepts reservations</span>
+                      </label>
+                      {location.reservation_enabled === 1 && (
+                        <>
+                          <div className="field-inline">
+                            <span className="field-label">Defaults to</span>
+                            <div className="field-control">
+                              <select className="select select-inline" value={location.reservation_visibility} onChange={(e) => update({ reservationVisibility: e.target.value })}>
+                                <option value="public">Billable</option>
+                                <option value="internal">Non-Billable</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div className="field-inline">
+                            <span className="field-label">After check-out</span>
+                            <div className="field-control">
+                              <select className="select select-inline" value={location.post_reservation_status_id ?? ""} onChange={(e) => update({ postReservationStatusId: e.target.value || null })}>
+                                <option value="">status unchanged</option>
+                                {statuses.map((s) => (
+                                  <option key={s.id} value={s.id}>
+                                    becomes {s.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </>
+                  )}
+                </Section>
               )}
             </div>
 
-            <div>
-              <DeleteLocationControl
-                locationId={location.id}
-                name={location.name}
-              />
+            <div className="stack">
               {/* What the location has: edited here and nowhere else
                   (owner, 2026-10-05); the location page only shows it. */}
-              <div className="section-title">What it has</div>
-              <div className="stack" style={{ gap: 6, marginBottom: 12 }} data-testid="loc-catalogue">
+              <Section title="What it has" isMobile={isMobile} testId="loc-catalogue">
                 <LocationServicesPanel locationId={location.id} typeId={location.location_type_id} editable />
-              </div>
-              <div className="section-title spread">
-                <span>Checkpoints</span>
-                <button type="button" className="btn btn-sm" onClick={() => void addCheckpoint()}>
-                  + Add
-                </button>
-              </div>
-              <div className="stack" style={{ gap: 6 }}>
+              </Section>
+              <Section
+                title="Checkpoints"
+                isMobile={isMobile}
+                action={
+                  <button type="button" className="btn btn-sm" onClick={() => void addCheckpoint()}>
+                    + Add
+                  </button>
+                }
+              >
                 {checkpoints.map((cp) => (
                   <CheckpointEditor key={cp.id} checkpoint={cp} />
                 ))}
-                {checkpoints.length === 0 && (
-                  <span className="muted small">None here.</span>
-                )}
-              </div>
+                {checkpoints.length === 0 && <span className="muted small">None here. A checkpoint is what an NFC tag or QR code opens.</span>}
+              </Section>
             </div>
+          </div>
+          <div className="loc-edit-foot">
+            <DeleteLocationControl locationId={location.id} name={location.name} />
           </div>
         </div>
       )}

@@ -1,9 +1,9 @@
 import { useState } from "react";
-import type { ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { NoteDialog } from "../shared/NoteDialog";
+import { Section } from "../shared/Section";
 import { ManualCheckinDialog } from "../checklists/ManualCheckinDialog";
 import type { AttachmentTarget } from "../../data/attachments";
 import {
@@ -245,8 +245,12 @@ export function LocationDetailPage() {
             </div>
           )}
 
-          {/* Read-only here: these are edited on the admin location row. */}
-          <LocationServicesPanel locationId={location.id} typeId={location.location_type_id} />
+          {/* Read-only here, and folded away: it is edited on the admin
+              location row and rarely wanted on this page (owner,
+              2026-10-05). */}
+          <Section title="What it has" isMobile={isMobile} collapsed testId="loc-what-it-has">
+            <LocationServicesPanel locationId={location.id} typeId={location.location_type_id} />
+          </Section>
 
           {current.can("view_lease") && (
             <div className="field">
@@ -388,29 +392,3 @@ export function LocationDetailPage() {
   );
 }
 
-// Mobile collapses sections by default to keep the initial view scannable;
-// desktop shows everything at once (see spec — Mobile vs. desktop).
-function Section({
-  title,
-  isMobile,
-  children,
-}: {
-  title: string;
-  isMobile: boolean;
-  children: ReactNode;
-}) {
-  if (!isMobile) {
-    return (
-      <div>
-        <div className="section-title">{title}</div>
-        <div className="stack" style={{ gap: 8 }}>{children}</div>
-      </div>
-    );
-  }
-  return (
-    <details className="section-collapse">
-      <summary className="section-title">{title}</summary>
-      <div className="stack" style={{ gap: 8, marginTop: 8 }}>{children}</div>
-    </details>
-  );
-}

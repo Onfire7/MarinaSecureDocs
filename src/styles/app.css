@@ -2301,3 +2301,23 @@ h3 {
   background: var(--warn-bg);
   border-color: var(--warn);
 }
+
+/* ---------- The admin location row, opened (AdminLocationsPage) ---------- */
+.loc-edit {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-lt);
+}
+.loc-edit .field-inline > .field-label {
+  width: 110px;
+}
+.loc-edit .section-title {
+  margin-bottom: 8px;
+}
+.loc-edit-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-lt);
+}

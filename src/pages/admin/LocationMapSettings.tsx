@@ -12,8 +12,19 @@ import { createPlacement, deletePlacement, placementOf, savePlacement, type Loca
 import { useLocationMap, useMapFit } from "../../data/maps";
 import { MapLabelEditor } from "../shared/MapLabelEditor";
 import { useDevicePosition } from "../shared/useDevicePosition";
+import { DraftNumberInput } from "../shared/DraftInput";
 
-export function LocationMapSettings({ location, onGps }: { location: LocationRow; onGps: (lat: number, lng: number) => void }) {
+export function LocationMapSettings({
+  location,
+  onGps,
+  onGpsField,
+}: {
+  location: LocationRow;
+  /** Both coordinates at once, from the device. */
+  onGps: (lat: number, lng: number) => void;
+  /** One coordinate typed. */
+  onGpsField: (changes: { gpsLat?: number | null; gpsLng?: number | null }) => void;
+}) {
   const [chosenMapId, setChosenMapId] = useState<string | null>(null);
   const [editing, setEditing] = useState<"label" | "anchor" | null>(null);
   const { maps, map, own, placements } = useLocationMap(location.id, chosenMapId);
@@ -21,6 +32,7 @@ export function LocationMapSettings({ location, onGps }: { location: LocationRow
   const device = useDevicePosition();
   const shape: PlacementShape | null = own ? placementOf(own) : null;
   const pinned = location.gps_lat !== null && location.gps_lng !== null;
+  const inside = fit && pinned ? fit.toMap(location.gps_lat!, location.gps_lng!).inside : null;
 
   const finish = (next: PlacementShape | null) => {
     setEditing(null);
@@ -35,43 +47,40 @@ export function LocationMapSettings({ location, onGps }: { location: LocationRow
 
   return (
     <>
-      <div className="row" style={{ marginTop: 4, gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <button
-          type="button"
-          className="btn btn-sm"
-          disabled={!device}
-          title={device ? `±${Math.round(device.accuracy)} m` : "No fix from this device yet"}
-          data-testid="loc-use-position"
-          onClick={() => device && onGps(+device.lat.toFixed(7), +device.lng.toFixed(7))}
-        >
-          Use my position{device ? ` (±${Math.round(device.accuracy)} m)` : ""}
-        </button>
-        {fit && pinned && (
-          <span className="muted small">
-            {(() => {
-              const at = fit.toMap(location.gps_lat!, location.gps_lng!);
-              return at.inside ? "Inside the calibrated part of the map." : "Outside the calibrated part of the map.";
-            })()}
-          </span>
-        )}
+      <div className="field-inline">
+        <span className="field-label">GPS</span>
+        <div className="field-control row" style={{ gap: 6, flexWrap: "wrap" }}>
+          <DraftNumberInput className="input select-inline" style={{ width: 120 }} placeholder="latitude" aria-label="Latitude" value={location.gps_lat} onCommit={(gpsLat) => onGpsField({ gpsLat })} />
+          <DraftNumberInput className="input select-inline" style={{ width: 120 }} placeholder="longitude" aria-label="Longitude" value={location.gps_lng} onCommit={(gpsLng) => onGpsField({ gpsLng })} />
+          <button
+            type="button"
+            className="btn btn-sm"
+            disabled={!device}
+            title={device ? `±${Math.round(device.accuracy)} m` : "No fix from this device yet"}
+            data-testid="loc-use-position"
+            onClick={() => device && onGps(+device.lat.toFixed(7), +device.lng.toFixed(7))}
+          >
+            Use my position{device ? ` · ±${Math.round(device.accuracy)} m` : ""}
+          </button>
+        </div>
       </div>
-
-      <div className="field" style={{ marginTop: 10 }}>
-        <span className="field-label">On the map</span>
-        {maps.length === 0 ? (
-          <span className="muted small">No maps uploaded yet - Maps &amp; plotting.</span>
-        ) : (
-          <>
-            <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+      <div className="field-inline">
+        <span className="field-label">Map</span>
+        <div className="field-control">
+          {maps.length === 0 ? (
+            <span className="muted small">No maps uploaded yet - see Maps &amp; plotting.</span>
+          ) : (
+            <div className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }}>
               {own && map ? (
                 <span className="small" data-testid="loc-map-status">
-                  On <b>{map.scope_name ?? map.name}</b> at {shape!.cx.toFixed(1)}%, {shape!.cy.toFixed(1)}%
-                  {shape!.dx || shape!.dy ? ` · label ${signed(shape!.dx ?? 0)}, ${signed(shape!.dy ?? 0)}` : " · label on the anchor"}
+                  On <b>{map.scope_name ?? map.name}</b>
+                  {shape!.dx || shape!.dy ? `, label offset ${signed(shape!.dx ?? 0)}, ${signed(shape!.dy ?? 0)}` : ""}
+                  {inside === null ? "" : inside ? " · inside the calibrated area" : " · outside the calibrated area"}
                 </span>
               ) : (
                 <>
                   <span className="small muted" data-testid="loc-map-status">
-                    Not on any map.
+                    Not on a map.
                   </span>
                   {maps.length > 1 && (
                     <select className="select select-inline" value={map?.id ?? ""} onChange={(e) => setChosenMapId(e.target.value)} aria-label="Which map">
@@ -84,29 +93,23 @@ export function LocationMapSettings({ location, onGps }: { location: LocationRow
                   )}
                 </>
               )}
-            </div>
-            <div className="row" style={{ gap: 6, marginTop: 6, flexWrap: "wrap" }}>
               <button type="button" className="btn btn-sm" disabled={!map} data-testid="loc-set-anchor" onClick={() => setEditing("anchor")}>
-                {own ? "Move the anchor" : "Place on the map"}
+                {own ? "Move" : "Place on the map"}
               </button>
               {own && (
                 <button type="button" className="btn btn-sm" data-testid="loc-edit-label" onClick={() => setEditing("label")}>
-                  Edit the label
+                  Label
                 </button>
               )}
               {own && (
                 <button type="button" className="btn btn-sm btn-bare" onClick={() => finish(null)}>
-                  Remove from the map
+                  Remove
                 </button>
               )}
             </div>
-            {!pinned && (
-              <span className="muted small" style={{ display: "block", marginTop: 4 }}>
-                Give it coordinates too and it becomes a control point for where people are on this map.
-              </span>
-            )}
-          </>
-        )}
+          )}
+          {!pinned && own && <span className="muted small" style={{ display: "block", marginTop: 4 }}>With coordinates as well, it would help place people on this map.</span>}
+        </div>
       </div>
 
       {editing && map && (
