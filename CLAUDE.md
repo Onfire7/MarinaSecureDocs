@@ -185,6 +185,15 @@ Screenshots or it didn't happen.
   of this - it lands the whole delta in one frame and oscillates against
   mandatory snapping whatever the code does. Use
   `Input.dispatchTouchEvent`.
+- **A finger that lifted may still be in your pointer set.** The map
+  editor tracked touches by pointer id and removed one only when its
+  `pointerup` reached the element. One that never arrived stayed as a
+  ghost, so every later one-finger move was a pinch against a frozen
+  point: the zoom answered in one direction only and stopped zoomed in.
+  The browser marks the first finger of a new touch sequence `isPrimary`;
+  clear the set on its arrival, treat `lostpointercapture` as a lift, and
+  write the view the gesture maths reads synchronously to a ref, since
+  two moves land between renders.
 - **A scroll-snap page that is not a screen tall is a page the run cannot
   rest on.** The wizard's confirmation page was briefly `height: auto`, on
   the theory that an oversized snap area only snaps at its edges. What it
