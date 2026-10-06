@@ -100,6 +100,16 @@ body,
   height: 100%;
 }
 
+/* The page never zooms on a tap. Tapping a tiny map label twice, or a
+   button and then the thing it revealed, zoomed the whole page on the
+   owner's phone (2026-10-06) - double-tap zoom, which a browser offers
+   whatever the viewport says once "force enable zoom" is on. `manipulation`
+   keeps scrolling and pinch and drops the double-tap; the maps go further
+   (below) and the editor owns every gesture. */
+html {
+  touch-action: manipulation;
+}
+
 body {
   margin: 0;
   font-family: var(--font);
@@ -1552,6 +1562,13 @@ h3 {
   border: 1px solid var(--line-lt);
   border-radius: var(--radius);
   overflow: hidden;
+  /* A preview scrolls with the page and does nothing else: a pinch over
+     it must not zoom the page - zooming is the editor's, a tap away. */
+  touch-action: pan-y;
+}
+.map-canvas .map-rect,
+.map-canvas .map-anchor-button {
+  touch-action: pan-y;
 }
 .map-image {
   display: block;
