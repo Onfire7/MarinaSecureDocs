@@ -1562,9 +1562,45 @@ h3 {
   border: 1px solid var(--line-lt);
   border-radius: var(--radius);
   overflow: hidden;
-  /* A preview scrolls with the page and does nothing else: a pinch over
-     it must not zoom the page - zooming is the editor's, a tap away. */
+  /* The map zooms itself (ZoomableMap): a pinch over it is the map's,
+     never the page's. One finger still scrolls the page until zoomed in. */
   touch-action: pan-y;
+}
+.zmap {
+  position: relative;
+  overflow: hidden;
+}
+.zmap-zoomed {
+  touch-action: none;
+  cursor: grab;
+}
+.zmap-layer {
+  position: relative;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+/* Controls that sit on the map but not in it - the toggle, the hint, the
+   reset - live outside the transformed layer, so they stay put. */
+.zmap-fixed {
+  position: absolute;
+  z-index: 5;
+}
+.zmap-reset {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  z-index: 5;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--line-lt);
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  touch-action: manipulation;
 }
 .map-canvas .map-rect,
 .map-canvas .map-anchor-button {
@@ -2261,7 +2297,9 @@ h3 {
   background: var(--accent);
   border: 1.5px solid #fff;
   box-shadow: 0 0 0 1px var(--accent);
-  transform: translate(-50%, -50%);
+  /* Dots are dots at any zoom: the zoomable layers set --zs to their
+     scale and every dot counter-scales by it. */
+  transform: translate(-50%, -50%) scale(calc(1 / var(--zs, 1)));
   pointer-events: none;
 }
 .mle-anchor {
@@ -2272,7 +2310,7 @@ h3 {
   background: var(--warn);
   border: 2px solid #fff;
   box-shadow: 0 0 0 2px var(--warn), 0 1px 4px rgba(0, 0, 0, 0.4);
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(calc(1 / var(--zs, 1)));
   cursor: move;
   z-index: 2;
 }
@@ -2295,7 +2333,7 @@ h3 {
   background: #2b7fff;
   border: 2px solid #fff;
   box-shadow: 0 0 0 1px rgba(43, 127, 255, 0.6), 0 1px 4px rgba(0, 0, 0, 0.4);
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(calc(1 / var(--zs, 1)));
   pointer-events: none;
   z-index: 3;
 }
@@ -2362,7 +2400,8 @@ h3 {
   width: 12px;
   height: 12px;
   border-radius: 50% 50% 50% 0;
-  transform: translate(-50%, -100%) rotate(-45deg);
+  transform: translate(-50%, -100%) rotate(-45deg) scale(calc(1 / var(--zs, 1)));
+  transform-origin: 50% 100%;
   border: 2px solid #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
   pointer-events: none;

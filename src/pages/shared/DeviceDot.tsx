@@ -3,11 +3,12 @@
 // area; grey, and labelled, when the fit had to extrapolate; nothing at all
 // when there is no fit or no fix - a dot that might be anywhere is worse
 // than none. Rendered inside a `.map-canvas` (or the editor's map layer),
-// in percent, so it scales with the image.
+// in percent, so it scales with the image. The dot itself stays dot-sized
+// at any zoom through the `--zs` variable the zoomable layers set.
 import type { MapFit } from "../../lib/mapFit";
 import type { DevicePosition } from "./useDevicePosition";
 
-export function DeviceDot({ fit, position, scale = 1 }: { fit: MapFit | null; position: DevicePosition | null; /** The zoom the map is drawn at, so the dot can stay one size on screen; the ring is in map units and scales with it. */ scale?: number }) {
+export function DeviceDot({ fit, position }: { fit: MapFit | null; position: DevicePosition | null }) {
   if (!fit || !position) return null;
   const at = fit.toMap(position.lat, position.lng);
   if (!Number.isFinite(at.cx) || !Number.isFinite(at.cy)) return null;
@@ -21,7 +22,7 @@ export function DeviceDot({ fit, position, scale = 1 }: { fit: MapFit | null; po
       />
       <span
         className={`map-device-dot ${at.inside ? "" : "outside"}`}
-        style={{ left: `${at.cx}%`, top: `${at.cy}%`, transform: `translate(-50%, -50%) scale(${1 / scale})` }}
+        style={{ left: `${at.cx}%`, top: `${at.cy}%` }}
         data-testid="device-dot"
         data-inside={at.inside ? "1" : "0"}
         title={at.inside ? `You, ±${Math.round(position.accuracy)} m` : "You - outside the part of the map that has been calibrated"}

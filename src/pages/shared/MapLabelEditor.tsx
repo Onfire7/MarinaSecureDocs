@@ -397,7 +397,7 @@ export function MapLabelEditor({
         onPointerCancel={onPointerUp}
         onWheel={onWheel}
       >
-        <div className="mle-map" style={{ width: layerW, height: layerH || undefined, transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.s})` }}>
+        <div className="mle-map" style={{ width: layerW, height: layerH || undefined, transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.s})`, "--zs": view.s } as React.CSSProperties}>
           {imageUrl && <img src={imageUrl} alt={map.name} className="map-image" draggable={false} onLoad={(e) => setImg({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })} />}
           {show !== "anchors" &&
             otherLabels.map((b) => (
@@ -413,12 +413,12 @@ export function MapLabelEditor({
                 <span
                   key={a.id}
                   className={`map-anchor ${a.location_id === null ? "map-anchor-free" : "map-anchor-other"}`}
-                  style={{ left: `${a.cx}%`, top: `${a.cy}%`, transform: `translate(-50%, -50%) scale(${1 / view.s})` }}
+                  style={{ left: `${a.cx}%`, top: `${a.cy}%` }}
                   title={a.location_id === null ? (a.label ?? "Calibration point") : (a.location_name ?? "")}
                   aria-hidden
                 />
               ))}
-          <DeviceDot fit={fit} position={device} scale={view.s} />
+          <DeviceDot fit={fit} position={device} />
           {showLabel && (
             <span className="map-rect mle-subject" data-subject data-testid="mle-subject" style={placementStyle(draftLabel!)}>
               {subject.name}
@@ -433,7 +433,7 @@ export function MapLabelEditor({
                 className={`mle-anchor ${free ? "mle-anchor-free" : ""}`}
                 data-anchor
                 data-testid="mle-anchor"
-                style={{ left: `${draftAnchor.cx}%`, top: `${draftAnchor.cy}%`, transform: `translate(-50%, -50%) scale(${1 / view.s})` }}
+                style={{ left: `${draftAnchor.cx}%`, top: `${draftAnchor.cy}%` }}
                 title={`${subject.name} is here`}
               />
             </>

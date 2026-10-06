@@ -12,6 +12,7 @@ import { useDevicePosition } from "../shared/useDevicePosition";
 import { useMapFit } from "../../data/maps";
 import { useMapShow } from "../shared/mapShow";
 import { MapShowToggle } from "../shared/MapShowToggle";
+import { ZoomableMap } from "../shared/ZoomableMap";
 import {
   bulkUpdateLocations,
   createAnchor,
@@ -1683,8 +1684,7 @@ function MapPlotter({
           <span className="muted small">Showing</span>
           <MapShowToggle />
         </div>
-        <div className="map-canvas map-schematic">
-          {imageUrl && <img src={imageUrl} alt={map.name} className="map-image" draggable={false} />}
+        <ZoomableMap imageUrl={imageUrl} alt={map.name} className="map-canvas map-schematic" testId="plotter-map">
           <DeviceDot fit={fit} position={device} />
           {/* With both on, a located anchor is drawn only where it stands
               apart from its label - a label on its anchor already marks the
@@ -1742,9 +1742,9 @@ function MapPlotter({
               {b.location_name}
             </button>
           ))}
-        </div>
+        </ZoomableMap>
         <p className="muted small" style={{ marginTop: 6 }}>
-          Tap a label to move, size or rotate it on a zoomable map. A dot beside a label is its anchor - where the location is - when the label stands apart from it; an
+          Pinch or wheel to zoom this map; tap a label to move, size or rotate it in the editor. A dot beside a label is its anchor - where the location is - when the label stands apart from it; an
           amber dot is a calibration point.
         </p>
         {/* How well this map knows where things are (docs/maps.md): every

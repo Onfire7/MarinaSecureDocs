@@ -9,6 +9,7 @@ import {
 } from "../../data/locations";
 import { useMapShow } from "./mapShow";
 import { MapShowToggle } from "./MapShowToggle";
+import { ZoomableMap } from "./ZoomableMap";
 import { attachmentUrl } from "../../data/files";
 import { useMapFit } from "../../data/maps";
 import { DeviceDot } from "./DeviceDot";
@@ -118,10 +119,7 @@ export function SchematicMapView({
         <MapShowToggle compact />
       </div>
 
-      <div className="map-canvas map-schematic">
-        {imageUrl && (
-          <img src={imageUrl} alt={active.name} className="map-image" />
-        )}
+      <ZoomableMap imageUrl={imageUrl} alt={active.name} className="map-canvas map-schematic">
         <DeviceDot fit={fit} position={device} />
         {show !== "labels" &&
           allAnchors
@@ -169,7 +167,7 @@ export function SchematicMapView({
             </button>
           );
         })}
-      </div>
+      </ZoomableMap>
       {footnote && (
         <p className="muted small" style={{ marginTop: 8 }}>
           {footnote}

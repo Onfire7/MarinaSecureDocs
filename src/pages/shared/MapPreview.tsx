@@ -11,6 +11,7 @@ import { DeviceDot } from "./DeviceDot";
 import type { DevicePosition } from "./useDevicePosition";
 import { useMapShow } from "./mapShow";
 import { MapShowToggle } from "./MapShowToggle";
+import { ZoomableMap } from "./ZoomableMap";
 
 export function MapPreview({
   map,
@@ -50,14 +51,21 @@ export function MapPreview({
   // from its label; with anchors alone, every one.
   const apart = anchor && label ? Math.hypot(label.cx - anchor.cx, label.cy - anchor.cy) > 0.5 : anchor !== null;
   return (
-    <div
+    <ZoomableMap
+      imageUrl={imageUrl}
+      alt={map.name}
       className={`map-canvas map-schematic pc-preview ${onOpen ? "pc-tappable" : ""}`}
-      data-testid={testId}
       onClick={onOpen}
-      role={onOpen ? "button" : undefined}
-      aria-label={onOpen ? "Open the map" : undefined}
+      testId={testId}
+      overlay={
+        <>
+          <div className="pc-toolbar">
+            <MapShowToggle compact />
+          </div>
+          {onOpen && <span className="pc-zoom-hint">tap to edit · pinch to zoom</span>}
+        </>
+      }
     >
-      {imageUrl && <img src={imageUrl} alt={map.name} className="map-image" />}
       {showLabels &&
         labels
           .filter((b) => b.location_id !== subject.locationId)
@@ -93,10 +101,6 @@ export function MapPreview({
       {showAnchors && anchor && (apart || !showLabels) && (
         <span className="map-anchor" style={{ left: `${anchor.cx}%`, top: `${anchor.cy}%` }} title={`${subject.name} is here`} data-testid={`${testId}-anchor`} />
       )}
-      <div className="pc-toolbar">
-        <MapShowToggle compact />
-      </div>
-      {onOpen && <span className="pc-zoom-hint">tap to zoom</span>}
-    </div>
+    </ZoomableMap>
   );
 }
