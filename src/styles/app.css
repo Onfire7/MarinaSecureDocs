@@ -2484,3 +2484,22 @@ h3 {
   background: var(--mute);
   box-shadow: 0 0 0 1px var(--mute);
 }
+
+/* "+ Location" and "+ Point" on the plotter map (AdminLocationsPage). */
+.plotter-add {
+  left: 6px;
+  top: 6px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  max-width: calc(100% - 52px);
+}
+.plotter-pick {
+  flex-basis: 100%;
+  width: min(360px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--line-lt);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 8px;
+}

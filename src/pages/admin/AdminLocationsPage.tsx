@@ -1640,6 +1640,9 @@ function MapPlotter({
   // calibration point, or a new point.
   const [editing, setEditing] = useState<{ kind: "location"; locationId: string; name: string } | { kind: "point"; anchorId: string | null } | null>(null);
   const [addLocationId, setAddLocationId] = useState("");
+  // The "+ Location" search over the map (owner, 2026-10-06): picking one
+  // opens the editor at once.
+  const [picking, setPicking] = useState(false);
 
   const { data: anchors } = useMapAnchors(map.id);
   const { data: labels } = useMapLabels(map.id);
@@ -1687,7 +1690,38 @@ function MapPlotter({
           <span className="muted small">Showing</span>
           <MapShowToggle />
         </div>
-        <ZoomableMap imageUrl={imageUrl} alt={map.name} className="map-canvas map-schematic" testId="plotter-map">
+        <ZoomableMap
+          imageUrl={imageUrl}
+          alt={map.name}
+          className="map-canvas map-schematic"
+          testId="plotter-map"
+          overlay={
+            <div className="plotter-add zmap-fixed" onClick={(e) => e.stopPropagation()}>
+              <button type="button" className="btn btn-sm btn-primary" data-testid="plotter-add-location" onClick={() => setPicking((v) => !v)} aria-expanded={picking}>
+                + Location
+              </button>
+              <button type="button" className="btn btn-sm" data-testid="plotter-add-point" onClick={() => { setPicking(false); setEditing({ kind: "point", anchorId: null }); }}>
+                + Point
+              </button>
+              {picking && (
+                <div className="plotter-pick" data-testid="plotter-pick">
+                  <LocationPicker
+                    locations={locations.filter((l) => !plottedIds.has(l.id))}
+                    value=""
+                    onChange={(id) => {
+                      const loc = locations.find((l) => l.id === id);
+                      setPicking(false);
+                      if (loc) setEditing({ kind: "location", locationId: loc.id, name: loc.name });
+                    }}
+                    placeholder="Which location goes here?"
+                    allowNone={false}
+                    autoFocus
+                  />
+                </div>
+              )}
+            </div>
+          }
+        >
           <DeviceDot fit={fit} position={device} />
           {/* With both on, a located anchor is drawn only where it stands
               apart from its label - a label on its anchor already marks the
