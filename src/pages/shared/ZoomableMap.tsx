@@ -48,7 +48,10 @@ export function ZoomableMap({
     setView(v);
   };
   const gesture = useRef<{ kind: "pan" | "pinch"; moved: boolean; last: Pt; dist: number } | null>(null);
-  const swallowClick = useRef(false);
+  // The click that follows a drag is the drag's, not a tap: swallowed, but
+  // only for the moment after the gesture, and never for the map's own
+  // controls - a reset tapped after a pan was eaten this way once.
+  const swallowUntil = useRef(0);
   const touch = useRef({ start: (_e: TouchEvent) => {}, move: (_e: TouchEvent) => {}, end: (_e: TouchEvent) => {} });
 
   const size = () => {
@@ -76,7 +79,6 @@ export function ZoomableMap({
   };
   const beginPinch = (a: Pt, b: Pt) => {
     gesture.current = { kind: "pinch", moved: true, last: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, dist: Math.hypot(a.x - b.x, a.y - b.y) };
-    swallowClick.current = true;
   };
   const movePinch = (a: Pt, b: Pt) => {
     const g = gesture.current;
@@ -98,7 +100,6 @@ export function ZoomableMap({
     const dy = p.y - g.last.y;
     if (!g.moved && Math.hypot(dx, dy) < 4) return;
     g.moved = true;
-    swallowClick.current = true;
     g.last = p;
     const v = viewRef.current;
     // Unzoomed there is nothing to pan; the page scrolls instead.
@@ -108,7 +109,7 @@ export function ZoomableMap({
   const release = () => {
     const g = gesture.current;
     gesture.current = null;
-    if (g && !g.moved) swallowClick.current = false;
+    if (g && g.moved) swallowUntil.current = performance.now() + 400;
   };
 
   // Touch and wheel natively: React registers both as passive, and a
@@ -177,7 +178,6 @@ export function ZoomableMap({
   // The mouse: drag to pan once zoomed; a drag is not a click.
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.pointerType === "touch" || e.button !== 0) return;
-    swallowClick.current = false;
     begin(local(e.clientX, e.clientY));
     if (viewRef.current.s > 1) boxRef.current?.setPointerCapture(e.pointerId);
   };
@@ -190,10 +190,11 @@ export function ZoomableMap({
     release();
   };
   const onClickCapture = (e: React.MouseEvent) => {
-    if (swallowClick.current) {
+    const own = e.target instanceof Element && e.target.closest(".zmap-reset, .zmap-fixed, .pc-toolbar, .map-show");
+    if (!own && performance.now() < swallowUntil.current) {
       e.stopPropagation();
       e.preventDefault();
-      swallowClick.current = false;
+      swallowUntil.current = 0;
     }
   };
   const zoomed = view.s > 1.01;
