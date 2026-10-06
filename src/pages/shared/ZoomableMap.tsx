@@ -115,7 +115,8 @@ export function ZoomableMap({
   // Touch and wheel natively: React registers both as passive, and a
   // passive listener cannot keep the page from scrolling or zooming under
   // a gesture that is ours. Unzoomed, a one-finger drag is left to the
-  // page so the map does not trap scrolling.
+  // page so the map does not trap scrolling; zoomed, the move is
+  // prevented so the map pans instead of the page.
   const pts = (list: TouchList): Pt[] => [...list].map((t) => local(t.clientX, t.clientY));
   touch.current = {
     start: (e) => {
@@ -124,7 +125,9 @@ export function ZoomableMap({
         e.preventDefault();
         beginPinch(t[0], t[1]);
       } else if (t.length === 1) {
-        if (viewRef.current.s > 1) e.preventDefault();
+        // No preventDefault on a one-finger start: that is what keeps the
+        // browser from turning a tap into a click, and a tap on a label
+        // or the reset must still click. The MOVE is prevented instead.
         begin(t[0]);
       }
     },
