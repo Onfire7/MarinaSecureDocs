@@ -3,9 +3,12 @@ import { placementStyle } from "../../lib/locations";
 import {
   labelShapeOf,
   useMarinaMaps,
+  useMapAnchors,
   useMapLabels,
   type MarinaMapRow,
 } from "../../data/locations";
+import { useMapShow } from "./mapShow";
+import { MapShowToggle } from "./MapShowToggle";
 import { attachmentUrl } from "../../data/files";
 import { useMapFit } from "../../data/maps";
 import { DeviceDot } from "./DeviceDot";
@@ -41,6 +44,8 @@ export function SchematicMapView({
 }) {
   const { data: maps } = useMarinaMaps();
   const { data: allPlacements } = useMapLabels();
+  const { data: allAnchors } = useMapAnchors();
+  const show = useMapShow();
   const [mapStack, setMapStack] = useState<MarinaMapRow[]>([]);
 
   const placementsByMap = useMemo(() => {
@@ -110,6 +115,7 @@ export function SchematicMapView({
         <span className="section-title" style={{ marginBottom: 0 }}>
           {active.scope_name ?? active.name}
         </span>
+        <MapShowToggle compact />
       </div>
 
       <div className="map-canvas map-schematic">
@@ -117,7 +123,26 @@ export function SchematicMapView({
           <img src={imageUrl} alt={active.name} className="map-image" />
         )}
         <DeviceDot fit={fit} position={device} />
-        {placements.map((p) => {
+        {show !== "labels" &&
+          allAnchors
+            .filter((a) => a.map_id === active.id && (a.location_id === null || show === "anchors"))
+            .filter((a) => a.location_id === null || !include || include(a.location_id))
+            .map((a) =>
+              a.location_id === null ? (
+                <span key={a.id} className="map-anchor map-anchor-free" style={{ left: `${a.cx}%`, top: `${a.cy}%` }} title={a.label ?? "Calibration point"} aria-hidden />
+              ) : (
+                <button
+                  key={a.id}
+                  type="button"
+                  className="map-anchor map-anchor-button"
+                  style={{ left: `${a.cx}%`, top: `${a.cy}%`, background: colorFor(a.location_id).border }}
+                  title={a.location_name ?? ""}
+                  aria-label={a.location_name ?? ""}
+                  onClick={() => onOpen(a.location_id!)}
+                />
+              ),
+            )}
+        {show !== "anchors" && placements.map((p) => {
           if (include && !include(p.location_id)) return null;
           const colors = colorFor(p.location_id);
           const childMap = mapForLocation(p.location_id);

@@ -9,6 +9,8 @@ import { labelShapeOf, type MapAnchorRow, type MapLabelRow, type MarinaMapRow } 
 import { attachmentUrl } from "../../data/files";
 import { DeviceDot } from "./DeviceDot";
 import type { DevicePosition } from "./useDevicePosition";
+import { useMapShow } from "./mapShow";
+import { MapShowToggle } from "./MapShowToggle";
 
 export function MapPreview({
   map,
@@ -41,6 +43,11 @@ export function MapPreview({
   testId?: string;
 }) {
   const imageUrl = attachmentUrl(map.image_path);
+  const show = useMapShow();
+  const showLabels = show !== "anchors";
+  const showAnchors = show !== "labels";
+  // With both on, a located anchor is drawn only where it stands apart
+  // from its label; with anchors alone, every one.
   const apart = anchor && label ? Math.hypot(label.cx - anchor.cx, label.cy - anchor.cy) > 0.5 : anchor !== null;
   return (
     <div
@@ -51,18 +58,26 @@ export function MapPreview({
       aria-label={onOpen ? "Open the map" : undefined}
     >
       {imageUrl && <img src={imageUrl} alt={map.name} className="map-image" />}
-      {labels
-        .filter((b) => b.location_id !== subject.locationId)
-        .map((b) => (
-          <span key={b.id} className="map-rect pc-other" style={placementStyle(labelShapeOf(b))}>
-            {b.location_name}
-          </span>
-        ))}
-      {anchors
-        .filter((a) => a.location_id === null)
-        .map((a) => (
-          <span key={a.id} className="map-anchor map-anchor-free" style={{ left: `${a.cx}%`, top: `${a.cy}%` }} title={a.label ?? "Calibration point"} aria-hidden />
-        ))}
+      {showLabels &&
+        labels
+          .filter((b) => b.location_id !== subject.locationId)
+          .map((b) => (
+            <span key={b.id} className="map-rect pc-other" style={placementStyle(labelShapeOf(b))}>
+              {b.location_name}
+            </span>
+          ))}
+      {showAnchors &&
+        anchors
+          .filter((a) => a.location_id === null || (show === "anchors" && a.location_id !== subject.locationId))
+          .map((a) => (
+            <span
+              key={a.id}
+              className={`map-anchor ${a.location_id === null ? "map-anchor-free" : "map-anchor-other"}`}
+              style={{ left: `${a.cx}%`, top: `${a.cy}%` }}
+              title={a.location_id === null ? (a.label ?? "Calibration point") : (a.location_name ?? "")}
+              aria-hidden
+            />
+          ))}
       <DeviceDot fit={fit} position={device} />
       {fit &&
         marks.map((m, i) => {
@@ -70,12 +85,17 @@ export function MapPreview({
           if (!Number.isFinite(at.cx) || !Number.isFinite(at.cy)) return null;
           return <span key={i} className={`map-mark map-mark-${m.kind} ${at.inside ? "" : "outside"}`} style={{ left: `${at.cx}%`, top: `${at.cy}%` }} title={m.title} data-testid={`${testId}-mark-${m.kind}`} />;
         })}
-      {label && (
+      {showLabels && label && (
         <span className={`map-rect pc-mine ${proposed ? "pc-proposed-label" : ""}`} style={placementStyle(label)} title={proposed ? "Proposed placement — waits for approval" : undefined} data-testid={`${testId}-label`}>
           {subject.name}
         </span>
       )}
-      {anchor && apart && <span className="map-anchor" style={{ left: `${anchor.cx}%`, top: `${anchor.cy}%` }} title={`${subject.name} is here`} data-testid={`${testId}-anchor`} />}
+      {showAnchors && anchor && (apart || !showLabels) && (
+        <span className="map-anchor" style={{ left: `${anchor.cx}%`, top: `${anchor.cy}%` }} title={`${subject.name} is here`} data-testid={`${testId}-anchor`} />
+      )}
+      <div className="pc-toolbar">
+        <MapShowToggle compact />
+      </div>
       {onOpen && <span className="pc-zoom-hint">tap to zoom</span>}
     </div>
   );

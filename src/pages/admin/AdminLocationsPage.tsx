@@ -10,6 +10,8 @@ import { useIsMobile } from "../../hooks/useIsMobile";
 import { DeviceDot } from "../shared/DeviceDot";
 import { useDevicePosition } from "../shared/useDevicePosition";
 import { useMapFit } from "../../data/maps";
+import { useMapShow } from "../shared/mapShow";
+import { MapShowToggle } from "../shared/MapShowToggle";
 import {
   bulkUpdateLocations,
   createAnchor,
@@ -1642,6 +1644,7 @@ function MapPlotter({
   const { data: labels } = useMapLabels(map.id);
   const fit = useMapFit(map.id);
   const device = useDevicePosition();
+  const show = useMapShow();
   const imageUrl = attachmentUrl(map.image_path);
   const plottedIds = new Set([...anchors.map((a) => a.location_id), ...labels.map((b) => b.location_id)].filter((x): x is string => x !== null));
   const freePoints = anchors.filter((a) => a.location_id === null);
@@ -1676,21 +1679,40 @@ function MapPlotter({
       <div>
         {/* A preview; the editing happens fullscreen, where the map can be
             zoomed (shared/MapLabelEditor.tsx). Tap a label or a point. */}
+        <div className="row spread" style={{ marginBottom: 6 }}>
+          <span className="muted small">Showing</span>
+          <MapShowToggle />
+        </div>
         <div className="map-canvas map-schematic">
           {imageUrl && <img src={imageUrl} alt={map.name} className="map-image" draggable={false} />}
           <DeviceDot fit={fit} position={device} />
-          {/* A located anchor is drawn only where it stands apart from its
-              label; a label on its anchor already marks the spot. */}
-          {anchors
-            .filter((a) => a.location_id !== null)
-            .filter((a) => {
-              const b = labelOf(a.location_id!);
-              return !b || Math.hypot(b.cx - a.cx, b.cy - a.cy) > 0.5;
-            })
-            .map((a) => (
-              <span key={`a-${a.id}`} className="map-anchor" style={{ left: `${a.cx}%`, top: `${a.cy}%` }} aria-hidden />
-            ))}
-          {freePoints.map((a) => (
+          {/* With both on, a located anchor is drawn only where it stands
+              apart from its label - a label on its anchor already marks the
+              spot; with anchors alone, every one, and tapping it edits. */}
+          {show !== "labels" &&
+            anchors
+              .filter((a) => a.location_id !== null)
+              .filter((a) => {
+                if (show === "anchors") return true;
+                const b = labelOf(a.location_id!);
+                return !b || Math.hypot(b.cx - a.cx, b.cy - a.cy) > 0.5;
+              })
+              .map((a) =>
+                show === "anchors" ? (
+                  <button
+                    key={`a-${a.id}`}
+                    type="button"
+                    className="map-anchor map-anchor-button"
+                    style={{ left: `${a.cx}%`, top: `${a.cy}%` }}
+                    title={a.location_name ?? ""}
+                    aria-label={a.location_name ?? ""}
+                    onClick={() => setEditing({ kind: "location", locationId: a.location_id!, name: a.location_name ?? "" })}
+                  />
+                ) : (
+                  <span key={`a-${a.id}`} className="map-anchor" style={{ left: `${a.cx}%`, top: `${a.cy}%` }} aria-hidden />
+                ),
+              )}
+          {show !== "labels" && freePoints.map((a) => (
             <button
               key={a.id}
               type="button"
@@ -1702,7 +1724,7 @@ function MapPlotter({
               onClick={() => setEditing({ kind: "point", anchorId: a.id })}
             />
           ))}
-          {labels.map((b) => (
+          {show !== "anchors" && labels.map((b) => (
             <button
               key={b.id}
               type="button"

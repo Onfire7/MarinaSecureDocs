@@ -35,6 +35,8 @@ import { labelShapeOf, type MapAnchorRow, type MapLabelRow, type MarinaMapRow } 
 import { attachmentUrl } from "../../data/files";
 import { DeviceDot } from "./DeviceDot";
 import { useDevicePosition } from "./useDevicePosition";
+import { useMapShow } from "./mapShow";
+import { MapShowToggle } from "./MapShowToggle";
 
 type Tool = "label" | "anchor" | "fontSize" | "paddingX" | "paddingY" | "rotation" | null;
 type Slider = Exclude<Tool, null | "label" | "anchor">;
@@ -125,6 +127,7 @@ export function MapLabelEditor({
   const toolRef = useRef(tool);
   toolRef.current = tool;
   const imageUrl = attachmentUrl(map.image_path);
+  const show = useMapShow();
 
   // A free point with no coordinates yet takes the device's as they arrive,
   // until the admin types something.
@@ -396,14 +399,25 @@ export function MapLabelEditor({
       >
         <div className="mle-map" style={{ width: layerW, height: layerH || undefined, transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.s})` }}>
           {imageUrl && <img src={imageUrl} alt={map.name} className="map-image" draggable={false} onLoad={(e) => setImg({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })} />}
-          {otherLabels.map((b) => (
-            <span key={b.id} className="map-rect mle-other" style={placementStyle(labelShapeOf(b))}>
-              {b.location_name}
-            </span>
-          ))}
-          {freePoints.map((a) => (
-            <span key={a.id} className="map-anchor map-anchor-free" style={{ left: `${a.cx}%`, top: `${a.cy}%`, transform: `translate(-50%, -50%) scale(${1 / view.s})` }} title={a.label ?? "Calibration point"} aria-hidden />
-          ))}
+          {show !== "anchors" &&
+            otherLabels.map((b) => (
+              <span key={b.id} className="map-rect mle-other" style={placementStyle(labelShapeOf(b))}>
+                {b.location_name}
+              </span>
+            ))}
+          {show !== "labels" &&
+            anchors
+              .filter((a) => a.location_id !== subject.locationId)
+              .filter((a) => a.location_id === null ? freePoints.includes(a) : show === "anchors")
+              .map((a) => (
+                <span
+                  key={a.id}
+                  className={`map-anchor ${a.location_id === null ? "map-anchor-free" : "map-anchor-other"}`}
+                  style={{ left: `${a.cx}%`, top: `${a.cy}%`, transform: `translate(-50%, -50%) scale(${1 / view.s})` }}
+                  title={a.location_id === null ? (a.label ?? "Calibration point") : (a.location_name ?? "")}
+                  aria-hidden
+                />
+              ))}
           <DeviceDot fit={fit} position={device} scale={view.s} />
           {showLabel && (
             <span className="map-rect mle-subject" data-subject data-testid="mle-subject" style={placementStyle(draftLabel!)}>
@@ -426,6 +440,9 @@ export function MapLabelEditor({
           )}
         </div>
         {hint && <div className="mle-hint">{hint}</div>}
+        <div className="mle-show">
+          <MapShowToggle compact />
+        </div>
       </div>
       <div className="mle-bar">
         {mode === "label" && active && (

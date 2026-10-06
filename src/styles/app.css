@@ -2398,3 +2398,50 @@ h3 {
   gap: 6px;
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
 }
+
+/* ---------- Anchors / labels / both (shared/MapShowToggle.tsx) ---------- */
+.map-show {
+  display: inline-flex;
+  border: 1px solid var(--line-lt);
+  border-radius: 999px;
+  background: var(--panel);
+  padding: 2px;
+  gap: 2px;
+}
+.map-show-opt {
+  border: 0;
+  background: none;
+  color: var(--mute);
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.map-show-opt.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 650;
+}
+.map-show-compact .map-show-opt {
+  font-size: 0.7rem;
+  padding: 3px 8px;
+}
+.pc-toolbar {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  z-index: 4;
+}
+.mle-show {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 4;
+}
+/* Another location's anchor, when anchors alone are shown. */
+.map-anchor-other {
+  background: var(--mute);
+  box-shadow: 0 0 0 1px var(--mute);
+}
