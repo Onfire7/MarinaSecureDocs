@@ -40,10 +40,12 @@ export function LocationMapSettings({
   const finish = (next: EditedPlace) => {
     setEditing(null);
     if (!map) return;
+    const gps = next.point && next.point.lat !== null && next.point.lng !== null ? { lat: next.point.lat, lng: next.point.lng } : null;
+    if (gps && (gps.lat !== location.gps_lat || gps.lng !== location.gps_lng)) onGps(gps.lat, gps.lng);
     if (next.anchor) {
-      if (anchorRow) void saveAnchor(anchorRow.id, { cx: next.anchor.cx, cy: next.anchor.cy });
-      else void createAnchor({ mapId: map.id, locationId: location.id, cx: next.anchor.cx, cy: next.anchor.cy, lat: location.gps_lat, lng: location.gps_lng });
-    }
+      if (anchorRow) void saveAnchor(anchorRow.id, { cx: next.anchor.cx, cy: next.anchor.cy, ...(gps ?? {}) });
+      else void createAnchor({ mapId: map.id, locationId: location.id, cx: next.anchor.cx, cy: next.anchor.cy, lat: gps?.lat ?? location.gps_lat, lng: gps?.lng ?? location.gps_lng });
+    } else if (anchorRow && gps) void saveAnchor(anchorRow.id, gps);
     if (next.label) {
       if (labelRow) void saveLabel(labelRow.id, next.label);
       else void createLabel(map.id, location.id, next.label);
@@ -147,6 +149,8 @@ export function LocationMapSettings({
           label={label}
           mode={editing}
           fit={fit}
+          coords
+          point={{ name: location.name, lat: location.gps_lat, lng: location.gps_lng }}
           removable={editing === "label" && onMap}
           removeLabel="Remove from this map"
           onCancel={() => setEditing(null)}

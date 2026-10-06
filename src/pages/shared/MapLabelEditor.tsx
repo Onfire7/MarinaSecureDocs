@@ -75,6 +75,7 @@ export function MapLabelEditor({
   mode = "label",
   fit = null,
   point,
+  coords = false,
   removable,
   removeLabel = "Remove from this map",
   onDone,
@@ -94,6 +95,10 @@ export function MapLabelEditor({
   fit?: MapFit | null;
   /** A free point's name and coordinates as they stand. */
   point?: { name: string; lat: number | null; lng: number | null };
+  /** Offer coordinates for a LOCATED subject as well - the admin's way to
+   *  pin a location while placing it (owner, 2026-10-06). An audit does
+   *  not: its capture has rules of its own. */
+  coords?: boolean;
   removable?: boolean;
   removeLabel?: string;
   onDone: (place: EditedPlace) => void;
@@ -129,16 +134,17 @@ export function MapLabelEditor({
   const imageUrl = attachmentUrl(map.image_path);
   const show = useMapShow();
 
-  // A free point with no coordinates yet takes the device's as they arrive,
+  // A point with no coordinates yet takes the device's as they arrive,
   // until the admin types something.
+  const wantsCoords = free || coords;
   const typed = useRef(false);
   useEffect(() => {
-    if (!free || typed.current || !device) return;
+    if (!wantsCoords || typed.current || !device) return;
     if (pointLat === "" && pointLng === "") {
       setPointLat(device.lat.toFixed(7));
       setPointLng(device.lng.toFixed(7));
     }
-  }, [free, device, pointLat, pointLng]);
+  }, [wantsCoords, device, pointLat, pointLng]);
 
   const layerW = port.w;
   const layerH = img && port.w ? (port.w * img.h) / img.w : 0;
@@ -355,7 +361,7 @@ export function MapLabelEditor({
     onDone({
       anchor: draftAnchor,
       label: free ? null : l,
-      point: free ? { name: pointName.trim() || "Calibration point", lat: num(pointLat), lng: num(pointLng) } : undefined,
+      point: wantsCoords ? { name: free ? pointName.trim() || "Calibration point" : subject.name, lat: num(pointLat), lng: num(pointLng) } : undefined,
     });
   };
   const canFinish = draftAnchor !== null || draftLabel !== null;
@@ -489,9 +495,21 @@ export function MapLabelEditor({
             )}
           </div>
         )}
-        {mode === "anchor" && !free && (
+        {mode === "anchor" && !free && !coords && (
           <div className="mle-anchor-note muted small">
             {draftAnchor ? "The dot is where the coordinates you just captured belong on this map." : "Zoom in, then tap the spot you are standing on."}
+          </div>
+        )}
+        {coords && !free && (
+          <div className="mle-point-form" data-testid="mle-coords">
+            <div className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+              <span className="muted small">GPS</span>
+              <input className="input select-inline" style={{ width: 120 }} placeholder="latitude" aria-label="Latitude" inputMode="decimal" value={pointLat} onChange={(e) => { typed.current = true; setPointLat(e.target.value); }} />
+              <input className="input select-inline" style={{ width: 120 }} placeholder="longitude" aria-label="Longitude" inputMode="decimal" value={pointLng} onChange={(e) => { typed.current = true; setPointLng(e.target.value); }} />
+              <button type="button" className="btn btn-sm" disabled={!device} data-testid="mle-use-position" onClick={() => device && (setPointLat(device.lat.toFixed(7)), setPointLng(device.lng.toFixed(7)))}>
+                Use my position{device ? ` · ±${Math.round(device.accuracy)} m` : ""}
+              </button>
+            </div>
           </div>
         )}
         {mode === "anchor" && free && (

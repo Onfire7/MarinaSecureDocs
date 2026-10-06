@@ -1634,7 +1634,7 @@ function MapPlotter({
   locations,
 }: {
   map: MarinaMapRow;
-  locations: PickerLocation[];
+  locations: LocationRow[];
 }) {
   // What the editor is open on: a location (its label and anchor), a free
   // calibration point, or a new point.
@@ -1658,11 +1658,14 @@ function MapPlotter({
   const finishLocation = (locationId: string, next: EditedPlace) => {
     const a = anchorOf(locationId);
     const b = labelOf(locationId);
+    // Coordinates typed or taken from the device go on the anchor; the
+    // trigger carries them to the location (docs/maps.md). Without any,
+    // a located anchor takes the location's by the same trigger.
+    const gps = next.point && next.point.lat !== null && next.point.lng !== null ? { lat: next.point.lat, lng: next.point.lng } : null;
     if (next.anchor) {
-      if (a) void saveAnchor(a.id, { cx: next.anchor.cx, cy: next.anchor.cy });
-      // Coordinates arrive from the location by trigger (docs/maps.md).
-      else void createAnchor({ mapId: map.id, locationId, cx: next.anchor.cx, cy: next.anchor.cy });
-    }
+      if (a) void saveAnchor(a.id, { cx: next.anchor.cx, cy: next.anchor.cy, ...(gps ?? {}) });
+      else void createAnchor({ mapId: map.id, locationId, cx: next.anchor.cx, cy: next.anchor.cy, ...(gps ?? {}) });
+    } else if (a && gps) void saveAnchor(a.id, gps);
     if (next.label) {
       if (b) void saveLabel(b.id, next.label);
       else void createLabel(map.id, locationId, next.label);
@@ -1854,6 +1857,11 @@ function MapPlotter({
             return b ? labelShapeOf(b) : null;
           })()}
           fit={fit}
+          coords
+          point={(() => {
+            const loc = locations.find((l) => l.id === editing.locationId);
+            return { name: editing.name, lat: loc?.gps_lat ?? null, lng: loc?.gps_lng ?? null };
+          })()}
           removable={plottedIds.has(editing.locationId)}
           removeLabel="Unplot from this map"
           onCancel={() => setEditing(null)}
