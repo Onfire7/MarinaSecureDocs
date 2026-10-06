@@ -37,6 +37,7 @@ import { DeviceDot } from "./DeviceDot";
 import { useDevicePosition } from "./useDevicePosition";
 import { useMapShow } from "./mapShow";
 import { MapShowToggle } from "./MapShowToggle";
+import { LocationPicker, type PickerLocation } from "./LocationPicker";
 
 type Tool = "label" | "anchor" | "fontSize" | "paddingX" | "paddingY" | "rotation" | null;
 type Slider = Exclude<Tool, null | "label" | "anchor">;
@@ -56,6 +57,14 @@ interface View {
   tx: number;
   ty: number;
 }
+
+/** Where the last editor on a map was looking, for this session: the next
+ *  one opened on something not yet placed starts there, so adding several
+ *  points in a row stays where the work is (owner, 2026-10-06). */
+const lastView = new Map<string, { view: View; w: number; h: number }>();
+
+/** What to edit next, from the editor's own + Location / + Point. */
+export type NextPlace = { kind: "point" } | { kind: "location"; locationId: string; name: string };
 
 /** What the editor hands back: the anchor and label as they now stand, and
  *  for a free calibration point its name and coordinates. */
@@ -78,6 +87,8 @@ export function MapLabelEditor({
   coords = false,
   removable,
   removeLabel = "Remove from this map",
+  onAddNext,
+  addLocations = [],
   onDone,
   onRemove,
   onCancel,
@@ -101,6 +112,12 @@ export function MapLabelEditor({
   coords?: boolean;
   removable?: boolean;
   removeLabel?: string;
+  /** Offer + Location and + Point in the editor itself: each hands back
+   *  what was placed (or null if nothing was) and what to edit next, and
+   *  the caller saves the one and opens the other without closing. */
+  onAddNext?: (place: EditedPlace | null, next: NextPlace) => void;
+  /** The locations + Location offers. */
+  addLocations?: PickerLocation[];
   onDone: (place: EditedPlace) => void;
   /** The Remove button; what is removed is the caller's business. */
   onRemove?: () => void;
@@ -124,7 +141,10 @@ export function MapLabelEditor({
   const commit = (v: View) => {
     viewRef.current = v;
     setView(v);
+    const el = viewportRef.current;
+    if (el) lastView.set(map.id, { view: v, w: el.clientWidth, h: el.clientHeight });
   };
+  const [picking, setPicking] = useState(false);
   const anchorRef = useRef(draftAnchor);
   anchorRef.current = draftAnchor;
   const labelRef = useRef(draftLabel);
@@ -168,7 +188,9 @@ export function MapLabelEditor({
     const fitScale = Math.min(port.w / layerW, port.h / layerH);
     const close = Math.min(MAX_ZOOM, Math.max(fitScale, fitScale * 3));
     const at = mode === "anchor" ? (anchor ?? label) : (label ?? anchor);
+    const last = lastView.get(map.id);
     if (at) commit(centreOn({ x: at.cx, y: at.cy }, close, layerW, layerH, port, 0.5));
+    else if (last && last.w === port.w && last.h === port.h) commit(last.view);
     else if (fit && device) {
       const d = fit.toMap(device.lat, device.lng);
       commit(centreOn({ x: d.cx, y: d.cy }, close, layerW, layerH, port, 0.5));
@@ -351,20 +373,26 @@ export function MapLabelEditor({
   const active = TOOLS.find((t) => t.key === tool && t.key !== "label" && t.key !== "anchor");
   const value = (k: Slider) => draftLabel?.[k] ?? DEFAULT_LABEL_STYLE[k];
 
-  const finish = () => {
+  const collect = (): EditedPlace => {
     let l = draftLabel;
     // Anchored for the first time with no label yet: the label starts in
     // the remembered style beside the anchor, so the map page has one.
     if (!free && draftAnchor && !l && !label) l = newLabel(draftAnchor, loadLabelStyle());
     if (l) saveLabelStyle(l, draftAnchor);
     const num = (s: string) => (s.trim() === "" ? null : Number(s));
-    onDone({
+    return {
       anchor: draftAnchor,
       label: free ? null : l,
       point: wantsCoords ? { name: free ? pointName.trim() || "Calibration point" : subject.name, lat: num(pointLat), lng: num(pointLng) } : undefined,
-    });
+    };
   };
+  const finish = () => onDone(collect());
   const canFinish = draftAnchor !== null || draftLabel !== null;
+  // Save this one (if anything was placed) and move on to the next.
+  const addNext = (next: NextPlace) => {
+    setPicking(false);
+    onAddNext?.(canFinish ? collect() : null, next);
+  };
 
   const otherLabels = labels.filter((b) => b.location_id !== subject.locationId);
   const freePoints = anchors.filter((a) => a.location_id === null && !(free && point && a.label === point.name && a.cx === anchor?.cx && a.cy === anchor?.cy));
@@ -394,6 +422,32 @@ export function MapLabelEditor({
           Done
         </button>
       </div>
+      {onAddNext && (
+        <div className="mle-addbar">
+          <span className="muted small">{canFinish ? "Save this and add" : "Add"}</span>
+          <button type="button" className="btn btn-sm" data-testid="mle-add-location" aria-expanded={picking} onClick={() => setPicking((v) => !v)}>
+            + Location
+          </button>
+          <button type="button" className="btn btn-sm" data-testid="mle-add-point" onClick={() => addNext({ kind: "point" })}>
+            + Point
+          </button>
+          {picking && (
+            <div className="mle-pick" data-testid="mle-pick">
+              <LocationPicker
+                locations={addLocations.filter((l) => l.id !== subject.locationId)}
+                value=""
+                onChange={(id) => {
+                  const loc = addLocations.find((l) => l.id === id);
+                  if (loc) addNext({ kind: "location", locationId: loc.id, name: loc.name });
+                }}
+                placeholder="Which location next?"
+                allowNone={false}
+                autoFocus
+              />
+            </div>
+          )}
+        </div>
+      )}
       <div
         className={`mle-viewport ${!canFinish || tool === "anchor" || tool === "label" ? "mle-placing" : ""}`}
         ref={viewportRef}

@@ -2503,3 +2503,30 @@ h3 {
   box-shadow: var(--shadow);
   padding: 8px;
 }
+
+/* + Location / + Point inside the editor (MapLabelEditor onAddNext). */
+.mle-addbar {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line-lt);
+  touch-action: manipulation;
+}
+.mle-pick {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 100%;
+  z-index: 10;
+  background: var(--panel);
+  border: 1px solid var(--line-lt);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 8px;
+  touch-action: auto;
+}

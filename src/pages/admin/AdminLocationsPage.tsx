@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { publicOrigin } from "../../lib/config";
 import type { ReactNode } from "react";
 import { compareNames, placementStyle } from "../../lib/locations";
-import { MapLabelEditor, type EditedPlace } from "../shared/MapLabelEditor";
+import { MapLabelEditor, type EditedPlace, type NextPlace } from "../shared/MapLabelEditor";
 import { LocationMapSettings } from "./LocationMapSettings";
 import { LocationServicesPanel, useHasCatalogue } from "../shared/LocationServicesPanel";
 import { Section } from "../shared/Section";
@@ -1638,7 +1638,12 @@ function MapPlotter({
 }) {
   // What the editor is open on: a location (its label and anchor), a free
   // calibration point, or a new point.
-  const [editing, setEditing] = useState<{ kind: "location"; locationId: string; name: string } | { kind: "point"; anchorId: string | null } | null>(null);
+  const [editing, setEditingRaw] = useState<({ kind: "location"; locationId: string; name: string } | { kind: "point"; anchorId: string | null }) & { seq: number } | null>(null);
+  // Every subject gets its own editor instance - a fresh draft - even when
+  // two in a row are both new points.
+  const seq = useRef(0);
+  const setEditing = (e: { kind: "location"; locationId: string; name: string } | { kind: "point"; anchorId: string | null } | null) =>
+    setEditingRaw(e ? { ...e, seq: ++seq.current } : null);
   const [addLocationId, setAddLocationId] = useState("");
   // The "+ Location" search over the map (owner, 2026-10-06): picking one
   // opens the editor at once.
@@ -1674,6 +1679,15 @@ function MapPlotter({
       else void createLabel(map.id, locationId, next.label);
     } else if (b) void deleteLabel(b.id);
   };
+  // + Location / + Point inside the editor: save what was placed, open the next.
+  const addNext = (place: EditedPlace | null, next: NextPlace) => {
+    if (place && editing?.kind === "location") finishLocation(editing.locationId, place);
+    if (place && editing?.kind === "point") finishPoint(editing.anchorId, place);
+    if (next.kind === "point") setEditing({ kind: "point", anchorId: null });
+    else setEditing({ kind: "location", locationId: next.locationId, name: next.name });
+  };
+  const unplotted = locations.filter((l) => !plottedIds.has(l.id));
+
   const finishPoint = (anchorId: string | null, next: EditedPlace) => {
     if (!next.anchor) return;
     const p = next.point ?? { name: "Calibration point", lat: null, lng: null };
@@ -1878,6 +1892,9 @@ function MapPlotter({
 
       {editing?.kind === "location" && (
         <MapLabelEditor
+          key={editing.seq}
+          onAddNext={addNext}
+          addLocations={unplotted}
           map={map}
           anchors={anchors}
           labels={labels}
@@ -1917,6 +1934,9 @@ function MapPlotter({
       )}
       {editing?.kind === "point" && (
         <MapLabelEditor
+          key={editing.seq}
+          onAddNext={addNext}
+          addLocations={unplotted}
           map={map}
           anchors={anchors}
           labels={labels}
