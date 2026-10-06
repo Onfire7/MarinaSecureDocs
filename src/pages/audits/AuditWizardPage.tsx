@@ -40,6 +40,7 @@ import {
   type ItemGroup,
   type WizardItem,
   type WizardTarget,
+  placementFromPayload,
 } from "../../lib/auditWizard";
 import { WizardRun } from "./wizard/WizardRun";
 import type { AnswerMode, RunProps } from "./wizard/runProps";
@@ -229,10 +230,11 @@ export function AuditWizardPage() {
         seed[item.key] = finding.clearly_marked === 1;
       } else if (item.kind === "map") {
         const move = proposed.find((p) => p.kind === "move_placement")?.payload;
-        if (finding?.mapped_correctly != null || move)
+        const placement = move ? placementFromPayload(move) : null;
+        if (finding?.mapped_correctly != null || placement)
           seed[item.key] = {
             correct: finding?.mapped_correctly == null ? null : finding.mapped_correctly === 1,
-            placement: move ? { map_id: String(move.map_id), placement: (move.placement as Record<string, unknown>) ?? {} } : null,
+            placement,
           };
       } else if (item.kind === "occupied" && finding?.occupied != null) {
         seed[item.key] = finding.occupied === 1;

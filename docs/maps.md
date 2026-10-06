@@ -6,20 +6,25 @@ with the owner on 2026-10-04. Vocabulary is in `CONTEXT.md`; the pure model
 is `src/lib/mapFit.ts` and `src/lib/locations.ts` (`PlacementShape`); the
 hooks are `src/data/maps.ts`; the editor is `src/pages/shared/MapLabelEditor.tsx`.
 
-## A placement is an anchor and a label
+## Anchors and labels are two tables
 
-`location_map_placements.placement` is `{cx, cy, dx?, dy?, rotation,
-fontSize?, paddingX?, paddingY?}`, all in percent of the map image except
-the pixel sizes.
-
-- **The anchor** `cx, cy` is where the location *is*. It is the point a GPS
-  fix is tied to, and the point every fit below is built from.
-- **The label** is drawn at `cx + dx, cy + dy`. The offset lets a label sit
-  beside a slip rather than on top of it, and a whole dock's labels share
-  one offset. A placement without `dx, dy` draws its label on the anchor -
-  which is every placement made before 2026-10-04, so nothing migrated.
-- `labelCentre()` and `placementStyle()` in `lib/locations.ts` are the only
-  places that do the addition. Every viewer and the editor use them.
+- **`map_anchors`** is the fit. One row per (map, location), or a **free
+  calibration point** with no location - a dock corner, a gate - so a map
+  can be calibrated where nothing is plotted (owner, 2026-10-05). Each
+  carries `cx, cy` in percent of the image and the `lat, lng` it stands
+  for. A located anchor's coordinates mirror the location's and are kept
+  in step by trigger in both directions.
+- **`map_labels`** is decoration. One row per (map, location): the label's
+  own centre, rotation and size. Its coordinates are its own: moving the
+  anchor leaves the label where it was.
+- `PlacementShape` is gone; `MapPoint` is an anchor, `LabelShape` a label,
+  `MapPlacement` the pair a Proposal carries. `placementStyle()` draws a
+  label; the editor draws the tether between the two.
+- The old one-blob `location_map_placements` migrated on 2026-10-05: its
+  anchor became a `map_anchors` row with the location's coordinates, its
+  label a `map_labels` row at anchor + offset. A `move_placement` Proposal
+  made before then still applies: `apply_map_placement()` reads either
+  payload shape, as does `placementFromPayload()` on the client.
 
 ## How a location gets anchored
 
@@ -34,7 +39,8 @@ nothing. GPS is asked before the map for this reason - the map page then
 has a label to ask about.
 
 The *map* page (and the Finding form's map card) shows the map with the
-location's anchor dot and label, asks *Is it placed correctly on the map?*
+location's label and, where it stands apart from the label, its anchor
+dot, asks *Is it placed correctly on the map?*
 under it only when there is a placement, and opens the editor in *label*
 mode on No, on a tap, or on *Place it on the map*.
 
@@ -61,11 +67,16 @@ quietly on another customer's. A marina map may be drawn with a dock too
 long or a loop road too tight, so a single affine fit would be right on
 average and wrong at the end of the long dock, and nobody would know.
 
-- **Control points** are every placement on the map whose location is
-  pinned: anchor `cx, cy` paired with `gps_lat, gps_lng`
-  (`controlPointsFor`). Every audit that captures a fix and taps the map
-  adds one. There is no separate calibration table; if empty corners ever
-  need points of their own, add them as locations.
+- **Control points** are every anchor on the map that carries coordinates
+  (`controlPointsFor`): a located anchor with its location's pin, a free
+  calibration point with its own, and - **provisionally** - an anchor an
+  open audit has proposed and nobody has decided on yet, paired with the
+  fix captured beside it or the location's saved pin
+  (`useProvisionalAnchors`). Provisional points count now, so the dot
+  improves during the walk rather than after approval (owner, 2026-10-05),
+  and the admin fit card names them as provisional. A provisional anchor
+  for a location supersedes its saved one. Every audit that captures a fix
+  and taps the map adds a point; the admin plotter adds free ones.
 - **The fit** (`buildMapFit`) projects the points to local metres,
   triangulates them (Bowyer-Watson, no dependency), and maps inside each
   triangle by barycentric weights, both directions. Each region keeps its

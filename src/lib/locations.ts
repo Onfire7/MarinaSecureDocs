@@ -79,19 +79,17 @@ export function statusMapColors(status: string | null | undefined): {
 // image); everything about the rectangle's own size is intrinsic to its
 // label instead, so a rotated label rotates a normally-proportioned box
 // rather than stretching two independently-percent axes against each other.
-/** A location's place on a map (docs/maps.md). `cx, cy` is the ANCHOR -
- *  where the location IS, in percent of the image, and the point its GPS
- *  coordinates are tied to. The label hangs off it by `dx, dy`, also in
- *  percent, so a label can sit beside a slip rather than on top of it and
- *  a whole dock's labels can share one offset. A shape without an offset
- *  draws the label on the anchor, which is what every placement made
- *  before 2026-10-04 is. */
-export interface PlacementShape {
+/** A point on a map, in percent of the image: x to the right, y down. */
+export interface MapPoint {
   cx: number;
   cy: number;
+}
+
+/** A label on a map (docs/maps.md): its own centre, rotation and size.
+ *  Independent of the anchor it names - moving the anchor leaves the label
+ *  where it was (owner, 2026-10-05). */
+export interface LabelShape extends MapPoint {
   rotation: number;
-  dx?: number;
-  dy?: number;
   fontSize?: number;
   paddingX?: number;
   paddingY?: number;
@@ -103,11 +101,6 @@ export const DEFAULT_PLACEMENT_STYLE = {
   paddingY: 4,
 } as const;
 
-/** Where the label is drawn: the anchor plus the offset. */
-export function labelCentre(p: PlacementShape): { x: number; y: number } {
-  return { x: p.cx + (p.dx ?? 0), y: p.cy + (p.dy ?? 0) };
-}
-
 /** The size a label is laid out at before being scaled to its stored size.
  *  A dense map stores labels at 4px, and a phone browser paints text that
  *  small larger than it lays it out - the name spilled out of the top-left
@@ -117,7 +110,7 @@ export function labelCentre(p: PlacementShape): { x: number; y: number } {
 export const LABEL_LAYOUT_PX = 12;
 
 /** CSS for an intrinsically-sized, rotated map-rect label — shared by the editor and every viewer. */
-export function placementStyle(p: PlacementShape): {
+export function placementStyle(p: LabelShape): {
   left: string;
   top: string;
   fontSize: string;
@@ -128,15 +121,14 @@ export function placementStyle(p: PlacementShape): {
   const fontSize = p.fontSize ?? DEFAULT_PLACEMENT_STYLE.fontSize;
   const paddingX = p.paddingX ?? DEFAULT_PLACEMENT_STYLE.paddingX;
   const paddingY = p.paddingY ?? DEFAULT_PLACEMENT_STYLE.paddingY;
-  const at = labelCentre(p);
   // Small labels are laid out at LABEL_LAYOUT_PX and scaled down; a label
   // already that size or larger is laid out as it is.
   const base = Math.max(LABEL_LAYOUT_PX, fontSize);
   const k = fontSize / base;
   const r = 1 / k;
   return {
-    left: `${at.x}%`,
-    top: `${at.y}%`,
+    left: `${p.cx}%`,
+    top: `${p.cy}%`,
     fontSize: `${base}px`,
     padding: `${paddingY * r}px ${paddingX * r}px`,
     maxWidth: `${220 * r}px`,

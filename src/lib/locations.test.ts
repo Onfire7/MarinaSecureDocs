@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { breadcrumb, compareNames, labelCentre, placementStyle } from "./locations";
+import { breadcrumb, compareNames, placementStyle } from "./locations";
 import { aLocation } from "../test/fixtures";
 
 describe("compareNames", () => {
@@ -42,10 +42,8 @@ describe("breadcrumb", () => {
 });
 
 describe("placementStyle", () => {
-  it("draws the label on the anchor when there is no offset, and off it by the offset when there is", () => {
+  it("draws the label at its own centre", () => {
     expect(placementStyle({ cx: 40, cy: 60, rotation: 0 })).toMatchObject({ left: "40%", top: "60%" });
-    expect(placementStyle({ cx: 40, cy: 60, rotation: 0, dx: 5, dy: -2.5 })).toMatchObject({ left: "45%", top: "57.5%" });
-    expect(labelCentre({ cx: 40, cy: 60, rotation: 0, dx: 5 })).toEqual({ x: 45, y: 60 });
   });
   it("lays a small label out at a readable size and scales it down; a large one is laid out as it is", () => {
     const small = placementStyle({ cx: 0, cy: 0, rotation: -42, fontSize: 4, paddingX: 2, paddingY: 1 });

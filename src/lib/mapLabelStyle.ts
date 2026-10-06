@@ -1,16 +1,23 @@
-// The label settings the last placement was made with - font size,
-// padding, rotation - remembered per device (owner, 2026-10-04: local
-// storage, not a marina setting), so the next label placed starts where
-// the last one was left rather than at the defaults. A dock's labels are
-// all the same size and angle; the auditor should set that once.
-import { DEFAULT_PLACEMENT_STYLE, type PlacementShape } from "./locations";
+// The label settings the last label was finished with - size, padding,
+// rotation, and where it sat relative to its anchor - remembered per device
+// (owner, 2026-10-04: local storage, not a marina setting), so the next
+// label placed starts where the last one was left rather than at the
+// defaults. A dock's labels are all the same size, angle and offset; the
+// auditor should set that once.
+import { DEFAULT_PLACEMENT_STYLE, type LabelShape, type MapPoint } from "./locations";
 
 export const LABEL_STYLE_KEY = "marinasecure.mapLabelStyle";
 
-export type LabelStyle = Required<Pick<PlacementShape, "fontSize" | "paddingX" | "paddingY" | "rotation" | "dx" | "dy">>;
+export interface LabelStyle {
+  fontSize: number;
+  paddingX: number;
+  paddingY: number;
+  rotation: number;
+  /** Where the label sits relative to its anchor, in percent of the map. */
+  dx: number;
+  dy: number;
+}
 
-/** The offset is part of the style: along a dock every label sits the same
- *  way off its slip, and that is the thing worth remembering. */
 export const DEFAULT_LABEL_STYLE: LabelStyle = { ...DEFAULT_PLACEMENT_STYLE, rotation: 0, dx: 0, dy: 0 };
 
 interface StoreLike {
@@ -39,16 +46,17 @@ export function loadLabelStyle(store: StoreLike | null = defaultStore()): LabelS
   }
 }
 
-/** Remember the style a placement was finished with. */
-export function saveLabelStyle(shape: PlacementShape, store: StoreLike | null = defaultStore()): void {
+/** Remember how a label was finished: its style, and where it sits
+ *  relative to its anchor (nowhere in particular when there is no anchor). */
+export function saveLabelStyle(label: LabelShape, anchor: MapPoint | null, store: StoreLike | null = defaultStore()): void {
   if (!store) return;
   const style: LabelStyle = {
-    fontSize: num(shape.fontSize, DEFAULT_LABEL_STYLE.fontSize),
-    paddingX: num(shape.paddingX, DEFAULT_LABEL_STYLE.paddingX),
-    paddingY: num(shape.paddingY, DEFAULT_LABEL_STYLE.paddingY),
-    rotation: num(shape.rotation, DEFAULT_LABEL_STYLE.rotation),
-    dx: num(shape.dx, DEFAULT_LABEL_STYLE.dx),
-    dy: num(shape.dy, DEFAULT_LABEL_STYLE.dy),
+    fontSize: num(label.fontSize, DEFAULT_LABEL_STYLE.fontSize),
+    paddingX: num(label.paddingX, DEFAULT_LABEL_STYLE.paddingX),
+    paddingY: num(label.paddingY, DEFAULT_LABEL_STYLE.paddingY),
+    rotation: num(label.rotation, DEFAULT_LABEL_STYLE.rotation),
+    dx: anchor ? +(label.cx - anchor.cx).toFixed(2) : DEFAULT_LABEL_STYLE.dx,
+    dy: anchor ? +(label.cy - anchor.cy).toFixed(2) : DEFAULT_LABEL_STYLE.dy,
   };
   try {
     store.setItem(LABEL_STYLE_KEY, JSON.stringify(style));
@@ -57,16 +65,11 @@ export function saveLabelStyle(shape: PlacementShape, store: StoreLike | null = 
   }
 }
 
-/** A new placement anchored at `cx, cy`, its label where the last one's
- *  was relative to its anchor, in the last one's style. */
-export function newPlacement(cx: number, cy: number, style: LabelStyle): PlacementShape {
-  return { cx, cy, ...style };
-}
-
-/** An existing placement re-anchored: the label keeps its offset and style,
- *  so it moves with the anchor. */
-export function reanchored(shape: PlacementShape, cx: number, cy: number): PlacementShape {
-  return { ...shape, cx, cy };
+/** A new label for an anchor: where the last one sat relative to its
+ *  anchor, in the last one's style, kept on the map. */
+export function newLabel(anchor: MapPoint, style: LabelStyle): LabelShape {
+  const clamp = (n: number) => +Math.max(0, Math.min(100, n)).toFixed(2);
+  return { cx: clamp(anchor.cx + style.dx), cy: clamp(anchor.cy + style.dy), rotation: style.rotation, fontSize: style.fontSize, paddingX: style.paddingX, paddingY: style.paddingY };
 }
 
 function num(v: unknown, fallback: number): number {

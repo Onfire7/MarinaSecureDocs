@@ -110,9 +110,8 @@ variants; this is D).
     label; *Cancel* changes nothing.
   - **The style a label is finished with is remembered on this device**
     (`lib/mapLabelStyle.ts`, local storage - the owner's choice over a
-    marina setting), offset included, and the next label placed starts in
-    it. A label for a location whose anchor was just tapped starts on that
-    anchor, saved or not.
+    marina setting), together with where it sat relative to its anchor,
+    and the next label placed starts beside its anchor that way.
   - A move of a label that was on the map is a `move_placement` Proposal,
     written with the answer, replaced by the next move and removed by
     *discard* - every other user navigates by that map, so it waits for
@@ -134,14 +133,15 @@ variants; this is D).
   - **Capturing opens the map in anchor mode: zoom in, tap where you are.**
     The tap ties the fix to the map (`docs/maps.md`); it rides on the
     answer and is written as a `move_placement` Proposal beside the
-    `set_gps` one - the existing placement re-anchored with its label kept,
-    or a new one in the remembered label style. Cancel keeps the fix and
-    ties nothing; *Tap where I am on the map* offers it again.
+    `set_gps` one - the anchor, with the label left where it was (the
+    audit's own, else the one on file) or a new label beside the anchor in
+    the remembered style. Cancel keeps the fix and ties nothing; *Tap where
+    I am on the map* offers it again.
   - **The run holds one placement per location**, and every page of that
     location reads and writes it (owner, 2026-10-05): the anchor tapped on
-    the GPS page re-anchors the run's placement with its label kept, and
-    the map page's editor opens on exactly that, saved or not. The anchor
-    write re-anchors the *pending* Proposal before the row on file for the
+    the GPS page moves the run's anchor and leaves its label, and the map
+    page's editor opens on exactly that, saved or not. The anchor write
+    keeps the *pending* Proposal's label before the one on file for the
     same reason - a label adjusted earlier in the audit must survive a
     later anchor.
 - **No Next button under a field** (owner, 2026-10-04, reversing the same

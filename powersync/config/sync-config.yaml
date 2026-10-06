@@ -56,7 +56,9 @@ streams:
       - SELECT * FROM location_statuses
       - SELECT * FROM locations
       - SELECT * FROM marina_maps
-      - SELECT * FROM location_map_placements
+      # Anchors are the map's GPS fit, labels its decoration (docs/maps.md).
+      - SELECT * FROM map_anchors
+      - SELECT * FROM map_labels
       - SELECT * FROM checkpoints
       - SELECT * FROM tours
       - SELECT * FROM tour_checkpoints

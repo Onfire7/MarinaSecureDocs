@@ -6,6 +6,7 @@ import {
   buildCatalogue,
   buildSteps,
   pagesForTarget,
+  placementFromPayload,
   filterTargets,
   isAnswered,
   sameAnswer,
@@ -296,5 +297,22 @@ describe("the confirmation page", () => {
   it("24 · and a confirmation sweep is a run with nothing else selected", () => {
     const steps = buildSteps([slip, camp], groups, new Set([CONFIRM_KEY]));
     expect(steps.map((s) => `${s.target.id}:${s.page.items[0].key}`)).toEqual(["t-slip:confirm", "t-camp:confirm"]);
+  });
+});
+
+describe("placementFromPayload", () => {
+  it("25 · reads the new payload, and the one before it with the label at anchor plus offset", () => {
+    expect(placementFromPayload({ map_id: "m", anchor: { cx: 10, cy: 20 }, label: { cx: 30, cy: 40, rotation: 5, fontSize: 4 } })).toEqual({
+      map_id: "m",
+      anchor: { cx: 10, cy: 20 },
+      label: { cx: 30, cy: 40, rotation: 5, fontSize: 4 },
+    });
+    expect(placementFromPayload({ map_id: "m", placement: { cx: 10, cy: 20, dx: 3, dy: -2, rotation: 7, paddingX: 0 } })).toEqual({
+      map_id: "m",
+      anchor: { cx: 10, cy: 20 },
+      label: { cx: 13, cy: 18, rotation: 7, fontSize: undefined, paddingX: 0, paddingY: undefined },
+    });
+    expect(placementFromPayload({ map_id: "m", anchor: { cx: 1, cy: 2 }, label: null })).toEqual({ map_id: "m", anchor: { cx: 1, cy: 2 }, label: null });
+    expect(placementFromPayload({})).toBeNull();
   });
 });

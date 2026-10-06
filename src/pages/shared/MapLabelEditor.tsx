@@ -1,36 +1,37 @@
 // The fullscreen map editor (docs/maps.md): a location's place on a map you
 // can pinch and pan. Shared by the wizard's GPS and map pages, the Finding
-// form and the admin plotter, so there is one way to put a location on a
-// map.
+// form and the admin plotter, so there is one way to put a location - or a
+// free calibration point - on a map.
 //
-// A placement is an ANCHOR - where the location is - and a LABEL that
-// hangs off it by an offset (lib/locations.ts, PlacementShape). The editor
-// has two modes:
+// A place is an ANCHOR - where the location is, the point its GPS is tied
+// to - and a LABEL with coordinates of its own (owner, 2026-10-05: moving
+// the anchor leaves the label where it was). Two modes:
 //
 //   · `anchor`: "tap where you are". Opened right after a GPS fix is
-//     captured, it shows a dot and nothing else to adjust; the tap ties
-//     the fix to the map. Done returns the shape re-anchored - label
-//     offset and style kept - or, for a location not on the map yet, a new
-//     shape in the remembered label style;
+//     captured, it shows a dot and nothing else to adjust; the tap ties the
+//     fix to the map. For a free calibration point (no location) the bar
+//     also takes the point's name and coordinates, from the device by
+//     default. Done returns the anchor - and, for a location that had no
+//     label yet, a label in the remembered style beside it;
 //   · `label`: the label itself. The bar under the map is one icon per
-//     setting - Label (drag or tap to put the label somewhere, which is
-//     the offset), Anchor (move the dot), Size, Width, Height, Angle - and
-//     tapping one shows ITS slider, alone, with the label brought into the
-//     top part of the screen so the slider's effect is seen while the
-//     thumb is on it.
+//     setting - Label (drag or tap to put the label somewhere), Anchor
+//     (move the dot), Size, Width, Height, Angle - and tapping one shows ITS
+//     slider, alone, with the label brought into the top part of the screen
+//     so the slider's effect is seen while the thumb is on it.
 //
+// Fingers come from touch events, which hand over the whole list of fingers
+// every time, so a finger that lifted cannot linger as a ghost (CLAUDE.md).
 // The device's own position is drawn through the map's fit when there is
 // one. The style a label is finished with is remembered on this device
 // (lib/mapLabelStyle.ts). It edits a draft and hands it back on Done;
-// Cancel hands back nothing. It is rendered through a portal so that
-// whatever listens to touches beneath it (the wizard owns its touch
-// stream) hears nothing.
+// Cancel hands back nothing. Rendered through a portal so whatever listens
+// to touches beneath it (the wizard owns its touch stream) hears nothing.
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 import { createPortal } from "react-dom";
-import { labelCentre, placementStyle, type PlacementShape } from "../../lib/locations";
-import { DEFAULT_LABEL_STYLE, loadLabelStyle, newPlacement, reanchored, saveLabelStyle } from "../../lib/mapLabelStyle";
+import { placementStyle, type LabelShape, type MapPoint } from "../../lib/locations";
+import { DEFAULT_LABEL_STYLE, loadLabelStyle, newLabel, saveLabelStyle } from "../../lib/mapLabelStyle";
 import type { MapFit } from "../../lib/mapFit";
-import { placementOf, type MarinaMapRow, type PlacementRow } from "../../data/locations";
+import { labelShapeOf, type MapAnchorRow, type MapLabelRow, type MarinaMapRow } from "../../data/locations";
 import { attachmentUrl } from "../../data/files";
 import { DeviceDot } from "./DeviceDot";
 import { useDevicePosition } from "./useDevicePosition";
@@ -54,58 +55,88 @@ interface View {
   ty: number;
 }
 
+/** What the editor hands back: the anchor and label as they now stand, and
+ *  for a free calibration point its name and coordinates. */
+export interface EditedPlace {
+  anchor: MapPoint | null;
+  label: LabelShape | null;
+  point?: { name: string; lat: number | null; lng: number | null };
+}
+
 export function MapLabelEditor({
   map,
-  placements,
+  anchors,
+  labels,
   subject,
-  shape,
+  anchor,
+  label,
   mode = "label",
   fit = null,
+  point,
   removable,
   removeLabel = "Remove from this map",
   onDone,
+  onRemove,
   onCancel,
 }: {
   map: MarinaMapRow;
-  /** Every placement on this map; the subject's own, if any, is drawn from `shape` instead. */
-  placements: PlacementRow[];
-  subject: { locationId: string; name: string };
-  /** Where the subject is now, or null when it is not on the map yet. */
-  shape: PlacementShape | null;
+  /** Everything on this map; the subject's own rows are drawn from `anchor` and `label` instead. */
+  anchors: MapAnchorRow[];
+  labels: MapLabelRow[];
+  /** A location, or (locationId null) a free calibration point. */
+  subject: { locationId: string | null; name: string };
+  anchor: MapPoint | null;
+  label: LabelShape | null;
   mode?: "label" | "anchor";
   /** The map's GPS fit, for the device dot. */
   fit?: MapFit | null;
+  /** A free point's name and coordinates as they stand. */
+  point?: { name: string; lat: number | null; lng: number | null };
   removable?: boolean;
   removeLabel?: string;
-  /** The shape to keep, or null when the label was removed. */
-  onDone: (shape: PlacementShape | null) => void;
+  onDone: (place: EditedPlace) => void;
+  /** The Remove button; what is removed is the caller's business. */
+  onRemove?: () => void;
   onCancel: () => void;
 }) {
-  const [draft, setDraft] = useState<PlacementShape | null>(shape);
-  const [tool, setTool] = useState<Tool>(mode === "anchor" ? "anchor" : shape ? null : "anchor");
+  const free = subject.locationId === null;
+  const [draftAnchor, setDraftAnchor] = useState<MapPoint | null>(anchor);
+  const [draftLabel, setDraftLabel] = useState<LabelShape | null>(label);
+  const device = useDevicePosition();
+  const [pointName, setPointName] = useState(point?.name ?? subject.name);
+  const [pointLat, setPointLat] = useState<string>(point?.lat != null ? String(point.lat) : "");
+  const [pointLng, setPointLng] = useState<string>(point?.lng != null ? String(point.lng) : "");
+  const [tool, setTool] = useState<Tool>(mode === "anchor" ? "anchor" : label ? null : "anchor");
   const [view, setView] = useState<View>({ s: 1, tx: 0, ty: 0 });
   const [img, setImg] = useState<{ w: number; h: number } | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [port, setPort] = useState({ w: 0, h: 0 });
   const touch = useRef({ start: (_e: TouchEvent) => {}, move: (_e: TouchEvent) => {}, end: (_e: TouchEvent) => {} });
   const gesture = useRef<{ kind: "pan" | "label" | "anchor" | "pinch"; moved: boolean; last: { x: number; y: number }; dist: number } | null>(null);
-  // The view the gesture maths reads is the ref, written synchronously:
-  // two pointer moves land between one render and the next, and a zoom
-  // factor applied to a stale state is a zoom that drifts.
   const viewRef = useRef(view);
   const commit = (v: View) => {
     viewRef.current = v;
     setView(v);
   };
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
+  const anchorRef = useRef(draftAnchor);
+  anchorRef.current = draftAnchor;
+  const labelRef = useRef(draftLabel);
+  labelRef.current = draftLabel;
   const toolRef = useRef(tool);
   toolRef.current = tool;
   const imageUrl = attachmentUrl(map.image_path);
-  const device = useDevicePosition();
 
-  // The layer is as wide as the viewport, the image 100% of it, so a page
-  // of coordinates in percent is the same arithmetic everywhere.
+  // A free point with no coordinates yet takes the device's as they arrive,
+  // until the admin types something.
+  const typed = useRef(false);
+  useEffect(() => {
+    if (!free || typed.current || !device) return;
+    if (pointLat === "" && pointLng === "") {
+      setPointLat(device.lat.toFixed(7));
+      setPointLng(device.lng.toFixed(7));
+    }
+  }, [free, device, pointLat, pointLng]);
+
   const layerW = port.w;
   const layerH = img && port.w ? (port.w * img.h) / img.w : 0;
 
@@ -119,28 +150,24 @@ export function MapLabelEditor({
     return () => ro.disconnect();
   }, []);
 
-  // First sight: the label close up when there is one; else the device,
-  // if the map knows where that is; else the whole map.
+  // First sight: the thing being edited close up when there is one; else
+  // the device, if the map knows where that is; else the whole map.
   const framed = useRef(false);
   useEffect(() => {
     if (framed.current || !layerH || !port.h) return;
     framed.current = true;
     const fitScale = Math.min(port.w / layerW, port.h / layerH);
     const close = Math.min(MAX_ZOOM, Math.max(fitScale, fitScale * 3));
-    if (shape) commit(centreOn(mode === "anchor" ? { x: shape.cx, y: shape.cy } : labelCentre(shape), close, layerW, layerH, port, 0.5));
+    const at = mode === "anchor" ? (anchor ?? label) : (label ?? anchor);
+    if (at) commit(centreOn({ x: at.cx, y: at.cy }, close, layerW, layerH, port, 0.5));
     else if (fit && device) {
-      const at = fit.toMap(device.lat, device.lng);
-      commit(centreOn({ x: at.cx, y: at.cy }, close, layerW, layerH, port, 0.5));
+      const d = fit.toMap(device.lat, device.lng);
+      commit(centreOn({ x: d.cx, y: d.cy }, close, layerW, layerH, port, 0.5));
     } else commit({ s: fitScale, tx: (port.w - layerW * fitScale) / 2, ty: (port.h - layerH * fitScale) / 2 });
-  }, [layerH, layerW, port, shape, mode, fit, device]);
+  }, [layerH, layerW, port, anchor, label, mode, fit, device]);
 
-  // Nothing beneath the editor scrolls or zooms while it is up - and
-  // nothing in it zooms the PAGE. touch-action: none on the whole layer
-  // covers Android; a pinch that begins on the top bar or the tool bar
-  // would otherwise zoom the browser's viewport and carry Cancel and Done
-  // off the screen with it (owner, 2026-10-04). iOS ignores touch-action
-  // for pinch, so a non-passive listener refuses two-finger moves and
-  // gesturestart as well.
+  // Nothing beneath the editor scrolls or zooms while it is up, and
+  // nothing in it zooms the PAGE (owner, 2026-10-04).
   const layerRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const root = document.documentElement;
@@ -148,8 +175,6 @@ export function MapLabelEditor({
     root.style.overflow = "hidden";
     const el = layerRef.current;
     const vp = viewportRef.current;
-    // Two fingers anywhere on the layer - a bar included - must not zoom
-    // the page; on the map every touch is ours.
     const twoFingers = (e: TouchEvent) => {
       if (e.touches.length > 1) e.preventDefault();
     };
@@ -187,7 +212,7 @@ export function MapLabelEditor({
     commit(clampView({ s, tx: at.x - (at.x - v.tx) * kk, ty: at.y - (at.y - v.ty) * kk }));
   };
   const pct = (n: number) => +Math.max(0, Math.min(100, n)).toFixed(2);
-  const toPercent = (x: number, y: number) => {
+  const toPercent = (x: number, y: number): MapPoint => {
     const v = viewRef.current;
     return { cx: pct(((x - v.tx) / (layerW * v.s)) * 100), cy: pct(((y - v.ty) / (layerH * v.s)) * 100) };
   };
@@ -202,13 +227,7 @@ export function MapLabelEditor({
     return el?.closest("[data-anchor]") ? "anchor" : el?.closest("[data-subject]") && mode === "label" ? "label" : "pan";
   };
 
-  // ── the gesture, whoever delivers it ────────────────────────────────
-  // Fingers come from TOUCH events, where the browser hands over the whole
-  // list of fingers on every event: there is no set of our own to fall out
-  // of step with it, so a finger that lifted cannot linger as a ghost and
-  // turn the next one-finger move into a pinch (owner, 2026-10-05, after
-  // the pointer-id version did exactly that twice). The mouse comes from
-  // pointer events, one at a time.
+  // ── the gesture ─────────────────────────────────────────────────────
   const begin = (kind: "anchor" | "label" | "pan", p: Pt) => {
     gesture.current = { kind, moved: false, last: p, dist: 0 };
   };
@@ -221,7 +240,6 @@ export function MapLabelEditor({
     const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     const dist = Math.hypot(a.x - b.x, a.y - b.y);
     const v = viewRef.current;
-    // Fingers almost touching give a ratio that is all noise.
     const k = g.dist > 12 && dist > 12 ? dist / g.dist : 1;
     const s = Math.min(MAX_ZOOM, Math.max(0.2, v.s * k));
     const kk = s / v.s;
@@ -238,31 +256,33 @@ export function MapLabelEditor({
     g.moved = true;
     g.last = p;
     const v = viewRef.current;
-    const d = draftRef.current;
     const ddx = (dx / (layerW * v.s)) * 100;
     const ddy = (dy / (layerH * v.s)) * 100;
-    if (g.kind === "label" && d) setDraft({ ...d, dx: +((d.dx ?? 0) + ddx).toFixed(2), dy: +((d.dy ?? 0) + ddy).toFixed(2) });
-    else if (g.kind === "anchor" && d) setDraft(reanchored(d, pct(d.cx + ddx), pct(d.cy + ddy)));
+    const a = anchorRef.current;
+    const l = labelRef.current;
+    if (g.kind === "label" && l) setDraftLabel({ ...l, cx: pct(l.cx + ddx), cy: pct(l.cy + ddy) });
+    else if (g.kind === "anchor" && a) setDraftAnchor({ cx: pct(a.cx + ddx), cy: pct(a.cy + ddy) });
     else commit({ ...v, tx: v.tx + dx, ty: v.ty + dy });
   };
   const release = (tapAt: Pt | null) => {
     const g = gesture.current;
     gesture.current = null;
     if (!g || g.kind === "pinch" || g.moved || !tapAt) return;
-    // A tap. With the Anchor tool on (or no placement yet), it is where the
-    // location is; with the Label tool on, it is where the label goes.
-    const d = draftRef.current;
-    const t = toolRef.current;
     const at = toPercent(tapAt.x, tapAt.y);
-    if (!d) {
-      setDraft(newPlacement(at.cx, at.cy, loadLabelStyle()));
-      if (mode === "label") setTool(null);
-    } else if (t === "anchor") setDraft(reanchored(d, at.cx, at.cy));
-    else if (t === "label") setDraft({ ...d, dx: +(at.cx - d.cx).toFixed(2), dy: +(at.cy - d.cy).toFixed(2) });
+    const t = toolRef.current;
+    const a = anchorRef.current;
+    const l = labelRef.current;
+    if (mode === "anchor" || t === "anchor" || (!a && !l)) {
+      // Where the location (or point) is. A location with no label yet
+      // gets one beside the anchor, in the remembered style.
+      setDraftAnchor(at);
+      if (!l && !free && mode === "label") setDraftLabel(newLabel(at, loadLabelStyle()));
+      if (mode === "label" && !a && !l) setTool(null);
+    } else if (t === "label") {
+      setDraftLabel(l ? { ...l, ...at } : { ...newLabel(at, loadLabelStyle()), ...at });
+    }
   };
 
-  // Touch: registered natively (non-passive, so the page never pans or
-  // zooms under us) and read through a ref so the listeners are added once.
   const pts = (list: TouchList): Pt[] => [...list].map((t) => localXY(t.clientX, t.clientY));
   touch.current = {
     start: (e) => {
@@ -290,13 +310,10 @@ export function MapLabelEditor({
         const c = e.changedTouches[0];
         release(c ? localXY(c.clientX, c.clientY) : null);
       } else if (t.length === 1) {
-        // One finger of a pinch lifted: the other carries on as a pan.
         gesture.current = { kind: "pan", moved: true, last: t[0], dist: 0 };
       }
     },
   };
-
-  // The mouse (and a pen): one pointer, captured for the drag.
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.pointerType === "touch") return;
     viewportRef.current?.setPointerCapture(e.pointerId);
@@ -315,32 +332,45 @@ export function MapLabelEditor({
     zoomAt(Math.exp(-e.deltaY / 400), local(e));
   };
 
-  // A slider is up: bring the label into the top part of the screen, where
-  // the bar does not cover it and the thumb is nowhere near it.
+  // A slider is up: bring the label into the top part of the screen.
   const pick = (t: Exclude<Tool, null>) => {
     const next = tool === t ? null : t;
     setTool(next);
-    const d = draftRef.current;
-    if (next && next !== "label" && next !== "anchor" && d) commit(centreOn(labelCentre(d), Math.max(viewRef.current.s, 2), layerW, layerH, port, 0.3));
+    const l = labelRef.current;
+    if (next && next !== "label" && next !== "anchor" && l) commit(centreOn({ x: l.cx, y: l.cy }, Math.max(viewRef.current.s, 2), layerW, layerH, port, 0.3));
   };
   const active = TOOLS.find((t) => t.key === tool && t.key !== "label" && t.key !== "anchor");
-  const value = (k: Slider) => draft?.[k] ?? DEFAULT_LABEL_STYLE[k];
+  const value = (k: Slider) => draftLabel?.[k] ?? DEFAULT_LABEL_STYLE[k];
 
   const finish = () => {
-    if (draft) saveLabelStyle(draft);
-    onDone(draft);
+    let l = draftLabel;
+    // Anchored for the first time with no label yet: the label starts in
+    // the remembered style beside the anchor, so the map page has one.
+    if (!free && draftAnchor && !l && !label) l = newLabel(draftAnchor, loadLabelStyle());
+    if (l) saveLabelStyle(l, draftAnchor);
+    const num = (s: string) => (s.trim() === "" ? null : Number(s));
+    onDone({
+      anchor: draftAnchor,
+      label: free ? null : l,
+      point: free ? { name: pointName.trim() || "Calibration point", lat: num(pointLat), lng: num(pointLng) } : undefined,
+    });
   };
+  const canFinish = draftAnchor !== null || draftLabel !== null;
 
-  const others = placements.filter((p) => p.location_id !== subject.locationId);
-  const hint = !draft
+  const otherLabels = labels.filter((b) => b.location_id !== subject.locationId);
+  const freePoints = anchors.filter((a) => a.location_id === null && !(free && point && a.label === point.name && a.cx === anchor?.cx && a.cy === anchor?.cy));
+  const hint = !draftAnchor && !draftLabel
     ? mode === "anchor"
-      ? `Tap where you are standing - where ${subject.name} is.`
+      ? free
+        ? "Tap the spot on the map this point marks."
+        : `Tap where you are standing - where ${subject.name} is.`
       : `Tap where ${subject.name} is.`
     : mode === "anchor" || tool === "anchor"
       ? "Drag the dot, or tap where it should be."
       : tool === "label"
         ? "Drag the label, or tap where it should be."
         : null;
+  const showLabel = mode === "label" && tool !== "anchor" && draftLabel;
   const body = (
     <div className="mle-layer" ref={layerRef} role="dialog" aria-label={`${subject.name} on ${map.scope_name ?? map.name}`}>
       <div className="mle-top">
@@ -348,15 +378,15 @@ export function MapLabelEditor({
           Cancel
         </button>
         <div className="mle-title">
-          <b>{subject.name}</b>
-          <span className="muted small">{mode === "anchor" ? "where it is" : map.scope_name ?? map.name}</span>
+          <b>{free ? pointName || "Calibration point" : subject.name}</b>
+          <span className="muted small">{mode === "anchor" ? (free ? "calibration point" : "where it is") : map.scope_name ?? map.name}</span>
         </div>
-        <button type="button" className="btn btn-sm btn-primary" data-testid="mle-done" disabled={!draft} onClick={finish}>
+        <button type="button" className="btn btn-sm btn-primary" data-testid="mle-done" disabled={!canFinish} onClick={finish}>
           Done
         </button>
       </div>
       <div
-        className={`mle-viewport ${!draft || tool === "anchor" || tool === "label" ? "mle-placing" : ""}`}
+        className={`mle-viewport ${!canFinish || tool === "anchor" || tool === "label" ? "mle-placing" : ""}`}
         ref={viewportRef}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -366,29 +396,30 @@ export function MapLabelEditor({
       >
         <div className="mle-map" style={{ width: layerW, height: layerH || undefined, transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.s})` }}>
           {imageUrl && <img src={imageUrl} alt={map.name} className="map-image" draggable={false} onLoad={(e) => setImg({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })} />}
-          {others.map((p) => (
-            <span key={p.id} className="map-rect mle-other" style={placementStyle(placementOf(p))}>
-              {p.location_name}
+          {otherLabels.map((b) => (
+            <span key={b.id} className="map-rect mle-other" style={placementStyle(labelShapeOf(b))}>
+              {b.location_name}
             </span>
           ))}
+          {freePoints.map((a) => (
+            <span key={a.id} className="map-anchor map-anchor-free" style={{ left: `${a.cx}%`, top: `${a.cy}%`, transform: `translate(-50%, -50%) scale(${1 / view.s})` }} title={a.label ?? "Calibration point"} aria-hidden />
+          ))}
           <DeviceDot fit={fit} position={device} scale={view.s} />
-          {/* With the Anchor tool on, the label is out of the way: the
-              dot is what is being placed, and a label on top of it hides
-              the spot. */}
-          {draft && mode === "label" && tool !== "anchor" && (
-            <span className="map-rect mle-subject" data-subject data-testid="mle-subject" style={placementStyle(draft)}>
+          {showLabel && (
+            <span className="map-rect mle-subject" data-subject data-testid="mle-subject" style={placementStyle(draftLabel!)}>
               {subject.name}
             </span>
           )}
-          {draft && (
+          {draftAnchor && (
             <>
-              {mode === "label" && tool !== "anchor" && (draft.dx || draft.dy) ? <span className="mle-tether" style={{ ...tetherStyle(draft), borderTopWidth: 1.5 / view.s }} aria-hidden /> : null}
-              {/* Counter-scaled: a dot is a dot at any zoom, not a disc. */}
+              {showLabel && draftLabel && Math.hypot(draftLabel.cx - draftAnchor.cx, draftLabel.cy - draftAnchor.cy) > 0.5 ? (
+                <span className="mle-tether" style={{ ...tetherStyle(draftAnchor, draftLabel), borderTopWidth: 1.5 / view.s }} aria-hidden />
+              ) : null}
               <span
-                className="mle-anchor"
+                className={`mle-anchor ${free ? "mle-anchor-free" : ""}`}
                 data-anchor
                 data-testid="mle-anchor"
-                style={{ left: `${draft.cx}%`, top: `${draft.cy}%`, transform: `translate(-50%, -50%) scale(${1 / view.s})` }}
+                style={{ left: `${draftAnchor.cx}%`, top: `${draftAnchor.cy}%`, transform: `translate(-50%, -50%) scale(${1 / view.s})` }}
                 title={`${subject.name} is here`}
               />
             </>
@@ -409,7 +440,7 @@ export function MapLabelEditor({
               max={active.max}
               value={value(active.key as Slider)}
               aria-label={active.label}
-              onChange={(e) => draft && setDraft({ ...draft, [active.key]: Number(e.target.value) })}
+              onChange={(e) => draftLabel && setDraftLabel({ ...draftLabel, [active.key]: Number(e.target.value) })}
             />
           </div>
         )}
@@ -420,7 +451,7 @@ export function MapLabelEditor({
                 key={t.key}
                 type="button"
                 className={`mle-tool ${tool === t.key ? "on" : ""}`}
-                disabled={!draft}
+                disabled={!canFinish || (t.key !== "label" && t.key !== "anchor" && !draftLabel)}
                 aria-label={t.label}
                 aria-pressed={tool === t.key}
                 onClick={() => pick(t.key)}
@@ -431,8 +462,8 @@ export function MapLabelEditor({
                 <span className="mle-tool-label">{t.label}</span>
               </button>
             ))}
-            {removable && draft && (
-              <button type="button" className="mle-tool mle-tool-danger" aria-label={removeLabel} onClick={() => onDone(null)}>
+            {removable && onRemove && (
+              <button type="button" className="mle-tool mle-tool-danger" aria-label={removeLabel} onClick={onRemove}>
                 <span className="mle-tool-icon" aria-hidden>
                   ✕
                 </span>
@@ -441,9 +472,26 @@ export function MapLabelEditor({
             )}
           </div>
         )}
-        {mode === "anchor" && (
+        {mode === "anchor" && !free && (
           <div className="mle-anchor-note muted small">
-            {draft ? "The dot is where the coordinates you just captured belong on this map." : "Zoom in, then tap the spot you are standing on."}
+            {draftAnchor ? "The dot is where the coordinates you just captured belong on this map." : "Zoom in, then tap the spot you are standing on."}
+          </div>
+        )}
+        {mode === "anchor" && free && (
+          <div className="mle-point-form">
+            <input className="input" placeholder="What this point is (NE dock corner)" aria-label="Name" value={pointName} onChange={(e) => setPointName(e.target.value)} />
+            <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+              <input className="input select-inline" style={{ width: 130 }} placeholder="latitude" aria-label="Latitude" inputMode="decimal" value={pointLat} onChange={(e) => { typed.current = true; setPointLat(e.target.value); }} />
+              <input className="input select-inline" style={{ width: 130 }} placeholder="longitude" aria-label="Longitude" inputMode="decimal" value={pointLng} onChange={(e) => { typed.current = true; setPointLng(e.target.value); }} />
+              <button type="button" className="btn btn-sm" disabled={!device} onClick={() => device && (setPointLat(device.lat.toFixed(7)), setPointLng(device.lng.toFixed(7)))}>
+                Use my position{device ? ` · ±${Math.round(device.accuracy)} m` : ""}
+              </button>
+              {removable && onRemove && (
+                <button type="button" className="btn btn-sm btn-bare" style={{ color: "var(--bad)" }} onClick={onRemove}>
+                  {removeLabel}
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -452,20 +500,17 @@ export function MapLabelEditor({
   return createPortal(body, document.body);
 }
 
-/** The view that puts a point (percent of the map) at the horizontal
- *  centre and `yFraction` of the height. */
 function centreOn(at: { x: number; y: number }, s: number, layerW: number, layerH: number, port: { w: number; h: number }, yFraction: number): View {
   return { s, tx: port.w / 2 - (at.x / 100) * layerW * s, ty: port.h * yFraction - (at.y / 100) * layerH * s };
 }
 
-/** A line from the anchor to the label, so the offset reads as one. */
-function tetherStyle(p: PlacementShape): React.CSSProperties {
-  const to = labelCentre(p);
-  const dx = to.x - p.cx;
-  const dy = to.y - p.cy;
+/** A line from the anchor to the label, so the pair reads as one. */
+function tetherStyle(anchor: MapPoint, label: MapPoint): React.CSSProperties {
+  const dx = label.cx - anchor.cx;
+  const dy = label.cy - anchor.cy;
   return {
-    left: `${p.cx}%`,
-    top: `${p.cy}%`,
+    left: `${anchor.cx}%`,
+    top: `${anchor.cy}%`,
     width: `${Math.hypot(dx, dy)}%`,
     transform: `rotate(${(Math.atan2(dy, dx) * 180) / Math.PI}deg)`,
   };

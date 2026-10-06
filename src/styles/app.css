@@ -2360,3 +2360,24 @@ h3 {
 .map-mark.outside {
   opacity: 0.6;
 }
+
+/* A free calibration point (docs/maps.md): an anchor with no location. */
+.map-anchor-free,
+.mle-anchor-free {
+  background: var(--warn);
+  box-shadow: 0 0 0 1px var(--warn);
+}
+.map-anchor-button {
+  pointer-events: auto;
+  cursor: pointer;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #fff;
+  padding: 0;
+}
+.mle-point-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+}

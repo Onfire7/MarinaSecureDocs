@@ -46,10 +46,11 @@ import type { AttachmentTarget } from "../../data/attachments";
 import { LocationPicker } from "../shared/LocationPicker";
 import { NoteDialog } from "../shared/NoteDialog";
 import { PlacementCheck, type ProposedPlacement } from "./PlacementCheck";
+import { placementFromPayload } from "../../lib/auditWizard";
 import { GpsCapture } from "./GpsCapture";
 import { MapLabelEditor } from "../shared/MapLabelEditor";
 import { useLocationMap, useMapFit } from "../../data/maps";
-import { placementOf } from "../../data/locations";
+import { labelShapeOf } from "../../data/locations";
 
 // The Finding form (docs/audits.md § Field work). One screen for one target:
 // the built-in questions of the audit's kind, the target's own questions,
@@ -288,7 +289,7 @@ function FindingForm({
         if (p.kind === "retire_location") setRetire(true);
         if (p.kind === "rename") setRename(String(pl.name ?? ""));
         if (p.kind === "set_gps") setGpsCapture({ lat: Number(pl.lat), lng: Number(pl.lng), accuracy: Number(pl.accuracy) });
-        if (p.kind === "move_placement") setPlacement({ map_id: String(pl.map_id), placement: pl.placement as ProposedPlacement["placement"] });
+        if (p.kind === "move_placement") setPlacement(placementFromPayload(pl));
         if (p.kind === "create_location") {
           setName(String(pl.name ?? ""));
           setTypeId(String(pl.location_type_id ?? ""));
@@ -356,7 +357,7 @@ function FindingForm({
         });
       } else {
         if (gpsCapture) proposals.push({ kind: "set_gps", payload: gpsCapture });
-        if (placement) proposals.push({ kind: "move_placement", payload: { map_id: placement.map_id, placement: placement.placement } });
+        if (placement) proposals.push({ kind: "move_placement", payload: { map_id: placement.map_id, anchor: placement.anchor, label: placement.label } });
         if (retire) proposals.push({ kind: "retire_location", payload: {} });
         if (rename.trim() && rename.trim() !== target.location_name) proposals.push({ kind: "rename", payload: { name: rename.trim() } });
         if (typeId && typeId !== target.location_type_id) proposals.push({ kind: "retype", payload: { location_type_id: typeId } });
@@ -623,15 +624,17 @@ function FindingForm({
       {anchoring && target?.location_id && anchorMap.map && (
         <MapLabelEditor
           map={anchorMap.map}
-          placements={anchorMap.placements}
+          anchors={anchorMap.anchors}
+          labels={anchorMap.labels}
           subject={{ locationId: target.location_id, name: target.location_name }}
-          shape={placement && placement.map_id === anchorMap.map.id ? placement.placement : anchorMap.own ? placementOf(anchorMap.own) : null}
+          anchor={placement && placement.map_id === anchorMap.map.id ? placement.anchor : anchorMap.anchor ? { cx: anchorMap.anchor.cx, cy: anchorMap.anchor.cy } : null}
+          label={placement && placement.map_id === anchorMap.map.id ? placement.label : anchorMap.label ? labelShapeOf(anchorMap.label) : null}
           mode="anchor"
           fit={anchorFit}
           onCancel={() => setAnchoring(false)}
-          onDone={(shape) => {
+          onDone={(next) => {
             setAnchoring(false);
-            if (shape && anchorMap.map) setPlacement({ map_id: anchorMap.map.id, placement: shape });
+            if (anchorMap.map) setPlacement({ map_id: anchorMap.map.id, anchor: next.anchor, label: next.label });
           }}
         />
       )}

@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { publicOrigin } from "../../lib/config";
 import type { ReactNode } from "react";
 import { compareNames, placementStyle } from "../../lib/locations";
-import { MapLabelEditor } from "../shared/MapLabelEditor";
+import { MapLabelEditor, type EditedPlace } from "../shared/MapLabelEditor";
 import { LocationMapSettings } from "./LocationMapSettings";
 import { LocationServicesPanel, useHasCatalogue } from "../shared/LocationServicesPanel";
 import { Section } from "../shared/Section";
@@ -12,15 +12,18 @@ import { useDevicePosition } from "../shared/useDevicePosition";
 import { useMapFit } from "../../data/maps";
 import {
   bulkUpdateLocations,
-  createPlacement,
+  createAnchor,
+  createLabel,
+  deleteAnchor,
+  deleteLabel,
   deleteLocationType,
   deleteMarinaMap,
-  deletePlacement,
-  placementOf,
+  labelShapeOf,
   saveLocation,
   saveLocationType,
   saveMarinaMap,
-  savePlacement,
+  saveAnchor,
+  saveLabel,
   setTypeParents,
   deleteLocationWithPlacements,
   useLocationDependencies,
@@ -28,7 +31,8 @@ import {
   useLocationTypeParents,
   useLocationTypes,
   useMarinaMaps,
-  usePlacements,
+  useMapAnchors,
+  useMapLabels,
   type LocationInput,
   type LocationRow,
   type LocationTypeRow,
@@ -1434,7 +1438,7 @@ function MapsTab() {
 
   const current = useCurrent();
   const { data: maps } = useMarinaMaps();
-  const { data: allPlacements } = usePlacements();
+  const { data: allLabels } = useMapLabels();
   const { data: allLocations } = useLocations();
   const locations = useMemo(
     () => [...allLocations].sort((a, b) => compareNames(a.name, b.name)),
@@ -1443,7 +1447,7 @@ function MapsTab() {
   const roots = locations.filter((l) => !l.parent_id);
   const active = maps.find((m) => m.id === selectedMap) ?? maps[0];
   const placementsOf = (mapId: string) =>
-    allPlacements.filter((p) => p.map_id === mapId);
+    allLabels.filter((p) => p.map_id === mapId);
 
   const upload = async (file: File) => {
     // Scope is required before the upload completes — there's no way to
@@ -1629,63 +1633,103 @@ function MapPlotter({
   map: MarinaMapRow;
   locations: PickerLocation[];
 }) {
-  // Which label the editor is open on: an existing placement, or a
-  // location being added (no placement yet).
-  const [editing, setEditing] = useState<{ placementId: string | null; locationId: string; name: string } | null>(null);
+  // What the editor is open on: a location (its label and anchor), a free
+  // calibration point, or a new point.
+  const [editing, setEditing] = useState<{ kind: "location"; locationId: string; name: string } | { kind: "point"; anchorId: string | null } | null>(null);
   const [addLocationId, setAddLocationId] = useState("");
 
-  const { data: rows } = usePlacements(map.id);
+  const { data: anchors } = useMapAnchors(map.id);
+  const { data: labels } = useMapLabels(map.id);
   const fit = useMapFit(map.id);
   const device = useDevicePosition();
-  // The stored shape is jsonb, so it arrives as text; parsed once per row here
-  // rather than at each of the half-dozen places that read a coordinate.
-  const placements = rows.map((p) => ({ ...p, shape: placementOf(p) }));
-  const residuals = fit ? fit.residuals() : [];
-  const plottedIds = new Set(placements.map((p) => p.location_id));
   const imageUrl = attachmentUrl(map.image_path);
-  const editingShape = editing?.placementId ? (placements.find((p) => p.id === editing.placementId)?.shape ?? null) : null;
+  const plottedIds = new Set([...anchors.map((a) => a.location_id), ...labels.map((b) => b.location_id)].filter((x): x is string => x !== null));
+  const freePoints = anchors.filter((a) => a.location_id === null);
+  const residuals = fit ? fit.residuals() : [];
+
+  const anchorOf = (locationId: string) => anchors.find((a) => a.location_id === locationId) ?? null;
+  const labelOf = (locationId: string) => labels.find((b) => b.location_id === locationId) ?? null;
+  const editingPoint = editing?.kind === "point" && editing.anchorId ? (anchors.find((a) => a.id === editing.anchorId) ?? null) : null;
+
+  const finishLocation = (locationId: string, next: EditedPlace) => {
+    const a = anchorOf(locationId);
+    const b = labelOf(locationId);
+    if (next.anchor) {
+      if (a) void saveAnchor(a.id, { cx: next.anchor.cx, cy: next.anchor.cy });
+      // Coordinates arrive from the location by trigger (docs/maps.md).
+      else void createAnchor({ mapId: map.id, locationId, cx: next.anchor.cx, cy: next.anchor.cy });
+    }
+    if (next.label) {
+      if (b) void saveLabel(b.id, next.label);
+      else void createLabel(map.id, locationId, next.label);
+    } else if (b) void deleteLabel(b.id);
+  };
+  const finishPoint = (anchorId: string | null, next: EditedPlace) => {
+    if (!next.anchor) return;
+    const p = next.point ?? { name: "Calibration point", lat: null, lng: null };
+    if (anchorId) void saveAnchor(anchorId, { cx: next.anchor.cx, cy: next.anchor.cy, lat: p.lat, lng: p.lng, label: p.name });
+    else void createAnchor({ mapId: map.id, locationId: null, cx: next.anchor.cx, cy: next.anchor.cy, lat: p.lat, lng: p.lng, label: p.name });
+  };
 
   return (
     <div className="grid-2">
       <div>
         {/* A preview; the editing happens fullscreen, where the map can be
-            zoomed (shared/MapLabelEditor.tsx). Tap a label to open it. */}
+            zoomed (shared/MapLabelEditor.tsx). Tap a label or a point. */}
         <div className="map-canvas map-schematic">
           {imageUrl && <img src={imageUrl} alt={map.name} className="map-image" draggable={false} />}
           <DeviceDot fit={fit} position={device} />
-          {/* An anchor is drawn only where it is apart from its label; a
-              label sitting on its anchor already marks the spot. */}
-          {placements
-            .filter((p) => p.shape.dx || p.shape.dy)
-            .map((p) => (
-              <span key={`a-${p.id}`} className="map-anchor" style={{ left: `${p.shape.cx}%`, top: `${p.shape.cy}%` }} aria-hidden />
+          {/* A located anchor is drawn only where it stands apart from its
+              label; a label on its anchor already marks the spot. */}
+          {anchors
+            .filter((a) => a.location_id !== null)
+            .filter((a) => {
+              const b = labelOf(a.location_id!);
+              return !b || Math.hypot(b.cx - a.cx, b.cy - a.cy) > 0.5;
+            })
+            .map((a) => (
+              <span key={`a-${a.id}`} className="map-anchor" style={{ left: `${a.cx}%`, top: `${a.cy}%` }} aria-hidden />
             ))}
-          {placements.map((p) => (
+          {freePoints.map((a) => (
             <button
-              key={p.id}
+              key={a.id}
+              type="button"
+              className="map-anchor map-anchor-free map-anchor-button"
+              style={{ left: `${a.cx}%`, top: `${a.cy}%` }}
+              title={a.label ?? "Calibration point"}
+              aria-label={a.label ?? "Calibration point"}
+              data-testid="map-free-point"
+              onClick={() => setEditing({ kind: "point", anchorId: a.id })}
+            />
+          ))}
+          {labels.map((b) => (
+            <button
+              key={b.id}
               type="button"
               className="map-rect"
               style={{
-                ...placementStyle(p.shape),
+                ...placementStyle(labelShapeOf(b)),
                 background: "var(--accent-soft)",
                 color: "var(--accent)",
-                borderColor: editing?.placementId === p.id ? "var(--accent)" : "var(--line)",
-                borderWidth: editing?.placementId === p.id ? 2.5 : 1.5,
+                borderColor: editing?.kind === "location" && editing.locationId === b.location_id ? "var(--accent)" : "var(--line)",
+                borderWidth: editing?.kind === "location" && editing.locationId === b.location_id ? 2.5 : 1.5,
               }}
-              title={p.location_name}
-              onClick={() => setEditing({ placementId: p.id, locationId: p.location_id, name: p.location_name })}
+              title={b.location_name}
+              onClick={() => setEditing({ kind: "location", locationId: b.location_id, name: b.location_name })}
             >
-              {p.location_name}
+              {b.location_name}
             </button>
           ))}
         </div>
         <p className="muted small" style={{ marginTop: 6 }}>
-          Tap a label to move, size or rotate it on a zoomable map. A dot beside a label is its anchor - where the location is - when the label has been moved off it.
+          Tap a label to move, size or rotate it on a zoomable map. A dot beside a label is its anchor - where the location is - when the label stands apart from it; an
+          amber dot is a calibration point.
         </p>
         {/* How well this map knows where things are (docs/maps.md): every
-            anchored AND pinned location is a control point, and each one's
-            leave-one-out error names a wrong pin rather than averaging it
-            away. */}
+            anchor with coordinates is a control point - a located one, a
+            free calibration point, or one an open audit has proposed - and
+            each one's leave-one-out error names a wrong pin rather than
+            averaging it away. */}
         <div className="card" style={{ marginTop: 10 }}>
           <div className="card-kicker">
             <span>GPS fit</span>
@@ -1694,21 +1738,22 @@ function MapPlotter({
           {fit ? (
             <>
               <p className="muted small" style={{ margin: "4px 0 8px" }}>
-                Worst {Math.round(residuals[0]?.errorMeters ?? 0)} m · typical {Math.round(residuals[Math.floor(residuals.length / 2)]?.errorMeters ?? 0)} m. A location far
-                above the rest is pinned or anchored in the wrong place.
+                Worst {Math.round(residuals[0]?.errorMeters ?? 0)} m · typical {Math.round(residuals[Math.floor(residuals.length / 2)]?.errorMeters ?? 0)} m. A point far above
+                the rest is pinned or anchored in the wrong place. <i>Provisional</i> points come from an open audit and count until it is decided.
               </p>
               <ul className="muted small" style={{ margin: 0, paddingLeft: 18 }} data-testid="map-residuals">
-                {residuals.slice(0, 8).map((r) => (
-                  <li key={r.point.label ?? `${r.point.cx},${r.point.cy}`}>
-                    {r.point.label ?? "?"} · {Number.isFinite(r.errorMeters) ? `${Math.round(r.errorMeters)} m` : "cannot be checked"}
+                {residuals.slice(0, 10).map((r) => (
+                  <li key={`${r.point.label ?? "?"}-${r.point.cx},${r.point.cy}`}>
+                    {r.point.label ?? "?"}
+                    {r.point.provisional ? " (provisional)" : ""} · {Number.isFinite(r.errorMeters) ? `${Math.round(r.errorMeters)} m` : "cannot be checked"}
                   </li>
                 ))}
               </ul>
             </>
           ) : (
             <p className="muted small" style={{ margin: "4px 0 0" }}>
-              Three locations that are both on this map and have GPS coordinates are needed before the map can show where anyone is. Audits add them: capture a fix,
-              then tap where you are.
+              Three anchors with GPS coordinates are needed before the map can show where anyone is: locations that are anchored and pinned, or calibration
+              points added below. Audits add them: capture a fix, then tap where you are.
             </p>
           )}
         </div>
@@ -1736,7 +1781,7 @@ function MapPlotter({
             onClick={() => {
               const loc = locations.find((l) => l.id === addLocationId);
               if (!loc) return;
-              setEditing({ placementId: null, locationId: loc.id, name: loc.name });
+              setEditing({ kind: "location", locationId: loc.id, name: loc.name });
               setAddLocationId("");
             }}
           >
@@ -1744,29 +1789,91 @@ function MapPlotter({
           </button>
         </div>
         <span className="muted small">A new label is placed with a tap, in the style the last one was finished with.</span>
+
+        {/* Free calibration points (docs/maps.md): anchors that belong to
+            no location, for the corners and open ground where nothing is
+            plotted, so the whole map can say where people are. */}
+        <div className="section-title spread" style={{ marginTop: 18 }}>
+          <span>Calibration points</span>
+          <button type="button" className="btn btn-sm" data-testid="map-add-point" onClick={() => setEditing({ kind: "point", anchorId: null })}>
+            + Add
+          </button>
+        </div>
+        <div className="stack" style={{ gap: 6 }}>
+          {freePoints.map((a) => (
+            <button key={a.id} type="button" className="card spread" style={{ textAlign: "left", cursor: "pointer" }} onClick={() => setEditing({ kind: "point", anchorId: a.id })}>
+              <span>
+                <span className="card-title">{a.label ?? "Calibration point"}</span>
+                <span className="card-meta" style={{ display: "block" }}>
+                  {a.lat !== null && a.lng !== null ? `${a.lat.toFixed(5)}, ${a.lng.toFixed(5)}` : "no coordinates yet"}
+                </span>
+              </span>
+              <span className="muted small">
+                {a.cx.toFixed(1)}%, {a.cy.toFixed(1)}%
+              </span>
+            </button>
+          ))}
+          {freePoints.length === 0 && <span className="muted small">None yet. A point on a dock corner or a gate, with its GPS, calibrates the map where no location is plotted.</span>}
+        </div>
       </div>
 
-      {editing && (
+      {editing?.kind === "location" && (
         <MapLabelEditor
           map={map}
-          placements={rows}
+          anchors={anchors}
+          labels={labels}
           subject={{ locationId: editing.locationId, name: editing.name }}
-          shape={editingShape}
+          anchor={(() => {
+            const a = anchorOf(editing.locationId);
+            return a ? { cx: a.cx, cy: a.cy } : null;
+          })()}
+          label={(() => {
+            const b = labelOf(editing.locationId);
+            return b ? labelShapeOf(b) : null;
+          })()}
           fit={fit}
-          removable={editing.placementId !== null}
+          removable={plottedIds.has(editing.locationId)}
           removeLabel="Unplot from this map"
           onCancel={() => setEditing(null)}
-          onDone={(shape) => {
-            const id = editing.placementId;
-            setEditing(null);
-            // Removes just this one placement — the same location stays
+          onRemove={() => {
+            // Removes just this one map's rows — the same location stays
             // plotted on any other map.
-            if (!shape) {
-              if (id) void deletePlacement(id);
-              return;
-            }
-            if (id) void savePlacement(id, shape);
-            else void createPlacement(map.id, editing.locationId, shape);
+            const a = anchorOf(editing.locationId);
+            const b = labelOf(editing.locationId);
+            setEditing(null);
+            if (a) void deleteAnchor(a.id);
+            if (b) void deleteLabel(b.id);
+          }}
+          onDone={(next) => {
+            const id = editing.locationId;
+            setEditing(null);
+            finishLocation(id, next);
+          }}
+        />
+      )}
+      {editing?.kind === "point" && (
+        <MapLabelEditor
+          map={map}
+          anchors={anchors}
+          labels={labels}
+          subject={{ locationId: null, name: editingPoint?.label ?? "Calibration point" }}
+          anchor={editingPoint ? { cx: editingPoint.cx, cy: editingPoint.cy } : null}
+          label={null}
+          mode="anchor"
+          fit={fit}
+          point={editingPoint ? { name: editingPoint.label ?? "Calibration point", lat: editingPoint.lat, lng: editingPoint.lng } : undefined}
+          removable={editingPoint !== null}
+          removeLabel="Remove this point"
+          onCancel={() => setEditing(null)}
+          onRemove={() => {
+            const id = editing.anchorId;
+            setEditing(null);
+            if (id) void deleteAnchor(id);
+          }}
+          onDone={(next) => {
+            const id = editing.anchorId;
+            setEditing(null);
+            finishPoint(id, next);
           }}
         />
       )}

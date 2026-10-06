@@ -50,10 +50,12 @@ Locations are plotted. Not a real-world geographic map.
 _Avoid_: site plan, diagram
 
 **Anchor**:
-Where a Location *is* on a Marina Map, as a point; its label hangs off it
-by an offset. A GPS fix captured in an Audit is tied to the map by tapping
-the anchor, and every anchored, pinned Location is a control point for the
-map's GPS fit (`docs/maps.md`).
+Where something *is* on a Marina Map, as a point, with the GPS it stands
+for: a Location's anchor, or a **calibration point** that belongs to no
+Location (a dock corner). A GPS fix captured in an Audit is tied to the map
+by tapping the anchor. Every anchor with coordinates is a control point for
+the map's GPS fit (`docs/maps.md`). A Location's **Map Label** is a
+separate thing with coordinates of its own.
 
 **Reservable**:
 A Location or Asset that accepts Reservations — a capability its type

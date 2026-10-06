@@ -7,14 +7,14 @@
 // still reaches the note; answers with nothing to follow move straight on.
 import { useRef, useState, type CSSProperties } from "react";
 import { useLocationMap, useMapFit } from "../../../data/maps";
-import { placementOf } from "../../../data/locations";
+import { labelShapeOf } from "../../../data/locations";
 import { MapLabelEditor } from "../../shared/MapLabelEditor";
 import { MapPreview } from "../../shared/MapPreview";
 import { useDevicePosition } from "../../shared/useDevicePosition";
 import { useNoteSuggestions } from "../../../data/services";
 import { useMarinaSettings } from "../../../data/settings";
 import type { AmenityAnswer, AttributeAnswer, AnswerValue, GpsAnswer, MapAnswer, ServiceAnswer, WizardItem, WizardTarget } from "../../../lib/auditWizard";
-import type { PlacementShape } from "../../../lib/locations";
+import type { LabelShape, MapPoint } from "../../../lib/locations";
 import { GpsCapture } from "../GpsCapture";
 import { PlacementCheck } from "../PlacementCheck";
 import type { AnswerMode } from "./runProps";
@@ -486,8 +486,8 @@ function MapControl({
         locationName={target.location_name}
         editable
         big={big}
-        proposed={v.placement as React.ComponentProps<typeof PlacementCheck>["proposed"]}
-        onPropose={(p, correct) => onChange({ ...v, placement: p ? { map_id: p.map_id, placement: { ...p.placement } } : null, ...(correct === undefined ? {} : { correct }) })}
+        proposed={v.placement}
+        onPropose={(p, correct) => onChange({ ...v, placement: p, ...(correct === undefined ? {} : { correct }) })}
         answer={v.correct}
         onAnswer={(correct) => {
           onChange({ ...v, correct });
@@ -522,15 +522,15 @@ function GpsControl({
   const settings = useMarinaSettings();
   const [anchoring, setAnchoring] = useState(false);
   const fix = value && typeof value === "object" && "lat" in value ? (value as GpsAnswer) : null;
-  const { map, own, placements } = useLocationMap(target.location_id, auditPlacement?.map_id ?? fix?.anchor?.map_id ?? null);
+  const { map, anchor: anchorRow, label: labelRow, anchors, labels } = useLocationMap(target.location_id, auditPlacement?.map_id ?? fix?.anchor?.map_id ?? null);
   const fit = useMapFit(map?.id);
   const device = useDevicePosition();
-  const ownShape = own ? placementOf(own) : null;
   // Where the location is, as this run has it: the run's own placement
   // (an anchor tapped or a label adjusted on another page of this
   // location, saved or not), else what is on file.
-  const shape: PlacementShape | null =
-    auditPlacement && map && auditPlacement.map_id === map.id ? (auditPlacement.placement as unknown as PlacementShape) : ownShape;
+  const here = auditPlacement && map && auditPlacement.map_id === map.id ? auditPlacement : null;
+  const anchor: MapPoint | null = here ? here.anchor : anchorRow ? { cx: anchorRow.cx, cy: anchorRow.cy } : null;
+  const label: LabelShape | null = here ? here.label : labelRow ? labelShapeOf(labelRow) : null;
   const pinned = target.gps_lat !== null && target.gps_lng !== null;
   // What the map can say about this page: where you are, where the pin on
   // file is, where the fix just captured is - each only when the fit can
@@ -558,9 +558,11 @@ function GpsControl({
       {map && target.location_id && (
         <MapPreview
           map={map}
-          placements={placements}
+          anchors={anchors}
+          labels={labels}
           subject={{ locationId: target.location_id, name: target.location_name }}
-          shape={shape}
+          anchor={anchor}
+          label={label}
           proposed={!!fix?.anchor}
           fit={fit}
           device={device}
@@ -580,18 +582,20 @@ function GpsControl({
       {anchoring && fix && map && target.location_id && (
         <MapLabelEditor
           map={map}
-          placements={placements}
+          anchors={anchors}
+          labels={labels}
           subject={{ locationId: target.location_id, name: target.location_name }}
-          shape={shape}
+          anchor={anchor}
+          label={label}
           mode="anchor"
           fit={fit}
           onCancel={() => setAnchoring(false)}
           onDone={(next) => {
             setAnchoring(false);
-            onChange({ ...fix, anchor: next ? { map_id: map.id, cx: next.cx, cy: next.cy } : null });
-            // The run's placement moves with the anchor, label and style
-            // kept, so the map page - and its editor - start from here.
-            if (next) onPlacement?.({ map_id: map.id, placement: { ...next } as unknown as Record<string, unknown> });
+            onChange({ ...fix, anchor: next.anchor ? { map_id: map.id, cx: next.anchor.cx, cy: next.anchor.cy } : null });
+            // The run's placement takes the anchor; the label stays where
+            // it was, or starts beside the anchor if there was none.
+            onPlacement?.({ map_id: map.id, anchor: next.anchor, label: next.label });
           }}
         />
       )}

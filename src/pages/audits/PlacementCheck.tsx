@@ -1,16 +1,17 @@
 import { useState } from "react";
-import type { PlacementShape } from "../../lib/locations";
-import { placementOf } from "../../data/locations";
+import type { LabelShape, MapPoint } from "../../lib/locations";
+import type { MapPlacement } from "../../lib/auditWizard";
+import { labelShapeOf } from "../../data/locations";
 import { useLocationMap, useMapFit } from "../../data/maps";
 import { MapLabelEditor } from "../shared/MapLabelEditor";
 import { MapPreview } from "../shared/MapPreview";
 import { useDevicePosition } from "../shared/useDevicePosition";
 
 // "Is it placed correctly on the map?" needs the map in front of the person
-// answering. This shows the map the location is plotted on with its anchor
-// and label highlighted and every other label muted, and the device's own
+// answering. This shows the map the location is on with its anchor and
+// label highlighted and every other label muted, and the device's own
 // position when the map can place it; the question sits UNDER the map, and
-// only when there is a placement to ask about - a location that is not on
+// only when there is something to ask about - a location that is not on
 // the map yet is simply placed (owner, 2026-10-04). Tapping the map,
 // answering No, or *Place it on the map* opens the fullscreen editor
 // (shared/MapLabelEditor.tsx), which zooms.
@@ -19,10 +20,7 @@ import { useDevicePosition } from "../shared/useDevicePosition";
 // § What becomes a Proposal), never a write: every other user navigates by
 // that map. Moving a label that was there answers No.
 
-export interface ProposedPlacement {
-  map_id: string;
-  placement: PlacementShape;
-}
+export type ProposedPlacement = MapPlacement;
 
 export function PlacementCheck({
   locationId,
@@ -51,14 +49,16 @@ export function PlacementCheck({
 }) {
   const [chosenMapId, setChosenMapId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
-  const { maps, map, own, placements } = useLocationMap(locationId, proposed?.map_id ?? chosenMapId);
+  const { maps, map, anchor: savedAnchor, label: savedLabel, anchors, labels } = useLocationMap(locationId, proposed?.map_id ?? chosenMapId);
   const fit = useMapFit(map?.id);
   const device = useDevicePosition();
 
-  const ownShape = own ? placementOf(own) : null;
+  const saved = { anchor: savedAnchor ? { cx: savedAnchor.cx, cy: savedAnchor.cy } : null, label: savedLabel ? labelShapeOf(savedLabel) : null };
   /** Where it is, as far as this check knows: the proposal wins. */
-  const current: PlacementShape | null = proposed && map && proposed.map_id === map.id ? proposed.placement : ownShape;
-  const placed = current !== null;
+  const here = proposed && map && proposed.map_id === map.id ? proposed : null;
+  const anchor: MapPoint | null = here ? (here.anchor ?? saved.anchor) : saved.anchor;
+  const label: LabelShape | null = here ? (here.label ?? saved.label) : saved.label;
+  const placed = anchor !== null || label !== null;
 
   if (!map) {
     return <div className="muted small">No marina map is uploaded, so placement cannot be checked here.</div>;
@@ -82,8 +82,8 @@ export function PlacementCheck({
   return (
     <div className="pc">
       <div className="pc-status">
-        <span className="muted small">{own ? `On ${map.scope_name ?? map.name}` : proposed ? "Placed in this audit - waits for approval" : "Not on any map yet."}</span>
-        {maps.length > 1 && editable && !own && !proposed && (
+        <span className="muted small">{savedAnchor || savedLabel ? `On ${map.scope_name ?? map.name}` : proposed ? "Placed in this audit - waits for approval" : "Not on any map yet."}</span>
+        {maps.length > 1 && editable && !placed && (
           <select className="select select-inline" value={map.id} onChange={(e) => setChosenMapId(e.target.value)} aria-label="Which map">
             {maps.map((m) => (
               <option key={m.id} value={m.id}>
@@ -95,9 +95,11 @@ export function PlacementCheck({
       </div>
       <MapPreview
         map={map}
-        placements={placements}
+        anchors={anchors}
+        labels={labels}
         subject={{ locationId, name: locationName }}
-        shape={current}
+        anchor={anchor}
+        label={label}
         proposed={proposed !== null}
         fit={fit}
         device={device}
@@ -136,25 +138,27 @@ export function PlacementCheck({
       {editing && editable && (
         <MapLabelEditor
           map={map}
-          placements={placements}
+          anchors={anchors}
+          labels={labels}
           subject={{ locationId, name: locationName }}
-          shape={current}
+          anchor={anchor}
+          label={label}
           fit={fit}
           removable={proposed !== null}
           removeLabel="Discard the proposal"
           onCancel={() => setEditing(false)}
-          onDone={(shape) => {
+          onRemove={() => {
             setEditing(false);
-            if (!shape) {
-              onPropose(null);
-              return;
-            }
+            onPropose(null);
+          }}
+          onDone={(next) => {
+            setEditing(false);
             // Finishing where it already is proposes nothing.
-            if (ownShape && sameShape(shape, ownShape) && !proposed) return;
+            if (!proposed && samePoint(next.anchor, saved.anchor) && sameLabel(next.label, saved.label)) return;
             // Moving a label that was on the map says it was not placed
             // correctly. Placing one that was not on the map says nothing:
             // the question was never asked.
-            onPropose({ map_id: map.id, placement: shape }, ownShape ? false : undefined);
+            onPropose({ map_id: map.id, anchor: next.anchor, label: next.label }, saved.label || saved.anchor ? false : undefined);
           }}
         />
       )}
@@ -162,7 +166,11 @@ export function PlacementCheck({
   );
 }
 
-function sameShape(a: PlacementShape, b: PlacementShape): boolean {
-  const keys = ["cx", "cy", "dx", "dy", "rotation", "fontSize", "paddingX", "paddingY"] as const;
+function samePoint(a: MapPoint | null, b: MapPoint | null): boolean {
+  return (a === null && b === null) || (a !== null && b !== null && a.cx === b.cx && a.cy === b.cy);
+}
+function sameLabel(a: LabelShape | null, b: LabelShape | null): boolean {
+  if (a === null || b === null) return a === b;
+  const keys = ["cx", "cy", "rotation", "fontSize", "paddingX", "paddingY"] as const;
   return keys.every((k) => (a[k] ?? null) === (b[k] ?? null));
 }

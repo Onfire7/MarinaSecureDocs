@@ -283,11 +283,52 @@ export function filterTargets(
 export interface ServiceAnswer { present: boolean | null; working: boolean; note: string }
 export interface AmenityAnswer { present: boolean | null; note: string }
 export interface AttributeAnswer { value: string; text: string; note: string }
+/** A location's place on a map as a Proposal carries it (docs/maps.md):
+ *  the anchor (where it is) and the label (what it says, where), either of
+ *  which may be unknown yet. The move_placement payload. */
+export interface MapPlacement {
+  map_id: string;
+  anchor: { cx: number; cy: number } | null;
+  label: { cx: number; cy: number; rotation: number; fontSize?: number; paddingX?: number; paddingY?: number } | null;
+}
+
 /** "Placed correctly on the map?" - the answer, and the move_placement
  *  Proposal the auditor made while looking at it, if any. */
 export interface MapAnswer {
   correct: boolean | null;
-  placement: { map_id: string; placement: Record<string, unknown> } | null;
+  placement: MapPlacement | null;
+}
+
+/** A move_placement payload, this shape or the one before 2026-10-05
+ *  ({map_id, placement: {cx, cy, dx?, dy?, rotation, ...}}), as a
+ *  MapPlacement. */
+export function placementFromPayload(payload: Record<string, unknown> | null | undefined): MapPlacement | null {
+  if (!payload || typeof payload.map_id !== "string") return null;
+  const map_id = payload.map_id;
+  const legacy = payload.placement as Record<string, unknown> | undefined;
+  if (legacy && typeof legacy.cx === "number" && typeof legacy.cy === "number") {
+    const dx = typeof legacy.dx === "number" ? legacy.dx : 0;
+    const dy = typeof legacy.dy === "number" ? legacy.dy : 0;
+    return {
+      map_id,
+      anchor: { cx: legacy.cx, cy: legacy.cy },
+      label: {
+        cx: legacy.cx + dx,
+        cy: legacy.cy + dy,
+        rotation: typeof legacy.rotation === "number" ? legacy.rotation : 0,
+        fontSize: typeof legacy.fontSize === "number" ? legacy.fontSize : undefined,
+        paddingX: typeof legacy.paddingX === "number" ? legacy.paddingX : undefined,
+        paddingY: typeof legacy.paddingY === "number" ? legacy.paddingY : undefined,
+      },
+    };
+  }
+  const anchor = payload.anchor as { cx?: unknown; cy?: unknown } | null | undefined;
+  const label = payload.label as MapPlacement["label"] | null | undefined;
+  return {
+    map_id,
+    anchor: anchor && typeof anchor.cx === "number" && typeof anchor.cy === "number" ? { cx: anchor.cx, cy: anchor.cy } : null,
+    label: label && typeof label.cx === "number" && typeof label.cy === "number" ? { ...label, rotation: typeof label.rotation === "number" ? label.rotation : 0 } : null,
+  };
 }
 /** A captured fix, and the spot on the map the auditor tapped as "I am
  *  here" - the anchor that ties the coordinates to the map. */

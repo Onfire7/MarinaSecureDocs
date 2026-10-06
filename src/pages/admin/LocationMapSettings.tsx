@@ -1,16 +1,16 @@
 // A location's place on the map, from its admin row (docs/maps.md): which
 // map it is on, its anchor and label, and the buttons that open the shared
-// editor to set them. Admin writes placements directly - there is no
-// Proposal to wait on here - through the same data functions the plotter
-// uses. "Use my position" beside the coordinates fills them from the
-// device, under no accuracy rule: an admin at a desk typing coordinates
+// editor to set them. Admin writes anchors and labels directly - there is
+// no Proposal to wait on here - through the same data functions the
+// plotter uses. "Use my position" beside the coordinates fills them from
+// the device, under no accuracy rule: an admin at a desk typing coordinates
 // off a satellite view is the normal case, and the audit's capture rules
 // are the audit's.
 import { useState } from "react";
-import type { PlacementShape } from "../../lib/locations";
-import { createPlacement, deletePlacement, placementOf, savePlacement, type LocationRow } from "../../data/locations";
+import type { LabelShape, MapPoint } from "../../lib/locations";
+import { createAnchor, createLabel, deleteAnchor, deleteLabel, labelShapeOf, saveAnchor, saveLabel, type LocationRow } from "../../data/locations";
 import { useLocationMap, useMapFit } from "../../data/maps";
-import { MapLabelEditor } from "../shared/MapLabelEditor";
+import { MapLabelEditor, type EditedPlace } from "../shared/MapLabelEditor";
 import { useDevicePosition } from "../shared/useDevicePosition";
 import { DraftNumberInput } from "../shared/DraftInput";
 import { MapPreview } from "../shared/MapPreview";
@@ -28,22 +28,31 @@ export function LocationMapSettings({
 }) {
   const [chosenMapId, setChosenMapId] = useState<string | null>(null);
   const [editing, setEditing] = useState<"label" | "anchor" | null>(null);
-  const { maps, map, own, placements } = useLocationMap(location.id, chosenMapId);
+  const { maps, map, anchor: anchorRow, label: labelRow, anchors, labels } = useLocationMap(location.id, chosenMapId);
   const fit = useMapFit(map?.id);
   const device = useDevicePosition();
-  const shape: PlacementShape | null = own ? placementOf(own) : null;
+  const anchor: MapPoint | null = anchorRow ? { cx: anchorRow.cx, cy: anchorRow.cy } : null;
+  const label: LabelShape | null = labelRow ? labelShapeOf(labelRow) : null;
+  const onMap = anchor !== null || label !== null;
   const pinned = location.gps_lat !== null && location.gps_lng !== null;
   const inside = fit && pinned ? fit.toMap(location.gps_lat!, location.gps_lng!).inside : null;
 
-  const finish = (next: PlacementShape | null) => {
+  const finish = (next: EditedPlace) => {
     setEditing(null);
     if (!map) return;
-    if (!next) {
-      if (own) void deletePlacement(own.id);
-      return;
+    if (next.anchor) {
+      if (anchorRow) void saveAnchor(anchorRow.id, { cx: next.anchor.cx, cy: next.anchor.cy });
+      else void createAnchor({ mapId: map.id, locationId: location.id, cx: next.anchor.cx, cy: next.anchor.cy, lat: location.gps_lat, lng: location.gps_lng });
     }
-    if (own) void savePlacement(own.id, next);
-    else void createPlacement(map.id, location.id, next);
+    if (next.label) {
+      if (labelRow) void saveLabel(labelRow.id, next.label);
+      else void createLabel(map.id, location.id, next.label);
+    } else if (labelRow) void deleteLabel(labelRow.id);
+  };
+  const removeAll = () => {
+    setEditing(null);
+    if (anchorRow) void deleteAnchor(anchorRow.id);
+    if (labelRow) void deleteLabel(labelRow.id);
   };
 
   return (
@@ -72,10 +81,11 @@ export function LocationMapSettings({
             <span className="muted small">No maps uploaded yet - see Maps &amp; plotting.</span>
           ) : (
             <div className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-              {own && map ? (
+              {onMap && map ? (
                 <span className="small" data-testid="loc-map-status">
                   On <b>{map.scope_name ?? map.name}</b>
-                  {shape!.dx || shape!.dy ? `, label offset ${signed(shape!.dx ?? 0)}, ${signed(shape!.dy ?? 0)}` : ""}
+                  {anchor ? "" : ", label only"}
+                  {label ? "" : ", no label"}
                   {inside === null ? "" : inside ? " · inside the calibrated area" : " · outside the calibrated area"}
                 </span>
               ) : (
@@ -95,32 +105,34 @@ export function LocationMapSettings({
                 </>
               )}
               <button type="button" className="btn btn-sm" disabled={!map} data-testid="loc-set-anchor" onClick={() => setEditing("anchor")}>
-                {own ? "Move" : "Place on the map"}
+                {anchor ? "Move" : "Place on the map"}
               </button>
-              {own && (
+              {onMap && (
                 <button type="button" className="btn btn-sm" data-testid="loc-edit-label" onClick={() => setEditing("label")}>
                   Label
                 </button>
               )}
-              {own && (
-                <button type="button" className="btn btn-sm btn-bare" onClick={() => finish(null)}>
+              {onMap && (
+                <button type="button" className="btn btn-sm btn-bare" onClick={removeAll}>
                   Remove
                 </button>
               )}
             </div>
           )}
-          {!pinned && own && <span className="muted small" style={{ display: "block", marginTop: 4 }}>With coordinates as well, it would help place people on this map.</span>}
+          {!pinned && onMap && <span className="muted small" style={{ display: "block", marginTop: 4 }}>With coordinates as well, it would help place people on this map.</span>}
         </div>
       </div>
       {map && (
         <MapPreview
           map={map}
-          placements={placements}
+          anchors={anchors}
+          labels={labels}
           subject={{ locationId: location.id, name: location.name }}
-          shape={shape}
+          anchor={anchor}
+          label={label}
           fit={fit}
           device={device}
-          onOpen={() => setEditing(own ? "label" : "anchor")}
+          onOpen={() => setEditing(onMap ? "label" : "anchor")}
           testId="loc-map-preview"
         />
       )}
@@ -128,20 +140,20 @@ export function LocationMapSettings({
       {editing && map && (
         <MapLabelEditor
           map={map}
-          placements={placements}
+          anchors={anchors}
+          labels={labels}
           subject={{ locationId: location.id, name: location.name }}
-          shape={shape}
+          anchor={anchor}
+          label={label}
           mode={editing}
           fit={fit}
-          removable={editing === "label" && own !== null}
+          removable={editing === "label" && onMap}
+          removeLabel="Remove from this map"
           onCancel={() => setEditing(null)}
+          onRemove={removeAll}
           onDone={finish}
         />
       )}
     </>
   );
-}
-
-function signed(n: number): string {
-  return `${n > 0 ? "+" : ""}${n.toFixed(1)}`;
 }

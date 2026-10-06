@@ -36,6 +36,9 @@ export interface ControlPoint {
   lng: number;
   /** What to call it in a residual report. */
   label?: string;
+  /** From an undecided audit Proposal rather than a saved anchor: counts
+   *  now, named as such in the report (owner, 2026-10-05). */
+  provisional?: boolean;
 }
 
 export interface MapPoint {
@@ -106,6 +109,7 @@ export function mergeControlPoints(points: ControlPoint[]): ControlPoint[] {
       out.push({ ...p });
       continue;
     }
+    if (p.provisional) twin.provisional = true;
     // Average the twins rather than keep the first: neither is more right.
     twin.cx = (twin.cx + p.cx) / 2;
     twin.cy = (twin.cy + p.cy) / 2;
@@ -115,19 +119,20 @@ export function mergeControlPoints(points: ControlPoint[]): ControlPoint[] {
   return out;
 }
 
-/** The control points a map has: every placement whose location is pinned.
- *  The placement's cx, cy is the ANCHOR (the location's map coordinate),
- *  not the label, which hangs off it by an offset. */
+/** The control points a map has: every anchor that carries coordinates -
+ *  a located anchor's are its location's, a free calibration point's are
+ *  its own. An anchor without coordinates is a place with no fix yet and
+ *  contributes nothing. A provisional anchor for a location supersedes the
+ *  saved one: it is the newer word on where the location is. */
 export function controlPointsFor(
-  placements: { location_id: string; cx: number; cy: number }[],
-  locations: { id: string; name?: string; gps_lat: number | null; gps_lng: number | null }[],
+  anchors: { cx: number; cy: number; lat: number | null; lng: number | null; label?: string | null; locationId?: string | null; provisional?: boolean }[],
 ): ControlPoint[] {
-  const byId = new Map(locations.map((l) => [l.id, l]));
+  const provisionalFor = new Set(anchors.filter((a) => a.provisional && a.locationId).map((a) => a.locationId));
   const out: ControlPoint[] = [];
-  for (const p of placements) {
-    const l = byId.get(p.location_id);
-    if (!l || l.gps_lat === null || l.gps_lng === null) continue;
-    out.push({ cx: p.cx, cy: p.cy, lat: l.gps_lat, lng: l.gps_lng, label: l.name });
+  for (const a of anchors) {
+    if (a.lat === null || a.lng === null) continue;
+    if (!a.provisional && a.locationId && provisionalFor.has(a.locationId)) continue;
+    out.push({ cx: a.cx, cy: a.cy, lat: a.lat, lng: a.lng, label: a.label ?? undefined, provisional: a.provisional || undefined });
   }
   return out;
 }

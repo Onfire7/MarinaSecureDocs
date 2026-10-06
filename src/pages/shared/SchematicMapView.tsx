@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { placementStyle } from "../../lib/locations";
 import {
-  placementOf,
+  labelShapeOf,
   useMarinaMaps,
-  usePlacements,
+  useMapLabels,
   type MarinaMapRow,
 } from "../../data/locations";
 import { attachmentUrl } from "../../data/files";
@@ -40,7 +40,7 @@ export function SchematicMapView({
   footnote?: string;
 }) {
   const { data: maps } = useMarinaMaps();
-  const { data: allPlacements } = usePlacements();
+  const { data: allPlacements } = useMapLabels();
   const [mapStack, setMapStack] = useState<MarinaMapRow[]>([]);
 
   const placementsByMap = useMemo(() => {
@@ -127,7 +127,7 @@ export function SchematicMapView({
               type="button"
               className="map-rect"
               style={{
-                ...placementStyle(placementOf(p)),
+                ...placementStyle(labelShapeOf(p)),
                 background: colors.background,
                 borderColor: colors.border,
                 color: colors.text,

@@ -133,17 +133,31 @@ a table; see [Permissions](permissions.md) for the definition.
 `name`, `scope_id → locations` (not null — every map is scoped to a location;
 root locations carry overview maps), `image_attachment_id → attachments`.
 
-#### `location_map_placements` — Tier 0 / `manage_locations` · sync: always
+#### `map_anchors` — Tier 0 / `manage_locations` · sync: always
 
-`map_id → marina_maps`, `location_id → locations`, `placement jsonb`.
+`map_id → marina_maps`, `location_id → locations` (nullable), `cx`, `cy`
+(percent of the image, 0–100), `lat`, `lng`, `label`, `created_at`. Unique
+on `(map_id, location_id)` where the location is set.
 
-The blob is `{cx, cy, dx?, dy?, rotation, fontSize?, paddingX?, paddingY?}`
-— `cx, cy` is the **anchor**, where the location is, as percentages of the
-map image; the label is drawn at `cx + dx, cy + dy` (`docs/maps.md`). A
-blob without `dx, dy` draws the label on the anchor. The anchor paired with
-the location's GPS coordinates is a control point for the map's GPS fit.
-Stays `jsonb`: it is opaque presentation state read only by the map
-renderer.
+Where a location **is** on a map, with the GPS it stands for - the map's
+control points (`docs/maps.md`). A row with no location is a **free
+calibration point** (a dock corner, a gate) for calibrating where nothing
+is plotted; `label` names it. A located anchor's `lat`/`lng` mirror the
+location's `gps_lat`/`gps_lng` and are kept in step by trigger in both
+directions, so the fit reads one table while the rest of the app keeps
+reading the location. Replaced `location_map_placements` on 2026-10-05;
+every placement migrated to an anchor and a label.
+
+#### `map_labels` — Tier 0 / `manage_locations` · sync: always
+
+`map_id → marina_maps`, `location_id → locations` not null, `cx`, `cy`,
+`rotation`, `font_size`, `padding_x`, `padding_y`. Unique on
+`(map_id, location_id)`.
+
+A label's own centre on the map, independent of the anchor it names:
+moving the anchor leaves the label where it was. Decoration only - nothing
+but the map renderer reads it. A legacy placement's label migrated to
+anchor + offset.
 
 #### `checkpoints` — Tier 0 / `manage_locations` · sync: always
 
@@ -622,7 +636,7 @@ Proposal when it differs from the Location's row. `audit_finding_answers`:
 | finding_id | → audit_findings not null, cascade | |
 | kind | audit_proposal_kind not null | `create_location` / `retire_location` / `rename` / `retype` / `reparent` / `move_placement` / `set_gps` / `set_service` / `set_amenity` / `set_attribute`. |
 | structural | boolean not null | True for the first six; deciding those needs `manage_locations`. Stored rather than derived so RLS can test it. |
-| payload | jsonb not null | Kind-specific. `create_location`: name, type, parent, gps, services, amenities, status, occupants. `set_gps`: lat, lng, accuracy. `set_service`: service_id, present. `set_attribute`: attribute_id, value, text, note — a number fills `value`, a choice fills `text`, both null clears it; never a separate presence flag. A `STRUCTURED_COLUMNS` entry. |
+| payload | jsonb not null | Kind-specific. `create_location`: name, type, parent, gps, services, amenities, status, occupants. `set_gps`: lat, lng, accuracy. `move_placement`: map_id, anchor {cx, cy} or null, label {cx, cy, rotation, fontSize, paddingX, paddingY} or null - or, before 2026-10-05, placement {cx, cy, dx, dy, …}; `apply_map_placement()` takes either. `set_service`: service_id, present. `set_attribute`: attribute_id, value, text, note — a number fills `value`, a choice fills `text`, both null clears it; never a separate presence flag. A `STRUCTURED_COLUMNS` entry. |
 | decision | audit_decision | Null until decided; `approved` / `rejected`. |
 | decided_by_id / decided_at / reason | | Reason required on reject. |
 | applied_location_id | → locations | For `create_location`, the row created on approval; tickets carrying this proposal re-target to it. |

@@ -1,8 +1,8 @@
 import { useQuery } from "@powersync/react";
-import { db, bool, json } from "../lib/db";
+import { db, bool } from "../lib/db";
 import { insert, remove, transact, update } from "./sql";
 import { recordActivity } from "./activity";
-import type { PlacementShape } from "../lib/locations";
+import type { LabelShape } from "../lib/locations";
 
 // Locations — the marina's own geography, and the types that shape it.
 //
@@ -252,7 +252,7 @@ export function useLocationDependencies(locationId: string) {
        (SELECT COUNT(*) FROM incidents WHERE location_id = ?1) AS incidents,
        (SELECT COUNT(*) FROM tickets WHERE location_id = ?1) AS tickets,
        (SELECT COUNT(*) FROM notes WHERE location_id = ?1) AS notes,
-       (SELECT COUNT(*) FROM location_map_placements WHERE location_id = ?1) AS placements,
+       (SELECT COUNT(*) FROM map_anchors WHERE location_id = ?1) + (SELECT COUNT(*) FROM map_labels WHERE location_id = ?1) AS placements,
        (SELECT COUNT(*) FROM boats WHERE location_id = ?1) AS has_boat,
        (SELECT COUNT(*) FROM vehicles WHERE location_id = ?1) AS has_vehicle`,
     [locationId],
@@ -263,7 +263,8 @@ export function useLocationDependencies(locationId: string) {
 /** Delete a location along with the map placements that only describe it. */
 export async function deleteLocationWithPlacements(locationId: string): Promise<void> {
   await transact(async (tx) => {
-    await tx.execute("DELETE FROM location_map_placements WHERE location_id = ?", [
+    await tx.execute("DELETE FROM map_anchors WHERE location_id = ?", [locationId]);
+    await tx.execute("DELETE FROM map_labels WHERE location_id = ?", [
       locationId,
     ]);
     await remove(tx, "locations", locationId);
@@ -333,14 +334,6 @@ export interface MarinaMapRow {
   image_path: string | null;
 }
 
-export interface PlacementRow {
-  id: string;
-  map_id: string;
-  location_id: string;
-  placement: string | null;
-  location_name: string;
-}
-
 export function useMarinaMaps() {
   return useQuery<MarinaMapRow>(
     `SELECT m.*, l.name AS scope_name, l.parent_id AS scope_parent_id,
@@ -352,44 +345,116 @@ export function useMarinaMaps() {
   );
 }
 
-export function usePlacements(mapId?: string) {
-  return useQuery<PlacementRow>(
-    mapId
-      ? `SELECT p.*, l.name AS location_name FROM location_map_placements p
-           JOIN locations l ON l.id = p.location_id WHERE p.map_id = ?`
-      : `SELECT p.*, l.name AS location_name FROM location_map_placements p
-           JOIN locations l ON l.id = p.location_id`,
+/** An anchor (docs/maps.md): where a location is on a map, with the GPS it
+ *  stands for - or a free calibration point with no location. A located
+ *  anchor's lat/lng mirror the location's (kept in step by trigger); on the
+ *  device they may lag a sync behind, so readers fall back to the
+ *  location's own coordinates. */
+export interface MapAnchorRow {
+  id: string;
+  map_id: string;
+  location_id: string | null;
+  cx: number;
+  cy: number;
+  lat: number | null;
+  lng: number | null;
+  label: string | null;
+  location_name: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
+}
+
+/** A label on a map: its own centre, independent of the anchor it names. */
+export interface MapLabelRow {
+  id: string;
+  map_id: string;
+  location_id: string;
+  cx: number;
+  cy: number;
+  rotation: number;
+  font_size: number | null;
+  padding_x: number | null;
+  padding_y: number | null;
+  location_name: string;
+}
+
+export function useMapAnchors(mapId?: string) {
+  return useQuery<MapAnchorRow>(
+    `SELECT a.*, l.name AS location_name, l.gps_lat AS location_lat, l.gps_lng AS location_lng
+       FROM map_anchors a LEFT JOIN locations l ON l.id = a.location_id
+      ${mapId ? "WHERE a.map_id = ?" : ""}`,
     mapId ? [mapId] : [],
   );
 }
 
-export function placementOf(row: PlacementRow): PlacementShape {
-  return json<PlacementShape>(row.placement, { cx: 50, cy: 50, rotation: 0 });
+export function useMapLabels(mapId?: string) {
+  return useQuery<MapLabelRow>(
+    `SELECT b.*, l.name AS location_name
+       FROM map_labels b JOIN locations l ON l.id = b.location_id
+      ${mapId ? "WHERE b.map_id = ?" : ""}`,
+    mapId ? [mapId] : [],
+  );
 }
 
-export function savePlacement(
-  placementId: string,
-  shape: PlacementShape,
-): Promise<void> {
-  return update(db, "location_map_placements", placementId, {
-    placement: JSON.stringify(shape),
+export function labelShapeOf(row: MapLabelRow): LabelShape {
+  return {
+    cx: row.cx,
+    cy: row.cy,
+    rotation: row.rotation ?? 0,
+    fontSize: row.font_size ?? undefined,
+    paddingX: row.padding_x ?? undefined,
+    paddingY: row.padding_y ?? undefined,
+  };
+}
+
+/** The coordinates an anchor stands for: its own, else its location's. */
+export function anchorGps(row: MapAnchorRow): { lat: number; lng: number } | null {
+  const lat = row.lat ?? row.location_lat;
+  const lng = row.lng ?? row.location_lng;
+  return lat !== null && lng !== null ? { lat, lng } : null;
+}
+
+export function createAnchor(input: { mapId: string; locationId: string | null; cx: number; cy: number; lat?: number | null; lng?: number | null; label?: string | null }): Promise<string> {
+  return insert(db, "map_anchors", {
+    map_id: input.mapId,
+    location_id: input.locationId,
+    cx: input.cx,
+    cy: input.cy,
+    lat: input.lat ?? null,
+    lng: input.lng ?? null,
+    label: input.label ?? null,
   });
 }
 
-export function createPlacement(
-  mapId: string,
-  locationId: string,
-  shape: PlacementShape,
-): Promise<string> {
-  return insert(db, "location_map_placements", {
-    map_id: mapId,
-    location_id: locationId,
-    placement: JSON.stringify(shape),
-  });
+export function saveAnchor(anchorId: string, changes: Partial<{ cx: number; cy: number; lat: number | null; lng: number | null; label: string | null }>): Promise<void> {
+  return update(db, "map_anchors", anchorId, changes);
 }
 
-export function deletePlacement(placementId: string): Promise<void> {
-  return remove(db, "location_map_placements", placementId);
+export function deleteAnchor(anchorId: string): Promise<void> {
+  return remove(db, "map_anchors", anchorId);
+}
+
+function labelColumns(shape: LabelShape) {
+  return {
+    cx: shape.cx,
+    cy: shape.cy,
+    rotation: shape.rotation ?? 0,
+    font_size: shape.fontSize ?? null,
+    padding_x: shape.paddingX ?? null,
+    padding_y: shape.paddingY ?? null,
+  };
+}
+
+export function createLabel(mapId: string, locationId: string, shape: LabelShape): Promise<string> {
+  return insert(db, "map_labels", { map_id: mapId, location_id: locationId, ...labelColumns(shape) });
+}
+
+export function saveLabel(labelId: string, shape: LabelShape): Promise<void> {
+  return update(db, "map_labels", labelId, labelColumns(shape));
+}
+
+export function deleteLabel(labelId: string): Promise<void> {
+  return remove(db, "map_labels", labelId);
 }
 
 export function saveMarinaMap(map: {

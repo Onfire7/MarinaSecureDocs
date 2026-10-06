@@ -999,20 +999,6 @@ const location_attributes = new Table(
   },
 );
 
-const location_map_placements = new Table(
-  {
-    map_id: column.text,
-    location_id: column.text,
-    placement: column.text,
-  },
-  {
-    indexes: {
-      by_location_id: ["location_id"],
-      by_map_id: ["map_id"],
-    },
-  },
-);
-
 const location_services = new Table(
   {
     location_id: column.text,
@@ -1107,6 +1093,44 @@ const maintenance_rules = new Table(
   {
     indexes: {
       by_asset_id: ["asset_id"],
+    },
+  },
+);
+
+const map_anchors = new Table(
+  {
+    map_id: column.text,
+    location_id: column.text,
+    cx: column.real,
+    cy: column.real,
+    lat: column.real,
+    lng: column.real,
+    label: column.text,
+    created_at: column.text,
+  },
+  {
+    indexes: {
+      by_location_id: ["location_id"],
+      by_map_id: ["map_id"],
+    },
+  },
+);
+
+const map_labels = new Table(
+  {
+    map_id: column.text,
+    location_id: column.text,
+    cx: column.real,
+    cy: column.real,
+    rotation: column.real,
+    font_size: column.integer,
+    padding_x: column.integer,
+    padding_y: column.integer,
+  },
+  {
+    indexes: {
+      by_location_id: ["location_id"],
+      by_map_id: ["map_id"],
     },
   },
 );
@@ -1572,13 +1596,14 @@ export const AppSchema = new Schema({
   leases,
   location_amenities,
   location_attributes,
-  location_map_placements,
   location_services,
   location_statuses,
   location_type_parents,
   location_types,
   locations,
   maintenance_rules,
+  map_anchors,
+  map_labels,
   marina_maps,
   marina_settings,
   notes,
@@ -1668,13 +1693,14 @@ export const TABLE_NAMES = [
   "leases",
   "location_amenities",
   "location_attributes",
-  "location_map_placements",
   "location_services",
   "location_statuses",
   "location_type_parents",
   "location_types",
   "locations",
   "maintenance_rules",
+  "map_anchors",
+  "map_labels",
   "marina_maps",
   "marina_settings",
   "notes",
@@ -1720,7 +1746,6 @@ export const STRUCTURED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   checklist_template_items: ["config"],
   checklist_template_sections: ["trigger_config", "due_by"],
   checklist_templates: ["trigger_config", "due_by"],
-  location_map_placements: ["placement"],
   marina_settings: ["shift_report_recipients"],
   phone_lines: ["routing"],
   roles: ["allow", "deny"],

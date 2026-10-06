@@ -4,9 +4,8 @@ import type { LockContext } from "@powersync/web";
 import { insert, remove, transact, update } from "./sql";
 import { recordActivity } from "./activity";
 import { unexpectedOccupancy } from "../lib/audits";
-import type { PlacementShape } from "../lib/locations";
-import { loadLabelStyle, newPlacement, reanchored } from "../lib/mapLabelStyle";
-import type { AnswerValue, AmenityAnswer, AttributeAnswer, GpsAnswer, MapAnswer, ServiceAnswer, WizardItem } from "../lib/auditWizard";
+import { loadLabelStyle, newLabel } from "../lib/mapLabelStyle";
+import { placementFromPayload, type AnswerValue, type AmenityAnswer, type AttributeAnswer, type GpsAnswer, type MapAnswer, type ServiceAnswer, type WizardItem } from "../lib/auditWizard";
 
 // The wizard's writes (docs/audits.md § The wizard). One item at a time,
 // the moment it is answered.
@@ -224,15 +223,17 @@ async function writeOccupied(tx: LockContext, w: WizardWrite, findingId: string)
   });
 }
 
-/** The answer goes on the Finding; the move, if the auditor made one on
- *  the map, is a move_placement Proposal like the Finding form's - every
- *  other user navigates by that map, so it waits for approval. */
+/** The answer goes on the Finding; the place, if the auditor made one on
+ *  the map, is a move_placement Proposal like the Finding form's - the
+ *  anchor and the label (docs/maps.md) - replaced by the next and removed
+ *  by discard. Every other user navigates by that map, so it waits for
+ *  approval. */
 async function writeMap(tx: LockContext, w: WizardWrite, findingId: string) {
   const v = w.value as MapAnswer | boolean | null;
   const correct = typeof v === "boolean" ? v : (v?.correct ?? null);
   const placement = typeof v === "object" && v !== null ? v.placement : null;
   await update(tx, "audit_findings", findingId, { mapped_correctly: correct === null ? null : correct ? 1 : 0, updated_at: stamp() });
-  await replaceProposal(tx, findingId, "move_placement", null, placement ? { map_id: placement.map_id, placement: placement.placement } : null);
+  await replaceProposal(tx, findingId, "move_placement", null, placement ? { map_id: placement.map_id, anchor: placement.anchor, label: placement.label } : null);
 }
 
 /** A fix is a set_gps Proposal; anything that is not a fix clears it. The
@@ -241,48 +242,40 @@ async function writeMap(tx: LockContext, w: WizardWrite, findingId: string) {
  *
  *  The fix may carry an ANCHOR - the spot on the map the auditor tapped as
  *  "I am here" (docs/maps.md). That is a move_placement Proposal like the
- *  map page's: the location's existing placement re-anchored, label offset
- *  and style kept, or a new one in the remembered label style. The map
- *  page then has a label to ask about. A fix without an anchor leaves any
- *  placement Proposal as it was. */
+ *  map page's: the anchor moves, the label stays where it was - the
+ *  audit's own (a label adjusted earlier in this audit lives in the
+ *  pending Proposal), else the one on file, else a new one in the
+ *  remembered style beside the anchor, so the map page has one to ask
+ *  about. A fix without an anchor leaves any placement Proposal as it was. */
 async function writeGps(tx: LockContext, w: WizardWrite, findingId: string) {
   const fix = w.value as Partial<GpsAnswer> | string | boolean | null;
   const real = typeof fix === "object" && fix !== null && typeof fix.lat === "number" && typeof fix.lng === "number";
   await replaceProposal(tx, findingId, "set_gps", null, real ? { lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy ?? null } : null);
   if (!real || !fix.anchor) return;
   const { map_id, cx, cy } = fix.anchor;
-  // The audit's own placement first - a label adjusted earlier in this
-  // audit lives in the pending Proposal, and re-anchoring from the row on
-  // file would throw that work away - then the row on file, then a new
-  // one in the remembered style.
   const pending = await tx.getOptional<{ payload: string }>(
     "SELECT payload FROM audit_proposals WHERE finding_id = ? AND kind = 'move_placement' AND decision IS NULL",
     [findingId],
   );
-  const pendingShape = pending ? pendingPlacement(pending.payload, map_id) : null;
-  const existing =
-    !pendingShape && w.locationId
-      ? await tx.getOptional<{ placement: string }>("SELECT placement FROM location_map_placements WHERE location_id = ? AND map_id = ?", [w.locationId, map_id])
-      : null;
-  const shape = pendingShape ? reanchored(pendingShape, cx, cy) : existing ? reanchored(parseShape(existing.placement), cx, cy) : newPlacement(cx, cy, loadLabelStyle());
-  await replaceProposal(tx, findingId, "move_placement", null, { map_id, placement: shape });
-}
-
-function pendingPlacement(raw: string, mapId: string): PlacementShape | null {
-  try {
-    const v = JSON.parse(raw) as { map_id?: string; placement?: PlacementShape };
-    return v && v.map_id === mapId && v.placement && typeof v.placement === "object" ? v.placement : null;
-  } catch {
-    return null;
+  const pendingPlace = pending ? placementFromPayload(parseJson(pending.payload)) : null;
+  let label = pendingPlace && pendingPlace.map_id === map_id ? pendingPlace.label : null;
+  if (!label && w.locationId) {
+    const saved = await tx.getOptional<{ cx: number; cy: number; rotation: number; font_size: number | null; padding_x: number | null; padding_y: number | null }>(
+      "SELECT cx, cy, rotation, font_size, padding_x, padding_y FROM map_labels WHERE location_id = ? AND map_id = ?",
+      [w.locationId, map_id],
+    );
+    if (saved) label = { cx: saved.cx, cy: saved.cy, rotation: saved.rotation ?? 0, fontSize: saved.font_size ?? undefined, paddingX: saved.padding_x ?? undefined, paddingY: saved.padding_y ?? undefined };
   }
+  if (!label) label = newLabel({ cx, cy }, loadLabelStyle());
+  await replaceProposal(tx, findingId, "move_placement", null, { map_id, anchor: { cx, cy }, label });
 }
 
-function parseShape(raw: string): PlacementShape {
+function parseJson(raw: string): Record<string, unknown> {
   try {
-    const v = JSON.parse(raw) as PlacementShape;
-    return v && typeof v === "object" ? v : { cx: 50, cy: 50, rotation: 0 };
+    const v = JSON.parse(raw) as unknown;
+    return v && typeof v === "object" ? (v as Record<string, unknown>) : {};
   } catch {
-    return { cx: 50, cy: 50, rotation: 0 };
+    return {};
   }
 }
 

@@ -104,20 +104,18 @@ describe("buildMapFit", () => {
     expect(Math.abs(fit.toMap(g.lat, g.lng).cx - plain(100, 60).cx)).toBeLessThan(0.1);
   });
 
-  it("8 · control points are the anchored AND pinned locations; the rest are ignored", () => {
-    const placements = [
-      { location_id: "a", cx: 10, cy: 10 },
-      { location_id: "b", cx: 50, cy: 50 },
-      { location_id: "c", cx: 90, cy: 90 },
+  it("8 · control points are the anchors with coordinates; a provisional one supersedes the saved one", () => {
+    const anchors = [
+      { cx: 10, cy: 10, lat: 33.8, lng: -96.6, label: "Slip 1", locationId: "a" },
+      { cx: 50, cy: 50, lat: null, lng: null, label: "Slip 2", locationId: "b" },
+      { cx: 90, cy: 90, lat: 33.82, lng: -96.62, label: "NE corner", locationId: null },
+      { cx: 12, cy: 11, lat: 33.801, lng: -96.601, label: "Slip 1", locationId: "a", provisional: true },
     ];
-    const locations = [
-      { id: "a", name: "Slip 1", gps_lat: 33.8, gps_lng: -96.6 },
-      { id: "b", name: "Slip 2", gps_lat: null, gps_lng: null },
-      { id: "d", name: "Unplotted", gps_lat: 33.81, gps_lng: -96.61 },
-    ];
-    expect(controlPointsFor(placements, locations)).toEqual([{ cx: 10, cy: 10, lat: 33.8, lng: -96.6, label: "Slip 1" }]);
+    expect(controlPointsFor(anchors)).toEqual([
+      { cx: 90, cy: 90, lat: 33.82, lng: -96.62, label: "NE corner", provisional: undefined },
+      { cx: 12, cy: 11, lat: 33.801, lng: -96.601, label: "Slip 1", provisional: true },
+    ]);
   });
-
   it("9 · an accuracy radius in metres is the right size on the map, axis by axis", () => {
     const fit = buildMapFit(grid(plain, [0, 100, 200], [0, 60, 120]))!;
     const g = gps(100, 60);

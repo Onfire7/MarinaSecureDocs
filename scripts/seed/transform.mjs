@@ -203,9 +203,20 @@ export function transform(ex) {
   put("marina_maps", g("marinaMaps").map((r) => ({
     id: r.id, name: r.name, scope_id: one(r.scope), image_attachment_id: one(r.image),
   })));
-  put("location_map_placements", g("locationMapPlacements").map((r) => ({
+  // Instant's one placement blob becomes an anchor (where the location is,
+  // with its coordinates) and a label (at anchor + offset). docs/maps.md.
+  const placements = g("locationMapPlacements").filter((r) => r.placement && r.placement.cx != null && r.placement.cy != null);
+  const gpsOf = new Map(g("locations").map((l) => [l.id, { lat: l.gpsLat ?? null, lng: l.gpsLng ?? null }]));
+  put("map_anchors", placements.map((r) => ({
     id: r.id, map_id: one(r.map), location_id: one(r.location),
-    placement: JSON.stringify(r.placement ?? {}),
+    cx: r.placement.cx, cy: r.placement.cy,
+    lat: gpsOf.get(one(r.location))?.lat ?? null, lng: gpsOf.get(one(r.location))?.lng ?? null,
+  })));
+  put("map_labels", placements.map((r) => ({
+    map_id: one(r.map), location_id: one(r.location),
+    cx: r.placement.cx + (r.placement.dx ?? 0), cy: r.placement.cy + (r.placement.dy ?? 0),
+    rotation: r.placement.rotation ?? 0,
+    font_size: r.placement.fontSize ?? null, padding_x: r.placement.paddingX ?? null, padding_y: r.placement.paddingY ?? null,
   })));
 
   put("checkpoints", g("checkpoints").map((r) => ({
@@ -468,7 +479,7 @@ export const LOAD_ORDER = [
   "attachments", "contacts", "contact_details", "roles", "users", "user_roles",
   "boats", "boat_owners", "boat_authorized_users",
   "vehicles", "vehicle_owners",
-  "locations", "marina_maps", "location_map_placements",
+  "locations", "marina_maps", "map_anchors", "map_labels",
   "checkpoints", "tours", "tour_checkpoints",
   "assets", "maintenance_rules", "asset_status_logs", "asset_checkouts", "asset_meter_readings",
   "leases", "lease_lessees", "lease_documents", "lease_comments", "reservations",

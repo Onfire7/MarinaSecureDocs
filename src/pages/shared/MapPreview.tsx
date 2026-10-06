@@ -1,20 +1,22 @@
 // A map at a glance, with one location picked out (docs/maps.md): its
-// label and, when the label has been moved off it, its anchor; every other
-// label muted; the device's own position when the map's fit can place it.
-// Not an editor - tapping it opens one. The placement check and the admin
-// location row both show this.
-import { placementStyle, type PlacementShape } from "../../lib/locations";
+// label, its anchor where that stands apart from the label, every other
+// label muted, the free calibration points, and the device's own position
+// when the map's fit can place it. Not an editor - tapping it opens one.
+// The placement check, the wizard's GPS page and the admin row show this.
+import { placementStyle, type LabelShape, type MapPoint } from "../../lib/locations";
 import type { MapFit } from "../../lib/mapFit";
-import { placementOf, type MarinaMapRow, type PlacementRow } from "../../data/locations";
+import { labelShapeOf, type MapAnchorRow, type MapLabelRow, type MarinaMapRow } from "../../data/locations";
 import { attachmentUrl } from "../../data/files";
 import { DeviceDot } from "./DeviceDot";
 import type { DevicePosition } from "./useDevicePosition";
 
 export function MapPreview({
   map,
-  placements,
+  anchors,
+  labels,
   subject,
-  shape,
+  anchor,
+  label,
   proposed,
   fit,
   device,
@@ -23,10 +25,11 @@ export function MapPreview({
   testId = "map-preview",
 }: {
   map: MarinaMapRow;
-  placements: PlacementRow[];
+  anchors: MapAnchorRow[];
+  labels: MapLabelRow[];
   subject: { locationId: string; name: string };
-  /** Where the subject is drawn, or null when it is not on this map. */
-  shape: PlacementShape | null;
+  anchor: MapPoint | null;
+  label: LabelShape | null;
   /** Draw the subject as a proposal awaiting approval. */
   proposed?: boolean;
   fit: MapFit | null;
@@ -38,6 +41,7 @@ export function MapPreview({
   testId?: string;
 }) {
   const imageUrl = attachmentUrl(map.image_path);
+  const apart = anchor && label ? Math.hypot(label.cx - anchor.cx, label.cy - anchor.cy) > 0.5 : anchor !== null;
   return (
     <div
       className={`map-canvas map-schematic pc-preview ${onOpen ? "pc-tappable" : ""}`}
@@ -47,12 +51,17 @@ export function MapPreview({
       aria-label={onOpen ? "Open the map" : undefined}
     >
       {imageUrl && <img src={imageUrl} alt={map.name} className="map-image" />}
-      {placements
-        .filter((p) => p.location_id !== subject.locationId)
-        .map((p) => (
-          <span key={p.id} className="map-rect pc-other" style={placementStyle(placementOf(p))}>
-            {p.location_name}
+      {labels
+        .filter((b) => b.location_id !== subject.locationId)
+        .map((b) => (
+          <span key={b.id} className="map-rect pc-other" style={placementStyle(labelShapeOf(b))}>
+            {b.location_name}
           </span>
+        ))}
+      {anchors
+        .filter((a) => a.location_id === null)
+        .map((a) => (
+          <span key={a.id} className="map-anchor map-anchor-free" style={{ left: `${a.cx}%`, top: `${a.cy}%` }} title={a.label ?? "Calibration point"} aria-hidden />
         ))}
       <DeviceDot fit={fit} position={device} />
       {fit &&
@@ -61,14 +70,12 @@ export function MapPreview({
           if (!Number.isFinite(at.cx) || !Number.isFinite(at.cy)) return null;
           return <span key={i} className={`map-mark map-mark-${m.kind} ${at.inside ? "" : "outside"}`} style={{ left: `${at.cx}%`, top: `${at.cy}%` }} title={m.title} data-testid={`${testId}-mark-${m.kind}`} />;
         })}
-      {shape && (
-        <>
-          <span className={`map-rect pc-mine ${proposed ? "pc-proposed-label" : ""}`} style={placementStyle(shape)} title={proposed ? "Proposed placement — waits for approval" : undefined} data-testid={`${testId}-label`}>
-            {subject.name}
-          </span>
-          {shape.dx || shape.dy ? <span className="map-anchor" style={{ left: `${shape.cx}%`, top: `${shape.cy}%` }} title={`${subject.name} is here`} data-testid={`${testId}-anchor`} /> : null}
-        </>
+      {label && (
+        <span className={`map-rect pc-mine ${proposed ? "pc-proposed-label" : ""}`} style={placementStyle(label)} title={proposed ? "Proposed placement — waits for approval" : undefined} data-testid={`${testId}-label`}>
+          {subject.name}
+        </span>
       )}
+      {anchor && apart && <span className="map-anchor" style={{ left: `${anchor.cx}%`, top: `${anchor.cy}%` }} title={`${subject.name} is here`} data-testid={`${testId}-anchor`} />}
       {onOpen && <span className="pc-zoom-hint">tap to zoom</span>}
     </div>
   );
