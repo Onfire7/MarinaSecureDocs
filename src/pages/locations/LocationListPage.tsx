@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { SchematicMapView } from "../shared/SchematicMapView";
+import { EditOnMap } from "./EditOnMap";
 import {
   compareNames,
   statusBadgeClass,
@@ -113,7 +114,7 @@ export function LocationListPage() {
       ) : view === "list" ? (
         <ListView locations={filtered} flat={filterActive} canManage={canManage} />
       ) : (
-        <SchematicMap locations={filtered} />
+        <SchematicMap locations={filtered} canManage={canManage} />
       )}
     </div>
   );
@@ -298,13 +299,16 @@ function LocationCard({
 
 // ---------------------------------------------------------------- Map
 
-/** The marina map, interactive and read-only: zoom it, flip anchors and
- *  labels, tap a location to see what it is and its status, tap it again -
- *  or Open - to go to it. Editing is the admin plotter's; nothing here
- *  writes. The type and status filters apply to it as to the other views. */
-function SchematicMap({ locations }: { locations: LocationRow[] }) {
+/** The marina map: zoom it, flip anchors and labels, tap a location to see
+ *  what it is and its status, tap it again - or Open - to go to it. Read
+ *  only, except that a user with manage_locations gets "Edit on map" on the
+ *  card: the shared editor on this map, for the label, the outline (mask)
+ *  or the anchor. The type and status filters apply to it as to the list. */
+function SchematicMap({ locations, canManage }: { locations: LocationRow[]; canManage: boolean }) {
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // The map showing, so "Edit on map" edits the location on THIS map.
+  const [mapId, setMapId] = useState<string | null>(null);
   const byId = new Map(locations.map((l) => [l.id, l]));
   const selected = selectedId ? (byId.get(selectedId) ?? null) : null;
 
@@ -316,6 +320,7 @@ function SchematicMap({ locations }: { locations: LocationRow[] }) {
           return locationId === selectedId ? { ...c, border: "var(--accent)" } : c;
         }}
         include={(locationId) => byId.has(locationId)}
+        onActiveMapChange={(m) => setMapId(m?.id ?? null)}
         onOpen={(locationId) => (locationId === selectedId ? navigate(`/locations/${locationId}`) : setSelectedId(locationId))}
         footnote="Tap a location to see it, tap it again to open it. Rectangles are colored by status. A ▸ marker drills into that location's own map."
       />
@@ -329,6 +334,9 @@ function SchematicMap({ locations }: { locations: LocationRow[] }) {
           </span>
           <span className="row">
             {selected.tracks_status === 1 && <span className={statusBadgeClass(selected.status_name)}>{selected.status_name ?? "—"}</span>}
+            {/* Editing stays out of everyone else's way: only manage_locations
+                sees it, and it saves directly, as the admin row does. */}
+            {canManage && mapId && <EditOnMap location={selected} mapId={mapId} />}
             <Link to={`/locations/${selected.id}`} className="btn btn-sm btn-primary">
               Open
             </Link>

@@ -19,7 +19,11 @@ side, applied to both):
   remembered on the device). Each location is its label, its traced
   outline (shaded, see-through) and/or its anchor, coloured by status. **Tapping one selects it** - a card under the map
   gives its name, type and status with *Open* - and tapping the selected
-  one again opens it. A ▸ on a label drills into that location's own map;
+  one again opens it. A user with `manage_locations` also gets **Edit on
+  map** (*Place on map* when it is not on this one) on that card: the
+  shared editor on the map being viewed, to change the label, the traced
+  outline - its mask - or the anchor, saved directly as from the admin row
+  (2026-10-07). Nobody else sees anything that writes. A ▸ on a label drills into that location's own map;
   with several properties the map opens on a chooser. The device appears as
   a blue dot where the map's fit can place it, grey outside the calibrated
   area. A location not on the map is not on it; it is in the list.

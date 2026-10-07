@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { placementStyle } from "../../lib/locations";
 import {
   labelShapeOf,
@@ -36,6 +36,7 @@ export function SchematicMapView({
   include,
   onOpen,
   footnote,
+  onActiveMapChange,
 }: {
   /** Fill/border for a location's rectangle. */
   colorFor: (locationId: string) => RectStyle;
@@ -43,6 +44,9 @@ export function SchematicMapView({
   include?: (locationId: string) => boolean;
   onOpen: (locationId: string) => void;
   footnote?: string;
+  /** Told which map is showing, as it changes - for anything outside the
+   *  map that acts on it. */
+  onActiveMapChange?: (map: MarinaMapRow | null) => void;
 }) {
   const { data: maps } = useMarinaMaps();
   const { data: allPlacements } = useMapLabels();
@@ -66,6 +70,10 @@ export function SchematicMapView({
 
   const active =
     mapStack.at(-1) ?? (rootMaps.length === 1 ? rootMaps[0] : undefined);
+  useEffect(() => {
+    onActiveMapChange?.(active ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active?.id]);
   // Where the viewer is, when this map can say (docs/maps.md).
   const fit = useMapFit(active?.id);
   const device = useDevicePosition();

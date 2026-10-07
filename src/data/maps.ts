@@ -7,7 +7,24 @@ import { useMemo } from "react";
 import { useQuery } from "@powersync/react";
 import { placementFromPayload } from "../lib/auditWizard";
 import { buildMapFit, controlPointsFor, type MapFit } from "../lib/mapFit";
-import { anchorGps, useLocations, useMapAnchors, useMapLabels, useMarinaMaps, type MapAnchorRow, type MapLabelRow, type MarinaMapRow } from "./locations";
+import {
+  anchorGps,
+  createAnchor,
+  createLabel,
+  deleteAnchor,
+  deleteLabel,
+  saveAnchor,
+  saveLabel,
+  saveLocation,
+  useLocations,
+  useMapAnchors,
+  useMapLabels,
+  useMarinaMaps,
+  type MapAnchorRow,
+  type MapLabelRow,
+  type MarinaMapRow,
+} from "./locations";
+import type { LabelShape, MapPoint } from "../lib/locations";
 
 /** The map a location is shown on: the one it is anchored or labelled on,
  *  else the map of its nearest ancestor that has one, else the first
@@ -121,4 +138,35 @@ function parse(raw: string): Record<string, unknown> {
   } catch {
     return {};
   }
+}
+
+/** What the editor hands back for a location, saved directly - the admin
+ *  path, with no Proposal to wait on (needs manage_locations). The anchor
+ *  carries any coordinates typed or taken from the device, and the trigger
+ *  takes them on to the location; a label without an outline or text is
+ *  removed. Used by the admin row and the Locations map alike. */
+export function saveLocationPlace(input: {
+  mapId: string;
+  location: { id: string; gps_lat: number | null; gps_lng: number | null };
+  anchorRow: MapAnchorRow | null;
+  labelRow: MapLabelRow | null;
+  next: { anchor: MapPoint | null; label: LabelShape | null; point?: { lat: number | null; lng: number | null } };
+}): void {
+  const { mapId, location, anchorRow, labelRow, next } = input;
+  const gps = next.point && next.point.lat !== null && next.point.lng !== null ? { lat: next.point.lat, lng: next.point.lng } : null;
+  if (gps && !next.anchor && !anchorRow && (gps.lat !== location.gps_lat || gps.lng !== location.gps_lng)) void saveLocation(location.id, { gpsLat: gps.lat, gpsLng: gps.lng });
+  if (next.anchor) {
+    if (anchorRow) void saveAnchor(anchorRow.id, { cx: next.anchor.cx, cy: next.anchor.cy, ...(gps ?? {}) });
+    else void createAnchor({ mapId, locationId: location.id, cx: next.anchor.cx, cy: next.anchor.cy, lat: gps?.lat ?? location.gps_lat, lng: gps?.lng ?? location.gps_lng });
+  } else if (anchorRow && gps) void saveAnchor(anchorRow.id, gps);
+  if (next.label) {
+    if (labelRow) void saveLabel(labelRow.id, next.label);
+    else void createLabel(mapId, location.id, next.label);
+  } else if (labelRow) void deleteLabel(labelRow.id);
+}
+
+/** Take a location off one map: its anchor and its label there. */
+export function removeLocationPlace(anchorRow: MapAnchorRow | null, labelRow: MapLabelRow | null): void {
+  if (anchorRow) void deleteAnchor(anchorRow.id);
+  if (labelRow) void deleteLabel(labelRow.id);
 }

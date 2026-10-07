@@ -8,8 +8,8 @@
 // are the audit's.
 import { useState } from "react";
 import type { LabelShape, MapPoint } from "../../lib/locations";
-import { createAnchor, createLabel, deleteAnchor, deleteLabel, labelShapeOf, saveAnchor, saveLabel, type LocationRow } from "../../data/locations";
-import { useLocationMap, useMapFit } from "../../data/maps";
+import { labelShapeOf, type LocationRow } from "../../data/locations";
+import { removeLocationPlace, saveLocationPlace, useLocationMap, useMapFit } from "../../data/maps";
 import { MapLabelEditor, type EditedPlace } from "../shared/MapLabelEditor";
 import { useDevicePosition } from "../shared/useDevicePosition";
 import { DraftNumberInput } from "../shared/DraftInput";
@@ -39,22 +39,11 @@ export function LocationMapSettings({
 
   const finish = (next: EditedPlace) => {
     setEditing(null);
-    if (!map) return;
-    const gps = next.point && next.point.lat !== null && next.point.lng !== null ? { lat: next.point.lat, lng: next.point.lng } : null;
-    if (gps && (gps.lat !== location.gps_lat || gps.lng !== location.gps_lng)) onGps(gps.lat, gps.lng);
-    if (next.anchor) {
-      if (anchorRow) void saveAnchor(anchorRow.id, { cx: next.anchor.cx, cy: next.anchor.cy, ...(gps ?? {}) });
-      else void createAnchor({ mapId: map.id, locationId: location.id, cx: next.anchor.cx, cy: next.anchor.cy, lat: gps?.lat ?? location.gps_lat, lng: gps?.lng ?? location.gps_lng });
-    } else if (anchorRow && gps) void saveAnchor(anchorRow.id, gps);
-    if (next.label) {
-      if (labelRow) void saveLabel(labelRow.id, next.label);
-      else void createLabel(map.id, location.id, next.label);
-    } else if (labelRow) void deleteLabel(labelRow.id);
+    if (map) saveLocationPlace({ mapId: map.id, location, anchorRow, labelRow, next });
   };
   const removeAll = () => {
     setEditing(null);
-    if (anchorRow) void deleteAnchor(anchorRow.id);
-    if (labelRow) void deleteLabel(labelRow.id);
+    removeLocationPlace(anchorRow, labelRow);
   };
 
   return (
@@ -86,8 +75,8 @@ export function LocationMapSettings({
               {onMap && map ? (
                 <span className="small" data-testid="loc-map-status">
                   On <b>{map.scope_name ?? map.name}</b>
-                  {anchor ? "" : ", label only"}
-                  {label ? "" : ", no label"}
+                  {anchor ? "" : ", no anchor"}
+                  {!label ? ", no label" : label.outline ? (label.showText === false ? ", outline" : ", outline and label") : ""}
                   {inside === null ? "" : inside ? " · inside the calibrated area" : " · outside the calibrated area"}
                 </span>
               ) : (
@@ -111,7 +100,7 @@ export function LocationMapSettings({
               </button>
               {onMap && (
                 <button type="button" className="btn btn-sm" data-testid="loc-edit-label" onClick={() => setEditing("label")}>
-                  Label
+                  Label / outline
                 </button>
               )}
               {onMap && (
