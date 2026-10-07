@@ -111,6 +111,21 @@ that stand in for the artist's hand, including one whose left half is at
 twice the scale of the right, where the piecewise fit is right and the
 single affine is shown to be wrong.
 
+## What a map shows
+
+Every map carries two independent switches, **Anchors** and **Labels**
+(owner, 2026-10-07; the day before they were one three-way choice), one
+setting for the whole app, remembered on the device (`pages/shared/
+mapShow.ts`, parsed by `lib/mapShow.ts`, which still reads the three words
+the first version stored). Labels alone is the map as it reads; anchors
+alone draws a dot for every located anchor, tappable where the map is; both
+draws a located anchor only where it stands apart from its label, so a
+label on its anchor is not marked twice; neither shows the bare image and
+the device. Free calibration points belong to the anchors switch.
+
+Maps zoom in place wherever they appear (`ZoomableMap`), and the Locations
+page opens on the map when the marina has one.
+
 ## Limits
 
 Consumer GPS is five to ten metres on a good day and worse among trees and

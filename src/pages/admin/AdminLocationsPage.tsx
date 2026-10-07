@@ -1740,16 +1740,16 @@ function MapPlotter({
           {/* With both on, a located anchor is drawn only where it stands
               apart from its label - a label on its anchor already marks the
               spot; with anchors alone, every one, and tapping it edits. */}
-          {show !== "labels" &&
+          {show.anchors &&
             anchors
               .filter((a) => a.location_id !== null)
               .filter((a) => {
-                if (show === "anchors") return true;
+                if (!show.labels) return true;
                 const b = labelOf(a.location_id!);
                 return !b || Math.hypot(b.cx - a.cx, b.cy - a.cy) > 0.5;
               })
               .map((a) =>
-                show === "anchors" ? (
+                !show.labels ? (
                   <button
                     key={`a-${a.id}`}
                     type="button"
@@ -1763,7 +1763,7 @@ function MapPlotter({
                   <span key={`a-${a.id}`} className="map-anchor" style={{ left: `${a.cx}%`, top: `${a.cy}%` }} aria-hidden />
                 ),
               )}
-          {show !== "labels" && freePoints.map((a) => (
+          {show.anchors && freePoints.map((a) => (
             <button
               key={a.id}
               type="button"
@@ -1775,7 +1775,7 @@ function MapPlotter({
               onClick={() => setEditing({ kind: "point", anchorId: a.id })}
             />
           ))}
-          {show !== "anchors" && labels.map((b) => (
+          {show.labels && labels.map((b) => (
             <button
               key={b.id}
               type="button"

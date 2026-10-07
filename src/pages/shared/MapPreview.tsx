@@ -45,8 +45,8 @@ export function MapPreview({
 }) {
   const imageUrl = attachmentUrl(map.image_path);
   const show = useMapShow();
-  const showLabels = show !== "anchors";
-  const showAnchors = show !== "labels";
+  const showLabels = show.labels;
+  const showAnchors = show.anchors;
   // With both on, a located anchor is drawn only where it stands apart
   // from its label; with anchors alone, every one.
   const apart = anchor && label ? Math.hypot(label.cx - anchor.cx, label.cy - anchor.cy) > 0.5 : anchor !== null;
@@ -76,7 +76,7 @@ export function MapPreview({
           ))}
       {showAnchors &&
         anchors
-          .filter((a) => a.location_id === null || (show === "anchors" && a.location_id !== subject.locationId))
+          .filter((a) => a.location_id === null || (!show.labels && a.location_id !== subject.locationId))
           .map((a) => (
             <span
               key={a.id}

@@ -459,16 +459,16 @@ export function MapLabelEditor({
       >
         <div className="mle-map" style={{ width: layerW, height: layerH || undefined, transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.s})`, "--zs": view.s } as React.CSSProperties}>
           {imageUrl && <img src={imageUrl} alt={map.name} className="map-image" draggable={false} onLoad={(e) => setImg({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })} />}
-          {show !== "anchors" &&
+          {show.labels &&
             otherLabels.map((b) => (
               <span key={b.id} className="map-rect mle-other" style={placementStyle(labelShapeOf(b))}>
                 {b.location_name}
               </span>
             ))}
-          {show !== "labels" &&
+          {show.anchors &&
             anchors
               .filter((a) => a.location_id !== subject.locationId)
-              .filter((a) => a.location_id === null ? freePoints.includes(a) : show === "anchors")
+              .filter((a) => a.location_id === null ? freePoints.includes(a) : !show.labels)
               .map((a) => (
                 <span
                   key={a.id}

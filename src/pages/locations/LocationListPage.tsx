@@ -19,16 +19,18 @@ import {
 } from "../../data/locations";
 import { useLocationStatuses } from "../../data/lookups";
 
-// Locations — Location List / Map View (see pages/location-list.html).
-// Three presentations of the same filtered set: hierarchy list, geographic
-// pin map (gps coordinates), and schematic map (MarinaMap image +
-// LocationMapPlacement rectangles).
-type ViewMode = "list" | "pins" | "schematic";
+// Locations — Location List / Map View (LocationListPage.spec.md).
+// Three presentations of the same filtered set: the marina map (the image
+// with each location's label and anchor), a hierarchy list, and a geographic
+// pin plot (gps coordinates). The map is the landing view whenever the
+// marina has one (owner, 2026-10-07).
+type ViewMode = "map" | "list" | "pins";
 
 export function LocationListPage() {
   const current = useCurrent();
   const canManage = current.can("manage_locations");
-  const [view, setView] = useState<ViewMode>("list");
+  // null until someone chooses: the map where there is one, else the list.
+  const [chosen, setChosen] = useState<ViewMode | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
 
@@ -37,6 +39,8 @@ export function LocationListPage() {
   const { data: maps } = useMarinaMaps();
   const { statuses } = useLocationStatuses();
   const hasSchematic = maps.length > 0;
+  const view: ViewMode = chosen ?? (hasSchematic ? "map" : "list");
+  const setView = setChosen;
 
   const filtered = locations.filter(
     (l) =>
@@ -57,8 +61,8 @@ export function LocationListPage() {
       </div>
 
       <div className="chip-row">
-        {(["list", "pins", "schematic"] as ViewMode[])
-          .filter((m) => m !== "schematic" || hasSchematic)
+        {(["map", "list", "pins"] as ViewMode[])
+          .filter((m) => m !== "map" || hasSchematic)
           .map((m) => (
             <button
               key={m}
@@ -66,7 +70,7 @@ export function LocationListPage() {
               className={"chip" + (view === m ? " active" : "")}
               onClick={() => setView(m)}
             >
-              {m === "list" ? "List" : m === "pins" ? "Pin Map" : "Schematic"}
+              {m === "map" ? "Map" : m === "list" ? "List" : "Pin Map"}
             </button>
           ))}
         <select
@@ -110,7 +114,7 @@ export function LocationListPage() {
       ) : view === "pins" ? (
         <PinMap locations={filtered} />
       ) : (
-        <SchematicMap locations={locations} />
+        <SchematicMap locations={filtered} />
       )}
     </div>
   );
@@ -343,17 +347,48 @@ function PinMap({ locations }: { locations: LocationRow[] }) {
   );
 }
 
-// ---------------------------------------------------------------- Schematic
+// ---------------------------------------------------------------- Map
 
+/** The marina map, interactive and read-only: zoom it, flip anchors and
+ *  labels, tap a location to see what it is and its status, tap it again -
+ *  or Open - to go to it. Editing is the admin plotter's; nothing here
+ *  writes. The type and status filters apply to it as to the other views. */
 function SchematicMap({ locations }: { locations: LocationRow[] }) {
   const navigate = useNavigate();
-  const statusById = new Map(locations.map((l) => [l.id, l.status_name]));
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const byId = new Map(locations.map((l) => [l.id, l]));
+  const selected = selectedId ? (byId.get(selectedId) ?? null) : null;
 
   return (
-    <SchematicMapView
-      colorFor={(locationId) => statusMapColors(statusById.get(locationId) ?? "")}
-      onOpen={(locationId) => navigate(`/locations/${locationId}`)}
-      footnote="Rectangles are color-coded by status. A ▸ marker drills into that location's own detail map; anything else opens the location."
-    />
+    <div className="stack" style={{ gap: 10 }}>
+      <SchematicMapView
+        colorFor={(locationId) => {
+          const c = statusMapColors(byId.get(locationId)?.status_name ?? "");
+          return locationId === selectedId ? { ...c, border: "var(--accent)" } : c;
+        }}
+        include={(locationId) => byId.has(locationId)}
+        onOpen={(locationId) => (locationId === selectedId ? navigate(`/locations/${locationId}`) : setSelectedId(locationId))}
+        footnote="Tap a location to see it, tap it again to open it. Rectangles are colored by status. A ▸ marker drills into that location's own map."
+      />
+      {selected && (
+        <div className="card spread" data-testid="map-selected">
+          <span style={{ minWidth: 0 }}>
+            <span className="card-title">{selected.name}</span>
+            <span className="card-meta" style={{ display: "block" }}>
+              {selected.type_name}
+            </span>
+          </span>
+          <span className="row">
+            {selected.tracks_status === 1 && <span className={statusBadgeClass(selected.status_name)}>{selected.status_name ?? "—"}</span>}
+            <Link to={`/locations/${selected.id}`} className="btn btn-sm btn-primary">
+              Open
+            </Link>
+            <button type="button" className="btn btn-sm btn-bare" aria-label="Close" onClick={() => setSelectedId(null)}>
+              ✕
+            </button>
+          </span>
+        </div>
+      )}
+    </div>
   );
 }

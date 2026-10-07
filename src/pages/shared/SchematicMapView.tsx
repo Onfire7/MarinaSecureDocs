@@ -121,9 +121,9 @@ export function SchematicMapView({
 
       <ZoomableMap imageUrl={imageUrl} alt={active.name} className="map-canvas map-schematic">
         <DeviceDot fit={fit} position={device} />
-        {show !== "labels" &&
+        {show.anchors &&
           allAnchors
-            .filter((a) => a.map_id === active.id && (a.location_id === null || show === "anchors"))
+            .filter((a) => a.map_id === active.id && (a.location_id === null || !show.labels))
             .filter((a) => a.location_id === null || !include || include(a.location_id))
             .map((a) =>
               a.location_id === null ? (
@@ -140,7 +140,7 @@ export function SchematicMapView({
                 />
               ),
             )}
-        {show !== "anchors" && placements.map((p) => {
+        {show.labels && placements.map((p) => {
           if (include && !include(p.location_id)) return null;
           const colors = colorFor(p.location_id);
           const childMap = mapForLocation(p.location_id);
