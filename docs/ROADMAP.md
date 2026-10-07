@@ -112,6 +112,19 @@ each page is touched. Tests accompany every change.
 
 ## Deferred
 
+### Tile maps under the regular maps
+
+A real-world tile map (roads, water, aerial) as a base layer for the
+marina's own maps, so a location can be seen and a device placed where the
+drawn map has nothing. Asked for 2026-10-07 when the *Pin Map* view was
+removed from the Locations page: that view plotted GPS coordinates on a blank
+panel with no scale, and the marina map, with its GPS fit (`docs/maps.md`),
+covers what it did. The fit already turns a GPS position into a place on a
+map image, so a tile layer is a second projection, not a new model.
+
+**Why deferred:** nothing needs it yet, and it brings a tile provider, its
+key, its terms and offline behaviour with it - decide those before building.
+
 ### Netlify Functions surface
 
 Shift-report send and sweep, and the Twilio bridge for calls and SMS.

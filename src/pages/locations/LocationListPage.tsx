@@ -20,11 +20,12 @@ import {
 import { useLocationStatuses } from "../../data/lookups";
 
 // Locations — Location List / Map View (LocationListPage.spec.md).
-// Three presentations of the same filtered set: the marina map (the image
-// with each location's label and anchor), a hierarchy list, and a geographic
-// pin plot (gps coordinates). The map is the landing view whenever the
-// marina has one (owner, 2026-10-07).
-type ViewMode = "map" | "list" | "pins";
+// Two presentations of the same filtered set: the marina map (the image
+// with each location's label and anchor) and a hierarchy list. The map is
+// the landing view whenever the marina has one (owner, 2026-10-07). A
+// relative GPS "pin map" lived here until 2026-10-07; tile-map support
+// for the regular maps is the planned replacement (docs/ROADMAP.md).
+type ViewMode = "map" | "list";
 
 export function LocationListPage() {
   const current = useCurrent();
@@ -61,7 +62,7 @@ export function LocationListPage() {
       </div>
 
       <div className="chip-row">
-        {(["map", "list", "pins"] as ViewMode[])
+        {(["map", "list"] as ViewMode[])
           .filter((m) => m !== "map" || hasSchematic)
           .map((m) => (
             <button
@@ -70,7 +71,7 @@ export function LocationListPage() {
               className={"chip" + (view === m ? " active" : "")}
               onClick={() => setView(m)}
             >
-              {m === "map" ? "Map" : m === "list" ? "List" : "Pin Map"}
+              {m === "map" ? "Map" : "List"}
             </button>
           ))}
         <select
@@ -111,8 +112,6 @@ export function LocationListPage() {
         </div>
       ) : view === "list" ? (
         <ListView locations={filtered} flat={filterActive} canManage={canManage} />
-      ) : view === "pins" ? (
-        <PinMap locations={filtered} />
       ) : (
         <SchematicMap locations={filtered} />
       )}
@@ -294,56 +293,6 @@ function LocationCard({
     </div>
   ) : (
     <div className="card spread">{body}</div>
-  );
-}
-
-// ---------------------------------------------------------------- Pin map
-
-// Relative plot over the bounding box of the filtered set's gps coordinates —
-// deliberately dependency-free rather than a tile-based live map; locations
-// without coordinates are omitted from this mode but remain in the list.
-function PinMap({ locations }: { locations: LocationRow[] }) {
-  const navigate = useNavigate();
-  const pinned = locations.filter((l) => l.gps_lat != null && l.gps_lng != null);
-  if (pinned.length === 0) {
-    return (
-      <div className="placeholder">
-        <div className="big">No locations have GPS coordinates yet</div>
-        Coordinates are set per location in Admin → Locations.
-      </div>
-    );
-  }
-  const lats = pinned.map((l) => l.gps_lat!);
-  const lngs = pinned.map((l) => l.gps_lng!);
-  const [minLat, maxLat] = [Math.min(...lats), Math.max(...lats)];
-  const [minLng, maxLng] = [Math.min(...lngs), Math.max(...lngs)];
-  const span = (v: number, min: number, max: number) =>
-    max === min ? 50 : ((v - min) / (max - min)) * 90 + 5;
-
-  return (
-    <div className="map-canvas">
-      {pinned.map((l) => {
-        const colors = statusMapColors(l.status_name);
-        return (
-          <button
-            key={l.id}
-            type="button"
-            className="map-pin"
-            style={{
-              left: `${span(l.gps_lng!, minLng, maxLng)}%`,
-              // north up: higher latitude renders nearer the top
-              top: `${100 - span(l.gps_lat!, minLat, maxLat)}%`,
-              background: colors.background,
-              borderColor: colors.border,
-            }}
-            title={`${l.name} — ${l.status_name ?? "—"}`}
-            onClick={() => navigate(`/locations/${l.id}`)}
-          >
-            {l.name}
-          </button>
-        );
-      })}
-    </div>
   );
 }
 

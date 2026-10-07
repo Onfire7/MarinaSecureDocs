@@ -8,8 +8,8 @@ on 2026-10-07.
 
 ## Views
 
-Three presentations of one filtered set (type and status filters, client
-side, applied to all three):
+Two presentations of one filtered set (type and status filters, client
+side, applied to both):
 
 - **Map** - the marina's map, **the landing view whenever the marina has
   one** (owner, 2026-10-07; before, the list was). Interactive and
@@ -26,11 +26,13 @@ side, applied to all three):
 - **List** - the hierarchy. A phone drills level by level; a desktop shows
   the indented tree. Filtering flattens it. A user with `manage_locations`
   changes a status inline.
-- **Pin Map** - each location with GPS coordinates plotted relative to the
-  others, no image. A location without coordinates is omitted.
-
 With no map uploaded the Map view is not offered and the list is the
 landing view.
+
+There used to be a third view, *Pin Map*, a blank panel with each
+location's GPS coordinates plotted relative to the others. It was removed on
+2026-10-07: it had no image, scale or position, and the marina map covers
+the need. Tile-map support on the regular maps is planned instead.
 
 ## Actions
 

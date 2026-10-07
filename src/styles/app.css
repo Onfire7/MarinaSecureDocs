@@ -1651,26 +1651,6 @@ h3 {
 .mle-map .map-rect:hover {
   outline: none;
 }
-.map-pin {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  font: inherit;
-  /* Same reason as .map-rect: a pin is scaled with the map. */
-  text-size-adjust: none;
-  -webkit-text-size-adjust: none;
-  font-size: 0.72rem;
-  font-weight: 650;
-  border: 1.5px solid var(--line);
-  border-radius: 999px;
-  padding: 3px 9px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.map-pin:hover {
-  outline: 2px solid var(--accent);
-  z-index: 2;
-}
-
 /* ---------- Inline controls & collapsible sections ---------- */
 
 .select-inline {
