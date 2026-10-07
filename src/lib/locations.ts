@@ -93,6 +93,11 @@ export interface LabelShape extends MapPoint {
   fontSize?: number;
   paddingX?: number;
   paddingY?: number;
+  /** A traced polygon, shaded in the status colour, drawn with or instead
+   *  of the text (lib/outline.ts; owner, 2026-10-07). */
+  outline?: [number, number][] | null;
+  /** Draw the text. Off only when there is an outline to draw instead. */
+  showText?: boolean;
 }
 
 export const DEFAULT_PLACEMENT_STYLE = {

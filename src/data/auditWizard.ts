@@ -5,6 +5,7 @@ import { insert, remove, transact, update } from "./sql";
 import { recordActivity } from "./activity";
 import { unexpectedOccupancy } from "../lib/audits";
 import { loadLabelStyle, newLabel } from "../lib/mapLabelStyle";
+import { parseOutline } from "../lib/outline";
 import { placementFromPayload, type AnswerValue, type AmenityAnswer, type AttributeAnswer, type GpsAnswer, type MapAnswer, type ServiceAnswer, type WizardItem } from "../lib/auditWizard";
 
 // The wizard's writes (docs/audits.md § The wizard). One item at a time,
@@ -260,11 +261,11 @@ async function writeGps(tx: LockContext, w: WizardWrite, findingId: string) {
   const pendingPlace = pending ? placementFromPayload(parseJson(pending.payload)) : null;
   let label = pendingPlace && pendingPlace.map_id === map_id ? pendingPlace.label : null;
   if (!label && w.locationId) {
-    const saved = await tx.getOptional<{ cx: number; cy: number; rotation: number; font_size: number | null; padding_x: number | null; padding_y: number | null }>(
-      "SELECT cx, cy, rotation, font_size, padding_x, padding_y FROM map_labels WHERE location_id = ? AND map_id = ?",
+    const saved = await tx.getOptional<{ cx: number; cy: number; rotation: number; font_size: number | null; padding_x: number | null; padding_y: number | null; outline: string | null; show_text: number | null }>(
+      "SELECT cx, cy, rotation, font_size, padding_x, padding_y, outline, show_text FROM map_labels WHERE location_id = ? AND map_id = ?",
       [w.locationId, map_id],
     );
-    if (saved) label = { cx: saved.cx, cy: saved.cy, rotation: saved.rotation ?? 0, fontSize: saved.font_size ?? undefined, paddingX: saved.padding_x ?? undefined, paddingY: saved.padding_y ?? undefined };
+    if (saved) label = { cx: saved.cx, cy: saved.cy, rotation: saved.rotation ?? 0, fontSize: saved.font_size ?? undefined, paddingX: saved.padding_x ?? undefined, paddingY: saved.padding_y ?? undefined, outline: parseOutline(saved.outline), showText: saved.show_text !== 0 };
   }
   if (!label) label = newLabel({ cx, cy }, loadLabelStyle());
   await replaceProposal(tx, findingId, "move_placement", null, { map_id, anchor: { cx, cy }, label });

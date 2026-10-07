@@ -151,8 +151,10 @@ every placement migrated to an anchor and a label.
 #### `map_labels` — Tier 0 / `manage_locations` · sync: always
 
 `map_id → marina_maps`, `location_id → locations` not null, `cx`, `cy`,
-`rotation`, `font_size`, `padding_x`, `padding_y`. Unique on
-`(map_id, location_id)`.
+`rotation`, `font_size`, `padding_x`, `padding_y`, `outline jsonb` (three
+or more `[x, y]` corners in percent, or null), `show_text boolean not null
+default true` (false only with an outline). Unique on
+`(map_id, location_id)`. A `STRUCTURED_COLUMNS` entry for `outline`.
 
 A label's own centre on the map, independent of the anchor it names:
 moving the anchor leaves the label where it was. Decoration only - nothing

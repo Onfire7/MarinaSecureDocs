@@ -38,13 +38,17 @@ import { useDevicePosition } from "./useDevicePosition";
 import { useMapShow } from "./mapShow";
 import { MapShowToggle } from "./MapShowToggle";
 import { LocationPicker, type PickerLocation } from "./LocationPicker";
+import { MapOutlines } from "./MapOutlines";
+import { cleanOutline, outlineCentre } from "../../lib/outline";
 
-type Tool = "label" | "anchor" | "fontSize" | "paddingX" | "paddingY" | "rotation" | null;
-type Slider = Exclude<Tool, null | "label" | "anchor">;
+type Tool = "label" | "anchor" | "outline" | "fontSize" | "paddingX" | "paddingY" | "rotation" | null;
+type Slider = Exclude<Tool, null | "label" | "anchor" | "outline">;
 
 const TOOLS: { key: Exclude<Tool, null>; icon: string; label: string; min?: number; max?: number }[] = [
   { key: "label", icon: "✥", label: "Label" },
   { key: "anchor", icon: "◎", label: "Anchor" },
+  // Trace the location's shape: tap each corner (lib/outline.ts).
+  { key: "outline", icon: "⬠", label: "Outline" },
   { key: "fontSize", icon: "A", label: "Size", min: 2, max: 32 },
   { key: "paddingX", icon: "↔", label: "Width", min: 0, max: 24 },
   { key: "paddingY", icon: "↕", label: "Height", min: 0, max: 24 },
@@ -136,7 +140,7 @@ export function MapLabelEditor({
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [port, setPort] = useState({ w: 0, h: 0 });
   const touch = useRef({ start: (_e: TouchEvent) => {}, move: (_e: TouchEvent) => {}, end: (_e: TouchEvent) => {} });
-  const gesture = useRef<{ kind: "pan" | "label" | "anchor" | "pinch"; moved: boolean; last: { x: number; y: number }; dist: number } | null>(null);
+  const gesture = useRef<{ kind: "pan" | "label" | "anchor" | "vertex" | "pinch"; moved: boolean; last: { x: number; y: number }; dist: number; idx?: number } | null>(null);
   const viewRef = useRef(view);
   const commit = (v: View) => {
     viewRef.current = v;
@@ -253,14 +257,16 @@ export function MapLabelEditor({
     return { x: clientX - r.left, y: clientY - r.top };
   };
   const local = (e: ReactPointerEvent | ReactWheelEvent) => localXY(e.clientX, e.clientY);
-  const kindAt = (target: EventTarget | null): "anchor" | "label" | "pan" => {
+  const kindAt = (target: EventTarget | null): { kind: "anchor" | "label" | "vertex" | "pan"; idx?: number } => {
     const el = target instanceof Element ? target : null;
-    return el?.closest("[data-anchor]") ? "anchor" : el?.closest("[data-subject]") && mode === "label" ? "label" : "pan";
+    const vertex = el?.closest<HTMLElement>("[data-vertex]");
+    if (vertex) return { kind: "vertex", idx: Number(vertex.dataset.vertex) };
+    return { kind: el?.closest("[data-anchor]") ? "anchor" : el?.closest("[data-subject]") && mode === "label" ? "label" : "pan" };
   };
 
   // ── the gesture ─────────────────────────────────────────────────────
-  const begin = (kind: "anchor" | "label" | "pan", p: Pt) => {
-    gesture.current = { kind, moved: false, last: p, dist: 0 };
+  const begin = (at: { kind: "anchor" | "label" | "vertex" | "pan"; idx?: number }, p: Pt) => {
+    gesture.current = { kind: at.kind, idx: at.idx, moved: false, last: p, dist: 0 };
   };
   const beginPinch = (a: Pt, b: Pt) => {
     gesture.current = { kind: "pinch", moved: true, last: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, dist: Math.hypot(a.x - b.x, a.y - b.y) };
@@ -291,7 +297,10 @@ export function MapLabelEditor({
     const ddy = (dy / (layerH * v.s)) * 100;
     const a = anchorRef.current;
     const l = labelRef.current;
-    if (g.kind === "label" && l) setDraftLabel({ ...l, cx: pct(l.cx + ddx), cy: pct(l.cy + ddy) });
+    if (g.kind === "vertex" && l?.outline && g.idx !== undefined) {
+      const i = g.idx;
+      setDraftLabel({ ...l, outline: l.outline.map((q, k) => (k === i ? [pct(q[0] + ddx), pct(q[1] + ddy)] : q)) });
+    } else if (g.kind === "label" && l) setDraftLabel({ ...l, cx: pct(l.cx + ddx), cy: pct(l.cy + ddy) });
     else if (g.kind === "anchor" && a) setDraftAnchor({ cx: pct(a.cx + ddx), cy: pct(a.cy + ddy) });
     else commit({ ...v, tx: v.tx + dx, ty: v.ty + dy });
   };
@@ -303,6 +312,13 @@ export function MapLabelEditor({
     const t = toolRef.current;
     const a = anchorRef.current;
     const l = labelRef.current;
+    if (mode === "label" && t === "outline") {
+      // Another corner. A location with no label yet gets one whose text
+      // is off: the outline is drawn instead (owner, 2026-10-07).
+      const corner: [number, number] = [at.cx, at.cy];
+      setDraftLabel(l ? { ...l, outline: [...(l.outline ?? []), corner] } : { ...newLabel(at, loadLabelStyle()), cx: at.cx, cy: at.cy, outline: [corner], showText: false });
+      return;
+    }
     if (mode === "anchor" || t === "anchor" || (!a && !l)) {
       // Where the location (or point) is. A location with no label yet
       // gets one beside the anchor, in the remembered style.
@@ -330,7 +346,7 @@ export function MapLabelEditor({
         if (!g || g.kind !== "pinch") beginPinch(t[0], t[1]);
         else movePinch(t[0], t[1]);
       } else if (t.length === 1) {
-        if (!g) begin("pan", t[0]);
+        if (!g) begin({ kind: "pan" }, t[0]);
         else if (g.kind === "pinch") gesture.current = { kind: "pan", moved: true, last: t[0], dist: 0 };
         else moveOne(t[0]);
       }
@@ -368,20 +384,38 @@ export function MapLabelEditor({
     const next = tool === t ? null : t;
     setTool(next);
     const l = labelRef.current;
-    if (next && next !== "label" && next !== "anchor" && l) commit(centreOn({ x: l.cx, y: l.cy }, Math.max(viewRef.current.s, 2), layerW, layerH, port, 0.3));
+    if (next && next !== "label" && next !== "anchor" && next !== "outline" && l) commit(centreOn({ x: l.cx, y: l.cy }, Math.max(viewRef.current.s, 2), layerW, layerH, port, 0.3));
   };
-  const active = TOOLS.find((t) => t.key === tool && t.key !== "label" && t.key !== "anchor");
+  const active = TOOLS.find((t) => t.key === tool && t.key !== "label" && t.key !== "anchor" && t.key !== "outline");
   const value = (k: Slider) => draftLabel?.[k] ?? DEFAULT_LABEL_STYLE[k];
 
   const collect = (): EditedPlace => {
     let l = draftLabel;
+    let a = draftAnchor;
     // Anchored for the first time with no label yet: the label starts in
     // the remembered style beside the anchor, so the map page has one.
-    if (!free && draftAnchor && !l && !label) l = newLabel(draftAnchor, loadLabelStyle());
-    if (l) saveLabelStyle(l, draftAnchor);
+    if (!free && a && !l && !label) l = newLabel(a, loadLabelStyle());
+    if (l) {
+      // An outline of fewer than three corners is not one; and a row must
+      // draw something, so with no outline the text is on.
+      const outline = cleanOutline(l.outline);
+      l = { ...l, outline, showText: outline ? l.showText !== false : true };
+      // Text off: the label's point is the outline's middle, which is
+      // where a card points and the editor frames.
+      if (outline && l.showText === false) {
+        const c = outlineCentre(outline);
+        l = { ...l, cx: c.x, cy: c.y };
+      }
+      // A location traced but never anchored is anchored in its middle.
+      if (!free && !a && outline) {
+        const c = outlineCentre(outline);
+        a = { cx: c.x, cy: c.y };
+      }
+      if (l.showText !== false) saveLabelStyle(l, a);
+    }
     const num = (s: string) => (s.trim() === "" ? null : Number(s));
     return {
-      anchor: draftAnchor,
+      anchor: a,
       label: free ? null : l,
       point: wantsCoords ? { name: free ? pointName.trim() || "Calibration point" : subject.name, lat: num(pointLat), lng: num(pointLng) } : undefined,
     };
@@ -397,7 +431,9 @@ export function MapLabelEditor({
   const otherLabels = labels.filter((b) => b.location_id !== subject.locationId);
   const freePoints = anchors.filter((a) => a.location_id === null && !(free && point && a.label === point.name && a.cx === anchor?.cx && a.cy === anchor?.cy));
   const hint = !draftAnchor && !draftLabel
-    ? mode === "anchor"
+    ? tool === "outline"
+      ? `Tap each corner of ${subject.name}. Drag a corner to move it.`
+      : mode === "anchor"
       ? free
         ? "Tap the spot on the map this point marks."
         : `Tap where you are standing - where ${subject.name} is.`
@@ -406,7 +442,9 @@ export function MapLabelEditor({
       ? "Drag the dot, or tap where it should be."
       : tool === "label"
         ? "Drag the label, or tap where it should be."
-        : null;
+        : tool === "outline"
+          ? `Tap each corner of ${subject.name}. Drag a corner to move it.`
+          : null;
   const showLabel = mode === "label" && tool !== "anchor" && draftLabel;
   const body = (
     <div className="mle-layer" ref={layerRef} role="dialog" aria-label={`${subject.name} on ${map.scope_name ?? map.name}`}>
@@ -459,12 +497,27 @@ export function MapLabelEditor({
       >
         <div className="mle-map" style={{ width: layerW, height: layerH || undefined, transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.s})`, "--zs": view.s } as React.CSSProperties}>
           {imageUrl && <img src={imageUrl} alt={map.name} className="map-image" draggable={false} onLoad={(e) => setImg({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })} />}
+          {show.labels && (
+            <MapOutlines
+              items={[
+                ...otherLabels.flatMap((b) => {
+                  const o = labelShapeOf(b).outline;
+                  return o ? [{ id: b.id, points: o, color: "var(--mute)", muted: true, title: b.location_name }] : [];
+                }),
+                ...(mode === "label" && draftLabel?.outline && draftLabel.outline.length >= 2
+                  ? [{ id: "subject", points: draftLabel.outline, color: "var(--warn)", title: subject.name, testId: "mle-outline" }]
+                  : []),
+              ]}
+            />
+          )}
           {show.labels &&
-            otherLabels.map((b) => (
-              <span key={b.id} className="map-rect mle-other" style={placementStyle(labelShapeOf(b))}>
-                {b.location_name}
-              </span>
-            ))}
+            otherLabels
+              .filter((b) => b.show_text !== 0)
+              .map((b) => (
+                <span key={b.id} className="map-rect mle-other" style={placementStyle(labelShapeOf(b))}>
+                  {b.location_name}
+                </span>
+              ))}
           {show.anchors &&
             anchors
               .filter((a) => a.location_id !== subject.locationId)
@@ -479,11 +532,16 @@ export function MapLabelEditor({
                 />
               ))}
           <DeviceDot fit={fit} position={device} />
-          {showLabel && (
+          {showLabel && draftLabel!.showText !== false && (
             <span className="map-rect mle-subject" data-subject data-testid="mle-subject" style={placementStyle(draftLabel!)}>
               {subject.name}
             </span>
           )}
+          {mode === "label" &&
+            tool === "outline" &&
+            draftLabel?.outline?.map(([x, y], i) => (
+              <span key={i} className={`mle-vertex ${i === 0 ? "first" : ""}`} data-vertex={i} data-testid="mle-vertex" style={{ left: `${x}%`, top: `${y}%` }} aria-hidden />
+            ))}
           {draftAnchor && (
             <>
               {showLabel && draftLabel && Math.hypot(draftLabel.cx - draftAnchor.cx, draftLabel.cy - draftAnchor.cy) > 0.5 ? (
@@ -505,6 +563,33 @@ export function MapLabelEditor({
         </div>
       </div>
       <div className="mle-bar">
+        {mode === "label" && tool === "outline" && (
+          <div className="mle-outline-bar" data-testid="mle-outline-bar">
+            <span className="muted small">{draftLabel?.outline?.length ?? 0} corners</span>
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={!draftLabel?.outline?.length}
+              onClick={() => draftLabel && setDraftLabel({ ...draftLabel, outline: (draftLabel.outline ?? []).slice(0, -1) })}
+            >
+              Undo corner
+            </button>
+            <button type="button" className="btn btn-sm btn-bare" disabled={!draftLabel?.outline?.length} onClick={() => draftLabel && setDraftLabel({ ...draftLabel, outline: null, showText: true })}>
+              Clear
+            </button>
+            <label className="row small" style={{ gap: 4, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                data-testid="mle-show-text"
+                checked={draftLabel?.showText !== false}
+                // The text can go only when there is an outline to draw instead.
+                disabled={!draftLabel || (draftLabel.outline?.length ?? 0) < 3}
+                onChange={(e) => draftLabel && setDraftLabel({ ...draftLabel, showText: e.target.checked })}
+              />
+              Show name
+            </label>
+          </div>
+        )}
         {mode === "label" && active && (
           <div className="mle-slider">
             <span className="mle-slider-label">
@@ -528,7 +613,7 @@ export function MapLabelEditor({
                 key={t.key}
                 type="button"
                 className={`mle-tool ${tool === t.key ? "on" : ""}`}
-                disabled={!canFinish || (t.key !== "label" && t.key !== "anchor" && !draftLabel)}
+                disabled={t.key === "outline" ? false : !canFinish || (t.key !== "label" && t.key !== "anchor" && !draftLabel)}
                 aria-label={t.label}
                 aria-pressed={tool === t.key}
                 onClick={() => pick(t.key)}

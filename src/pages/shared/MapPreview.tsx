@@ -12,6 +12,7 @@ import type { DevicePosition } from "./useDevicePosition";
 import { useMapShow } from "./mapShow";
 import { MapShowToggle } from "./MapShowToggle";
 import { ZoomableMap } from "./ZoomableMap";
+import { MapOutlines } from "./MapOutlines";
 
 export function MapPreview({
   map,
@@ -66,9 +67,22 @@ export function MapPreview({
         </>
       }
     >
+      {showLabels && (
+        <MapOutlines
+          items={[
+            ...labels
+              .filter((b) => b.location_id !== subject.locationId)
+              .flatMap((b) => {
+                const o = labelShapeOf(b).outline;
+                return o ? [{ id: b.id, points: o, color: "var(--mute)", muted: true, title: b.location_name }] : [];
+              }),
+            ...(label?.outline ? [{ id: "subject", points: label.outline, color: proposed ? "var(--warn)" : "var(--accent)", title: subject.name, testId: `${testId}-outline` }] : []),
+          ]}
+        />
+      )}
       {showLabels &&
         labels
-          .filter((b) => b.location_id !== subject.locationId)
+          .filter((b) => b.location_id !== subject.locationId && b.show_text !== 0)
           .map((b) => (
             <span key={b.id} className="map-rect pc-other" style={placementStyle(labelShapeOf(b))}>
               {b.location_name}
@@ -93,7 +107,7 @@ export function MapPreview({
           if (!Number.isFinite(at.cx) || !Number.isFinite(at.cy)) return null;
           return <span key={i} className={`map-mark map-mark-${m.kind} ${at.inside ? "" : "outside"}`} style={{ left: `${at.cx}%`, top: `${at.cy}%` }} title={m.title} data-testid={`${testId}-mark-${m.kind}`} />;
         })}
-      {showLabels && label && (
+      {showLabels && label && label.showText !== false && (
         <span className={`map-rect pc-mine ${proposed ? "pc-proposed-label" : ""}`} style={placementStyle(label)} title={proposed ? "Proposed placement — waits for approval" : undefined} data-testid={`${testId}-label`}>
           {subject.name}
         </span>

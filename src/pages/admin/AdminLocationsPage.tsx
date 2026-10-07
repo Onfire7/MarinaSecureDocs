@@ -13,6 +13,7 @@ import { useMapFit } from "../../data/maps";
 import { useMapShow } from "../shared/mapShow";
 import { MapShowToggle } from "../shared/MapShowToggle";
 import { ZoomableMap } from "../shared/ZoomableMap";
+import { MapOutlines } from "../shared/MapOutlines";
 import {
   bulkUpdateLocations,
   createAnchor,
@@ -1775,7 +1776,17 @@ function MapPlotter({
               onClick={() => setEditing({ kind: "point", anchorId: a.id })}
             />
           ))}
-          {show.labels && labels.map((b) => (
+          {show.labels && (
+            <MapOutlines
+              items={labels.flatMap((b) => {
+                const o = labelShapeOf(b).outline;
+                return o
+                  ? [{ id: b.id, points: o, color: "var(--accent)", title: b.location_name, testId: "plotter-outline", onClick: () => setEditing({ kind: "location", locationId: b.location_id, name: b.location_name }) }]
+                  : [];
+              })}
+            />
+          )}
+          {show.labels && labels.filter((b) => b.show_text !== 0).map((b) => (
             <button
               key={b.id}
               type="button"

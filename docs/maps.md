@@ -111,6 +111,32 @@ that stand in for the artist's hand, including one whose left half is at
 twice the scale of the right, where the piecewise fit is right and the
 single affine is shown to be wrong.
 
+## Outlines
+
+A location's drawing on a map may be a traced **outline** as well as, or
+instead of, its text label (owner, 2026-10-07) - for a map image that is
+already labelled, where a second label only clutters. It is two columns on
+`map_labels`: `outline`, a jsonb list of three or more `[x, y]` corners in
+percent of the image (`valid_map_outline()` checks it), and `show_text`,
+off only when there is an outline to draw instead (a check keeps every row
+drawing something). Outlines are drawn by one SVG layer per map
+(`MapOutlines`) under the labels and dots: a see-through fill in the
+location's status colour wherever the map colours by status (the Locations
+map), the accent on the plotter, muted for everything but the location in
+hand on a preview; the edge stays one width at any zoom, and tapping inside
+does what tapping the label does. The Labels switch shows or hides outlines
+with the text.
+
+In the editor the **Outline** tool traces one: tap each corner, drag a
+corner to move it, *Undo corner*, *Clear*, and *Show name* to keep or drop
+the text (only with three corners or more). `lib/outline.ts` cleans what was
+traced - clamped, repeated corners dropped, no shape with no area - and
+finds a point inside it for the label's position when the text is off; a
+location traced but never anchored is anchored there. An outline rides in a
+`move_placement` Proposal's label; `apply_map_placement()` sets it when the
+payload names it and otherwise leaves the one that is there, so an older
+Proposal cannot erase it.
+
 ## What a map shows
 
 Every map carries two independent switches, **Anchors** and **Labels**

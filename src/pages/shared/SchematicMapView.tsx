@@ -10,6 +10,7 @@ import {
 import { useMapShow } from "./mapShow";
 import { MapShowToggle } from "./MapShowToggle";
 import { ZoomableMap } from "./ZoomableMap";
+import { MapOutlines } from "./MapOutlines";
 import { attachmentUrl } from "../../data/files";
 import { useMapFit } from "../../data/maps";
 import { DeviceDot } from "./DeviceDot";
@@ -140,8 +141,31 @@ export function SchematicMapView({
                 />
               ),
             )}
+        {/* Outlines first, under the labels and dots, in the status colour;
+            tapping inside one does what tapping its label does. */}
+        {show.labels && (
+          <MapOutlines
+            items={placements.flatMap((p) => {
+              if (include && !include(p.location_id)) return [];
+              const outline = labelShapeOf(p).outline;
+              if (!outline) return [];
+              const childMap = mapForLocation(p.location_id);
+              return [
+                {
+                  id: p.id,
+                  points: outline,
+                  color: colorFor(p.location_id).border,
+                  title: p.location_name,
+                  testId: "map-outline",
+                  onClick: () => (childMap ? setMapStack([...mapStack, childMap]) : onOpen(p.location_id)),
+                },
+              ];
+            })}
+          />
+        )}
         {show.labels && placements.map((p) => {
           if (include && !include(p.location_id)) return null;
+          if (p.show_text === 0) return null;
           const colors = colorFor(p.location_id);
           const childMap = mapForLocation(p.location_id);
           return (

@@ -315,4 +315,15 @@ describe("placementFromPayload", () => {
     expect(placementFromPayload({ map_id: "m", anchor: { cx: 1, cy: 2 }, label: null })).toEqual({ map_id: "m", anchor: { cx: 1, cy: 2 }, label: null });
     expect(placementFromPayload({})).toBeNull();
   });
+  it("26 · an outline and its text switch ride through; a payload without them still reads", () => {
+    const outline = [[10, 10], [30, 10], [30, 30]];
+    expect(placementFromPayload({ map_id: "m", anchor: null, label: { cx: 20, cy: 20, rotation: 0, outline, showText: false } })?.label).toEqual({
+      cx: 20,
+      cy: 20,
+      rotation: 0,
+      outline,
+      showText: false,
+    });
+    expect(placementFromPayload({ map_id: "m", anchor: null, label: { cx: 20, cy: 20, rotation: 0 } })?.label?.outline).toBeUndefined();
+  });
 });

@@ -172,5 +172,9 @@ function samePoint(a: MapPoint | null, b: MapPoint | null): boolean {
 function sameLabel(a: LabelShape | null, b: LabelShape | null): boolean {
   if (a === null || b === null) return a === b;
   const keys = ["cx", "cy", "rotation", "fontSize", "paddingX", "paddingY"] as const;
-  return keys.every((k) => (a[k] ?? null) === (b[k] ?? null));
+  return (
+    keys.every((k) => (a[k] ?? null) === (b[k] ?? null)) &&
+    JSON.stringify(a.outline ?? null) === JSON.stringify(b.outline ?? null) &&
+    (a.showText !== false) === (b.showText !== false)
+  );
 }

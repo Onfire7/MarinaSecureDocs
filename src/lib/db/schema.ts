@@ -1126,6 +1126,8 @@ const map_labels = new Table(
     font_size: column.integer,
     padding_x: column.integer,
     padding_y: column.integer,
+    outline: column.text,
+    show_text: column.integer,
   },
   {
     indexes: {
@@ -1746,6 +1748,7 @@ export const STRUCTURED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   checklist_template_items: ["config"],
   checklist_template_sections: ["trigger_config", "due_by"],
   checklist_templates: ["trigger_config", "due_by"],
+  map_labels: ["outline"],
   marina_settings: ["shift_report_recipients"],
   phone_lines: ["routing"],
   roles: ["allow", "deny"],

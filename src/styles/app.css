@@ -2510,3 +2510,69 @@ h3 {
   padding: 8px;
   touch-action: auto;
 }
+
+/* ---------- Outlines (shared/MapOutlines.tsx) ---------- */
+/* Over the image, under the labels and dots, in the map's percent
+   coordinates. The fill is see-through so the drawing beneath reads; the
+   edge stays one width at any zoom. */
+.map-outlines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.map-outlines polygon {
+  fill-opacity: 0.35;
+  stroke-width: 2px;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.map-outlines polygon.muted {
+  fill-opacity: 0.18;
+  stroke-opacity: 0.6;
+}
+.map-outlines polygon.tappable {
+  pointer-events: visiblePainted;
+  cursor: pointer;
+}
+/* A corner of the outline being traced: dragged to move. */
+.mle-vertex {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: #fff;
+  border: 2px solid var(--warn);
+  transform: translate(-50%, -50%) scale(calc(1 / var(--zs, 1)));
+  cursor: move;
+  z-index: 3;
+}
+.mle-vertex.first {
+  background: var(--warn);
+}
+.mle-outline-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 10px 12px 4px;
+}
+.mle-tools {
+  overflow-x: auto;
+}
+.mle-tool {
+  min-width: 46px;
+  padding: 6px 4px;
+}
+/* Outlines sit under every label and dot, so a dot inside a shaded
+   shape is still seen and still tapped. */
+.map-outlines {
+  z-index: 0;
+}
+.map-rect,
+.map-anchor {
+  z-index: 1;
+}

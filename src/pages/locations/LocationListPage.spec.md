@@ -16,8 +16,8 @@ side, applied to both):
   read-only: pinch or wheel to zoom, one finger pans once zoomed in
   (`ZoomableMap`), the *Anchors* / *Labels* switches show either, both or
   neither (`docs/maps.md`; the setting is shared with every other map and
-  remembered on the device). Each location is its label and/or its anchor,
-  coloured by status. **Tapping one selects it** - a card under the map
+  remembered on the device). Each location is its label, its traced
+  outline (shaded, see-through) and/or its anchor, coloured by status. **Tapping one selects it** - a card under the map
   gives its name, type and status with *Open* - and tapping the selected
   one again opens it. A ▸ on a label drills into that location's own map;
   with several properties the map opens on a chooser. The device appears as

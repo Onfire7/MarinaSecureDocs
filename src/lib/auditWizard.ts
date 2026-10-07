@@ -289,7 +289,7 @@ export interface AttributeAnswer { value: string; text: string; note: string }
 export interface MapPlacement {
   map_id: string;
   anchor: { cx: number; cy: number } | null;
-  label: { cx: number; cy: number; rotation: number; fontSize?: number; paddingX?: number; paddingY?: number } | null;
+  label: { cx: number; cy: number; rotation: number; fontSize?: number; paddingX?: number; paddingY?: number; outline?: [number, number][] | null; showText?: boolean } | null;
 }
 
 /** "Placed correctly on the map?" - the answer, and the move_placement

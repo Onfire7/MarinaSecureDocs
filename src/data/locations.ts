@@ -3,6 +3,7 @@ import { db, bool } from "../lib/db";
 import { insert, remove, transact, update } from "./sql";
 import { recordActivity } from "./activity";
 import type { LabelShape } from "../lib/locations";
+import { cleanOutline, parseOutline } from "../lib/outline";
 
 // Locations — the marina's own geography, and the types that shape it.
 //
@@ -375,6 +376,9 @@ export interface MapLabelRow {
   font_size: number | null;
   padding_x: number | null;
   padding_y: number | null;
+  /** jsonb on the server, text on the device (lib/outline.ts). */
+  outline: string | null;
+  show_text: number | null;
   location_name: string;
 }
 
@@ -404,6 +408,8 @@ export function labelShapeOf(row: MapLabelRow): LabelShape {
     fontSize: row.font_size ?? undefined,
     paddingX: row.padding_x ?? undefined,
     paddingY: row.padding_y ?? undefined,
+    outline: parseOutline(row.outline),
+    showText: row.show_text !== 0,
   };
 }
 
@@ -435,6 +441,7 @@ export function deleteAnchor(anchorId: string): Promise<void> {
 }
 
 function labelColumns(shape: LabelShape) {
+  const outline = cleanOutline(shape.outline);
   return {
     cx: shape.cx,
     cy: shape.cy,
@@ -442,6 +449,11 @@ function labelColumns(shape: LabelShape) {
     font_size: shape.fontSize ?? null,
     padding_x: shape.paddingX ?? null,
     padding_y: shape.paddingY ?? null,
+    // Stringified like every jsonb column on the device; the connector
+    // reshapes it on upload (STRUCTURED_COLUMNS).
+    outline: outline ? JSON.stringify(outline) : null,
+    // A row must draw something: no outline means the text is shown.
+    show_text: outline && shape.showText === false ? 0 : 1,
   };
 }
 
