@@ -14,59 +14,21 @@ import type { LockContext } from "@powersync/web";
 import { deterministicId } from "../lib/detId";
 import { stamp } from "../lib/db";
 import {
-  eligibleToday,
   resolveDueBy,
   expectedStartAnchor,
   hideUntilFromAnchor,
   resolveHideUntil,
-  sectionEnabledByStatus,
-  type DueByRule,
-  type TemplateItemLike,
-  type TriggerConfig,
+  sectionsEligibleAtCreation,
+  type InstantiableSection,
+  type InstantiableTemplate,
 } from "../lib/checklists";
+import { instanceItemId } from "../lib/checklistUpdate";
 import { insertIfAbsent } from "./sql";
 
-/**
- * A template section with everything instantiation needs about it.
- *
- * Assembled by the data layer from four tables — the section, the status of
- * the location it belongs to, its checkpoint and asset links, and its items —
- * because a section's eligibility depends on all of them and none of them is
- * on the section row.
- */
-export interface InstantiableSection {
-  id: string;
-  name: string;
-  position: number;
-  is_active: number;
-  trigger_type: string;
-  triggerConfig?: TriggerConfig | null;
-  hide_until_rule?: string | null;
-  dueBy?: DueByRule | null;
-  location_id?: string | null;
-  /** For "location_status" gating; see checklists.ts. */
-  location_status_name?: string | null;
-  checkpointIds: string[];
-  assetIds: string[];
-  items: TemplateItemLike[];
-}
-
-export interface InstantiableTemplate {
-  id: string;
-  name: string;
-  /** What creates instances of it — clock_in, recurring, checkpoint, … */
-  trigger_type: string;
-  /** Its own recurrence gate: a checkpoint template can be Tuesdays-only. */
-  triggerConfig?: TriggerConfig | null;
-  /** Absent reads as false: the instance belongs to the role pool. */
-  assigned_to_user?: number | null;
-  hide_until_rule?: string | null;
-  /** "HH:MM"; see expectedStartAnchor(). */
-  expected_start?: string | null;
-  dueBy?: DueByRule | null;
-  assigned_role_id?: string | null;
-  sections: InstantiableSection[];
-}
+// The shapes and the creation rule are pure, and live in src/lib so the
+// open-checklist updater can share them; re-exported for existing callers.
+export { sectionsEligibleAtCreation };
+export type { InstantiableSection, InstantiableTemplate };
 
 /** Deterministic id for a template section's row on a given instance. */
 export function sectionInstanceId(
@@ -74,33 +36,6 @@ export function sectionInstanceId(
   templateSectionId: string,
 ): string {
   return deterministicId(`instsection:${instanceId}:${templateSectionId}`);
-}
-
-/**
- * Section rows created with the instance: active, and either always-on
- * (manual), recurring with today matching, or gated on the current status of
- * the place they belong to. Event-anchored types — checkpoint, location,
- * asset — wait for their event.
- */
-export function sectionsEligibleAtCreation(
-  sections: InstantiableSection[],
-  now: Date,
-): InstantiableSection[] {
-  return sections.filter((s) => {
-    if (s.is_active !== 1) return false;
-    if (s.trigger_type === "location_status") {
-      // No location, nothing to read a status from, so nothing to switch it
-      // on — the builder warns about this while the template is written.
-      return sectionEnabledByStatus(
-        s.triggerConfig?.statuses,
-        s.location_status_name,
-      );
-    }
-    return (
-      (s.trigger_type === "manual" || s.trigger_type === "recurring") &&
-      eligibleToday(s, now)
-    );
-  });
 }
 
 /**
@@ -154,13 +89,15 @@ export async function insertSectionInstance(
     hide_until: hideUntil == null ? null : stamp(hideUntil),
     due_by: dueBy == null ? null : stamp(dueBy),
     location_id: section.location_id ?? null,
+    // What an offset Due by counts from, should an update re-resolve it.
+    created_at: stamp(now),
   });
 
   for (const item of section.items) {
     await insertIfAbsent(
       tx,
       "checklist_instance_items",
-      deterministicId(`institem:${sid}:${item.id}`),
+      instanceItemId(sid, item.id),
       { section_id: sid, template_item_id: item.id, position: item.position },
     );
   }
@@ -206,6 +143,7 @@ export async function insertInstance(
     hide_until: hideUntil == null ? null : stamp(hideUntil),
     expected_start_at: anchor ? stamp(anchor.getTime()) : null,
     due_by: dueBy == null ? null : stamp(dueBy),
+    created_at: stamp(now),
   });
 
   for (const section of sectionsEligibleAtCreation(template.sections, now)) {

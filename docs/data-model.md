@@ -238,7 +238,19 @@ visited, onto an already-open instance.
 **Copy-on-edit.** Committing an edit writes a *new* row and repoints the
 section, so instance items forever reference the exact row they were created
 from without snapshotting config per instance. There is no forward "current"
-pointer: the live version is whichever row the section points at.
+pointer: the live version is whichever row the section points at. Walking
+`previous_version_id` backwards from each live row is how "Update open
+checklists" finds an old version's successor, so an edit that *replaces* an
+unreferenced row in place carries the old row's `previous_version_id` and
+`version` forward rather than breaking the chain.
+
+**A referenced row cannot be deleted, and asking does not fail.** A `BEFORE
+DELETE` trigger (`orphan_referenced_template_item`) turns the delete of a row
+any instance item reads through into `section_id = null`. The builder already
+orphans what it can see is referenced, but a device holds only open checklists
+and the last 30 days, so it deletes rows that older checklists read; before the
+trigger, Postgres refused (23503), the connector discarded the write, and the
+row synced back into the template beside its replacement.
 
 > **`section_id` is nullable, deliberately.** A superseded version is orphaned
 > from its section but keeps its instance references. 5 of 79 exported items
@@ -257,12 +269,15 @@ pointer: the live version is whichever row the section points at.
 (absent or past = visible), `due_by`, `parent_item_id → checklist_instance_items`
 (set only on nested instances spawned by a `location_check` item — the
 checklist list shows instances where this is null, so sub-checklists don't
-double-list).
+double-list). `created_at` (nullable; null on rows made before it existed) is
+what an offset `due_by` counts from when "Update open checklists" re-resolves
+it — see `src/pages/admin/AdminChecklistTemplatesPage.spec.md`.
 
 #### `checklist_instance_sections` — Tier 0 · sync: **age**
 
 `instance_id`, `template_section_id`, `label` (copied at creation),
-`position`, `hide_until`, `due_by`, `location_id`. Junctions to checkpoints and assets.
+`position`, `hide_until`, `due_by`, `location_id`, `created_at` (as on the
+instance). Junctions to checkpoints and assets.
 
 #### `checklist_instance_items` — Tier 0 · sync: **age**
 

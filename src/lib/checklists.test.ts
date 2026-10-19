@@ -28,6 +28,13 @@ describe("recurrenceMatchesDay", () => {
     expect(recurrenceMatchesDay("FREQ=WEEKLY;BYDAY=TU", WEDNESDAY)).toBe(false);
   });
 
+  it("does not match the day before the one its rule names", () => {
+    // Tuesday's window used to close inclusively on Wednesday's midnight,
+    // which is exactly where a Wednesday occurrence falls.
+    expect(recurrenceMatchesDay("FREQ=WEEKLY;BYDAY=WE", TUESDAY)).toBe(false);
+    expect(recurrenceMatchesDay("FREQ=WEEKLY;BYDAY=WE", WEDNESDAY)).toBe(true);
+  });
+
   it("fails OPEN on a malformed rule", () => {
     // Deliberate, and the opposite of what a permission check would do: an
     // admin typo should produce an extra checklist somebody dismisses, not

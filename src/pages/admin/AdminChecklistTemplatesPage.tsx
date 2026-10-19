@@ -28,6 +28,7 @@ import {
   useTemplateSections,
   useTemplateViewerRoles,
 } from "../../data/checklists";
+import { updateOpenChecklists, useOpenChecklistPlans } from "../../data/checklistUpdate";
 import { useRoles } from "../../data/users";
 import { useLocations } from "../../data/locations";
 import { useCheckpoints } from "../../data/checkpoints";
@@ -56,7 +57,7 @@ import { ReorderableList } from "../shared/ReorderableList";
 import { AdminHeader } from "./AdminHomePage";
 import { DraftInput, DraftNumberInput } from "../shared/DraftInput";
 
-// Admin — Checklist Templates (see docs/pages/admin-checklist-templates.html).
+// Admin — Checklist Templates (see AdminChecklistTemplatesPage.spec.md).
 // Authoring for the sectioned checklist model: a template belongs to one
 // role, contains ordered sections (each with its own trigger, visibility
 // rule, and place attachment), and sections contain the items. Template
@@ -159,6 +160,8 @@ export function AdminChecklistTemplatesPage() {
               type: it.type,
               label: it.label,
               order: it.position,
+              version: it.version,
+              previousVersionId: it.previous_version_id,
               config: itemConfig(it) as Record<string, unknown>,
             })),
         })),
@@ -261,6 +264,7 @@ type TemplateItemRow = {
   label: string;
   order: number;
   version?: number;
+  previousVersionId?: string | null;
   config?: Record<string, unknown>;
 };
 
@@ -338,12 +342,36 @@ const ELLIPSIS = {
  */
 let reportWriteError: ((message: string) => void) | null = null;
 
-function write(what: string, run: Promise<unknown>) {
-  void run.catch((err: unknown) => {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(`checklist templates — ${what} failed:`, err);
-    reportWriteError?.(`Couldn't ${what}: ${message}`);
-  });
+/**
+ * Template writes still in flight. Update open checklists waits for these
+ * before it plans: clicking it blurs whatever label was being edited, and that
+ * commit (check references, create, delete) would otherwise interleave with
+ * the update and hand it a template half-way through an edit.
+ */
+const inFlight = new Set<Promise<unknown>>();
+
+function track<T>(run: Promise<T>): Promise<T> {
+  inFlight.add(run);
+  void run.finally(() => inFlight.delete(run)).catch(() => {});
+  return run;
+}
+
+/** Every template write started so far has landed locally. */
+function templateWritesSettled(): Promise<unknown> {
+  return Promise.allSettled([...inFlight]);
+}
+
+/** Resolves once the write has landed or been reported; never rejects. */
+function write(what: string, run: Promise<unknown>): Promise<void> {
+  track(run);
+  return run.then(
+    () => {},
+    (err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`checklist templates — ${what} failed:`, err);
+      reportWriteError?.(`Couldn't ${what}: ${message}`);
+    },
+  );
 }
 
 /** A section's settings read back as one line — see templateSummary. */
@@ -673,6 +701,58 @@ function TrashIcon() {
   );
 }
 
+/**
+ * "N open checklists differ from this template. [Update them]"
+ *
+ * One offer for however many edits were made, never a question per edit: the
+ * count is of checklists that would change, so it appears once there is
+ * something to apply and clears once it has been. See the spec's "Update open
+ * checklists".
+ */
+function OpenChecklistsBanner({ templateId }: { templateId: string }) {
+  const current = useCurrent();
+  const plans = useOpenChecklistPlans(templateId);
+  const [busy, setBusy] = useState(false);
+  const [updated, setUpdated] = useState<number | null>(null);
+
+  if (plans.length === 0) {
+    if (updated == null) return null;
+    return (
+      <div className="badge badge-good" role="status" style={BANNER}>
+        Updated {updated} checklist{updated === 1 ? "" : "s"}.{" "}
+        <button type="button" className="btn btn-sm btn-quiet" onClick={() => setUpdated(null)}>
+          Dismiss
+        </button>
+      </div>
+    );
+  }
+
+  const n = plans.length;
+  const apply = () => {
+    setBusy(true);
+    write(
+      "update the open checklists",
+      templateWritesSettled()
+        .then(() => updateOpenChecklists(templateId, current.user?.id ?? null))
+        .then(setUpdated)
+        .finally(() => setBusy(false)),
+    );
+  };
+  return (
+    <div className="badge badge-warn" role="status" style={BANNER}>
+      <strong>
+        {n} open checklist{n === 1 ? "" : "s"} differ{n === 1 ? "s" : ""} from this template.
+      </strong>{" "}
+      Answered items keep the wording they were answered against.{" "}
+      <button type="button" className="btn btn-sm" disabled={busy} onClick={apply}>
+        {busy ? "Updating…" : n === 1 ? "Update it" : "Update them"}
+      </button>
+    </div>
+  );
+}
+
+const BANNER = { display: "block", marginBottom: 12, padding: "8px 10px", whiteSpace: "normal" } as const;
+
 function TemplateCard({
   template,
   roles,
@@ -835,6 +915,7 @@ function TemplateCard({
 
       {expanded && (
         <div style={{ marginTop: 12 }}>
+          <OpenChecklistsBanner templateId={template.id} />
           <div className="grid-2">
             <div>
               <div className="spread row-nowrap" style={{ marginBottom: 6 }}>
@@ -1159,7 +1240,11 @@ function SectionEditor({
   // new row and repoints this section's link, so instances created before
   // the edit keep the row they were created from. Order is presentation, not
   // meaning — reorders write in place.
-  const versionItem = async (
+  const versionItem = (
+    item: TemplateItemRow,
+    patch: { label?: string; config?: Record<string, unknown> },
+  ) => track(versionItemNow(item, patch));
+  const versionItemNow = async (
     item: TemplateItemRow,
     patch: { label?: string; config?: Record<string, unknown> },
   ) => {
@@ -1196,8 +1281,12 @@ function SectionEditor({
       });
       return;
     }
-    // Nothing reads through it, so edit it in place — no version, no orphan.
-    write(
+    // Nothing here reads through it, so replace it — no new version, no
+    // orphan. It inherits the old row's place in the version chain, which is
+    // how an open checklist on an earlier version still finds this one. If an
+    // older checklist this device cannot see does read through it, Postgres
+    // turns the delete into an orphan.
+    await write(
       "save this item's change",
       createItem({
         sectionId: section.id,
@@ -1205,6 +1294,8 @@ function SectionEditor({
         label: patch.label ?? item.label,
         config: (patch.config ?? item.config ?? {}) as never,
         position: item.order,
+        version: item.version ?? 1,
+        previousVersionId: item.previousVersionId ?? null,
       }).then(async (newId) => {
         await deleteItem(item.id);
         setOpenItemIds((prev) => {
@@ -1257,9 +1348,10 @@ function SectionEditor({
   // checklists render through this row forever. Same rule as an edit — a row no
   // instance reads through is the editor's own scratch work, and orphaning it
   // would leave exactly the litter that deleting a superseded draft avoids.
-  const removeItem = async (itemId: string) => {
+  const removeItem = (itemId: string) => track(removeItemNow(itemId));
+  const removeItemNow = async (itemId: string) => {
     const referenced = await itemHasInstances(itemId);
-    write(
+    await write(
       "remove that item",
       referenced
         ? orphanItem(itemId)

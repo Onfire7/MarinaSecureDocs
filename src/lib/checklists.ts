@@ -663,7 +663,9 @@ export function recurrenceMatchesDay(
     // nothing there; a year back covers YEARLY at negligible expansion cost.
     const dtstart = new Date(dayStart.getTime() - 366 * 24 * 60 * 60_000);
     const parsed = rrulestr(rule, { dtstart });
-    return parsed.between(dayStart, dayEnd, true).length > 0;
+    // Half-open: the next day's occurrence lands exactly on dayEnd, and an
+    // inclusive end made every rule match the day before its own as well.
+    return parsed.between(dayStart, new Date(dayEnd.getTime() - 1), true).length > 0;
   } catch (error) {
     console.error("Invalid recurrence rule:", rule, error);
     return true;
@@ -681,6 +683,77 @@ export function eligibleToday(
   day: Date = new Date(),
 ): boolean {
   return recurrenceMatchesDay(row.triggerConfig?.recurrenceRule, day);
+}
+
+// ---- Instantiation shapes ----
+
+/**
+ * A template section with everything instantiation needs about it.
+ *
+ * Assembled by the data layer from four tables — the section, the status of
+ * the location it belongs to, its checkpoint and asset links, and its items —
+ * because a section's eligibility depends on all of them and none of them is
+ * on the section row.
+ */
+export interface InstantiableSection {
+  id: string;
+  name: string;
+  position: number;
+  is_active: number;
+  trigger_type: string;
+  triggerConfig?: TriggerConfig | null;
+  hide_until_rule?: string | null;
+  dueBy?: DueByRule | null;
+  location_id?: string | null;
+  /** For "location_status" gating; see checklists.ts. */
+  location_status_name?: string | null;
+  checkpointIds: string[];
+  assetIds: string[];
+  items: TemplateItemLike[];
+}
+
+export interface InstantiableTemplate {
+  id: string;
+  name: string;
+  /** What creates instances of it — clock_in, recurring, checkpoint, … */
+  trigger_type: string;
+  /** Its own recurrence gate: a checkpoint template can be Tuesdays-only. */
+  triggerConfig?: TriggerConfig | null;
+  /** Absent reads as false: the instance belongs to the role pool. */
+  assigned_to_user?: number | null;
+  hide_until_rule?: string | null;
+  /** "HH:MM"; see expectedStartAnchor(). */
+  expected_start?: string | null;
+  dueBy?: DueByRule | null;
+  assigned_role_id?: string | null;
+  sections: InstantiableSection[];
+}
+
+/**
+ * Section rows created with the instance: active, and either always-on
+ * (manual), recurring with today matching, or gated on the current status of
+ * the place they belong to. Event-anchored types — checkpoint, location,
+ * asset — wait for their event.
+ */
+export function sectionsEligibleAtCreation(
+  sections: InstantiableSection[],
+  now: Date,
+): InstantiableSection[] {
+  return sections.filter((s) => {
+    if (s.is_active !== 1) return false;
+    if (s.trigger_type === "location_status") {
+      // No location, nothing to read a status from, so nothing to switch it
+      // on — the builder warns about this while the template is written.
+      return sectionEnabledByStatus(
+        s.triggerConfig?.statuses,
+        s.location_status_name,
+      );
+    }
+    return (
+      (s.trigger_type === "manual" || s.trigger_type === "recurring") &&
+      eligibleToday(s, now)
+    );
+  });
 }
 
 // ---- Instance visibility & derived completion ----

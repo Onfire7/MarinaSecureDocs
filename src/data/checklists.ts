@@ -1,6 +1,6 @@
 import { useQuery } from "@powersync/react";
 import { db, json, stamp } from "../lib/db";
-import { insert, remove, transact, update } from "./sql";
+import { insert, remove, transact, update, type Executor } from "./sql";
 import { recordActivity } from "./activity";
 import { id as newId, json as parseJson } from "../lib/db";
 import { deterministicId } from "../lib/detId";
@@ -26,11 +26,12 @@ import {
 
 // Checklists — templates, and the instances made from them.
 //
-// A template is authored once and instantiated many times. Instance rows COPY
-// their label and position rather than pointing at the template's, so editing a
-// template does not rewrite the history of every round already walked. The
-// template link survives for provenance, and template items version themselves
-// on edit (`previous_version_id`) for the same reason — which is why
+// A template is authored once and instantiated many times. Instance sections
+// COPY their label and position; instance items point at the exact template
+// item version they were made from. Either way, editing a template does not
+// rewrite the history of every round already walked — template items version
+// themselves on edit (`previous_version_id`) for that reason, and "Update open
+// checklists" (checklistUpdate.ts) is the one deliberate exception — which is why
 // checklist_template_items.section_id is nullable: an orphaned prior version is
 // a record of what an item used to say, and five of them exist in this marina's
 // real data.
@@ -801,6 +802,9 @@ export function createItem(input: {
   label: string;
   config: ItemConfig;
   position: number;
+  /** Set when this row replaces one in place; see the builder's versionItem. */
+  version?: number;
+  previousVersionId?: string | null;
 }): Promise<string> {
   return insert(db, "checklist_template_items", {
     section_id: input.sectionId,
@@ -808,7 +812,8 @@ export function createItem(input: {
     label: input.label,
     config: JSON.stringify(input.config),
     position: input.position,
-    version: 1,
+    version: input.version ?? 1,
+    previous_version_id: input.previousVersionId ?? null,
   });
 }
 
@@ -952,6 +957,16 @@ async function replaceLinks(
  * is read once and stitched together here. Every one of them is always
  * resident, so this is a handful of local reads.
  */
+type InstantiableSectionRow = TemplateSectionRow & { location_status_name: string | null };
+
+const INSTANTIABLE_SECTION_SELECT = `
+  SELECT s.*, t.name AS template_name, l.name AS location_name,
+         ls.name AS location_status_name
+    FROM checklist_template_sections s
+    LEFT JOIN checklist_templates t ON t.id = s.template_id
+    LEFT JOIN locations l ON l.id = s.location_id
+    LEFT JOIN location_statuses ls ON ls.id = l.status_id`;
+
 export function useInstantiableTemplates(
   triggerTypes: string[],
 ): InstantiableTemplate[] {
@@ -962,16 +977,8 @@ export function useInstantiableTemplates(
       : `${TEMPLATE_SELECT}`,
     triggerTypes,
   );
-  const { data: sections } = useQuery<
-    TemplateSectionRow & { location_status_name: string | null }
-  >(
-    `SELECT s.*, t.name AS template_name, l.name AS location_name,
-            ls.name AS location_status_name
-       FROM checklist_template_sections s
-       LEFT JOIN checklist_templates t ON t.id = s.template_id
-       LEFT JOIN locations l ON l.id = s.location_id
-       LEFT JOIN location_statuses ls ON ls.id = l.status_id
-      ORDER BY s.position`,
+  const { data: sections } = useQuery<InstantiableSectionRow>(
+    `${INSTANTIABLE_SECTION_SELECT} ORDER BY s.position`,
   );
   const { data: items } = useTemplateItems();
   const { data: sectionCheckpoints } = useSectionCheckpoints();
@@ -982,9 +989,44 @@ export function useInstantiableTemplates(
   );
 }
 
+/**
+ * One template in instantiable shape, read inside a transaction — the same
+ * assembly as useInstantiableTemplates(), for writers that must plan against
+ * what the database holds at the moment they write.
+ */
+export async function loadInstantiableTemplate(
+  executor: Executor,
+  templateId: string,
+): Promise<InstantiableTemplate | null> {
+  const template = await executor.getOptional<TemplateRow>(
+    `${TEMPLATE_SELECT} WHERE t.id = ?`,
+    [templateId],
+  );
+  if (!template) return null;
+  const sections = await executor.getAll<InstantiableSectionRow>(
+    `${INSTANTIABLE_SECTION_SELECT} WHERE s.template_id = ? ORDER BY s.position`,
+    [templateId],
+  );
+  const sectionIds = sections.map((s) => s.id);
+  const inSections = `IN (${sectionIds.map(() => "?").join(", ") || "NULL"})`;
+  const items = await executor.getAll<TemplateItemRow>(
+    `SELECT * FROM checklist_template_items WHERE section_id ${inSections} ORDER BY section_id, position`,
+    sectionIds,
+  );
+  const checkpoints = await executor.getAll<{ section_id: string; checkpoint_id: string }>(
+    `SELECT * FROM template_section_checkpoints WHERE section_id ${inSections}`,
+    sectionIds,
+  );
+  const assets = await executor.getAll<{ section_id: string; asset_id: string }>(
+    `SELECT * FROM template_section_assets WHERE section_id ${inSections}`,
+    sectionIds,
+  );
+  return assembleTemplate(template, sections, items, checkpoints, assets);
+}
+
 function assembleTemplate(
   t: TemplateRow,
-  sections: (TemplateSectionRow & { location_status_name: string | null })[],
+  sections: InstantiableSectionRow[],
   items: TemplateItemRow[],
   sectionCheckpoints: { section_id: string; checkpoint_id: string }[],
   sectionAssets: { section_id: string; asset_id: string }[],
@@ -1006,7 +1048,7 @@ function assembleTemplate(
 }
 
 function toInstantiableSection(
-  s: TemplateSectionRow & { location_status_name: string | null },
+  s: InstantiableSectionRow,
   items: TemplateItemRow[],
   sectionCheckpoints: { section_id: string; checkpoint_id: string }[],
   sectionAssets: { section_id: string; asset_id: string }[],

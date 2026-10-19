@@ -692,6 +692,7 @@ const checklist_instance_sections = new Table(
     due_by: column.text,
     location_id: column.text,
     is_recent: column.integer,
+    created_at: column.text,
   },
   {
     indexes: {
@@ -714,6 +715,7 @@ const checklist_instances = new Table(
     parent_item_id: column.text,
     is_recent: column.integer,
     expected_start_at: column.text,
+    created_at: column.text,
   },
   {
     indexes: {
