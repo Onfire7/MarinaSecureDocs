@@ -1022,6 +1022,19 @@ h3 {
   max-height: 100%;
   overflow-y: auto;
 }
+/* The title stays pinned while a tall card scrolls. Negative margins pull
+   it out over the card's padding so it pins flush at the scrollport's top
+   edge, with an opaque background for content to scroll under — otherwise
+   lines would show through the 18px gap above it. Dialogs' inline
+   marginBottom still sets the gap below. */
+.dialog-card > .card-title:first-child {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: -18px -18px 0;
+  padding: 18px 18px 8px;
+  background: var(--panel);
+}
 
 /* Checkpoint scan modal: replaces the whole viewport (not a centered card
    like dialog-card) since the point is to look like the checkpoint check-in
