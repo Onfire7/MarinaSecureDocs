@@ -33,7 +33,16 @@
 .psa-missed .psa-glyph, .psa-missed .psa-result, .psa-exception .psa-result { color: var(--bad); font-weight: 650; }
 .psa-exception .psa-glyph { color: var(--warn); }
 .psa-time { color: var(--mute); font-variant-numeric: tabular-nums; font-size: 0.9rem; }
-@media (max-width: 760px) { .psa-row { grid-template-columns: 20px 1fr; } .psa-time, .psa-source { grid-column: 2; } .psa-result { grid-column: 2; } }
+@media (max-width: 760px) {
+  .psa-row { grid-template-columns: 20px 1fr auto; grid-template-areas: "glyph label result" "glyph meta meta"; row-gap: 1px; padding: 6px 0; }
+  .psa-row > :nth-child(1) { grid-area: glyph; }
+  .psa-row > :nth-child(2) { grid-area: meta; }
+  .psa-row > :nth-child(3) { grid-area: label; }
+  .psa-row > :nth-child(4) { grid-area: result; text-align: right; max-width: 45vw; }
+  .psa-row > :nth-child(5) { grid-area: meta; justify-self: end; text-align: right; }
+  .psa-folded > :nth-child(2) { display: none; }
+  .psa-folded > :nth-child(3) { grid-column: 2 / 4; }
+}
 
 /* B — Grid */
 .psb-pair { display: grid; grid-template-columns: 3fr 2fr; gap: 0; border: 1px solid var(--line-lt); border-radius: var(--radius); background: var(--panel); margin-bottom: 12px; overflow: hidden; }
