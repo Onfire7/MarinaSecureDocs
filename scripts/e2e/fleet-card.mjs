@@ -217,7 +217,7 @@ const enabledAfter = await fleetBox.isEnabled();
 await page.keyboard.press("Escape");
 const truckId = sql(`select id from assets where name = 'Truck e2e'`);
 await page.goto(`${APP_URL}/assets/${truckId}`, { waitUntil: "domcontentloaded" });
-const toggleShown = await page.getByLabel("Fleet vehicle").isVisible({ timeout: 60000 }).catch(() => false);
+const toggleShown = await page.getByLabel("Fleet vehicle").waitFor({ timeout: 60000 }).then(() => true, () => false);
 await page.getByLabel("Fleet vehicle").uncheck().catch(() => {});
 const unflagged = await until("the flag to clear", `select is_fleet from assets where name = 'Truck e2e'`, "f");
 await reset(true, ["manage_assets"]);

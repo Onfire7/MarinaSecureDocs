@@ -179,7 +179,12 @@ function AddAssetDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="dialog-backdrop" onClick={onClose}>
-      <div className="dialog-card" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="dialog-card"
+        role="dialog"
+        aria-label="Add asset"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="card-title" style={{ marginBottom: 10 }}>
           Add asset
         </div>
