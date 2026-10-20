@@ -529,7 +529,8 @@ export async function startInstance(
 
 /**
  * Submit a checklist: write everything its items described, complete it, and
- * close whatever it closes — all in one transaction.
+ * — all in one transaction. (An End of Shift Checklist no longer ends its
+ * shift here; End Shift and Submit, on the review, does.)
  *
  * One transaction is the whole point. Until this moment an item could be
  * reopened and changed freely, which is only safe because none of the incidents
@@ -541,8 +542,6 @@ export async function submitInstance(opts: {
   instanceId: string;
   templateName: string;
   parentItemId: string | null;
-  /** The shift this checklist closes, if it is an end-of-shift one. */
-  endedShift: { id: string; guardName: string } | null;
   collected: Collected;
   maintenance: MaintenanceCheck[];
   statusIds: { incidentOpen: string | null; ticketOpen: string | null };
@@ -577,16 +576,6 @@ export async function submitInstance(opts: {
       subjectId: opts.instanceId,
       actorId: opts.actorId,
     });
-    if (opts.endedShift) {
-      await update(tx, "shifts", opts.endedShift.id, { ended_at: now });
-      await recordActivity(tx, {
-        eventType: "shift.ended",
-        summary: `Shift ended by end-of-shift checklist "${opts.templateName}"`,
-        subjectType: "shifts",
-        subjectId: opts.endedShift.id,
-        actorId: opts.actorId,
-      });
-    }
   });
 }
 

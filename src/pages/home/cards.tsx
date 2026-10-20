@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { ComponentType } from "react";
-import { id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import type { CurrentUser } from "../../lib/auth/useCurrentUser";
 import {
@@ -10,12 +9,9 @@ import {
   useInstantiableTemplates,
 } from "../../data/checklists";
 import { useRoleIdsFor } from "../../data/users";
-import {
-  attachEndOfShiftChecklist,
-  endShift,
-  startShift,
-  useActiveShift,
-} from "../../data/shifts";
+import { startShift } from "../../data/shifts";
+import { useEndOfShift } from "../../data/endOfShift";
+import { endOfShiftLabel, useGoToEndOfShiftStep } from "./useEndOfShiftStep";
 import { useTickets } from "../../data/tickets";
 import { useIncidents } from "../../data/incidents";
 import { useMissedCalls, useSmsThreads } from "../../data/comms";
@@ -144,23 +140,25 @@ function ShiftCard() {
   const navigate = useNavigate();
   const userId = current.user?.id;
 
-  const { shift: activeShift } = useActiveShift(userId);
   const roleIds = useRoleIdsFor(userId);
-  const clockTemplates = useInstantiableTemplates(["clock_in", "clock_out"]);
+  const clockIn = useInstantiableTemplates(["clock_in"]);
+  // The end of the shift is one button whose label is its next step
+  // (DashboardPage.spec.md § The Shift card). Nothing on this card ends the
+  // shift: only End Shift and Submit, on the review, does.
+  const endOfShift = useEndOfShift(userId);
+  const goToNextStep = useGoToEndOfShiftStep();
+  const activeShift = endOfShift.shift;
 
   // Clock templates are role-scoped like everything else — a maintenance
-  // clock-in checklist shouldn't fire for a security guard.
-  const mine = clockTemplates.filter(
-    (t) => t.assigned_role_id && roleIds.includes(t.assigned_role_id),
-  );
-  // A template with nothing switched on right now generates nothing — see
-  // hasWorkAtCreation. Empty checklists are noise, and with status-gated
-  // sections an empty one is an ordinary outcome, not a mistake.
-  const clockInTemplate = mine.find(
-    (t) => t.trigger_type === "clock_in" && hasWorkAtCreation(t),
-  );
-  const clockOutTemplate = mine.find(
-    (t) => t.trigger_type === "clock_out" && hasWorkAtCreation(t),
+  // clock-in checklist shouldn't fire for a security guard. A template with
+  // nothing switched on right now generates nothing — see hasWorkAtCreation.
+  // Empty checklists are noise, and with status-gated sections an empty one is
+  // an ordinary outcome, not a mistake.
+  const clockInTemplate = clockIn.find(
+    (t) =>
+      t.assigned_role_id &&
+      roleIds.includes(t.assigned_role_id) &&
+      hasWorkAtCreation(t),
   );
 
   // Re-render each minute so elapsed time stays fresh.
@@ -184,26 +182,6 @@ function ShiftCard() {
       });
       navigate(`/checklists/${checklistId}`);
     }
-  };
-
-  const endShiftManually = async () => {
-    if (!activeShift || !userId || !current.user) return;
-    await endShift(activeShift.id, { id: userId, name: current.user.name });
-    // TODO: call the shift-report Netlify Function on-demand once the
-    // functions layer exists; the scheduled backstop sweep covers it meanwhile.
-  };
-
-  const startEndOfShiftChecklist = async () => {
-    if (!activeShift || !clockOutTemplate || !userId) return;
-    const checklistId = id();
-    await createInstanceFromTemplate({
-      template: clockOutTemplate,
-      userId,
-      instanceId: checklistId,
-      reason: "clock-out",
-    });
-    await attachEndOfShiftChecklist(activeShift.id, checklistId);
-    navigate(`/checklists/${checklistId}`);
   };
 
   if (!activeShift) {
@@ -235,25 +213,18 @@ function ShiftCard() {
           minute: "2-digit",
         })}
       </div>
-      <div style={{ marginTop: 10 }}>
-        {clockOutTemplate ? (
+      {endOfShift.step && (
+        <div style={{ marginTop: 10 }}>
           <button
             type="button"
             className="btn"
-            onClick={() => void startEndOfShiftChecklist()}
+            data-testid="shift-card-next"
+            onClick={() => void goToNextStep(endOfShift)}
           >
-            Complete end-of-shift checklist
+            {endOfShiftLabel(endOfShift.step)}
           </button>
-        ) : (
-          <button
-            type="button"
-            className="btn btn-danger"
-            onClick={() => void endShiftManually()}
-          >
-            End Shift
-          </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

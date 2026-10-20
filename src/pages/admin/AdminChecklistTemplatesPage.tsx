@@ -54,6 +54,13 @@ import { LocationPicker } from "../shared/LocationPicker";
 import { compareNames } from "../../lib/locations";
 import { MultiSelectDialog } from "../shared/MultiSelectDialog";
 import { ReorderableList } from "../shared/ReorderableList";
+import {
+  clockOutBlockedReason,
+  endShiftBlockedReason,
+  endShiftHidden,
+  pinEndShiftLast,
+  type TemplateShape,
+} from "../../lib/endOfShift";
 import { AdminHeader } from "./AdminHomePage";
 import { DraftInput, DraftNumberInput } from "../shared/DraftInput";
 
@@ -799,6 +806,20 @@ function TemplateCard({
     [template.sections],
   );
   const itemCount = sections.reduce((n, s) => n + s.items.length, 0);
+  // What the End Shift rules read (AdminChecklistTemplatesPage.spec.md § End
+  // Shift Items).
+  const shape: TemplateShape = {
+    trigger_type: template.triggerType,
+    sections: sections.map((s) => ({
+      id: s.id,
+      trigger_type: s.triggerType,
+      is_active: s.isActive,
+      items: s.items,
+    })),
+  };
+  const clockOutReason = clockOutBlockedReason(shape);
+  const holdsEndShift = (s: { items: { type: string }[] }) =>
+    s.items.some((i) => i.type === "end_shift");
   const viewerRoleIds = new Set((template.viewerRoles ?? []).map((r) => r.id));
   // The assigned role already has full access, so offering it here would only
   // let someone grant a weaker version of what it holds.
@@ -1016,11 +1037,22 @@ function TemplateCard({
                   onChange={(e) => update({ triggerType: e.target.value })}
                 >
                   {TRIGGERS.map((t) => (
-                    <option key={t.value} value={t.value}>
+                    <option
+                      key={t.value}
+                      value={t.value}
+                      disabled={
+                        t.value === "clock_out" &&
+                        !!clockOutReason &&
+                        template.triggerType !== "clock_out"
+                      }
+                    >
                       {t.label}
                     </option>
                   ))}
                 </select>
+                {clockOutReason && template.triggerType !== "clock_out" && (
+                  <span className="muted small">{clockOutReason}</span>
+                )}
               </div>
               <div>
                 {template.triggerType === "recurring" && (
@@ -1073,12 +1105,22 @@ function TemplateCard({
               </div>
               <ReorderableList
                 items={sections}
+                // The section holding the End Shift Item stays last.
                 onReorder={(orderedIds) =>
-                  write("reorder those sections", reorderSections(orderedIds))
+                  write(
+                    "reorder those sections",
+                    reorderSections(
+                      pinEndShiftLast(orderedIds, (sid) =>
+                        holdsEndShift(sections.find((s) => s.id === sid) ?? { items: [] }),
+                      ),
+                    ),
+                  )
                 }
+                pinned={holdsEndShift}
                 renderItem={(section) => (
                   <SectionEditor
                     section={section}
+                    templateShape={shape}
                     expectedStart={template.expectedStart}
                     defaultOpen={section.id === openedSectionId}
                     locations={locations}
@@ -1149,8 +1191,11 @@ function SectionEditor({
   locations,
   allCheckpoints,
   allAssets,
+  templateShape,
 }: {
   section: SectionRow & { items: TemplateItemRow[] };
+  /** The whole template, for the End Shift rules. */
+  templateShape: TemplateShape;
   /** The parent template's — it is what dates this section's hide-until. */
   expectedStart?: string;
   /** Just created — mount expanded rather than making you open it again. */
@@ -1313,7 +1358,22 @@ function SectionEditor({
   // always the right one — so default it. Arrives open with its name selected:
   // picking a type from the menu is an intention to describe the thing, and the
   // next thing you want is the cursor in the field.
+  // End Shift rules (AdminChecklistTemplatesPage.spec.md § End Shift Items):
+  // hidden where it can never go, disabled with its reason where it could.
+  const endShiftReason = endShiftBlockedReason(templateShape, section.id);
+  const menuTypes = (Object.keys(ITEM_TYPE_LABEL) as ItemType[]).filter(
+    (t) => t !== "end_shift" || !endShiftHidden(templateShape),
+  );
+  const isEndShift = (i: { type: string }) => i.type === "end_shift";
+  // Every write of this section's order goes through here, so the End Shift
+  // Item stays last whatever was dropped or appended where.
+  const writeOrder = (orderedIds: string[]) =>
+    reorderItems(
+      pinEndShiftLast(orderedIds, (iid) => items.some((i) => i.id === iid && isEndShift(i))),
+    );
+
   const addItem = (type: ItemType) => {
+    if (type === "end_shift" && endShiftReason) return;
     write(
       "add that item",
       createItem({
@@ -1324,7 +1384,11 @@ function SectionEditor({
           ? { locationId: section.location.id }
           : {}) as never,
         position: items.length,
-      }).then((newId) => {
+      }).then(async (newId) => {
+        // Appended after an End Shift Item; move it back above.
+        if (type !== "end_shift" && items.some(isEndShift)) {
+          await writeOrder([...items.map((i) => i.id), newId]);
+        }
         setOpenItemIds((prev) => new Set(prev).add(newId));
         setNamingItemId(newId);
         setLastAddedType(type);
@@ -1341,6 +1405,8 @@ function SectionEditor({
         label: `${item.label} (copy)`,
         config: (item.config ?? {}) as never,
         position: items.length,
+      }).then(async (newId) => {
+        if (items.some(isEndShift)) await writeOrder([...items.map((i) => i.id), newId]);
       }),
     );
 
@@ -1659,9 +1725,8 @@ function SectionEditor({
           </div>
           <ReorderableList
             items={items}
-            onReorder={(orderedIds) =>
-              write("reorder those items", reorderItems(orderedIds))
-            }
+            onReorder={(orderedIds) => write("reorder those items", writeOrder(orderedIds))}
+            pinned={isEndShift}
             renderItem={(item) => (
               <ItemRow
                 item={item}
@@ -1691,11 +1756,13 @@ function SectionEditor({
                 className="row"
                 style={{ flexWrap: "wrap", justifyContent: "center", gap: 6 }}
               >
-                {(Object.keys(ITEM_TYPE_LABEL) as ItemType[]).map((t) => (
+                {menuTypes.map((t) => (
                   <button
                     key={t}
                     type="button"
                     className="btn btn-sm"
+                    disabled={t === "end_shift" && !!endShiftReason}
+                    title={t === "end_shift" ? (endShiftReason ?? undefined) : undefined}
                     onClick={() => addItem(t)}
                   >
                     {ITEM_TYPE_LABEL[t]}
@@ -1713,16 +1780,22 @@ function SectionEditor({
                 }}
               >
                 <option value="">Add an item…</option>
-                {(Object.keys(ITEM_TYPE_LABEL) as ItemType[]).map((t) => (
-                  <option key={t} value={t}>
-                    {ITEM_TYPE_LABEL[t]}
-                  </option>
-                ))}
+                {menuTypes.map((t) =>
+                  t === "end_shift" && endShiftReason ? (
+                    <option key={t} value={t} disabled title={endShiftReason}>
+                      {ITEM_TYPE_LABEL[t]} (last section, made with the checklist)
+                    </option>
+                  ) : (
+                    <option key={t} value={t}>
+                      {ITEM_TYPE_LABEL[t]}
+                    </option>
+                  ),
+                )}
               </select>
               {/* Items come in runs — four door checks for four doors — and
                   the menu resets after every use, so the second one cost the
                   same three taps as the first. */}
-              {lastAddedType && (
+              {lastAddedType && lastAddedType !== "end_shift" && (
                 <button
                   type="button"
                   className="btn btn-sm"
@@ -2015,15 +2088,18 @@ function ItemRow({
               inside the config panel it only said what the fields under it
               already implied. */}
           <span className="badge">{itemTypeLabel(item.type)}</span>
-          <button
-            type="button"
-            className="btn btn-sm btn-quiet btn-icon"
-            title="Duplicate this item"
-            aria-label="Duplicate this item"
-            onClick={() => onDuplicate(item)}
-          >
-            ⧉
-          </button>
+          {/* One End Shift Item per template: nothing to duplicate. */}
+          {item.type !== "end_shift" && (
+            <button
+              type="button"
+              className="btn btn-sm btn-quiet btn-icon"
+              title="Duplicate this item"
+              aria-label="Duplicate this item"
+              onClick={() => onDuplicate(item)}
+            >
+              ⧉
+            </button>
+          )}
           <button
             type="button"
             className="btn btn-sm btn-quiet btn-icon btn-icon-danger"

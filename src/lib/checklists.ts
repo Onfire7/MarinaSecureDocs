@@ -13,7 +13,8 @@ export type ItemType =
   | "lock_check"
   | "location_check"
   | "meter_reading"
-  | "question";
+  | "question"
+  | "end_shift";
 
 /** One-line reading of a recorded answer, for lists and reports. */
 export function questionAnswerSummary(r: QuestionResult): string {
@@ -213,6 +214,11 @@ export interface SimpleCheckResult {
   type: "simple_check";
   completedAt: number;
 }
+/** Recorded as the End Shift Item submits its checklist; carries nothing else. */
+export interface EndShiftResult {
+  type: "end_shift";
+  completedAt: number;
+}
 export interface VerifyTaskResult {
   type: "verify_task";
   outcome: "confirmed" | "rejected_reason" | "rejected_ticket";
@@ -293,7 +299,8 @@ export type ItemResult =
   | DoorCheckResult
   | LocationCheckResult
   | MeterReadingResult
-  | QuestionResult;
+  | QuestionResult
+  | EndShiftResult;
 
 // ---- Template trigger types ----
 
@@ -374,6 +381,7 @@ export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   location_check: "Location-Based Check",
   meter_reading: "Meter Reading",
   question: "Question",
+  end_shift: "End Shift",
 };
 
 /**

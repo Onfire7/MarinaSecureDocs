@@ -30,7 +30,11 @@ import {
 import { useIncidentStatuses, useTicketStatuses } from "../../data/lookups";
 import { useLocations } from "../../data/locations";
 import { useRoleIdsFor } from "../../data/users";
-import { useInstances } from "../../data/checklists";
+import { useInstances, completeItem } from "../../data/checklists";
+import { useEndOfShift } from "../../data/endOfShift";
+import { pinEndShiftLast } from "../../lib/endOfShift";
+import { useGoToEndOfShiftStep } from "../home/useEndOfShiftStep";
+import { EndShiftItem } from "./EndShiftItem";
 import {
   DoorCheckItem,
   LockCheckItem,
@@ -119,7 +123,16 @@ export function ChecklistItemsPanel({
   const { instance: checklist } = useInstance(checklistId);
   const { data: sectionRows } = useInstanceSections(checklistId);
   const { data: itemRows } = useInstanceItems(checklistId);
+  // Set when this is the shift's End of Shift Checklist: its submit goes on
+  // to the review rather than ending the shift (§ Ending the shift).
   const endedShift = useShiftEndedBy(checklistId);
+  // The Shift card's "Finish …" opens this page at its End Shift Item. The
+  // item renders once the rows arrive, so wait for them, then scroll once.
+  const scrolledToEndShift = useRef(false);
+  // Where an End Shift Item goes once this checklist is submitted - read
+  // without this checklist, whose new status may not be back yet.
+  const endOfShift = useEndOfShift(current.user?.id, checklistId);
+  const goToEndOfShiftStep = useGoToEndOfShiftStep();
   const roleIds = useRoleIdsFor(current.user?.id);
   const { data: allLocations } = useLocations();
   const { data: allInstances } = useInstances();
@@ -162,6 +175,14 @@ export function ChecklistItemsPanel({
       userId!,
     );
   }, [checklist, userId, canAct, sectionId]);
+
+  useEffect(() => {
+    if (scrolledToEndShift.current || window.location.hash !== "#end-shift") return;
+    const el = document.getElementById("end-shift");
+    if (!el) return;
+    scrolledToEndShift.current = true;
+    el.scrollIntoView({ block: "center" });
+  }, [itemRows.length]);
 
   // Both lists arrive ordered from their own queries. Sections still inside
   // their hide_until exist but aren't anyone's work yet — their items still
@@ -249,7 +270,7 @@ export function ChecklistItemsPanel({
     }
   };
 
-  const runSubmit = async () => {
+  const runSubmit = async (then: "default" | "end_shift" = "default") => {
     const templateName = checklist.template_name ?? "Checklist";
     // Everything the items described while the guard worked — incidents,
     // tickets, meter readings — is written in the same transaction that
@@ -265,9 +286,6 @@ export function ChecklistItemsPanel({
       instanceId: checklist.id,
       templateName,
       parentItemId: checklist.parent_item_id,
-      endedShift: endedShift
-        ? { id: endedShift.id, guardName: current.user?.name ?? "a guard" }
-        : null,
       collected,
       maintenance,
       statusIds: {
@@ -276,7 +294,37 @@ export function ChecklistItemsPanel({
       },
       actorId: current.user?.id ?? null,
     });
-    onSubmitted?.();
+    if (then === "end_shift") {
+      await goToEndOfShiftStep(endOfShift);
+    } else if (endedShift && !endedShift.ended_at) {
+      navigate("/shift/end");
+    } else {
+      onSubmitted?.();
+    }
+  };
+
+  const endShiftItems = allItems.filter((i) => i.type === "end_shift");
+  // The End Shift Item marks itself answered and submits the checklist it
+  // sits on; findings are only written on submit, so ending the shift around
+  // an open checklist would lose them (§ End Shift Item).
+  const endShiftNow = async (item: ItemRow) => {
+    if (submitting) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      await completeItem(
+        item.id,
+        { type: "end_shift", completedAt: Date.now() },
+        item.note,
+        current.user?.id ?? null,
+      );
+      await runSubmit("end_shift");
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message : "Couldn't submit the checklist.",
+      );
+      setSubmitting(false);
+    }
   };
 
   const componentFor = (type: string): ComponentType<ItemProps> => {
@@ -304,7 +352,10 @@ export function ChecklistItemsPanel({
   // guard's own working order from then on (it started as the template's).
   // One write per drop, and the row order becomes the user's own working
   // order from then on — it started as the template's.
-  const reorderItems = (orderedIds: string[]) => void reorderInstanceItems(orderedIds);
+  // The End Shift Item is the checklist's last item whatever is dropped where.
+  const endShiftIds = new Set(endShiftItems.map((i) => i.id));
+  const reorderItems = (orderedIds: string[]) =>
+    void reorderInstanceItems(pinEndShiftLast(orderedIds, (rowId) => endShiftIds.has(rowId)));
 
   const title = checklist.template_name ?? "Checklist";
   const sectionLabel = sectionId
@@ -566,6 +617,20 @@ export function ChecklistItemsPanel({
                     enabled={canAct && !compact && section.items.length > 1}
                     onReorder={reorderItems}
                     renderItem={(item: (typeof run.items)[number]) => {
+                      if (item.type === "end_shift") {
+                        return (
+                          <EndShiftItem
+                            item={item}
+                            onShift={!!endOfShift.shift}
+                            othersRemaining={
+                              remainingAll - endShiftItems.filter((i) => !isDone(i)).length
+                            }
+                            busy={submitting}
+                            editable={canAct}
+                            onEndShift={() => void endShiftNow(item)}
+                          />
+                        );
+                      }
                       const Component = componentFor(item.type);
                       return (
                         <Component

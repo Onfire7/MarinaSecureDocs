@@ -18,6 +18,7 @@ export function ReorderableList<T extends { id: string }>({
   onReorder,
   renderItem,
   enabled = true,
+  pinned,
 }: {
   items: T[];
   /** Called once per completed move, with the full new id order. */
@@ -25,6 +26,9 @@ export function ReorderableList<T extends { id: string }>({
   renderItem: (item: T, index: number) => ReactNode;
   /** Off for unordered modes (a freeform tour has no sequence to express). */
   enabled?: boolean;
+  /** Rows with no handle of their own, held in place by the caller's
+   *  onReorder (the End Shift Item stays last). */
+  pinned?: (item: T) => boolean;
 }) {
   const [dragOrder, setDragOrder] = useState<string[] | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -123,7 +127,12 @@ export function ReorderableList<T extends { id: string }>({
             "reorder-row" + (draggingId === item.id ? " reorder-dragging" : "")
           }
         >
-          {enabled && (
+          {enabled && pinned?.(item) && (
+            <span className="reorder-handle" aria-hidden style={{ visibility: "hidden" }}>
+              ⠿
+            </span>
+          )}
+          {enabled && !pinned?.(item) && (
             <button
               type="button"
               className="reorder-handle"

@@ -208,6 +208,8 @@ function ResultSummary({ type, result }: { type: string; result: ItemResult | un
   switch (type) {
     case "simple_check":
       return <span>Complete</span>;
+    case "end_shift":
+      return <span>Ended the shift</span>;
     case "verify_task": {
       const r = result as Extract<ItemResult, { type: "verify_task" }>;
       if (r.outcome === "confirmed") return <span>Confirmed{r.attempted ? " (after attempt)" : ""}</span>;

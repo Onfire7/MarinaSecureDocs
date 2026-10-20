@@ -13,6 +13,7 @@ import { SignInPage } from "./pages/access/SignInPage";
 import { DevicePositionWatcher } from "./pages/shared/DevicePositionWatcher";
 import { UserSwitchPage } from "./pages/access/UserSwitchPage";
 import { DashboardPage } from "./pages/home/DashboardPage";
+import { EndOfShiftPage } from "./pages/home/EndOfShiftPage";
 import { MorePage } from "./pages/shared/MorePage";
 import { ChecklistListPage } from "./pages/checklists/ChecklistListPage";
 import { ChecklistRoute } from "./pages/checklists/ChecklistRoute";
@@ -93,6 +94,7 @@ export default function AuthedApp() {
                 }
               >
                 <Route path="/" element={<DashboardPage />} />
+                <Route path="/shift/end" element={<EndOfShiftPage />} />
                 <Route path="/more" element={<MorePage />} />
                 {/* The NFC/QR deep link. It lives inside the shell like any
                     other screen — a guard who scans a tag still needs the nav
