@@ -146,6 +146,44 @@ export function compareNames(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 }
 
+/** The map a page showing one map at a time opens on (docs/maps.md § A
+ *  location on several maps). Of the maps it is on: the one scoped to its
+ *  nearest ancestor, else the first by name. On none: its nearest
+ *  ancestor's map, else the overview (a map whose scope has no parent). */
+export function defaultMapFor(
+  locationId: string | null | undefined,
+  input: {
+    locations: { id: string; parent_id: string | null }[];
+    maps: { id: string; name: string; scope_id: string | null; scope_name?: string | null; scope_parent_id: string | null }[];
+    onMapIds: string[];
+  },
+): string | null {
+  const { locations, maps, onMapIds } = input;
+  const parentOf = new Map(locations.map((l) => [l.id, l.parent_id]));
+  // Ancestors nearest first.
+  const chain: string[] = [];
+  let cursor = locationId ? (parentOf.get(locationId) ?? null) : null;
+  while (cursor && chain.length < 32 && !chain.includes(cursor)) {
+    chain.push(cursor);
+    cursor = parentOf.get(cursor) ?? null;
+  }
+  const byName = (a: { name: string; scope_name?: string | null }, b: { name: string; scope_name?: string | null }) =>
+    compareNames(a.scope_name ?? a.name, b.scope_name ?? b.name);
+  const on = maps.filter((m) => onMapIds.includes(m.id));
+  if (on.length > 0) {
+    const rank = (m: { scope_id: string | null }) => {
+      const i = m.scope_id ? chain.indexOf(m.scope_id) : -1;
+      return i < 0 ? Number.MAX_SAFE_INTEGER : i;
+    };
+    return [...on].sort((a, b) => rank(a) - rank(b) || byName(a, b))[0].id;
+  }
+  for (const id of chain) {
+    const m = maps.filter((x) => x.scope_id === id).sort(byName)[0];
+    if (m) return m.id;
+  }
+  return [...maps].filter((m) => !m.scope_parent_id).sort(byName)[0]?.id ?? null;
+}
+
 // Walk the parent chain via an id→record map (the list pages already
 // subscribe to every location, so the chain is resolvable client-side).
 export function breadcrumb(

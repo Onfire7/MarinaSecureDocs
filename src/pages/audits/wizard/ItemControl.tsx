@@ -13,7 +13,7 @@ import { MapPreview } from "../../shared/MapPreview";
 import { useDevicePosition } from "../../shared/useDevicePosition";
 import { useNoteSuggestions } from "../../../data/services";
 import { useMarinaSettings } from "../../../data/settings";
-import type { AmenityAnswer, AttributeAnswer, AnswerValue, GpsAnswer, MapAnswer, ServiceAnswer, WizardItem, WizardTarget } from "../../../lib/auditWizard";
+import { mapAnswerOf, withPlacement, withoutPlacement, type AmenityAnswer, type AttributeAnswer, type AnswerValue, type GpsAnswer, type MapAnswer, type MapPlacement, type ServiceAnswer, type WizardItem, type WizardTarget } from "../../../lib/auditWizard";
 import type { LabelShape, MapPoint } from "../../../lib/locations";
 import { GpsCapture } from "../GpsCapture";
 import { PlacementCheck } from "../PlacementCheck";
@@ -28,20 +28,20 @@ export function ItemControl({
   big,
   advance,
   autoFocus,
-  auditPlacement,
+  auditPlacements,
   onPlacement,
 }: {
   item: WizardItem;
   /** Whose item: the map and GPS pages need the location itself. */
   target: WizardTarget;
   value: AnswerValue | undefined;
-  /** Where this RUN has the location on the map - the map answer's
-   *  placement - so the GPS page re-anchors the label the run has, not
+  /** Where this RUN has the location on each map - the map answer's
+   *  placements - so the GPS page re-anchors the label the run has, not
    *  the one on file (owner, 2026-10-05). */
-  auditPlacement?: MapAnswer["placement"];
+  auditPlacements?: MapPlacement[];
   /** The GPS page hands a re-anchored placement back through this, which
    *  is the map answer's write. */
-  onPlacement?: (p: NonNullable<MapAnswer["placement"]>) => void;
+  onPlacement?: (p: MapPlacement) => void;
   statuses: { id: string; name: string }[];
   /** `typing` while a field is being edited: the page holds the value and
    *  writes it when the field commits. A write per keystroke is ten
@@ -268,7 +268,7 @@ export function ItemControl({
     case "map":
       return <MapControl target={target} value={value} big={big} onChange={onChange} onward={onward} />;
     case "gps":
-      return <GpsControl target={target} value={value} big={big} onChange={onChange} auditPlacement={auditPlacement ?? null} onPlacement={onPlacement} />;
+      return <GpsControl target={target} value={value} big={big} onChange={onChange} auditPlacements={auditPlacements ?? []} onPlacement={onPlacement} />;
     case "status":
       return (
         <div className={`wz-control ${cls}`}>
@@ -459,11 +459,9 @@ function YesNo({
   );
 }
 
-/** "Placed correctly on the map?" with the map in front of the person
- *  answering, the same check the Finding form uses: the map on top, the
- *  question under it - and no question at all when the location is not on
- *  the map yet, just *Place it on the map*. Yes moves on; No opens the
- *  editor, because No is answered by moving it. */
+/** The map page: the map chooser, the chosen map and Done - no question
+ *  since 2026-10-19 (PlacementCheck, shared with the Finding form). A
+ *  change on a map is kept per map; Done answers the page and moves on. */
 function MapControl({
   target,
   value,
@@ -477,7 +475,8 @@ function MapControl({
   onChange: (v: AnswerValue, mode?: AnswerMode) => void;
   onward: () => void;
 }) {
-  const v: MapAnswer = typeof value === "boolean" ? { correct: value, placement: null } : ((value as MapAnswer | undefined) ?? { correct: null, placement: null });
+  const v = mapAnswerOf(value);
+  const write = (next: MapAnswer) => onChange(next as unknown as AnswerValue);
   if (!target.location_id) return <span className="muted small">Not a location on file, so it has no place on the map yet.</span>;
   return (
     <div className={`wz-control ${big ? "wz-big" : ""} wz-map`}>
@@ -486,12 +485,13 @@ function MapControl({
         locationName={target.location_name}
         editable
         big={big}
-        proposed={v.placement}
-        onPropose={(p, correct) => onChange({ ...v, placement: p, ...(correct === undefined ? {} : { correct }) })}
-        answer={v.correct}
-        onAnswer={(correct) => {
-          onChange({ ...v, correct });
-          if (correct) onward();
+        placements={v.placements}
+        onPlacement={(pl) => write(withPlacement(v, pl))}
+        onDiscard={(mapId) => write(withoutPlacement(v, mapId))}
+        done={v.done}
+        onDone={() => {
+          write({ ...v, done: true });
+          onward();
         }}
       />
     </div>
@@ -509,26 +509,26 @@ function GpsControl({
   value,
   big,
   onChange,
-  auditPlacement,
+  auditPlacements,
   onPlacement,
 }: {
   target: WizardTarget;
   value: AnswerValue | undefined;
   big?: boolean;
   onChange: (v: AnswerValue, mode?: AnswerMode) => void;
-  auditPlacement: MapAnswer["placement"];
-  onPlacement?: (p: NonNullable<MapAnswer["placement"]>) => void;
+  auditPlacements: MapPlacement[];
+  onPlacement?: (p: MapPlacement) => void;
 }) {
   const settings = useMarinaSettings();
   const [anchoring, setAnchoring] = useState(false);
   const fix = value && typeof value === "object" && "lat" in value ? (value as GpsAnswer) : null;
-  const { map, anchor: anchorRow, label: labelRow, anchors, labels } = useLocationMap(target.location_id, auditPlacement?.map_id ?? fix?.anchor?.map_id ?? null);
+  const { map, anchor: anchorRow, label: labelRow, anchors, labels } = useLocationMap(target.location_id, fix?.anchor?.map_id ?? null);
   const fit = useMapFit(map?.id);
   const device = useDevicePosition();
   // Where the location is, as this run has it: the run's own placement
   // (an anchor tapped or a label adjusted on another page of this
   // location, saved or not), else what is on file.
-  const here = auditPlacement && map && auditPlacement.map_id === map.id ? auditPlacement : null;
+  const here = (map && auditPlacements.find((p) => p.map_id === map.id)) || null;
   const anchor: MapPoint | null = here ? here.anchor : anchorRow ? { cx: anchorRow.cx, cy: anchorRow.cy } : null;
   const label: LabelShape | null = here ? here.label : labelRow ? labelShapeOf(labelRow) : null;
   const pinned = target.gps_lat !== null && target.gps_lng !== null;

@@ -46,7 +46,7 @@ import type { AttachmentTarget } from "../../data/attachments";
 import { LocationPicker } from "../shared/LocationPicker";
 import { NoteDialog } from "../shared/NoteDialog";
 import { PlacementCheck, type ProposedPlacement } from "./PlacementCheck";
-import { placementFromPayload } from "../../lib/auditWizard";
+import { mappedCorrectly, placementFromPayload, placementPayload, withPlacement, withoutPlacement, type MapAnswer } from "../../lib/auditWizard";
 import { GpsCapture } from "./GpsCapture";
 import { MapLabelEditor } from "../shared/MapLabelEditor";
 import { useLocationMap, useMapFit } from "../../data/maps";
@@ -189,7 +189,8 @@ function FindingForm({
   const [vehicleIds, setVehicleIds] = useState<string[]>([]);
   const [contactId, setContactId] = useState<string | null>(null);
   const [clearlyMarked, setClearlyMarked] = useState<YesNo>(null);
-  const [mappedCorrectly, setMappedCorrectly] = useState<YesNo>(null);
+  // The map check's answer: Done, and this audit's change on each map.
+  const [mapAnswer, setMapAnswer] = useState<MapAnswer>({ done: false, placements: [] });
   const [svc, setSvc] = useState<Record<string, { present: boolean; working: boolean; note: string }>>({});
   const [amen, setAmen] = useState<Record<string, { present: boolean; note: string }>>({});
   // No present/absent: an Attribute is always applicable to a valid type,
@@ -198,9 +199,10 @@ function FindingForm({
   const [attr, setAttr] = useState<Record<string, { value: string; text: string; note: string }>>({});
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [gpsCapture, setGpsCapture] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
-  const [placement, setPlacement] = useState<ProposedPlacement | null>(null);
   const [anchoring, setAnchoring] = useState(false);
-  const anchorMap = useLocationMap(target?.location_id, placement?.map_id ?? null);
+  // A fix is tied to the location's default map (docs/maps.md).
+  const anchorMap = useLocationMap(target?.location_id, null);
+  const anchorHere = anchorMap.map ? mapAnswer.placements.find((p) => p.map_id === anchorMap.map!.id) : undefined;
   const anchorFit = useMapFit(anchorMap.map?.id);
   const [retire, setRetire] = useState(false);
   const [rename, setRename] = useState("");
@@ -272,7 +274,7 @@ function FindingForm({
       setOccupied(finding.occupied === null ? null : finding.occupied === 1);
       setContactId(finding.contact_id);
       setClearlyMarked(finding.clearly_marked === null ? null : finding.clearly_marked === 1);
-      setMappedCorrectly(finding.mapped_correctly === null ? null : finding.mapped_correctly === 1);
+      const mapDone = finding.mapped_correctly !== null;
       setBoatIds(fBoats.map((b) => b.boat_id));
       setVehicleIds(fVehicles.map((v) => v.vehicle_id));
       const ans: Record<string, Answer> = {};
@@ -284,18 +286,23 @@ function FindingForm({
         }
       }
       setAnswers(ans);
+      const placements: ProposedPlacement[] = [];
       for (const p of fProposals) {
         const pl = parseProposalPayload(p);
         if (p.kind === "retire_location") setRetire(true);
         if (p.kind === "rename") setRename(String(pl.name ?? ""));
         if (p.kind === "set_gps") setGpsCapture({ lat: Number(pl.lat), lng: Number(pl.lng), accuracy: Number(pl.accuracy) });
-        if (p.kind === "move_placement") setPlacement(placementFromPayload(pl));
+        if (p.kind === "move_placement") {
+          const placed = placementFromPayload(pl);
+          if (placed) placements.push(placed);
+        }
         if (p.kind === "create_location") {
           setName(String(pl.name ?? ""));
           setTypeId(String(pl.location_type_id ?? ""));
           setParentId(String(pl.parent_id ?? ""));
         }
       }
+      setMapAnswer({ done: mapDone, placements });
     }
     setSeeded(true);
   }, [seeded, target, finding, sourcesSettled, validServices, validAmenities, validAttributes, currentServices, currentAmenities, currentAttributes, fServices, fAmenities, fBoats, fVehicles, fAnswers, fProposals]);
@@ -357,7 +364,7 @@ function FindingForm({
         });
       } else {
         if (gpsCapture) proposals.push({ kind: "set_gps", payload: gpsCapture });
-        if (placement) proposals.push({ kind: "move_placement", payload: { map_id: placement.map_id, anchor: placement.anchor, label: placement.label } });
+        for (const placed of mapAnswer.placements) proposals.push({ kind: "move_placement", payload: placementPayload(placed) });
         if (retire) proposals.push({ kind: "retire_location", payload: {} });
         if (rename.trim() && rename.trim() !== target.location_name) proposals.push({ kind: "rename", payload: { name: rename.trim() } });
         if (typeId && typeId !== target.location_type_id) proposals.push({ kind: "retype", payload: { location_type_id: typeId } });
@@ -376,7 +383,7 @@ function FindingForm({
           vehicleIds,
           statusId: target && statusId && statusId !== target.status_id ? statusId : null,
           clearlyMarked: kind === "status" ? clearlyMarked : null,
-          mappedCorrectly: kind === "status" ? mappedCorrectly : null,
+          mappedCorrectly: kind === "status" ? mappedCorrectly(mapAnswer) : null,
           services: target
             ? Object.entries(svc).map(([serviceId, v]) => ({ serviceId, present: v.present, working: v.working, note: v.note || null }))
             : [],
@@ -627,14 +634,15 @@ function FindingForm({
           anchors={anchorMap.anchors}
           labels={anchorMap.labels}
           subject={{ locationId: target.location_id, name: target.location_name }}
-          anchor={placement && placement.map_id === anchorMap.map.id ? placement.anchor : anchorMap.anchor ? { cx: anchorMap.anchor.cx, cy: anchorMap.anchor.cy } : null}
-          label={placement && placement.map_id === anchorMap.map.id ? placement.label : anchorMap.label ? labelShapeOf(anchorMap.label) : null}
+          anchor={anchorHere ? anchorHere.anchor : anchorMap.anchor ? { cx: anchorMap.anchor.cx, cy: anchorMap.anchor.cy } : null}
+          label={anchorHere ? anchorHere.label : anchorMap.label ? labelShapeOf(anchorMap.label) : null}
           mode="anchor"
           fit={anchorFit}
           onCancel={() => setAnchoring(false)}
           onDone={(next) => {
             setAnchoring(false);
-            if (anchorMap.map) setPlacement({ map_id: anchorMap.map.id, anchor: next.anchor, label: next.label });
+            const mapId = anchorMap.map?.id;
+            if (mapId) setMapAnswer((a) => withPlacement(a, { map_id: mapId, anchor: next.anchor, label: next.label }));
           }}
         />
       )}
@@ -649,20 +657,18 @@ function FindingForm({
           )}
           {showMap && (
             <div className="field">
-              {/* The map, then the question under it - and no question when
-                  the location is not on the map yet (PlacementCheck). */}
+              {/* The map chooser, the map and Done - no question since
+                  2026-10-19 (PlacementCheck). */}
               {target?.location_id && (
                 <PlacementCheck
                   locationId={target.location_id}
                   locationName={target.location_name}
                   editable={editable}
-                  proposed={placement}
-                  onPropose={(p, correct) => {
-                    setPlacement(p);
-                    if (correct !== undefined) setMappedCorrectly(correct);
-                  }}
-                  answer={mappedCorrectly}
-                  onAnswer={setMappedCorrectly}
+                  placements={mapAnswer.placements}
+                  onPlacement={(p) => setMapAnswer((a) => withPlacement(a, p))}
+                  onDiscard={(mapId) => setMapAnswer((a) => withoutPlacement(a, mapId))}
+                  done={mapAnswer.done}
+                  onDone={() => setMapAnswer((a) => ({ ...a, done: true }))}
                 />
               )}
             </div>

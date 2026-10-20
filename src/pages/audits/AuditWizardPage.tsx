@@ -229,13 +229,14 @@ export function AuditWizardPage() {
       } else if (item.kind === "marked" && finding?.clearly_marked != null) {
         seed[item.key] = finding.clearly_marked === 1;
       } else if (item.kind === "map") {
-        const move = proposed.find((p) => p.kind === "move_placement")?.payload;
-        const placement = move ? placementFromPayload(move) : null;
-        if (finding?.mapped_correctly != null || placement)
-          seed[item.key] = {
-            correct: finding?.mapped_correctly == null ? null : finding.mapped_correctly === 1,
-            placement,
-          };
+        // One change per map (docs/maps.md § A location on several maps);
+        // Done is a mapped_correctly that has been written.
+        const placements = proposed
+          .filter((p) => p.kind === "move_placement")
+          .map((p) => placementFromPayload(p.payload))
+          .filter((p): p is NonNullable<typeof p> => p !== null);
+        if (finding?.mapped_correctly != null || placements.length > 0)
+          seed[item.key] = { done: finding?.mapped_correctly != null, placements } as unknown as AnswerValue;
       } else if (item.kind === "occupied" && finding?.occupied != null) {
         seed[item.key] = finding.occupied === 1;
       }

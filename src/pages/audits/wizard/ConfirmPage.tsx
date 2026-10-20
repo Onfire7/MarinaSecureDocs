@@ -8,7 +8,7 @@
 // not touched are what is on file; rows it has are marked as such; rows
 // with nothing behind them say so, so a gap is visible before the sign-off
 // rather than afterwards on the audit page.
-import { CONFIRM_KEY, type AnswerValue, type AttributeAnswer, type AmenityAnswer, type MapAnswer, type ServiceAnswer, type WizardItem, type WizardTarget } from "../../../lib/auditWizard";
+import { CONFIRM_KEY, type AnswerValue, type AttributeAnswer, mapAnswerOf, type AmenityAnswer, type ServiceAnswer, type WizardItem, type WizardTarget } from "../../../lib/auditWizard";
 import type { RunProps } from "./runProps";
 
 export function ConfirmPage({ t, p, onDone }: { t: WizardTarget; p: RunProps; onDone?: () => void }) {
@@ -92,9 +92,10 @@ function shown(item: WizardItem, v: AnswerValue | undefined, t: WizardTarget, p:
       if (v === undefined || v === null || v === "") return gap;
       return { text: typeof v === "boolean" ? (v ? "Yes" : "No") : String(v), missing: false };
     case "map": {
-      const m = typeof v === "boolean" ? { correct: v, placement: null } : (v as MapAnswer | undefined);
-      if (!m || m.correct === null) return gap;
-      return { text: `${m.correct ? "Yes" : "No"}${m.placement ? " - new placement proposed" : ""}`, missing: false };
+      const m = mapAnswerOf(v);
+      if (!m.done) return gap;
+      const n = m.placements.length;
+      return { text: n === 0 ? "No changes" : `Changes proposed on ${n} map${n === 1 ? "" : "s"}`, missing: false };
     }
     case "marked":
     case "occupied":

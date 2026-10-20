@@ -152,6 +152,31 @@ the device. Free calibration points belong to the anchors switch.
 Maps zoom in place wherever they appear (`ZoomableMap`), and the Locations
 page opens on the map when the marina has one.
 
+## A location on several maps
+
+A location may be on any number of maps - its dock's map and the
+overview, say - with one anchor and one label on each (`map_anchors` and
+`map_labels` are unique per map and location). Nothing treats one of them
+as *the* map, but a page that shows one map at a time opens on a
+**default**: the most specific map it is on, the one whose scope is its
+nearest ancestor; failing that, the first of its maps by name. Not on any
+map, it is the nearest ancestor's map, else the overview, so a slip added
+in the field can be placed on its dock's map. (Before 2026-10-19 the
+default was whichever placement row came first.)
+
+- **Admin, a location's row** (`LocationMapSettings.tsx`) lists every map
+  it is on, each with *Move*, *Label / outline* and *Remove* (off that map
+  only); the preview is the selected one. *Add to another map...* lists the
+  maps it is not on and opens the editor on the one picked.
+- **The Locations map and the plotter** are already one map at a time:
+  *Edit on map* / *Place on map* acts on the map being viewed.
+- **An audit** (`PlacementCheck.tsx`) offers a chooser of every map,
+  marked where it is on it, and keeps one `move_placement` Proposal per map.
+  Placing it on a map it is not on adds it there; approval never takes it
+  off a map (owner, 2026-10-19).
+- **The GPS page's anchor** is tapped on the default map. Each map's fit is
+  built from that map's anchors only.
+
 ## Limits
 
 Consumer GPS is five to ten metres on a good day and worse among trees and

@@ -1,6 +1,8 @@
-// A location's place on the map, from its admin row (docs/maps.md): which
-// map it is on, its anchor and label, and the buttons that open the shared
-// editor to set them. Admin writes anchors and labels directly - there is
+// A location's place on the maps, from its admin row (docs/maps.md § A
+// location on several maps): every map it is on, one line each with the
+// buttons that open the shared editor on that map or take it off that map
+// alone, *Add to another map...* for the rest, and the selected map's
+// preview. Admin writes anchors and labels directly - there is
 // no Proposal to wait on here - through the same data functions the
 // plotter uses. "Use my position" beside the coordinates fills them from
 // the device, under no accuracy rule: an admin at a desk typing coordinates
@@ -28,7 +30,7 @@ export function LocationMapSettings({
 }) {
   const [chosenMapId, setChosenMapId] = useState<string | null>(null);
   const [editing, setEditing] = useState<"label" | "anchor" | null>(null);
-  const { maps, map, anchor: anchorRow, label: labelRow, anchors, labels } = useLocationMap(location.id, chosenMapId);
+  const { maps, map, onMapIds, ownAnchors, ownLabels, anchor: anchorRow, label: labelRow, anchors, labels } = useLocationMap(location.id, chosenMapId);
   const fit = useMapFit(map?.id);
   const device = useDevicePosition();
   const anchor: MapPoint | null = anchorRow ? { cx: anchorRow.cx, cy: anchorRow.cy } : null;
@@ -45,6 +47,19 @@ export function LocationMapSettings({
     setEditing(null);
     removeLocationPlace(anchorRow, labelRow);
   };
+  /** Off one map only; the rest stay. */
+  const removeFrom = (mapId: string) => {
+    if (mapId === map?.id) setEditing(null);
+    removeLocationPlace(ownAnchors.find((a) => a.map_id === mapId) ?? null, ownLabels.find((b) => b.map_id === mapId) ?? null);
+    if (mapId === chosenMapId) setChosenMapId(null);
+  };
+  const open = (mapId: string, mode: "label" | "anchor") => {
+    setChosenMapId(mapId);
+    setEditing(mode);
+  };
+  const nameOf = (m: { name: string; scope_name: string | null }) => m.scope_name ?? m.name;
+  const onMaps = maps.filter((m) => onMapIds.includes(m.id));
+  const offMaps = maps.filter((m) => !onMapIds.includes(m.id));
 
   return (
     <>
@@ -71,16 +86,40 @@ export function LocationMapSettings({
           {maps.length === 0 ? (
             <span className="muted small">No maps uploaded yet - see Maps &amp; plotting.</span>
           ) : (
-            <div className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-              {onMap && map ? (
-                <span className="small" data-testid="loc-map-status">
-                  On <b>{map.scope_name ?? map.name}</b>
-                  {anchor ? "" : ", no anchor"}
-                  {!label ? ", no label" : label.outline ? (label.showText === false ? ", outline" : ", outline and label") : ""}
-                  {inside === null ? "" : inside ? " · inside the calibrated area" : " · outside the calibrated area"}
-                </span>
-              ) : (
-                <>
+            <div className="stack" style={{ gap: 6 }}>
+              {onMaps.map((m) => {
+                const selected = m.id === map?.id;
+                const a = ownAnchors.find((x) => x.map_id === m.id);
+                const b = ownLabels.find((x) => x.map_id === m.id);
+                const shape = b ? labelShapeOf(b) : null;
+                return (
+                  <div key={m.id} className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }} data-testid="loc-map-row" data-map-id={m.id}>
+                    <button type="button" className={`btn btn-sm btn-bare ${selected ? "tree-match" : ""}`} onClick={() => setChosenMapId(m.id)} aria-pressed={selected} title="Show this map below">
+                      On <b>{nameOf(m)}</b>
+                    </button>
+                    <span className="small muted" data-testid={selected ? "loc-map-status" : undefined}>
+                      {[
+                        a ? null : "no anchor",
+                        !b ? "no label" : shape?.outline ? (shape.showText === false ? "outline" : "outline and label") : null,
+                        selected && inside !== null ? (inside ? "inside the calibrated area" : "outside the calibrated area") : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                    <button type="button" className="btn btn-sm" data-testid="loc-set-anchor" onClick={() => open(m.id, "anchor")}>
+                      Move
+                    </button>
+                    <button type="button" className="btn btn-sm" data-testid="loc-edit-label" onClick={() => open(m.id, "label")}>
+                      Label / outline
+                    </button>
+                    <button type="button" className="btn btn-sm btn-bare" data-testid="loc-map-remove" onClick={() => removeFrom(m.id)}>
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
+              {onMaps.length === 0 && (
+                <div className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                   <span className="small muted" data-testid="loc-map-status">
                     Not on a map.
                   </span>
@@ -88,25 +127,31 @@ export function LocationMapSettings({
                     <select className="select select-inline" value={map?.id ?? ""} onChange={(e) => setChosenMapId(e.target.value)} aria-label="Which map">
                       {maps.map((m) => (
                         <option key={m.id} value={m.id}>
-                          {m.scope_name ?? m.name}
+                          {nameOf(m)}
                         </option>
                       ))}
                     </select>
                   )}
-                </>
+                  <button type="button" className="btn btn-sm" disabled={!map} data-testid="loc-set-anchor" onClick={() => setEditing("anchor")}>
+                    Place on the map
+                  </button>
+                </div>
               )}
-              <button type="button" className="btn btn-sm" disabled={!map} data-testid="loc-set-anchor" onClick={() => setEditing("anchor")}>
-                {anchor ? "Move" : "Place on the map"}
-              </button>
-              {onMap && (
-                <button type="button" className="btn btn-sm" data-testid="loc-edit-label" onClick={() => setEditing("label")}>
-                  Label / outline
-                </button>
-              )}
-              {onMap && (
-                <button type="button" className="btn btn-sm btn-bare" onClick={removeAll}>
-                  Remove
-                </button>
+              {onMaps.length > 0 && offMaps.length > 0 && (
+                <select
+                  className="select select-inline"
+                  value=""
+                  onChange={(e) => e.target.value && open(e.target.value, "anchor")}
+                  aria-label="Add to another map"
+                  data-testid="loc-map-add"
+                >
+                  <option value="">Add to another map...</option>
+                  {offMaps.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {nameOf(m)}
+                    </option>
+                  ))}
+                </select>
               )}
             </div>
           )}

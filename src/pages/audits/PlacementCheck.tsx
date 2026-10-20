@@ -7,18 +7,20 @@ import { MapLabelEditor } from "../shared/MapLabelEditor";
 import { MapPreview } from "../shared/MapPreview";
 import { useDevicePosition } from "../shared/useDevicePosition";
 
-// "Is it placed correctly on the map?" needs the map in front of the person
-// answering. This shows the map the location is on with its anchor and
-// label highlighted and every other label muted, and the device's own
-// position when the map can place it; the question sits UNDER the map, and
-// only when there is something to ask about - a location that is not on
-// the map yet is simply placed (owner, 2026-10-04). Tapping the map,
-// answering No, or *Place it on the map* opens the fullscreen editor
-// (shared/MapLabelEditor.tsx), which zooms.
+// The audit's map check - a look, not a question (owner, 2026-10-19,
+// replacing *Is it placed correctly on the map?*). A location may be on
+// several maps (docs/maps.md § A location on several maps), so it opens
+// with a chooser of every map, ✓ where the location is on it - saved, or
+// changed in this audit - on its default map. Under it the chosen map with
+// the anchor and label highlighted, every other label muted, and the
+// device's own position when the map can place it; *Place it on this map*
+// or *Adjust*, or a tap on the map, opens the fullscreen editor
+// (shared/MapLabelEditor.tsx). **Done** is the page's answer.
 //
-// What comes back from the editor is a move_placement Proposal (docs/audits.md
-// § What becomes a Proposal), never a write: every other user navigates by
-// that map. Moving a label that was there answers No.
+// What comes back from the editor is a move_placement Proposal per map
+// (docs/audits.md § What becomes a Proposal), never a write: every other
+// user navigates by those maps. Placing it on a map it is not on adds it
+// there; nothing here takes it off one.
 
 export type ProposedPlacement = MapPlacement;
 
@@ -26,72 +28,67 @@ export function PlacementCheck({
   locationId,
   locationName,
   editable,
-  proposed,
-  onPropose,
-  answer,
-  onAnswer,
+  placements,
+  onPlacement,
+  onDiscard,
+  done,
+  onDone,
   big,
 }: {
   locationId: string;
   locationName: string;
   editable: boolean;
-  proposed: ProposedPlacement | null;
-  /** A new placement, and - when moving a label that was on the map - the
-   *  answer No that comes with it, in ONE call: two calls from the same
-   *  event each rebuilt the caller's state from what it held before the
-   *  other, and the second wiped out the first (2026-10-05). */
-  onPropose: (p: ProposedPlacement | null, answer?: boolean) => void;
-  /** The answer to "placed correctly?", asked only when it is placed. */
-  answer: boolean | null;
-  onAnswer: (v: boolean) => void;
+  /** This audit's change on each map, one per map. */
+  placements: ProposedPlacement[];
+  /** A change on one map, replacing that map's last. */
+  onPlacement: (p: ProposedPlacement) => void;
+  onDiscard: (mapId: string) => void;
+  /** Done tapped - the page's only answer. */
+  done: boolean;
+  onDone: () => void;
   /** The wizard's one-item-per-screen size. */
   big?: boolean;
 }) {
   const [chosenMapId, setChosenMapId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
-  const { maps, map, anchor: savedAnchor, label: savedLabel, anchors, labels } = useLocationMap(locationId, proposed?.map_id ?? chosenMapId);
+  const { maps, map, onMapIds, anchor: savedAnchor, label: savedLabel, anchors, labels } = useLocationMap(locationId, chosenMapId);
   const fit = useMapFit(map?.id);
   const device = useDevicePosition();
-
-  const saved = { anchor: savedAnchor ? { cx: savedAnchor.cx, cy: savedAnchor.cy } : null, label: savedLabel ? labelShapeOf(savedLabel) : null };
-  /** Where it is, as far as this check knows: the proposal wins. */
-  const here = proposed && map && proposed.map_id === map.id ? proposed : null;
-  const anchor: MapPoint | null = here ? (here.anchor ?? saved.anchor) : saved.anchor;
-  const label: LabelShape | null = here ? (here.label ?? saved.label) : saved.label;
-  const placed = anchor !== null || label !== null;
 
   if (!map) {
     return <div className="muted small">No marina map is uploaded, so placement cannot be checked here.</div>;
   }
 
-  const chip = (v: boolean, text: string) => (
-    <button
-      type="button"
-      className={`chip ${big ? "wz-chip-big" : ""} ${answer === v ? "tree-match" : ""}`}
-      disabled={!editable}
-      data-testid={v ? "placed-yes" : "placed-no"}
-      onClick={() => {
-        onAnswer(v);
-        if (!v) setEditing(true);
-      }}
-    >
-      {text}
-    </button>
-  );
+  const saved = { anchor: savedAnchor ? { cx: savedAnchor.cx, cy: savedAnchor.cy } : null, label: savedLabel ? labelShapeOf(savedLabel) : null };
+  /** This audit's change on the map shown, which wins over what is saved. */
+  const here = placements.find((p) => p.map_id === map.id) ?? null;
+  const anchor: MapPoint | null = here ? (here.anchor ?? saved.anchor) : saved.anchor;
+  const label: LabelShape | null = here ? (here.label ?? saved.label) : saved.label;
+  const placed = anchor !== null || label !== null;
+  const marked = new Set([...onMapIds, ...placements.map((p) => p.map_id)]);
+  const nameOf = (m: { name: string; scope_name: string | null }) => m.scope_name ?? m.name;
 
   return (
     <div className="pc">
       <div className="pc-status">
-        <span className="muted small">{savedAnchor || savedLabel ? `On ${map.scope_name ?? map.name}` : proposed ? "Placed in this audit - waits for approval" : "Not on any map yet."}</span>
-        {maps.length > 1 && editable && !placed && (
-          <select className="select select-inline" value={map.id} onChange={(e) => setChosenMapId(e.target.value)} aria-label="Which map">
-            {maps.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.scope_name ?? m.name}
-              </option>
-            ))}
-          </select>
-        )}
+        <select
+          className="select select-inline"
+          value={map.id}
+          disabled={maps.length < 2}
+          onChange={(e) => setChosenMapId(e.target.value)}
+          aria-label="Which map"
+          data-testid="pc-map"
+        >
+          {maps.map((m) => (
+            <option key={m.id} value={m.id}>
+              {marked.has(m.id) ? "✓ " : ""}
+              {nameOf(m)}
+            </option>
+          ))}
+        </select>
+        <span className="muted small" data-testid="pc-here">
+          {here ? "Changed in this audit - waits for approval" : placed ? "On this map" : "Not on this map"}
+        </span>
       </div>
       <MapPreview
         map={map}
@@ -100,35 +97,34 @@ export function PlacementCheck({
         subject={{ locationId, name: locationName }}
         anchor={anchor}
         label={label}
-        proposed={proposed !== null}
+        proposed={here !== null}
         fit={fit}
         device={device}
         onOpen={editable ? () => setEditing(true) : undefined}
         testId="pc-preview"
       />
 
-      {placed ? (
-        <div className="pc-question">
-          <span className={big ? "wz-d-label" : "field-label"} style={{ marginBottom: 0 }}>
-            Is it placed correctly on the map?
-          </span>
-          <div className="chip-row" style={{ marginBottom: 0, justifyContent: big ? "center" : undefined }}>
-            {chip(true, "Yes")}
-            {chip(false, "No")}
-          </div>
-        </div>
-      ) : (
-        editable && (
-          <button type="button" className={`btn btn-primary ${big ? "wz-btn-big" : "btn-sm"}`} data-testid="pc-place" onClick={() => setEditing(true)}>
-            Place it on the map
+      {editable && (
+        <div className="chip-row" style={{ marginBottom: 0, justifyContent: big ? "center" : undefined }}>
+          {placed ? (
+            <button type="button" className={`btn ${big ? "wz-btn-big" : "btn-sm"}`} data-testid="pc-adjust" onClick={() => setEditing(true)}>
+              Adjust
+            </button>
+          ) : (
+            <button type="button" className={`btn ${big ? "wz-btn-big" : "btn-sm"}`} data-testid="pc-place" onClick={() => setEditing(true)}>
+              Place it on this map
+            </button>
+          )}
+          <button type="button" className={`btn btn-primary ${big ? "wz-btn-big" : "btn-sm"} ${done ? "tree-match" : ""}`} data-testid="pc-done" onClick={onDone}>
+            {done ? "Done ✓" : "Done"}
           </button>
-        )
+        </div>
       )}
-      {proposed && (
+      {here && (
         <div className="pc-proposed">
-          <span className="badge badge-warn">New placement proposed - waits for approval</span>
+          <span className="badge badge-warn">Change on {nameOf(map)} proposed - waits for approval</span>
           {editable && (
-            <button type="button" className="btn btn-sm btn-bare" onClick={() => onPropose(null)}>
+            <button type="button" className="btn btn-sm btn-bare" data-testid="pc-discard" onClick={() => onDiscard(map.id)}>
               discard
             </button>
           )}
@@ -144,21 +140,18 @@ export function PlacementCheck({
           anchor={anchor}
           label={label}
           fit={fit}
-          removable={proposed !== null}
-          removeLabel="Discard the proposal"
+          removable={here !== null}
+          removeLabel="Discard the change"
           onCancel={() => setEditing(false)}
           onRemove={() => {
             setEditing(false);
-            onPropose(null);
+            onDiscard(map.id);
           }}
           onDone={(next) => {
             setEditing(false);
             // Finishing where it already is proposes nothing.
-            if (!proposed && samePoint(next.anchor, saved.anchor) && sameLabel(next.label, saved.label)) return;
-            // Moving a label that was on the map says it was not placed
-            // correctly. Placing one that was not on the map says nothing:
-            // the question was never asked.
-            onPropose({ map_id: map.id, anchor: next.anchor, label: next.label }, saved.label || saved.anchor ? false : undefined);
+            if (!here && samePoint(next.anchor, saved.anchor) && sameLabel(next.label, saved.label)) return;
+            onPlacement({ map_id: map.id, anchor: next.anchor, label: next.label });
           }}
         />
       )}

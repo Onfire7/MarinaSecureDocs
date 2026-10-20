@@ -7,6 +7,12 @@ import {
   buildSteps,
   pagesForTarget,
   placementFromPayload,
+  placementPayload,
+  mapAnswerOf,
+  mappedCorrectly,
+  withPlacement,
+  withoutPlacement,
+  type AnswerValue,
   filterTargets,
   isAnswered,
   sameAnswer,
@@ -117,7 +123,7 @@ describe("itemsForTarget", () => {
       "Is the breaker labelled?",
       "GPS coordinates",
       "Clearly marked?",
-      "Placed correctly on the map?",
+      "On the map",
       "Confirm this location is done",
     ]);
     expect(itemsForTarget(groups, all, camp).map((i) => i.label)).toEqual([
@@ -130,7 +136,7 @@ describe("itemsForTarget", () => {
       "Fire ring condition",
       "GPS coordinates",
       "Clearly marked?",
-      "Placed correctly on the map?",
+      "On the map",
       "Confirm this location is done",
     ]);
   });
@@ -173,7 +179,7 @@ describe("buildSteps", () => {
       "item:Fire ring condition",
       "item:GPS coordinates",
       "item:Clearly marked?",
-      "item:Placed correctly on the map?",
+      "item:On the map",
       "item:Confirm this location is done",
     ]);
     expect(pages[2].items.map((i) => i.label)).toEqual(["Power", "Water"]);
@@ -325,5 +331,43 @@ describe("placementFromPayload", () => {
       showText: false,
     });
     expect(placementFromPayload({ map_id: "m", anchor: null, label: { cx: 20, cy: 20, rotation: 0 } })?.label?.outline).toBeUndefined();
+  });
+  it("27 · a placement payload is the map, the anchor and the label - nothing else", () => {
+    const p = { map_id: "m", anchor: { cx: 1, cy: 2 }, label: null };
+    expect(placementPayload(p)).toEqual(p);
+    expect(placementFromPayload(placementPayload(p))).toEqual(p);
+  });
+});
+
+// A location on several maps (docs/maps.md § A location on several maps;
+// tests approved 2026-10-19).
+describe("the map page's answer", () => {
+  const onA = { map_id: "A", anchor: { cx: 10, cy: 10 }, label: null };
+  const onB = { map_id: "B", anchor: { cx: 20, cy: 20 }, label: null };
+  it("U2 · answered only once Done is tapped, with or without a change", () => {
+    expect(isAnswered(undefined, "map")).toBe(false);
+    expect(isAnswered({ done: false, placements: [onA] }, "map")).toBe(false);
+    expect(isAnswered({ done: true, placements: [] }, "map")).toBe(true);
+    expect(isAnswered({ done: true, placements: [onA] }, "map")).toBe(true);
+    // What Done records: no change proposed is true, any is false, not Done is nothing.
+    expect(mappedCorrectly({ done: true, placements: [] })).toBe(true);
+    expect(mappedCorrectly({ done: true, placements: [onA] })).toBe(false);
+    expect(mappedCorrectly({ done: false, placements: [onA] })).toBe(null);
+  });
+  it("U2b · an answer saved before 2026-10-19 still reads", () => {
+    expect(mapAnswerOf(true)).toEqual({ done: true, placements: [] });
+    expect(mapAnswerOf({ correct: false, placement: onA } as unknown as AnswerValue)).toEqual({ done: true, placements: [onA] });
+    expect(mapAnswerOf({ correct: null, placement: onA } as unknown as AnswerValue)).toEqual({ done: false, placements: [onA] });
+    expect(mapAnswerOf(undefined)).toEqual({ done: false, placements: [] });
+  });
+  it("U3 · one change per map: changing B keeps A's, discarding A keeps B's", () => {
+    let a = withPlacement(mapAnswerOf(undefined), onA);
+    a = withPlacement(a, onB);
+    expect(a.placements).toEqual([onA, onB]);
+    const movedA = { ...onA, anchor: { cx: 11, cy: 11 } };
+    a = withPlacement(a, movedA);
+    expect(a.placements).toEqual([movedA, onB]);
+    a = withoutPlacement(a, "A");
+    expect(a.placements).toEqual([onB]);
   });
 });

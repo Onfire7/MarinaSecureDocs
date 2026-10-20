@@ -174,7 +174,7 @@ describe("narrative", () => {
     expect(narrative(statusAudit, s)).toEqual([
       "3 of 4 locations were audited by Alice and Bob between Sep 20, 2026 and Sep 21, 2026; 1 was not reached before the audit closed.",
       "1 service was found not working: Power at 1 location.",
-      "Signage and mapping: 1 not clearly marked and 1 placed wrongly on the map.",
+      "Signage and mapping: 1 not clearly marked and 1 with map changes proposed.",
       "4 changes proposed: 2 approved, 1 rejected and 1 still to decide, 1 structural.",
       "2 tickets raised, 1 still open.",
     ]);
@@ -227,7 +227,7 @@ describe("attention", () => {
       "Water: shared tap",
       "WiFi: weak signal",
       "not clearly marked",
-      "wrong on the map",
+      "map changes proposed",
       "Is the pedestal breaker labelled: No",
       "ticket open: Label pedestal breaker at BH14-02L",
     ]);
@@ -279,7 +279,7 @@ describe("wide rows", () => {
       "Is the pedestal breaker labelled?": "Yes",
       "Fire ring condition": "Good",
       Marked: "Yes",
-      Map: "Yes",
+      Map: "No changes",
     });
     expect(rows[1].cells.Water).toBe("Absent");
     expect(rows[1].cells.WiFi).toBe("No");
@@ -288,6 +288,7 @@ describe("wide rows", () => {
     expect(rows[2].cells["Access"]).toBe("Back-in *");
     expect(rows[2].cells["Is the pedestal breaker labelled?"]).toBe("No");
     expect(rows[2].cells.Marked).toBe("No");
+    expect(rows[2].cells.Map).toBe("Changes proposed");
     expect(rows[2].notes).toBe("Power: pedestal dead; Water: shared tap; WiFi: weak signal");
     expect(Object.values(rows[3].cells).every((v) => v === "-")).toBe(true);
     expect(rows[3].notes).toBe("not audited · closed early");
@@ -307,6 +308,18 @@ describe("wide rows", () => {
       "Attribute", "Attribute", "Service", "Service", "Amenity", "Question", "Question", "Marked", "Map", "Change", "Ticket", "Ticket",
     ]);
     expect(items.find((x) => x.location === "BH14-02L" && x.item === "Power")).toMatchObject({ result: "Not working", tone: "bad", note: "pedestal dead" });
+  });
+  it("7e · U4 the map is a look, not a question: no changes, or changes proposed", () => {
+    // owner, 2026-10-19: the map page lost its Yes/No; mapped_correctly
+    // now says whether Done was tapped with a change proposed.
+    const items = itemRows(statusAudit);
+    expect(items.find((x) => x.location === "BH14-01L" && x.category === "Map")).toMatchObject({ item: "Map", result: "No changes", tone: "good" });
+    expect(items.find((x) => x.location === "BH14-02L" && x.category === "Map")).toMatchObject({ item: "Map", result: "Changes proposed", tone: "bad" });
+    // Not Done: a dash, and nothing to look at.
+    expect(wideRows(statusAudit)[3].cells.Map).toBe("-");
+    expect(attention(statusAudit.targets[0])).not.toContain("map changes proposed");
+    // Marked keeps its Yes/No.
+    expect(wideRows(statusAudit)[2].cells.Marked).toBe("No");
   });
 });
 

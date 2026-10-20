@@ -14,7 +14,7 @@ itself commits to.
   unit, or a select of its options when its kind is `choice` — each valid
   Service
   (present / working / note), each valid Amenity (present / note),
-  *clearly marked?*, *placed correctly on the map?*. A proposed new
+  *clearly marked?*, the map check. A proposed new
   location (no target) always shows Attributes, Services and Amenities,
   ignoring category flags — they don't apply to data entry on something
   that doesn't exist yet. Both kinds: Status select (applies at once), the
@@ -47,14 +47,11 @@ itself commits to.
   both false); a parameter change on a PowerSync query keeps the previous
   empty data and does not flip `isLoading`, which is what once made a
   reopened finding come up blank.
-- **The map is shown** under *placed correctly on the map?*: the map the
-  location is plotted on with its rectangle highlighted and the rest muted, or
-  its nearest ancestor's map when it is plotted nowhere. *Move it on the map*
-  (or *Place it*) arms a tap on the image; the tap becomes a `move_placement`
-  Proposal drawn in amber with the location's plain name (no "(proposed)"
-  suffix, so the label is the size the finished map will show), and answers
-  the question No. The Yes/No buttons sit beside the question, above the
-  map, not below it. *Adjust the label*
-  opens the same four sliders the admin map editor has (font size, padding,
-  rotation) on the proposed placement, and *Move again* re-arms the tap, so a
-  wrong label can be put right from the field, not only reported.
+- **The map check is the wizard's map page** (`shared` with it:
+  `PlacementCheck.tsx`; `AuditWizardPage.spec.md` § The map page is a look,
+  not a question): a chooser of every map, marked where the location is on
+  it, the chosen map with the location highlighted, *Place it on this map*
+  or *Adjust*, and **Done** - no Yes/No (owner, 2026-10-19). Each map's
+  change is its own `move_placement` Proposal; placing it on another map
+  adds it there. Done records `mapped_correctly` true with no change
+  proposed, false with one.

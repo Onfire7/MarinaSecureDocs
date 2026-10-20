@@ -24,40 +24,41 @@ import {
   type MapLabelRow,
   type MarinaMapRow,
 } from "./locations";
-import type { LabelShape, MapPoint } from "../lib/locations";
+import { defaultMapFor, type LabelShape, type MapPoint } from "../lib/locations";
 
-/** The map a location is shown on: the one it is anchored or labelled on,
- *  else the map of its nearest ancestor that has one, else the first
- *  overview map - so a slip added in the field can be placed on its dock's
- *  map. Returns every map too, for a chooser, and what is on the chosen one. */
+/** The map a location is shown on: the one asked for, else its default
+ *  (lib/locations.ts defaultMapFor - the most specific map it is on, else
+ *  its nearest ancestor's, else the overview; docs/maps.md § A location on
+ *  several maps). Returns every map too, for a chooser, the ids of those it
+ *  is on, and what is on the chosen one. */
 export function useLocationMap(locationId: string | null | undefined, preferMapId?: string | null) {
   const { data: maps } = useMarinaMaps();
   const { data: anchors } = useMapAnchors();
   const { data: labels } = useMapLabels();
   const { data: locations } = useLocations();
-  const ownAnchorAny = locationId ? (anchors.find((a) => a.location_id === locationId) ?? null) : null;
-  const ownLabelAny = locationId ? (labels.find((b) => b.location_id === locationId) ?? null) : null;
-  const fallback = useMemo(() => {
-    if (!locationId) return maps.find((m) => !m.scope_parent_id) ?? null;
-    const byId = new Map(locations.map((l) => [l.id, l]));
-    let cursor = byId.get(locationId)?.parent_id ?? null;
-    let guard = 0;
-    while (cursor && guard++ < 32) {
-      const m = maps.find((x) => x.scope_id === cursor);
-      if (m) return m;
-      cursor = byId.get(cursor)?.parent_id ?? null;
-    }
-    return maps.find((m) => !m.scope_parent_id) ?? null;
-  }, [locations, maps, locationId]);
-  const mapId = preferMapId ?? ownAnchorAny?.map_id ?? ownLabelAny?.map_id ?? fallback?.id ?? null;
+  const onMapIds = useMemo(() => {
+    if (!locationId) return [];
+    const ids = new Set<string>();
+    for (const a of anchors) if (a.location_id === locationId) ids.add(a.map_id);
+    for (const b of labels) if (b.location_id === locationId) ids.add(b.map_id);
+    return [...ids];
+  }, [anchors, labels, locationId]);
+  const defaultMapId = useMemo(() => defaultMapFor(locationId, { locations, maps, onMapIds }), [locationId, locations, maps, onMapIds]);
+  const mapId = preferMapId ?? defaultMapId;
   const map: MarinaMapRow | null = maps.find((m) => m.id === mapId) ?? null;
   const onMapAnchors: MapAnchorRow[] = anchors.filter((a) => a.map_id === mapId);
   const onMapLabels: MapLabelRow[] = labels.filter((b) => b.map_id === mapId);
   return {
     maps,
     map,
-    anchor: ownAnchorAny && ownAnchorAny.map_id === mapId ? ownAnchorAny : null,
-    label: ownLabelAny && ownLabelAny.map_id === mapId ? ownLabelAny : null,
+    defaultMapId,
+    onMapIds,
+    /** The location's own anchor and label on every map, for removing it
+     *  from one that is not the one shown. */
+    ownAnchors: locationId ? anchors.filter((a) => a.location_id === locationId) : [],
+    ownLabels: locationId ? labels.filter((b) => b.location_id === locationId) : [],
+    anchor: (locationId && onMapAnchors.find((a) => a.location_id === locationId)) || null,
+    label: (locationId && onMapLabels.find((b) => b.location_id === locationId)) || null,
     anchors: onMapAnchors,
     labels: onMapLabels,
     locations,

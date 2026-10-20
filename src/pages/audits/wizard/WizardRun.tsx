@@ -26,7 +26,7 @@ import { ConfirmPage } from "./ConfirmPage";
 import { ItemControl } from "./ItemControl";
 import { JumpBody } from "./JumpBody";
 import { useVisiblePageHeight } from "./useVisiblePageHeight";
-import { answeredCount, pagesForTarget, stepOfTarget, type MapAnswer, type Step, type WizardItem, type WizardPage, type WizardTarget } from "../../../lib/auditWizard";
+import { answeredCount, mapAnswerOf, pagesForTarget, stepOfTarget, withPlacement, type AnswerValue, type Step, type WizardItem, type WizardPage, type WizardTarget } from "../../../lib/auditWizard";
 import type { RunProps } from "./runProps";
 
 const SLIDE_MS = 500;
@@ -519,8 +519,8 @@ function LocationPage({
                 statuses={p.statuses}
                 advance={onAdvance}
                 onChange={(v, mode) => p.setAnswer(t.id, item.key, v, mode)}
-                auditPlacement={mapAnswerOf(answers).placement}
-                onPlacement={(pl) => p.setAnswer(t.id, "map", { ...mapAnswerOf(answers), placement: pl })}
+                auditPlacements={mapAnswerOf(answers?.map).placements}
+                onPlacement={(pl) => p.setAnswer(t.id, "map", withPlacement(mapAnswerOf(answers?.map), pl) as unknown as AnswerValue)}
               />
             </div>
           </div>
@@ -605,8 +605,8 @@ function Column({
                   autoFocus={i === activeIndex}
                   advance={onAdvance}
                   onChange={(v, mode) => p.setAnswer(target.id, item.key, v, mode)}
-                  auditPlacement={mapAnswerOf(answers).placement}
-                  onPlacement={(pl) => p.setAnswer(target.id, "map", { ...mapAnswerOf(answers), placement: pl })}
+                  auditPlacements={mapAnswerOf(answers?.map).placements}
+                  onPlacement={(pl) => p.setAnswer(target.id, "map", withPlacement(mapAnswerOf(answers?.map), pl) as unknown as AnswerValue)}
                 />
                 {onFile && <div className="wz-a-prefill">On file: {onFile}</div>}
               </div>
@@ -662,20 +662,10 @@ function SectionPage({
   );
 }
 
-/** What a page is headed. The map page's item is "Placed correctly on the
- *  map?" on the setup screen, but the page asks that under the map, and
- *  only when there is a placement to ask about. */
+/** What a page is headed: the map page is "On the map", which is also its
+ *  item's label since 2026-10-19 - kept here for answers recorded before. */
 function pageHeading(page: WizardPage): string {
   return page.kind === "item" && page.items[0].kind === "map" ? "On the map" : page.label;
-}
-
-/** The run's map answer for a location: where it has the location on the
- *  map and whether that was called correct. The GPS page re-anchors it
- *  and the map page edits it, so both see one placement. */
-function mapAnswerOf(answers: RunProps["answers"][string] | undefined): MapAnswer {
-  const v = answers?.map;
-  if (v && typeof v === "object" && "placement" in v) return v as MapAnswer;
-  return { correct: typeof v === "boolean" ? v : null, placement: null };
 }
 
 function useWide(px = 900) {

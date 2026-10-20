@@ -99,7 +99,7 @@ An Audit Template is reusable and has:
 - a **kind**: `occupancy` or `status`, chosen once, never varying per rule
 - for a Status Template, which built-in **categories** it asks about:
   Attributes, Services, Amenities, whether the Location is clearly marked,
-  and whether it's placed correctly on the map — each a checkbox, all on
+  and its place on the maps — each a checkbox, all on
   by default. Occupancy's built-ins (`Occupied?` and its occupants) are one
   question, not a set of categories, so this doesn't apply to that kind.
 - a tree of **Audit Rules**
@@ -219,12 +219,14 @@ Fixed per kind. A template cannot switch them off.
 2. **Services.** For each Service valid for the type: present? working? note.
 3. **Amenities.** For each Amenity valid for the type: present? note.
 4. **Marked.** *Is this Location clearly marked?* Yes/No.
-5. **Map.** The map it is plotted on is shown with its rectangle
-   highlighted (its nearest ancestor's map when it is plotted nowhere), and
-   under it *Is this Location placed correctly on the map?* - asked only
-   when it is on the map; one that is not is simply placed. Tapping the
-   map, or No, opens a fullscreen zoomable editor; what comes back is a
-   `move_placement` Proposal, and moving a label that was there answers No.
+5. **Map.** No question (owner, 2026-10-19): a chooser of every map,
+   marked where the Location is on it, opening on its default map
+   (`docs/maps.md` § A location on several maps); the chosen map with the
+   Location highlighted; *Place it on this map* or *Adjust*, which open a
+   fullscreen zoomable editor; and **Done**. Each map's change is its own
+   `move_placement` Proposal, and placing it on a map it is not on adds it
+   there. Done records `mapped_correctly`: true with no change proposed,
+   false with one.
 
 Every section opens **pre-filled from what the marina already knows** — a
 Service that's on file starts on *Present* with its working flag and note,
@@ -597,7 +599,7 @@ What counts as unanswered is, per category:
 - a **Question** the Rules attached to the target with no answer recorded.
 - **GPS**: the Location has no coordinates and the Finding carries no GPS
   Proposal.
-- **Marked** and **Map**: the built-in Yes/No left blank.
+- **Marked**: the built-in Yes/No left blank. **Map**: not marked Done.
 
 When nothing is outstanding the pills are replaced by the sentence that
 says so, because "no pills" and "nothing loaded yet" must not look alike.
@@ -674,7 +676,7 @@ Link, or - later - attached to an email. It contains, in order:
 5. **Needs attention.** One line per Location, in tree order: what is wrong
    there, in words. A Location needs attention when any of: a Service
    present but not working (with its note); **a note on any other Service
-   or Amenity**; *clearly marked* = No; *placed correctly* = No; Unexpected
+   or Amenity**; *clearly marked* = No; map changes proposed; Unexpected
    Occupancy; a Yes/No Question answered No; a Ticket raised from its
    Finding still open.
    - **A note is always a reason to look.** Somebody typed it on a phone,
@@ -724,7 +726,8 @@ Link, or - later - attached to an email. It contains, in order:
      | Amenity | `Yes` · `No` · `-` |
      | Attribute | the value with its unit, e.g. `38 ft`, `Back-in`; `*` after it when this Audit proposed it |
      | Question | `Yes` · `No` · the option chosen · the text · `-` |
-     | Marked, Map | `Yes` · `No` · `-` |
+     | Marked | `Yes` · `No` · `-` |
+     | Map | `No changes` · `Changes proposed` · `-` |
      | Occupied | `Occupied` · `Vacant`; `!` after it when it does not match the file |
      | Notes | the Finding's service and amenity notes, `Service: note; …` |
 

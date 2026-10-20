@@ -157,7 +157,7 @@ export function buildCatalogue(input: {
   if (status && audit.include_marked === 1)
     add("Checks", { key: "marked", kind: "marked", label: "Clearly marked?", group: "Checks", entryId: null });
   if (status && audit.include_map === 1)
-    add("Checks", { key: "map", kind: "map", label: "Placed correctly on the map?", group: "Checks", entryId: null });
+    add("Checks", { key: "map", kind: "map", label: "On the map", group: "Checks", entryId: null });
   add("GPS", { key: "gps", kind: "gps", label: "GPS coordinates", group: "GPS", entryId: null });
 
   return GROUP_ORDER.filter((g) => groups.has(g)).map((g) => ({ label: g, items: groups.get(g)! }));
@@ -292,11 +292,38 @@ export interface MapPlacement {
   label: { cx: number; cy: number; rotation: number; fontSize?: number; paddingX?: number; paddingY?: number; outline?: [number, number][] | null; showText?: boolean } | null;
 }
 
-/** "Placed correctly on the map?" - the answer, and the move_placement
- *  Proposal the auditor made while looking at it, if any. */
+/** The map page: Done tapped or not, and the change the auditor made on
+ *  each map - one move_placement Proposal per map (docs/maps.md § A
+ *  location on several maps). There is no Yes/No since 2026-10-19. */
 export interface MapAnswer {
-  correct: boolean | null;
-  placement: MapPlacement | null;
+  done: boolean;
+  placements: MapPlacement[];
+}
+
+/** Any stored map answer as a MapAnswer, including the two shapes before
+ *  2026-10-19: a bare boolean, and {correct, placement}. */
+export function mapAnswerOf(v: AnswerValue | undefined): MapAnswer {
+  if (typeof v === "boolean") return { done: true, placements: [] };
+  if (!v || typeof v !== "object") return { done: false, placements: [] };
+  const o = v as unknown as Record<string, unknown>;
+  if (Array.isArray(o.placements)) return { done: o.done === true, placements: o.placements as MapPlacement[] };
+  if ("correct" in o || "placement" in o)
+    return { done: o.correct === true || o.correct === false, placements: o.placement ? [o.placement as MapPlacement] : [] };
+  return { done: false, placements: [] };
+}
+/** The answer with this map's change put in, replacing that map's last. */
+export function withPlacement(a: MapAnswer, p: MapPlacement): MapAnswer {
+  const i = a.placements.findIndex((x) => x.map_id === p.map_id);
+  return { ...a, placements: i < 0 ? [...a.placements, p] : a.placements.map((x, j) => (j === i ? p : x)) };
+}
+/** The answer with this map's change discarded. */
+export function withoutPlacement(a: MapAnswer, mapId: string): MapAnswer {
+  return { ...a, placements: a.placements.filter((x) => x.map_id !== mapId) };
+}
+/** What Done records on the Finding: true with no change proposed, false
+ *  with one, nothing until Done. */
+export function mappedCorrectly(a: MapAnswer): boolean | null {
+  return a.done ? a.placements.length === 0 : null;
 }
 
 /** A move_placement payload, this shape or the one before 2026-10-05
@@ -330,6 +357,10 @@ export function placementFromPayload(payload: Record<string, unknown> | null | u
     label: label && typeof label.cx === "number" && typeof label.cy === "number" ? { ...label, rotation: typeof label.rotation === "number" ? label.rotation : 0 } : null,
   };
 }
+/** A MapPlacement as the move_placement payload it is written as. */
+export function placementPayload(p: MapPlacement): Record<string, unknown> {
+  return { map_id: p.map_id, anchor: p.anchor, label: p.label };
+}
 /** A captured fix, and the spot on the map the auditor tapped as "I am
  *  here" - the anchor that ties the coordinates to the map. */
 export interface GpsAnswer {
@@ -358,7 +389,7 @@ export function isAnswered(v: AnswerValue | undefined, kind: ItemKind): boolean 
     case "question":
       return v !== "" ;
     case "map":
-      return typeof v === "boolean" || (v as MapAnswer).correct !== null;
+      return mapAnswerOf(v).done;
     default:
       return true;
   }

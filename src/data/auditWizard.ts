@@ -6,7 +6,7 @@ import { recordActivity } from "./activity";
 import { unexpectedOccupancy } from "../lib/audits";
 import { loadLabelStyle, newLabel } from "../lib/mapLabelStyle";
 import { parseOutline } from "../lib/outline";
-import { placementFromPayload, type AnswerValue, type AmenityAnswer, type AttributeAnswer, type GpsAnswer, type MapAnswer, type ServiceAnswer, type WizardItem } from "../lib/auditWizard";
+import { mapAnswerOf, mappedCorrectly, placementFromPayload, placementPayload, type AnswerValue, type AmenityAnswer, type AttributeAnswer, type GpsAnswer, type ServiceAnswer, type WizardItem } from "../lib/auditWizard";
 
 // The wizard's writes (docs/audits.md § The wizard). One item at a time,
 // the moment it is answered.
@@ -224,17 +224,24 @@ async function writeOccupied(tx: LockContext, w: WizardWrite, findingId: string)
   });
 }
 
-/** The answer goes on the Finding; the place, if the auditor made one on
- *  the map, is a move_placement Proposal like the Finding form's - the
- *  anchor and the label (docs/maps.md) - replaced by the next and removed
- *  by discard. Every other user navigates by that map, so it waits for
+/** Done goes on the Finding as mapped_correctly - true with no change
+ *  proposed, false with one (lib/auditWizard.ts mappedCorrectly). Each map
+ *  the auditor changed is its own move_placement Proposal - the anchor and
+ *  the label (docs/maps.md) - replaced by the next change on that map and
+ *  removed by its discard; a map no longer in the answer loses its
+ *  Proposal. Every other user navigates by those maps, so each waits for
  *  approval. */
 async function writeMap(tx: LockContext, w: WizardWrite, findingId: string) {
-  const v = w.value as MapAnswer | boolean | null;
-  const correct = typeof v === "boolean" ? v : (v?.correct ?? null);
-  const placement = typeof v === "object" && v !== null ? v.placement : null;
+  const a = mapAnswerOf(w.value);
+  const correct = mappedCorrectly(a);
   await update(tx, "audit_findings", findingId, { mapped_correctly: correct === null ? null : correct ? 1 : 0, updated_at: stamp() });
-  await replaceProposal(tx, findingId, "move_placement", null, placement ? { map_id: placement.map_id, anchor: placement.anchor, label: placement.label } : null);
+  const pending = await tx.getAll<{ id: string; map_id: string | null }>(
+    "SELECT id, json_extract(payload, '$.map_id') AS map_id FROM audit_proposals WHERE finding_id = ? AND kind = 'move_placement' AND decision IS NULL",
+    [findingId],
+  );
+  const kept = new Set(a.placements.map((p) => p.map_id));
+  for (const row of pending) if (!row.map_id || !kept.has(row.map_id)) await remove(tx, "audit_proposals", row.id);
+  for (const p of a.placements) await replaceProposal(tx, findingId, "move_placement", p.map_id, placementPayload(p));
 }
 
 /** A fix is a set_gps Proposal; anything that is not a fix clears it. The
@@ -255,11 +262,11 @@ async function writeGps(tx: LockContext, w: WizardWrite, findingId: string) {
   if (!real || !fix.anchor) return;
   const { map_id, cx, cy } = fix.anchor;
   const pending = await tx.getOptional<{ payload: string }>(
-    "SELECT payload FROM audit_proposals WHERE finding_id = ? AND kind = 'move_placement' AND decision IS NULL",
-    [findingId],
+    "SELECT payload FROM audit_proposals WHERE finding_id = ? AND kind = 'move_placement' AND decision IS NULL AND json_extract(payload, '$.map_id') = ?",
+    [findingId, map_id],
   );
   const pendingPlace = pending ? placementFromPayload(parseJson(pending.payload)) : null;
-  let label = pendingPlace && pendingPlace.map_id === map_id ? pendingPlace.label : null;
+  let label = pendingPlace ? pendingPlace.label : null;
   if (!label && w.locationId) {
     const saved = await tx.getOptional<{ cx: number; cy: number; rotation: number; font_size: number | null; padding_x: number | null; padding_y: number | null; outline: string | null; show_text: number | null }>(
       "SELECT cx, cy, rotation, font_size, padding_x, padding_y, outline, show_text FROM map_labels WHERE location_id = ? AND map_id = ?",
@@ -268,7 +275,7 @@ async function writeGps(tx: LockContext, w: WizardWrite, findingId: string) {
     if (saved) label = { cx: saved.cx, cy: saved.cy, rotation: saved.rotation ?? 0, fontSize: saved.font_size ?? undefined, paddingX: saved.padding_x ?? undefined, paddingY: saved.padding_y ?? undefined, outline: parseOutline(saved.outline), showText: saved.show_text !== 0 };
   }
   if (!label) label = newLabel({ cx, cy }, loadLabelStyle());
-  await replaceProposal(tx, findingId, "move_placement", null, { map_id, anchor: { cx, cy }, label });
+  await replaceProposal(tx, findingId, "move_placement", map_id, placementPayload({ map_id, anchor: { cx, cy }, label }));
 }
 
 function parseJson(raw: string): Record<string, unknown> {
@@ -281,7 +288,8 @@ function parseJson(raw: string): Record<string, unknown> {
 }
 
 /**
- * One undecided Proposal per kind per entry per Finding. Re-answering an
+ * One undecided Proposal per kind per entry per Finding - per map, for a
+ * move_placement. Re-answering an
  * item replaces its Proposal; answering back to what is on file removes it.
  * A Proposal that has already been decided is never touched - the finalizer
  * has spoken.
@@ -293,7 +301,7 @@ async function replaceProposal(
   entryId: string | null,
   payload: Record<string, unknown> | null,
 ) {
-  const column = kind === "set_service" ? "service_id" : kind === "set_amenity" ? "amenity_id" : "attribute_id";
+  const column = kind === "set_service" ? "service_id" : kind === "set_amenity" ? "amenity_id" : kind === "move_placement" ? "map_id" : "attribute_id";
   const existing = await tx.getAll<{ id: string }>(
     `SELECT id FROM audit_proposals
       WHERE finding_id = ? AND kind = ? AND decision IS NULL

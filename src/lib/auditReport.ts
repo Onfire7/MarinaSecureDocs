@@ -276,7 +276,7 @@ export function narrative(r: AuditReport, s: Summary): string[] {
     }
     const parts: string[] = [];
     if (s.notMarked.length) parts.push(`${s.notMarked.length} not clearly marked`);
-    if (s.notMapped.length) parts.push(`${s.notMapped.length} placed wrongly on the map`);
+    if (s.notMapped.length) parts.push(`${s.notMapped.length} with map changes proposed`);
     if (parts.length) out.push(`Signage and mapping: ${list(parts)}.`);
   } else if (s.audited) {
     out.push(
@@ -332,7 +332,7 @@ export function attention(x: ReportTarget): string[] {
   }
   for (const a of x.amenities) if (a.note) out.push(`${a.name}: ${a.note}`);
   if (x.finding?.clearlyMarked === false) out.push("not clearly marked");
-  if (x.finding?.mappedCorrectly === false) out.push("wrong on the map");
+  if (x.finding?.mappedCorrectly === false) out.push("map changes proposed");
   if (x.finding?.unexpectedOccupancy) out.push(x.finding.occupied ? "occupied, nothing on file" : "vacant, but leased or reserved");
   for (const a of x.answers) if (a.value === false) out.push(`${a.prompt.replace(/\?$/, "")}: No`);
   for (const k of x.tickets) if (k.open) out.push(`ticket open: ${k.title}`);
@@ -442,7 +442,7 @@ export function wideRows(r: AuditReport): WideRow[] {
       cells[prompt] = !a || a.value == null || a.value === "" ? DASH : a.value === true ? "Yes" : a.value === false ? "No" : String(a.value);
     }
     if (r.audit.kind === "status" && r.audit.includeMarked) cells["Marked"] = yesNo(f?.clearlyMarked);
-    if (r.audit.kind === "status" && r.audit.includeMap) cells["Map"] = yesNo(f?.mappedCorrectly);
+    if (r.audit.kind === "status" && r.audit.includeMap) cells["Map"] = f?.mappedCorrectly == null ? DASH : f.mappedCorrectly ? "No changes" : "Changes proposed";
     const said =
       t.state === "not_audited"
         ? `not audited${t.notAuditedReason ? ` · ${t.notAuditedReason}` : ""}`
@@ -514,7 +514,7 @@ export function itemRows(r: AuditReport): ItemRow[] {
     if (r.audit.kind === "status" && r.audit.includeMarked && f.clearlyMarked !== null)
       rows.push({ ...base, category: "Marked", item: "Clearly marked?", result: f.clearlyMarked ? "Yes" : "No", tone: f.clearlyMarked ? "good" : "bad", note: "" });
     if (r.audit.kind === "status" && r.audit.includeMap && f.mappedCorrectly !== null)
-      rows.push({ ...base, category: "Map", item: "Placed correctly?", result: f.mappedCorrectly ? "Yes" : "No", tone: f.mappedCorrectly ? "good" : "bad", note: "" });
+      rows.push({ ...base, category: "Map", item: "Map", result: f.mappedCorrectly ? "No changes" : "Changes proposed", tone: f.mappedCorrectly ? "good" : "bad", note: "" });
     // Decided changes are an outcome and belong in the report. An undecided
     // one is a queue item, and there are hundreds of them before finalize
     // (see attention()); the value it proposes already shows against the

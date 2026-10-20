@@ -91,14 +91,19 @@ variants; this is D).
   Enter still moves to its note, and the note's Enter to the next item. An
   answer with nothing behind it — *Absent*, a Yes/No, a status — moves
   straight on.
-- **The map page shows the map, and the question under it.** The Finding
-  form's placement check: the map the location is plotted on, its anchor
-  dot and label highlighted, every other label muted, and the device's own
-  position when the map's fit can place it; under it *Is it placed
-  correctly on the map?* - asked **only when it is on the map**. A location
-  that is not on any map yet gets no question, just *Place it on the map*
-  (owner, 2026-10-04). Yes moves on. No opens the editor, since No is
-  answered by moving it; so does tapping the map.
+- **The map page is a look, not a question** (owner, 2026-10-19,
+  replacing *Is it placed correctly on the map?*). A location may be on
+  several maps (`docs/maps.md` § A location on several maps), so the page
+  opens with a **map chooser**: every map, each marked when the location is
+  on it - saved, or placed in this audit - and opening on the map it is
+  shown on by default. Under it the chosen map, its anchor dot and label
+  highlighted, every other label muted, the device's own position when the
+  map's fit can place it; and *Place it on this map* when it is not on the
+  chosen one, *Adjust* when it is - or a tap on the map. **Done** finishes
+  the page; there is no Yes/No. Done with no change proposed records
+  `mapped_correctly` true, and with one false - so the report's Map column
+  reads *No changes* / *Changes proposed*, and an audit still counts the
+  page unanswered until Done (owner, 2026-10-19).
   - **The editor is fullscreen and zooms** (`shared/MapLabelEditor.tsx`,
     also the Finding form's and the admin plotter's): pinch or wheel to
     zoom, one finger pans, the label and the anchor dot drag, or a tap
@@ -112,11 +117,13 @@ variants; this is D).
     (`lib/mapLabelStyle.ts`, local storage - the owner's choice over a
     marina setting), together with where it sat relative to its anchor,
     and the next label placed starts beside its anchor that way.
-  - A move of a label that was on the map is a `move_placement` Proposal,
-    written with the answer, replaced by the next move and removed by
-    *discard* - every other user navigates by that map, so it waits for
-    approval - and it answers No. Placing one that was not on the map
-    proposes the same and answers nothing: the question was never asked.
+  - **Each map's change is its own `move_placement` Proposal**, keyed
+    by its map: placing or adjusting it on one map replaces only that
+    map's Proposal, and *discard* removes only that one. Every other user
+    navigates by those maps, so each waits for approval.
+  - **Placing it on another map adds it there** (owner, 2026-10-19).
+    Approval never takes a location off a map; that is Admin's, from the
+    location's row or the plotter.
 - **The GPS page is asked at every location, pin or no pin**, and it is
   the Finding form's capture: the device's accuracy, where the pin is and
   how far the device is from it (or that there is none), the *I am
@@ -137,10 +144,11 @@ variants; this is D).
     audit's own, else the one on file) or a new label beside the anchor in
     the remembered style. Cancel keeps the fix and ties nothing; *Tap where
     I am on the map* offers it again.
-  - **The run holds one placement per location**, and every page of that
-    location reads and writes it (owner, 2026-10-05): the anchor tapped on
-    the GPS page moves the run's anchor and leaves its label, and the map
-    page's editor opens on exactly that, saved or not. The anchor write
+  - **The run holds one placement per location per map**, and every page
+    of that location reads and writes it (owner, 2026-10-05; per map
+    2026-10-19): the anchor is tapped on the map the GPS page shows (the
+    default one), moves the run's anchor on that map and leaves its label,
+    and the map page's editor opens on exactly that, saved or not. The anchor write
     keeps the *pending* Proposal's label before the one on file for the
     same reason - a label adjusted earlier in the audit must survive a
     later anchor.
