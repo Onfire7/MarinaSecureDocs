@@ -82,6 +82,7 @@ await shiftButton().filter({ hasText: "Finish Evening Lockup e2e" }).waitFor({ t
 const label9 = (await shiftButton().textContent().catch(() => "")) ?? "";
 await shiftButton().click().catch(() => {});
 await page.waitForURL(`**/checklists/${evening}**`, { timeout: 15000 }).catch(() => {});
+await endShiftItem().waitFor({ timeout: 30000 }).catch(() => {}); await page.waitForTimeout(500);
 const inView = await endShiftItem().isVisible().catch(() => false)
   && (await endShiftItem().evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }).catch(() => false));
 check("9. the Shift card names the open checklist and opens it at its End Shift Item",
@@ -128,7 +129,7 @@ await page.screenshot({ path: `${OUT}/end-shift-13.png`, fullPage: true });
 await page.getByRole("button", { name: "End Shift and Submit" }).click();
 const ended = await until("the shift to end", activeShift, "0");
 await page.goto(`${APP_URL}/`, { waitUntil: "domcontentloaded" });
-const startShown = await page.getByRole("button", { name: "Start Shift" }).isVisible({ timeout: 20000 }).catch(() => false);
+const startShown = await page.getByRole("button", { name: "Start Shift" }).waitFor({ timeout: 20000 }).then(() => true, () => false);
 check("11. submitting the End of Shift Checklist leaves the shift open on the review; End Shift and Submit ends it",
   page.url() && closingDone && stillOn && ended && startShown,
   `closing complete ${closingDone}, still on shift after it ${stillOn}, ended after the button ${ended}, Start Shift shown ${startShown}`);
@@ -168,6 +169,7 @@ async function openTemplate(name) {
   await page.getByRole("button", { name, exact: true }).click({ timeout: 120000 });
   const card = page.locator(".card", { has: page.locator(`input[aria-label="Template name"][value="${name}"]`) });
   await card.waitFor();
+  await card.getByRole("button", { name: /^Editor section \| / }).click();
   return card;
 }
 let card = await openTemplate("Editor e2e");
@@ -187,6 +189,7 @@ await until("the second item to upload", `select count(*) from checklist_templat
 await page.waitForTimeout(1500);
 const order = await itemsInOrder();
 const offeredAgain = await addMenu().locator('option[value="end_shift"]').count();
+await card.getByRole("button", { name: "Expand settings" }).click();
 const clockOutOption = card.locator('option[value="clock_out"]');
 const clockOutDisabled = await clockOutOption.evaluate((o) => o.disabled).catch(() => null);
 await page.screenshot({ path: `${OUT}/end-shift-15a.png`, fullPage: true });

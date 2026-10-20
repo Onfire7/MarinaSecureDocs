@@ -12,7 +12,10 @@
 --     so the template has nothing to do and no End of Shift Checklist is due.
 --   Template "Spare e2e" (Manual), section Spare (Always): E2E spare item.
 --   Templates "Editor e2e" (Manual) and "Editor clock out e2e" (Clock Out),
---     for the template-editor test; reset to one Simple Check each.
+--     for the template-editor test; reset to one Simple Check each. The
+--     Clock Out one's section is switched off, so it is never due: otherwise
+--     the role has two Clock Out templates with work, and which one the Shift
+--     card makes the End of Shift Checklist from is down to row order.
 --
 --   Each reset ends any open shift of the test account, then, when on_shift,
 --   starts one an hour ago. It opens a fresh Evening Lockup e2e with "E2E
@@ -83,6 +86,7 @@ begin
     values ('Editor clock out e2e', 'clock_out', role) returning id into t_edco;
   insert into checklist_template_sections (template_id, name, position, trigger_type)
     values (t_edco, 'Editor section', 0, 'manual') returning id into s_edco;
+  update checklist_template_sections set is_active = false where id = s_edco;
   insert into checklist_template_items (section_id, type, label, position)
     values (s_edco, 'simple_check', 'E2E editor clock out item', 0);
 
