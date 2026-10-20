@@ -355,6 +355,7 @@ no `create_ticket` permission.
 | reservation_enabled | boolean not null | |
 | reservation_visibility | text | |
 | post_return_status_id | → asset_statuses | |
+| is_fleet | boolean not null default false | A Fleet Vehicle, on the Dashboard's Fleet card. Checked: implies `checkoutable`. |
 
 > **Unwound.** `current_status` is **deleted**. It denormalized the newest
 > `asset_status_logs` row; that table is always-resident and tiny, so the
@@ -382,7 +383,16 @@ removed in favour of deriving from it.
 #### `asset_checkouts` — Tier 0 / `manage_assets` · sync: **age**
 
 `asset_id`, `person_id → contacts`, `checked_out_by_id → users`, `time_out`,
-`time_in` (null while out).
+`time_in` (null while out). Recorded by the Fleet card only, all nullable:
+`odometer_out`, `odometer_in` (numeric), `fuel_level_in` (smallint 0–4,
+quarters of a tank, checked), `return_note`.
+
+#### `asset_fuel_logs` — Tier 0 · sync: always
+
+A Fleet Vehicle's fill-ups. `asset_id` (restrict delete), `gallons numeric >
+0`, `cost numeric >= 0` (nullable, the marina's currency), `odometer`
+(nullable), `timestamp`, `logged_by_id`. In the `marina_config` stream; the
+Fleet card's gauge reads the newest.
 
 #### `asset_meter_readings` — Tier 0 · sync: **age**
 

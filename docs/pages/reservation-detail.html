@@ -46,7 +46,7 @@
     <table>
       <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
       <tr><td>Contact</td><td>Reservation.contact</td><td>Name always shown; phone/email require <code>view_contact</code>.</td></tr>
-      <tr><td>Target</td><td>Reservation.target</td><td>Links to <a href="location-detail.html">Location detail</a> or <a href="asset-detail.html">Asset detail</a>, whichever applies.</td></tr>
+      <tr><td>Target</td><td>Reservation.target</td><td>Links to <a href="location-detail.html">Location detail</a> or <a href="../../src/pages/assets/AssetDetailPage.spec.md">Asset detail</a>, whichever applies.</td></tr>
       <tr><td>Status</td><td>Reservation.status</td><td>Requested / Confirmed / Checked In / Checked Out / Cancelled.</td></tr>
       <tr><td>Expected / actual dates</td><td>expected_checkin/checkout, actual_checkin/checkout</td><td>Actual dates are nullable until check-in/out happens, per <a href="reservation-checkin-checkout.html">Reservation Check-In / Check-Out Dialog</a>.</td></tr>
       <tr><td>Reservation type</td><td>Reservation.billing_type</td><td>Billable / Non-Billable, chosen at booking; editable with <code>manage_reservations</code>.</td></tr>
@@ -68,7 +68,7 @@
       <li><strong>Non-Billable reservation</strong> — the whole billing section (early/late fields, rate/deposit/balance) is omitted from the layout, not shown empty, per <code>billing_type</code>.</li>
       <li><strong>No <code>manage_reservations</code></strong> — the reservation is still fully viewable (subject to <code>view_contact</code> for contact detail); every edit/check-in-out action is hidden.</li>
       <li><strong>Cancelled reservation</strong> — remains visible in history; a target's status/upcoming-indicator no longer reflects it once cancelled.</li>
-      <li><strong>Asset target</strong> — identical layout to a Location target, just linking to <a href="asset-detail.html">Asset detail</a> instead; the reservation model doesn't distinguish the two beyond the target reference itself.</li>
+      <li><strong>Asset target</strong> — identical layout to a Location target, just linking to <a href="../../src/pages/assets/AssetDetailPage.spec.md">Asset detail</a> instead; the reservation model doesn't distinguish the two beyond the target reference itself.</li>
     </ul>
 
     <h2>Mobile vs. desktop</h2>

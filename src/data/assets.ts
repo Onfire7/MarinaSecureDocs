@@ -1,10 +1,12 @@
 import { useQuery } from "@powersync/react";
 import { db, stamp } from "../lib/db";
+import type { LockContext } from "@powersync/web";
 import { insert, remove, transact, update } from "./sql";
 import { recordActivity } from "./activity";
 import {
   dueMeterMaintenanceRules,
   maintenanceRuleTitle,
+  type MeterRule,
 } from "../lib/maintenanceRules";
 
 // Assets — the marina's radios, carts, tools and pumps.
@@ -32,6 +34,7 @@ export interface AssetRow {
   reservation_enabled: number;
   reservation_visibility: string;
   post_return_status_id: string | null;
+  is_fleet: number;
   location_name: string | null;
   status_id: string | null;
   status_name: string | null;
@@ -141,6 +144,10 @@ export interface CheckoutRow {
   checked_out_by_id: string | null;
   time_out: string;
   time_in: string | null;
+  odometer_out: number | null;
+  odometer_in: number | null;
+  fuel_level_in: number | null;
+  return_note: string | null;
   person_name: string | null;
   checked_out_by_name: string | null;
 }
@@ -166,6 +173,7 @@ export interface AssetInput {
   reservationEnabled?: boolean;
   reservationVisibility?: string;
   postReturnStatusId?: string | null;
+  isFleet?: boolean;
 }
 
 function assetColumns(input: Partial<AssetInput>) {
@@ -186,6 +194,7 @@ function assetColumns(input: Partial<AssetInput>) {
     reservation_visibility: input.reservationVisibility,
     post_return_status_id:
       input.postReturnStatusId === undefined ? undefined : input.postReturnStatusId,
+    is_fleet: input.isFleet === undefined ? undefined : input.isFleet ? 1 : 0,
   };
 }
 
@@ -357,6 +366,21 @@ export async function recordMeterReading(
   ticketStatusId: string | null,
   actorId: string | null,
 ): Promise<string[]> {
+  const due = await meterRulesDue(asset, value);
+  return transact((tx) =>
+    writeMeterReading(tx, asset, value, source, correctionReason, ticketStatusId, actorId, due),
+  );
+}
+
+/**
+ * The maintenance rules a reading of `value` would make due. Read before the
+ * write transaction opens, since the check needs the rules, the history and
+ * the asset's tickets; pass the result to writeMeterReading.
+ */
+export async function meterRulesDue(
+  asset: AssetRow,
+  value: number,
+): Promise<MeterRule[]> {
   const rules = await db.getAll<MaintenanceRuleRow>(
     "SELECT * FROM maintenance_rules WHERE asset_id = ?",
     [asset.id],
@@ -375,60 +399,74 @@ export async function recordMeterReading(
     [asset.id],
   );
 
-  const due = dueMeterMaintenanceRules(
+  return dueMeterMaintenanceRules(
     asset,
     rules,
     value,
     priorReadings,
     existingTickets,
   );
+}
 
-  return transact(async (tx) => {
-    await insert(tx, "asset_meter_readings", {
+/**
+ * Write a reading and the tickets `due` raises, inside a caller's transaction,
+ * so a reading taken as part of something else (a fleet check-in) lands or
+ * fails with it.
+ */
+export async function writeMeterReading(
+  tx: LockContext,
+  asset: { id: string; name: string },
+  value: number,
+  source: "manual" | "checklist_item",
+  correctionReason: string | null,
+  ticketStatusId: string | null,
+  actorId: string | null,
+  due: MeterRule[],
+): Promise<string[]> {
+  await insert(tx, "asset_meter_readings", {
+    asset_id: asset.id,
+    value,
+    source,
+    timestamp: stamp(),
+    correction_reason: correctionReason,
+    logged_by_id: actorId,
+  });
+  // assets.meter_reading is a cache of the newest reading, kept because
+  // every list column and every maintenance comparison wants it and none of
+  // them wants the history. Unlike status, which has no such column, this one
+  // CAN disagree with its log — so it is written in the same transaction as
+  // the reading, never separately.
+  await update(tx, "assets", asset.id, { meter_reading: value });
+  await recordActivity(tx, {
+    eventType: "asset.meter_updated",
+    summary: `${asset.name} meter set to ${value}`,
+    subjectType: "assets",
+    subjectId: asset.id,
+    actorId,
+  });
+
+  const raised: string[] = [];
+  for (const rule of due) {
+    if (!ticketStatusId) break;
+    const title = maintenanceRuleTitle(asset, rule);
+    const ticketId = await insert(tx, "tickets", {
+      title,
+      description: `Raised automatically at ${value}.`,
+      priority: "medium",
+      status_id: ticketStatusId,
+      auto_generated: 1,
+      created_at: stamp(),
+      created_by_id: actorId,
       asset_id: asset.id,
-      value,
-      source,
-      timestamp: stamp(),
-      correction_reason: correctionReason,
-      logged_by_id: actorId,
     });
-    // assets.meter_reading is a cache of the newest reading, kept because
-    // every list column and every maintenance comparison wants it and none of
-    // them wants the history. Unlike status, which has no such column, this one
-    // CAN disagree with its log — so it is written in the same transaction as
-    // the reading, never separately.
-    await update(tx, "assets", asset.id, { meter_reading: value });
     await recordActivity(tx, {
-      eventType: "asset.meter_updated",
-      summary: `${asset.name} meter set to ${value}`,
-      subjectType: "assets",
-      subjectId: asset.id,
+      eventType: "ticket.created",
+      summary: `Ticket "${title}" created on ${asset.name}`,
+      subjectType: "tickets",
+      subjectId: ticketId,
       actorId,
     });
-
-    const raised: string[] = [];
-    for (const rule of due) {
-      if (!ticketStatusId) break;
-      const title = maintenanceRuleTitle(asset, rule);
-      const ticketId = await insert(tx, "tickets", {
-        title,
-        description: `Raised automatically at ${value}.`,
-        priority: "medium",
-        status_id: ticketStatusId,
-        auto_generated: 1,
-        created_at: stamp(),
-        created_by_id: actorId,
-        asset_id: asset.id,
-      });
-      await recordActivity(tx, {
-        eventType: "ticket.created",
-        summary: `Ticket "${title}" created on ${asset.name}`,
-        subjectType: "tickets",
-        subjectId: ticketId,
-        actorId,
-      });
-      raised.push(title);
-    }
-    return raised;
-  });
+    raised.push(title);
+  }
+  return raised;
 }

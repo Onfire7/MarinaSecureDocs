@@ -1,4 +1,4 @@
-// Assets — shared display helpers (see docs: pages/asset-list.html).
+// Assets — shared display helpers (see src/pages/assets/AssetListPage.spec.md).
 //
 // An asset's status is a row in asset_statuses, named by the marina. The names
 // below are only the ones this palette knows a colour for; anything else falls

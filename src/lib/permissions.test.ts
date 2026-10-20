@@ -75,3 +75,12 @@ describe("hasAnyManagePermission", () => {
     ).toBe(false);
   });
 });
+
+// Fleet card test 6 (src/pages/home/FleetCard.spec.md § Who sees it).
+describe("use_fleet", () => {
+  it("is a permission a role can grant, and does not open the Admin section", () => {
+    const perms = computeEffectivePermissions([aRole({ allow: ["use_fleet"] })]);
+    expect(perms.has("use_fleet")).toBe(true);
+    expect(hasAnyManagePermission(perms)).toBe(false);
+  });
+});

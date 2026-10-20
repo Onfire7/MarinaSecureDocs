@@ -33,6 +33,7 @@ none, and a card that reads no marina data (Clock) is always available.
 | Missed comms badge | `view_calls` and/or `view_sms`; sums only what the user can see | Office | Missed calls plus unread SMS; opens the missed comms detail. |
 | Upcoming reservations | None; there is no reservation view permission | Office, Marina Manager/Owner | Reservations with an `expected_checkin` in the near term. |
 | Admin shortcuts | Any `manage_*` permission | Marina Manager/Owner | Links into the relevant Admin sections. |
+| Fleet | `use_fleet`; hidden while the marina has no Fleet Vehicles | Security | The marina's own vehicles: check out and in, log mileage, fuel, Incidents and Tickets (`FleetCard.spec.md`). |
 
 ## The Shift card
 

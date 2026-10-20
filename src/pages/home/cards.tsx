@@ -16,6 +16,7 @@ import { useTickets } from "../../data/tickets";
 import { useIncidents } from "../../data/incidents";
 import { useMissedCalls, useSmsThreads } from "../../data/comms";
 import { useReservations } from "../../data/reservations";
+import { FleetCard } from "./FleetCard";
 
 // Dashboard cards (see DashboardPage.spec.md § Cards).
 // A card's availability gate is exactly the permission that governs the data
@@ -28,12 +29,20 @@ export type CardId =
   | "incident_summary"
   | "missed_comms"
   | "upcoming_reservations"
-  | "admin_shortcuts";
+  | "admin_shortcuts"
+  | "fleet";
+
+/** What a card's availability may depend on besides the user's permissions,
+ *  read once by the Dashboard. */
+export interface CardContext {
+  /** The Fleet card hides while the marina has no Fleet Vehicles. */
+  fleetVehicles: number;
+}
 
 export interface CardDef {
   id: CardId;
   title: string;
-  available: (current: CurrentUser) => boolean;
+  available: (current: CurrentUser, context: CardContext) => boolean;
   /** Role names (predefined set) whose default layout includes this card. */
   defaultForRoles: string[] | "all";
   Component: ComponentType;
@@ -90,6 +99,13 @@ export const CARD_REGISTRY: CardDef[] = [
     available: (c) => c.isAdmin,
     defaultForRoles: ALL_MANAGER_ROLES,
     Component: AdminShortcutsCard,
+  },
+  {
+    id: "fleet",
+    title: "Fleet",
+    available: (c, ctx) => c.can("use_fleet") && ctx.fleetVehicles > 0,
+    defaultForRoles: ["Security"],
+    Component: FleetCard,
   },
 ];
 

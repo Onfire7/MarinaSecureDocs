@@ -72,6 +72,10 @@ streams:
       - SELECT * FROM asset_status_logs
       - SELECT * FROM asset_checkouts
       - SELECT * FROM asset_meter_readings
+      # Fleet Vehicles' fill-ups: the card's fuel gauge reads the latest.
+      # Grows with use rather than with the fleet, but by a handful of rows a
+      # week (src/pages/home/FleetCard.spec.md).
+      - SELECT * FROM asset_fuel_logs
       - SELECT * FROM checklist_templates
       - SELECT * FROM template_viewer_roles
       - SELECT * FROM checklist_template_sections

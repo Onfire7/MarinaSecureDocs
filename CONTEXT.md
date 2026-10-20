@@ -71,7 +71,7 @@ optional Slip.
 
 **Vehicle**:
 A car, truck, trailer, or RV tracked by the system, optionally occupying a
-Location.
+Location. A guest's or tenant's; the marina's own are Fleet Vehicles.
 
 **Haul-Out**:
 Removing a boat from the water. A marina-performed haul-out raises a
@@ -302,6 +302,16 @@ Service, Needs Cleaning, Out of Service, …), tracked as a running history.
 **Checkout**:
 A record of an Asset being signed out and returned, naming who processed
 it and who took it.
+
+**Fleet Vehicle**:
+An Asset the marina drives: its own truck, van, golf cart or trailer,
+flagged so it appears on the Dashboard's Fleet card. Always checkoutable. A
+Fleet Vehicle whose Asset Status is Out of Service is disabled on the card.
+_Avoid_: Vehicle, which is a guest's
+
+**Fuel Log**:
+A record of a Fleet Vehicle being filled up: gallons, optional cost, and
+the odometer at the pump. After one, the vehicle's fuel gauge reads full.
 
 **Reservation**:
 A booking of a reservable Location or Asset. An upcoming Reservation never

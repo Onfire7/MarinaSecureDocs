@@ -10,7 +10,7 @@ import {
 import { createAsset, useAssets } from "../../data/assets";
 import { useAssetStatuses } from "../../data/lookups";
 
-// Assets — Asset List (see docs/pages/asset-list.html).
+// Assets — Asset List (see AssetListPage.spec.md).
 // Viewing is unrestricted, same as Tickets/Reservations/Boats; only creating
 // (and the detail page's status/checkout/meter actions) need manage_assets.
 export function AssetListPage() {
@@ -157,6 +157,7 @@ function AddAssetDialog({ onClose }: { onClose: () => void }) {
   const [hasMeter, setHasMeter] = useState(false);
   const [meterType, setMeterType] = useState("hours");
   const [checkoutable, setCheckoutable] = useState(false);
+  const [isFleet, setIsFleet] = useState(false);
 
   // A new asset has no status log, and therefore no status. That is honest
   // rather than incomplete: the first status is set by whoever puts it into
@@ -169,6 +170,8 @@ function AddAssetDialog({ onClose }: { onClose: () => void }) {
       hasMeter,
       meterType: hasMeter ? meterType : null,
       checkoutable,
+      // Only sent when set: a fleet vehicle must be checkoutable.
+      isFleet: checkoutable && isFleet ? true : undefined,
       reservationEnabled: false,
     });
     onClose();
@@ -234,6 +237,20 @@ function AddAssetDialog({ onClose }: { onClose: () => void }) {
               onChange={(e) => setCheckoutable(e.target.checked)}
             />
             <span className="small">Can be checked out</span>
+          </label>
+          <label
+            className="row"
+            style={{ cursor: checkoutable ? "pointer" : "default", marginTop: 6 }}
+          >
+            <input
+              type="checkbox"
+              checked={checkoutable && isFleet}
+              disabled={!checkoutable}
+              onChange={(e) => setIsFleet(e.target.checked)}
+            />
+            <span className={"small" + (checkoutable ? "" : " muted")}>
+              Fleet vehicle — on the Dashboard's Fleet card
+            </span>
           </label>
         </div>
         <p className="muted small">

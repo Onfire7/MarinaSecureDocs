@@ -21,12 +21,15 @@ import {
   useMaintenanceRules,
   useMeterReadings,
   type AssetRow,
+  type CheckoutRow,
 } from "../../data/assets";
 import { useLocations } from "../../data/locations";
 import { useReservationsForTarget } from "../../data/reservations";
 import { useAssetStatuses } from "../../data/lookups";
+import { setFleetVehicle, useFuelLogs } from "../../data/fleet";
+import { FUEL_STEPS } from "../../lib/fleet";
 
-// Assets — Asset Detail (see docs/pages/asset-detail.html).
+// Assets — Asset Detail (see AssetDetailPage.spec.md).
 // Status history, meter history, read-only maintenance rules (edited in
 // Admin), and the checkout log for checkoutable assets.
 export function AssetDetailPage() {
@@ -43,6 +46,7 @@ export function AssetDetailPage() {
   const { data: rules } = useMaintenanceRules(assetId);
   const { data: reservations } = useReservationsForTarget("asset", assetId);
   const { statuses } = useAssetStatuses();
+  const { data: fuelLogs } = useFuelLogs(assetId);
 
   const locationOptions = [...allLocations].sort((a, b) =>
     compareNames(a.name, b.name),
@@ -172,6 +176,30 @@ export function AssetDetailPage() {
             </div>
           </div>
 
+          {(canManage || asset.is_fleet === 1) && (
+            <div className="field">
+              <span className="field-label">Fleet</span>
+              {canManage ? (
+                <label
+                  className="row"
+                  style={{ cursor: "pointer", flexWrap: "nowrap", alignItems: "flex-start" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={asset.is_fleet === 1}
+                    onChange={(e) => void setFleetVehicle(asset, e.target.checked, actorId)}
+                  />
+                  <span className="small">
+                    Fleet vehicle — on the Dashboard's Fleet card
+                    {asset.checkoutable !== 1 && " (also makes it checkoutable)"}
+                  </span>
+                </label>
+              ) : (
+                <div className="field-value small">On the Dashboard's Fleet card</div>
+              )}
+            </div>
+          )}
+
           {asset.reservation_enabled === 1 && (
             <div className="field">
               <span className="field-label">Reservations</span>
@@ -283,16 +311,50 @@ export function AssetDetailPage() {
                   .filter((c) => c.time_in)
                   .slice(0, 6)
                   .map((c) => (
-                    <div key={c.id} className="card spread">
-                      <span>{c.person_name ?? "—"}</span>
-                      <span className="muted small">
-                        {new Date(c.time_out).toLocaleDateString()} –{" "}
-                        {new Date(c.time_in!).toLocaleDateString()}
-                      </span>
+                    <div key={c.id} className="card">
+                      <div className="spread">
+                        <span>{c.person_name ?? "—"}</span>
+                        <span className="muted small">
+                          {new Date(c.time_out).toLocaleDateString()} –{" "}
+                          {new Date(c.time_in!).toLocaleDateString()}
+                        </span>
+                      </div>
+                      {tripSummary(c, meterUnit(asset.meter_type)) && (
+                        <div className="muted small">
+                          {tripSummary(c, meterUnit(asset.meter_type))}
+                        </div>
+                      )}
+                      {c.return_note && <div className="small">“{c.return_note}”</div>}
                     </div>
                   ))}
                 {checkouts.length === 0 && (
                   <span className="muted small">Never checked out.</span>
+                )}
+              </div>
+            </div>
+          )}
+          {(asset.is_fleet === 1 || fuelLogs.length > 0) && (
+            <div>
+              <div className="section-title">Fuel</div>
+              <div className="stack" style={{ gap: 6 }}>
+                {fuelLogs.slice(0, 8).map((f) => (
+                  <div key={f.id} className="card spread">
+                    <span>
+                      {formatNumber(f.gallons)} gal
+                      <span className="muted small">
+                        {f.cost != null && ` · ${f.cost.toFixed(2)}`}
+                        {f.odometer != null &&
+                          ` · at ${formatNumber(f.odometer)} ${meterUnit(asset.meter_type)}`}
+                      </span>
+                    </span>
+                    <span className="muted small">
+                      {f.logged_by_name ? `${f.logged_by_name} · ` : ""}
+                      {new Date(f.timestamp).toLocaleDateString()}
+                    </span>
+                  </div>
+                ))}
+                {fuelLogs.length === 0 && (
+                  <span className="muted small">No fill-ups logged.</span>
                 )}
               </div>
             </div>
@@ -317,6 +379,21 @@ export function AssetDetailPage() {
       )}
     </div>
   );
+}
+
+/** Odometer, trip and fuel for a returned checkout, where the Fleet card
+ *  recorded them. */
+function tripSummary(c: CheckoutRow, unit: string): string | null {
+  const parts: string[] = [];
+  if (c.odometer_out != null && c.odometer_in != null) {
+    parts.push(
+      `${formatNumber(c.odometer_out)} → ${formatNumber(c.odometer_in)} ${unit} (+${formatNumber(c.odometer_in - c.odometer_out)})`,
+    );
+  } else if (c.odometer_out != null) {
+    parts.push(`Out at ${formatNumber(c.odometer_out)} ${unit}`);
+  }
+  if (c.fuel_level_in != null) parts.push(`Fuel ${FUEL_STEPS[c.fuel_level_in] ?? "?"}`);
+  return parts.length ? parts.join(" · ") : null;
 }
 
 function StatusDialog({ asset, onClose }: { asset: AssetRow; onClose: () => void }) {

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { saveDashboardLayout } from "../../data/users";
 import { json } from "../../lib/db";
+import { useFleetVehicleCount } from "../../data/fleet";
 import {
   CARD_REGISTRY,
   defaultLayout,
@@ -24,6 +25,7 @@ export function DashboardPage() {
   const layout: LayoutEntry[] = saved ?? defaultLayout(roleNames);
 
   const defById = new Map(CARD_REGISTRY.map((d) => [d.id, d]));
+  const context = { fleetVehicles: useFleetVehicleCount() };
 
   // A card whose permission was revoked drops out automatically (and is not
   // auto-restored later — the user re-adds it or resets to defaults).
@@ -31,13 +33,13 @@ export function DashboardPage() {
     .map((entry) => ({ entry, def: defById.get(entry.card as CardDef["id"]) }))
     .filter(
       (x): x is { entry: LayoutEntry; def: CardDef } =>
-        x.def !== undefined && x.def.available(current),
+        x.def !== undefined && x.def.available(current, context),
     );
 
   const visibleEntries = entries.filter((x) => x.entry.visible);
   const inLayout = new Set(entries.map((x) => x.def.id));
   const addable = CARD_REGISTRY.filter(
-    (d) => !inLayout.has(d.id) && d.available(current),
+    (d) => !inLayout.has(d.id) && d.available(current, context),
   );
 
   const persist = (next: LayoutEntry[] | null) => {

@@ -63,12 +63,33 @@ const asset_checkouts = new Table(
     checked_out_by_id: column.text,
     time_out: column.text,
     time_in: column.text,
+    odometer_out: column.real,
+    odometer_in: column.real,
+    fuel_level_in: column.integer,
+    return_note: column.text,
   },
   {
     indexes: {
       by_asset_id: ["asset_id"],
       by_checked_out_by_id: ["checked_out_by_id"],
       by_person_id: ["person_id"],
+    },
+  },
+);
+
+const asset_fuel_logs = new Table(
+  {
+    asset_id: column.text,
+    gallons: column.real,
+    cost: column.real,
+    odometer: column.real,
+    timestamp: column.text,
+    logged_by_id: column.text,
+  },
+  {
+    indexes: {
+      by_asset_id: ["asset_id"],
+      by_logged_by_id: ["logged_by_id"],
     },
   },
 );
@@ -131,6 +152,7 @@ const assets = new Table(
     reservation_enabled: column.integer,
     reservation_visibility: column.text,
     post_return_status_id: column.text,
+    is_fleet: column.integer,
   },
   {
     indexes: {
@@ -1547,6 +1569,7 @@ export const AppSchema = new Schema({
   amenities,
   amenity_location_types,
   asset_checkouts,
+  asset_fuel_logs,
   asset_meter_readings,
   asset_status_logs,
   asset_statuses,
@@ -1644,6 +1667,7 @@ export const TABLE_NAMES = [
   "amenities",
   "amenity_location_types",
   "asset_checkouts",
+  "asset_fuel_logs",
   "asset_meter_readings",
   "asset_status_logs",
   "asset_statuses",

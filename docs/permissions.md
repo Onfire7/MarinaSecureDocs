@@ -66,6 +66,7 @@ The full, fixed catalog of permissions. Marinas cannot invent new permissions, b
 | `manage_audits` | Creating Audit Templates, launching and closing Audits, approving or rejecting non-structural Proposals (Service and Amenity presence, GPS coordinates), and creating or revoking Share Links to an Audit Report. See `docs/audits.md`. |
 | `manage_reservations` | Creating/editing reservations and overriding status/dates. |
 | `manage_marina_settings` | Editing the MarinaSettings record: retention policy, GPS defaults, phone lines, recording toggle. |
+| `use_fleet` | The Dashboard's Fleet card: checking Fleet Vehicles out and in, and logging their mileage and fill-ups. Not `manage_*`, so it doesn't open Admin. Granted to the predefined Security role by migration `20261020000200`. See `src/pages/home/FleetCard.spec.md`. |
 
 The last five were identified while writing out [Role Workflows](workflows.md) and the page specs — implied by features but not present in the original list — and are now confirmed as part of the fixed catalog.
 
@@ -196,7 +197,7 @@ not just in a query.
 Everything else: `assign_ticket_to_self`, `assign_ticket_to_others`,
 `manage_checklists`, `view_reports`, `view_all_chats`, `manage_chats`,
 `manage_assets`, `manage_locations`, `manage_reservations`,
-`manage_marina_settings`, `manage_audits`.
+`manage_marina_settings`, `manage_audits`, `use_fleet`.
 
 These gate what the interface offers, not what the database permits. That is a
 deliberate stopping point rather than an oversight: they govern *marina
