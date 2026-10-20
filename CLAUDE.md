@@ -20,10 +20,8 @@ its own Twilio account. Nothing is shared between marinas.
 > **The rewrite is done, on the `beta2` branch** (renamed from
 > `rewrite/powersync` on 2026-09-10), deployed to
 > https://beta2.marinasecure.com by its own Netlify site, `marinasecure2`
-> (`marinasecure2.netlify.app`).
-> `beta` still
-> deploys the InstantDB build and still works; nothing in `src/` on the branch
-> imports InstantDB. **The cutover is complete (2026-09-22)**: `beta2` runs
+> (`marinasecure2.netlify.app`). Nothing in `src/` on the branch imports
+> InstantDB. **The cutover is complete (2026-09-22)**: `beta2` runs
 > against synced rows in the real marina database. Rules below marked
 > *(InstantDB only)* do not apply on the branch, and some are actively wrong
 > there.
@@ -59,8 +57,11 @@ spec-approval time and expensive afterward.
 
 - **Work on `beta2`.** It deploys to https://beta2.marinasecure.com in ~45s,
   from its own Netlify site (`marinasecure2`) with its own environment
-  variables. `beta` is the old InstantDB build on the `marinasecure` site and
-  is left alone; the two share a repo and nothing else.
+  variables.
+- **`beta` is retired (2026-10-20).** It was the InstantDB build on the
+  `marinasecure` site. Everything committed to it has been merged into
+  `beta2`, and the local branch is being removed. Never commit to, check out,
+  or merge from it; a checkout still on `beta` is the wrong checkout.
 - **Pages never touch the database.** *(On `beta2`.)* Queries and
   writes live in per-domain modules under `src/data/`; **no page file contains
   SQL**. `src/lib/db/schema.ts` is generated from the live database by
@@ -302,7 +303,7 @@ Screenshots or it didn't happen.
   `asUser({email})` impersonation only works for identities that have
   actually signed in.
 - **The testing loop that caught every real bug**: verification trio →
-  commit and push `beta` → poll the deployment until the `index-*.js` hash
+  commit and push `beta2` → poll the deployment until the `index-*.js` hash
   changes → `agent-login.mjs`, read the printed screen text, **open the
   screenshot and look at it** → drive the specific flow with an ad-hoc
   script reusing the saved state, asserting on visible text rather than
