@@ -10,9 +10,10 @@ import { EndOfShiftNote, Letterhead, NeedsAttention, Notes, Summary } from "./sh
 import { VariantA } from "./VariantA";
 import { VariantB } from "./VariantB";
 import { VariantC } from "./VariantC";
+import { VariantD } from "./VariantD";
 import "./prototype.css";
 
-const VARIANTS = { A: VariantA, B: VariantB, C: VariantC };
+const VARIANTS = { A: VariantA, B: VariantB, C: VariantC, D: VariantD };
 
 export function ShiftReportPrototypePage() {
   const [params] = useSearchParams();

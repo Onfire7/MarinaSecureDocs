@@ -45,7 +45,7 @@ function worst(items: RecordItem[]) {
   return "ok";
 }
 
-function Card({ name, path, items }: { name: string; path?: string; items: RecordItem[] }) {
+function Card({ name, path, items, timeSpan }: { name: string; path?: string; items: RecordItem[]; timeSpan?: (items: RecordItem[]) => string }) {
   const [all, setAll] = useState(false);
   const checkins = items.filter((i) => i.kind === "checkin" && i.source !== "(not expected)");
   const visited = checkins.filter((i) => i.mark !== "missed").length;
@@ -59,6 +59,7 @@ function Card({ name, path, items }: { name: string; path?: string; items: Recor
         <div>
           {path && <div className="muted small">{path}</div>}
           <strong>{name}</strong>
+          {timeSpan && timeSpan(items) && <div className="muted small">{timeSpan(items)}</div>}
         </div>
         <div className="psc-counts small">
           {checkins.length > 0 && (
@@ -145,7 +146,7 @@ export const VariantC = {
       </div>
     </>
   ),
-  Record: ({ r }: { r: ShiftReport }) => {
+  Record: ({ r, timeSpan }: { r: ShiftReport; timeSpan?: (items: RecordItem[]) => string }) => {
     let parent = "";
     return (
       <>
@@ -153,10 +154,10 @@ export const VariantC = {
         <div className="psc-board">
           {r.locations.map((l) => {
             if (l.depth === 0) parent = l.name;
-            return <Card key={l.id} name={l.name} path={l.depth > 0 ? parent : undefined} items={l.items} />;
+            return <Card key={l.id} name={l.name} path={l.depth > 0 ? parent : undefined} items={l.items} timeSpan={timeSpan} />;
           })}
           {r.unlocated.map((u) => (
-            <Card key={u.checklist} name={u.checklist} path="No location" items={u.items} />
+            <Card key={u.checklist} name={u.checklist} path="No location" items={u.items} timeSpan={timeSpan} />
           ))}
         </div>
       </>
