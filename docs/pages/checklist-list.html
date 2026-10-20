@@ -55,10 +55,10 @@
     <h2>Actions</h2>
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
-      <tr><td>Open a Not Started / In Progress checklist</td><td>Must be the <code>assigned_to</code> user, or hold the role it's assigned to</td><td>Opens <a href="active-checklist.html">Active checklist</a>.</td></tr>
+      <tr><td>Open a Not Started / In Progress checklist</td><td>Must be the <code>assigned_to</code> user, or hold the role it's assigned to</td><td>Opens <a href="../../src/pages/checklists/ActiveChecklistPage.spec.md">Active checklist</a>.</td></tr>
       <tr><td>Open a Complete checklist</td><td>Same as above</td><td>Opens <a href="checklist-detail.html">Checklist detail</a> (read-only).</td></tr>
       <tr><td>Expand Completed</td><td>None</td><td>A collapsed disclosure, not a filter — the split between open and done is the page's structure, so status filter chips no longer exist.</td></tr>
-      <tr><td>Start a checklist manually</td><td>A manual-trigger template whose <code>assigned_role</code> the user holds</td><td>Picker lists the eligible manual templates; choosing one materializes a full instance — every eligible section and all of its items as rows — assigned to self when <code>assigned_to_user</code> is set, otherwise left for the role to claim, and opens it directly, per <a href="active-checklist.html">Active checklist</a>. Hidden entirely when no manual template matches the user's roles.</td></tr>
+      <tr><td>Start a checklist manually</td><td>A manual-trigger template whose <code>assigned_role</code> the user holds</td><td>Picker lists the eligible manual templates; choosing one materializes a full instance — every eligible section and all of its items as rows — assigned to self when <code>assigned_to_user</code> is set, otherwise left for the role to claim, and opens it directly, per <a href="../../src/pages/checklists/ActiveChecklistPage.spec.md">Active checklist</a>. Hidden entirely when no manual template matches the user's roles.</td></tr>
       <tr><td>Monitoring section</td><td>A role the user holds is in a template's <code>viewer_roles</code></td><td>Open instances of that template, read-only — who has it (or "unclaimed") and its status. Opens the checklist in read-only mode; e.g. the office watching a maintenance checklist move without holding the role. Client-side only until the permissions overhaul.</td></tr>
       <tr><td>Tour sections</td><td>Security role</td><td>Rendered <strong>inline below the open checklists</strong>, one section per tour under a small heading (name, mode, remaining badge, progress bar) — per <a href="tour-progress.html">Tour progress</a>, which specifies the per-mode rendering. Not a tab and not a separate page: a guard typically has exactly one active tour, and its steps belong on the page every round starts from. Tours with remaining checkpoints sort above completed ones, which dim with "Complete ✓"; a tour's visited checkpoints collapse into a "Visited this shift · N" disclosure inside its section, mirroring the completed-checklists disclosure. Without an active shift the steps still list, with a note that progress starts with a shift. Not shown to users without the Security role.</td></tr>
     </table>
@@ -74,8 +74,8 @@
     <p>Mobile: one vertical column — open checklists, then tour sections, then the collapsed Completed disclosure. Desktop: checklists and tours in adjacent columns for users with tour access (Security); without it there is no second column, so the freed width goes to information density instead — open-checklist cards flow two per row. The former mobile Checklists/Tours chip tabs are gone either way: with tours inline there is nothing left to switch between.</p>
 
     <div class="page-foot">
-      <a href="dashboard.html">← Dashboard</a>
-      <a href="active-checklist.html">Active Checklist →</a>
+      <a href="../../src/pages/home/DashboardPage.spec.md">← Dashboard</a>
+      <a href="../../src/pages/checklists/ActiveChecklistPage.spec.md">Active Checklist →</a>
     </div>
   </main>
 </div>

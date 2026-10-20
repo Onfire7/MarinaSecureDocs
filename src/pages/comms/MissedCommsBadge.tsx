@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useMissedCalls, useSmsThreads } from "../../data/comms";
 
-// The floating Missed Comms Badge (see docs/pages/dashboard.html and
+// The floating Missed Comms Badge (see src/pages/home/DashboardPage.spec.md and docs/pages/
 // missed-comms-detail.html): an always-visible count of missed calls plus
 // unread SMS that opens the combined catch-up worklist.
 //

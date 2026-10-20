@@ -40,7 +40,7 @@
     <p class="lede">What opens when the floating Missed Comms Badge is tapped — every missed call and unread text in one combined view, including voicemail playback.</p>
 
     <h2>Purpose</h2>
-    <p>The Missed Comms Badge (see <a href="dashboard.html">Dashboard</a>) is a floating, always-visible count of missed calls plus unread SMS, per <a href="../workflows.md">Role Workflows</a>. This screen is what it opens into — a combined worklist for catching up, not a permanent home for call/text history (that's <a href="comms-home.html">Comms Home</a>). Its two halves are gated independently: <code>view_calls</code> for missed calls, <code>view_sms</code> for unread texts, same as the sections they mirror on Comms Home.</p>
+    <p>The Missed Comms Badge (see <a href="../../src/pages/home/DashboardPage.spec.md">Dashboard</a>) is a floating, always-visible count of missed calls plus unread SMS, per <a href="../workflows.md">Role Workflows</a>. This screen is what it opens into — a combined worklist for catching up, not a permanent home for call/text history (that's <a href="comms-home.html">Comms Home</a>). Its two halves are gated independently: <code>view_calls</code> for missed calls, <code>view_sms</code> for unread texts, same as the sections they mirror on Comms Home.</p>
 
     <h2>Data shown</h2>
     <table>
@@ -63,7 +63,7 @@
     <ul>
       <li><strong>No <code>view_calls</code></strong> — the missed-calls half is omitted; a badge count sourced only from unread SMS still shows if the user holds <code>view_sms</code>.</li>
       <li><strong>No <code>view_sms</code></strong> — same treatment, mirrored, for the unread-texts half.</li>
-      <li><strong>Neither permission</strong> — the badge itself has nothing to show and doesn't appear (see <a href="dashboard.html">Dashboard</a>).</li>
+      <li><strong>Neither permission</strong> — the badge itself has nothing to show and doesn't appear (see <a href="../../src/pages/home/DashboardPage.spec.md">Dashboard</a>).</li>
       <li><strong>Nothing missed or unread</strong> — empty state; the badge itself wouldn't be showing a count in this case, so this is mostly reached via direct navigation rather than the badge.</li>
       <li><strong>Marking read is one-way from here</strong> — opening a thread clears its unread flag; there's no "mark unread" action on this screen (that's a property of engaging with the thread, not something manually toggled).</li>
       <li><strong>Recording/transcription disabled</strong> — same as elsewhere, that section is simply omitted, not shown empty.</li>

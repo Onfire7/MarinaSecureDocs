@@ -231,7 +231,7 @@ visited, onto an already-open instance.
 
 `section_id` (**nullable** — see below), `type` (`simple_check` /
 `verify_task` / `door_check` / `lock_check` / `location_check` /
-`meter_reading` / `question`), `label`, `config jsonb`, `position`,
+`meter_reading` / `question` / `end_shift`), `label`, `config jsonb`, `position`,
 `version integer not null default 1`,
 `previous_version_id → checklist_template_items`.
 
@@ -668,7 +668,9 @@ proposal's `decision` is null; finalize applies approved proposals in
 
 `guard_id → users not null`, `started_at`, `ended_at`, `report_sent_at`
 (written by the Twilio Function that sends it),
-`end_of_shift_checklist_id → checklist_instances unique`.
+`end_of_shift_checklist_id → checklist_instances unique` (the shift's End of
+Shift Checklist, linked when it is created; submitting it no longer sets
+`ended_at`, End Shift and Submit does).
 
 #### `activity_log_entries` — Tier 0 read · sync: **age**
 

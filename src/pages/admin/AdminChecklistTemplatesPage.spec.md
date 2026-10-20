@@ -46,6 +46,34 @@ visibility; personal checklists will return later as their own feature.
   fresh version-1 row.
 - **Update open checklists.** See below.
 
+## End Shift Items
+
+An End Shift Item submits its checklist and carries the guard on to the end
+of their shift (`src/pages/checklists/ActiveChecklistPage.spec.md` § End
+Shift Item). Because it submits everything above it, the editor holds it to
+a few rules:
+
+- **At most one per template.** Once a template has one, End Shift is no
+  longer offered in the add-item menu.
+- **Always last.** It is added as the final item of the template's last
+  section, and stays there: it has no drag handle, nothing can be dropped
+  after it, and its section cannot be dragged above another. Duplicate is
+  not offered for it.
+- **Only in a section made with the checklist.** The last section's trigger
+  must be Always (with the checklist). A section created later by a scan or a
+  visit might never exist on a given night, and the item with it. If the last
+  section has any other trigger, End Shift is offered disabled, with the
+  reason.
+- **Never on a Clock Out template.** That template *is* the End of Shift
+  Checklist; finishing it already carries on to the end of the shift. End
+  Shift is not offered on a Clock Out template, and Clock Out is offered
+  disabled, with the reason, on a template that has one.
+
+The rules live in the editor because a template can't be saved in a state
+that breaks them, and nothing else writes templates. A device reading an old
+template that somehow breaks them still behaves: the Active Checklist only
+ever acts on an End Shift Item when it is tapped, wherever it sits.
+
 ## Item versions
 
 An instance item points at the exact template-item row it was created from,

@@ -9,7 +9,7 @@ import {
   type LayoutEntry,
 } from "./cards";
 
-// Home — Dashboard (see pages/dashboard.html).
+// Home — Dashboard (see DashboardPage.spec.md).
 // Role-adaptive default card set; per-user show/hide/reorder persisted on
 // User.dashboardLayout (null = derive from current roles).
 export function DashboardPage() {

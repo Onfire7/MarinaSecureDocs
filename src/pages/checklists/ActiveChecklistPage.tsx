@@ -42,7 +42,7 @@ import {
   type ItemProps,
 } from "./checklistItems";
 
-// Checklists & Tours — Active Checklist (see pages/active-checklist.html).
+// Checklists & Tours — Active Checklist (see ActiveChecklistPage.spec.md).
 // Item-by-item completion of an in-progress instance; every write here goes to
 // the device's own database, so it works fully offline. An instance is fully
 // materialized rows — sections and items exist in the database from the

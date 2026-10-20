@@ -52,7 +52,7 @@
     <h2>Actions</h2>
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
-      <tr><td>Select a listed user</td><td>None</td><td>Calls Clerk's <code>setActive()</code> for that user's existing session — no credential re-entry, since the session is already authenticated — then routes to the <a href="dashboard.html">Dashboard</a>.</td></tr>
+      <tr><td>Select a listed user</td><td>None</td><td>Calls Clerk's <code>setActive()</code> for that user's existing session — no credential re-entry, since the session is already authenticated — then routes to the <a href="../../src/pages/home/DashboardPage.spec.md">Dashboard</a>.</td></tr>
       <tr><td>Add another user</td><td>None</td><td>Routes to <a href="sign-in.html">Sign In</a> for a user not yet listed on this device; on success, Clerk adds their session to the device's multi-session list for future switches.</td></tr>
       <tr><td>Remove a user from this device</td><td>None (self) / <code>manage_users</code> (removing someone else's session)</td><td>Ends that user's Clerk session on this device entirely — used when someone leaves the marina or a device is being repurposed.</td></tr>
     </table>
@@ -69,7 +69,7 @@
 
     <div class="page-foot">
       <a href="sign-in.html">← Sign In</a>
-      <a href="dashboard.html">Dashboard →</a>
+      <a href="../../src/pages/home/DashboardPage.spec.md">Dashboard →</a>
     </div>
   </main>
 </div>

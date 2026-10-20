@@ -139,9 +139,14 @@ An item that records an Asset's meter value, feeding that Asset's
 maintenance rules.
 
 **End Shift Item**:
-An item that lets a guard finish their Shift from inside a checklist —
-starting their Clock Out checklist when their Role has one, otherwise going
-straight to the End of Shift review.
+The last item of a checklist, which submits that checklist and carries the
+guard on to the end of their Shift: the End of Shift Checklist if one is
+due, then End of Shift.
+
+**End of Shift Checklist**:
+The Checklist a Clock Out Trigger creates for a guard as their Shift ends.
+Finishing it leads to End of Shift; it does not end the Shift itself.
+_Avoid_: clock-out checklist
 
 ## Audits
 
@@ -355,8 +360,8 @@ A period of active duty for one guard, started and ended from the
 dashboard. Other records associate with it by timestamp, not by link.
 
 **End of Shift**:
-The moment a guard ends their Shift, after a last review of its Shift
-Report. The report's body is fixed as of then.
+The moment a guard ends their Shift, by approving its Shift Report with End
+Shift and Submit. The report's body is fixed as of then.
 _Avoid_: hand-in, clock-out (except as a Trigger)
 
 **Shift Report**:

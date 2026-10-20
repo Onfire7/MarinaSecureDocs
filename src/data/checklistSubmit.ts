@@ -19,7 +19,7 @@ import type { MaintenanceRuleRow, MeterReadingRow } from "./assets";
 
 /**
  * Turns the side effects an item *described* while the guard worked into the
- * rows they represent, at submit time (see docs/pages/active-checklist.html).
+ * rows they represent, at submit time (see src/pages/checklists/ActiveChecklistPage.spec.md).
  *
  * Nothing here runs until the checklist is submitted, which is what makes a
  * completed item editable: redoing an item only rewrites its own result, because

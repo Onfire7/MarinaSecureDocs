@@ -8,7 +8,8 @@ export interface NavSection {
   visible?: (current: CurrentUser) => boolean;
 }
 
-// Top-level sections, in sidenav order (see wireframes/dashboard.html).
+// Top-level sections, in sidenav order. This list is the authority for that
+// order; the wireframe that once drew it is gone.
 export const NAV_SECTIONS: NavSection[] = [
   { path: "/", label: "Home", icon: "⌂" },
   { path: "/checklists", label: "Checklists", icon: "☑" },

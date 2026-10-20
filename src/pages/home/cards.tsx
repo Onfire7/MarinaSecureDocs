@@ -21,7 +21,7 @@ import { useIncidents } from "../../data/incidents";
 import { useMissedCalls, useSmsThreads } from "../../data/comms";
 import { useReservations } from "../../data/reservations";
 
-// Dashboard cards (see pages/dashboard.html — Available cards).
+// Dashboard cards (see DashboardPage.spec.md § Cards).
 // A card's availability gate is exactly the permission that governs the data
 // it reads — no card-specific permissions exist.
 

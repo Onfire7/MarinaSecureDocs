@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * PWA install prompt plumbing (see docs/pages/dashboard.html — Install app).
+ * PWA install prompt plumbing (the button is src/layout/InstallAppButton.tsx).
  *
  * `beforeinstallprompt` fires once, early — routinely before React has
  * mounted — and the browser only lets the saved event be used later if

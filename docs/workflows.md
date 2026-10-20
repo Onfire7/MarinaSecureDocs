@@ -49,7 +49,7 @@ While viewing a slip or boat during a round, the guard sees whatever the marina 
 
 ### Ending a shift
 
-If the marina has defined an end-of-shift checklist, completing and submitting it ends the shift automatically. Otherwise, the guard ends the shift manually from the dashboard. Either way, ending the shift triggers compilation of the shift report, emailed to the marina's configured distribution list.
+Ending a shift always runs in the same order, from the dashboard's Shift card or from an End Shift Item at the end of an ordinary checklist: the End of Shift Checklist, if the guard's role has a Clock Out template with something to do, then a last look at the Shift Report, which ends the shift with End Shift and Submit (`src/pages/checklists/ActiveChecklistPage.spec.md` § Ending the shift). The guard then copies a ready-made email with the report's link; sending it automatically is on the roadmap.
 
 ## Maintenance
 

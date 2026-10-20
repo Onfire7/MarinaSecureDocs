@@ -52,7 +52,7 @@
     <h2>Actions</h2>
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
-      <tr><td>Sign in</td><td>None (this <em>is</em> the gate)</td><td>Handled by Clerk; on success, Clerk issues a session, InstantDB verifies it via its Clerk integration, and the app routes to the <a href="dashboard.html">Dashboard</a>.</td></tr>
+      <tr><td>Sign in</td><td>None (this <em>is</em> the gate)</td><td>Handled by Clerk; on success, Clerk issues a session, InstantDB verifies it via its Clerk integration, and the app routes to the <a href="../../src/pages/home/DashboardPage.spec.md">Dashboard</a>.</td></tr>
       <tr><td>Resend / forgot credential</td><td>None</td><td>Standard Clerk recovery flow for whichever challenge method is configured.</td></tr>
       <tr><td>Switch to a different user</td><td>Shown only when this device already has at least one signed-in Clerk session</td><td>Routes to <a href="user-switch.html">User Switch</a>, backed by Clerk's multi-session support, instead of a fresh sign-in.</td></tr>
     </table>
