@@ -9,6 +9,7 @@ export function EndShiftItem({
   item,
   onShift,
   othersRemaining,
+  countOthersRemaining,
   busy,
   editable,
   onEndShift,
@@ -16,8 +17,10 @@ export function EndShiftItem({
   item: InstanceItemRow;
   /** False when the person viewing has no active shift. */
   onShift: boolean;
-  /** Unanswered items on this checklist other than this one. */
+  /** Unanswered items on this checklist other than this one, as rendered. */
   othersRemaining: number;
+  /** The same count read at the moment of the tap, which the tap acts on. */
+  countOthersRemaining: () => Promise<number>;
   busy: boolean;
   editable: boolean;
   onEndShift: () => void;
@@ -71,7 +74,9 @@ export function EndShiftItem({
               type="button"
               className="btn btn-primary"
               disabled={busy}
-              onClick={() => (othersRemaining > 0 ? setConfirming(true) : onEndShift())}
+              onClick={async () =>
+                (await countOthersRemaining()) > 0 ? setConfirming(true) : onEndShift()
+              }
             >
               {busy ? "Submitting…" : "End Shift"}
             </button>

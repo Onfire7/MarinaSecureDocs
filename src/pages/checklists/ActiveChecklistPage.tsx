@@ -19,6 +19,7 @@ import {
 import {
   itemConfig,
   itemResult,
+  loadInstanceItems,
   reorderInstanceItems,
   startAndClaimInstance,
   submitInstance,
@@ -327,6 +328,15 @@ export function ChecklistItemsPanel({
     }
   };
 
+  // Whether End Shift must ask first is decided against the database, not
+  // this render: an answer tapped a moment earlier may not be in it yet, and
+  // asking on a stale count shows "Submit anyway" for a frame, then withdraws
+  // it as the count catches up - and the tap is gone.
+  const othersRemainingNow = async () => {
+    const rows = await loadInstanceItems(checklistId).catch(() => allItems);
+    return rows.filter((i) => i.type !== "end_shift" && !isDone(i)).length;
+  };
+
   const componentFor = (type: string): ComponentType<ItemProps> => {
     switch (normalizeItemType(type) as ItemType) {
       case "simple_check":
@@ -616,6 +626,7 @@ export function ChecklistItemsPanel({
                     items={run.items}
                     enabled={canAct && !compact && section.items.length > 1}
                     onReorder={reorderItems}
+                    pinned={(item) => endShiftIds.has(item.id)}
                     renderItem={(item: (typeof run.items)[number]) => {
                       if (item.type === "end_shift") {
                         return (
@@ -625,6 +636,7 @@ export function ChecklistItemsPanel({
                             othersRemaining={
                               remainingAll - endShiftItems.filter((i) => !isDone(i)).length
                             }
+                            countOthersRemaining={othersRemainingNow}
                             busy={submitting}
                             editable={canAct}
                             onEndShift={() => void endShiftNow(item)}

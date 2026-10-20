@@ -1031,28 +1031,34 @@ function TemplateCard({
 
               <div className="field-inline">
                 <span className="field-label">Trigger</span>
-                <select
-                  className="select field-control"
-                  value={template.triggerType}
-                  onChange={(e) => update({ triggerType: e.target.value })}
-                >
-                  {TRIGGERS.map((t) => (
-                    <option
-                      key={t.value}
-                      value={t.value}
-                      disabled={
-                        t.value === "clock_out" &&
-                        !!clockOutReason &&
-                        template.triggerType !== "clock_out"
-                      }
-                    >
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-                {clockOutReason && template.triggerType !== "clock_out" && (
-                  <span className="muted small">{clockOutReason}</span>
-                )}
+                {/* The reason sits under the select, not beside it: beside
+                    it, a sentence's width squeezed the select to its arrow. */}
+                <div className="field-control">
+                  <select
+                    className="select"
+                    value={template.triggerType}
+                    onChange={(e) => update({ triggerType: e.target.value })}
+                  >
+                    {TRIGGERS.map((t) => (
+                      <option
+                        key={t.value}
+                        value={t.value}
+                        disabled={
+                          t.value === "clock_out" &&
+                          !!clockOutReason &&
+                          template.triggerType !== "clock_out"
+                        }
+                      >
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                  {clockOutReason && template.triggerType !== "clock_out" && (
+                    <div className="muted small" style={{ marginTop: 4 }}>
+                      {clockOutReason}
+                    </div>
+                  )}
+                </div>
               </div>
               <div>
                 {template.triggerType === "recurring" && (

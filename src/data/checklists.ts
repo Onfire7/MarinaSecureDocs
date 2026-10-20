@@ -316,13 +316,21 @@ const INSTANCE_ITEM_SELECT = `
     LEFT JOIN checklist_template_items ti ON ti.id = ii.template_item_id
     LEFT JOIN users u ON u.id = ii.completed_by_id`;
 
-export function useInstanceItems(instanceId: string | undefined) {
-  return useQuery<InstanceItemRow>(
-    `${INSTANCE_ITEM_SELECT}
+const INSTANCE_ITEMS_OF = `${INSTANCE_ITEM_SELECT}
        JOIN checklist_instance_sections s ON s.id = ii.section_id
-      WHERE s.instance_id = ? ORDER BY s.position, ii.position`,
-    [instanceId ?? ""],
-  );
+      WHERE s.instance_id = ? ORDER BY s.position, ii.position`;
+
+export function useInstanceItems(instanceId: string | undefined) {
+  return useQuery<InstanceItemRow>(INSTANCE_ITEMS_OF, [instanceId ?? ""]);
+}
+
+/**
+ * The same rows as useInstanceItems(), read once. For a decision taken on a
+ * tap: the render can be a beat behind the answer written by the tap before
+ * it, and acting on that render loses the second tap.
+ */
+export async function loadInstanceItems(instanceId: string): Promise<InstanceItemRow[]> {
+  return db.getAll<InstanceItemRow>(INSTANCE_ITEMS_OF, [instanceId]);
 }
 
 export interface SectionAtPlace extends InstanceSectionRow {
