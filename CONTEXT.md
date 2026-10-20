@@ -141,7 +141,7 @@ maintenance rules.
 **End Shift Item**:
 An item that lets a guard finish their Shift from inside a checklist —
 starting their Clock Out checklist when their Role has one, otherwise going
-straight to the review and hand-in.
+straight to the End of Shift review.
 
 ## Audits
 
@@ -354,9 +354,14 @@ at least one of its sections.
 A period of active duty for one guard, started and ended from the
 dashboard. Other records associate with it by timestamp, not by link.
 
+**End of Shift**:
+The moment a guard ends their Shift, after a last review of its Shift
+Report. The report's body is fixed as of then.
+_Avoid_: hand-in, clock-out (except as a Trigger)
+
 **Shift Report**:
 The record of one guard's Shift, read by their supervisor. Its body is fixed
-when the Shift ends, like a paper report handed in; later changes to the
+at End of Shift, like a paper report turned in; later changes to the
 Incidents and Tickets it names appear beneath them as updates, never folded
 into the body. Only that guard's own activity.
 _Avoid_: end-of-shift summary, shift log
@@ -368,7 +373,7 @@ _Avoid_: share link, public link
 
 **End of Shift Note**:
 The guard's own free-text note to their supervisor, written while reviewing
-the Shift Report just before handing it in, and part of its fixed body.
+the Shift Report just before End of Shift, and part of its fixed body.
 _Avoid_: handover note, shift notes
 
 **Activity Log**:

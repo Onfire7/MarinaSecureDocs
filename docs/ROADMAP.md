@@ -286,8 +286,8 @@ was supposed to contain.
 
 When each Role's shifts are expected to start and end. Without it the system
 cannot tell a guard who is still on shift from one who should have finished
-and hasn't handed in a report: today both show the same "hasn't been handed
-in yet" banner, and the "should have ended" state is the one a supervisor
+and whose report hasn't reached End of Shift: today both show the same "this
+shift hasn't ended yet" banner, and the "should have ended" state is the one a supervisor
 most wants to see.
 
 **Why deferred:** rostering is a good-sized feature in its own right.
