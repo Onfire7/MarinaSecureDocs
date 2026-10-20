@@ -113,13 +113,16 @@ export function ManualCheckinDialog({
                 onChange={setCheckpointId}
                 placeholder={here ? "Search — nearest first…" : "Search checkpoints…"}
                 emptyMessage="No checkpoints exist yet."
-                autoFocus
+                // Focus lands on whatever still needs filling in: the
+                // checkpoint, unless the caller already chose it.
+                autoFocus={!initialCheckpointId}
               />
             </div>
             <div className="field">
               <span className="field-label">Reason — required</span>
               <textarea
                 className="textarea"
+                autoFocus={!!initialCheckpointId}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 rows={3}

@@ -8,6 +8,9 @@ import { applyTheme, getStoredTheme } from "./lib/theme.ts";
 // before React mounts.
 import "./lib/pwaInstall.ts";
 import { initAppUpdates } from "./lib/appUpdate.ts";
+// Side effect: keeps --vv-top/--vv-height current so dialogs center in the
+// part of the screen the on-screen keyboard leaves visible.
+import "./lib/visualViewport.ts";
 
 // Applied before the first render so a stored Dark/Light choice never
 // flashes the wrong palette on load.

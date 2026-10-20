@@ -993,9 +993,15 @@ h3 {
 
 /* ---------- Dialogs ---------- */
 
+/* Sized to the visual viewport (see lib/visualViewport.ts) rather than
+   inset: 0, so an open on-screen keyboard shrinks the area the card centers
+   in instead of covering the card. */
 .dialog-backdrop {
   position: fixed;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: var(--vv-top, 0px);
+  height: var(--vv-height, 100%);
   z-index: 50;
   background: rgba(30, 40, 45, 0.35);
   display: flex;
@@ -1011,7 +1017,9 @@ h3 {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 18px;
-  max-height: 90vh;
+  /* The backdrop already tracks the visible area; 100% of it minus its
+     padding keeps a tall card scrollable above the keyboard. */
+  max-height: 100%;
   overflow-y: auto;
 }
 
