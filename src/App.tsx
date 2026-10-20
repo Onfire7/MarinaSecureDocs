@@ -5,6 +5,7 @@ import { ErrorBoundary } from "./layout/ErrorBoundary";
 import { Splash } from "./layout/Splash";
 import { ConfigMissingPage } from "./pages/shared/ConfigMissingPage";
 import { SharedAuditReportPage } from "./pages/audits/SharedAuditReportPage";
+import { ShiftReportPrototypePage } from "./pages/reports/prototype/ShiftReportPrototypePage";
 
 // The signed-in app is a separate chunk. A Share Link's page (/r/<key>) is
 // public - no Clerk, no PowerSync, no shell - and is routed here before
@@ -13,6 +14,15 @@ import { SharedAuditReportPage } from "./pages/audits/SharedAuditReportPage";
 const AuthedApp = lazy(() => import("./AuthedApp"));
 
 export default function App() {
+  // PROTOTYPE — throwaway, see src/pages/reports/prototype. Fixture data
+  // only, so it runs without any configuration.
+  if (window.location.pathname === "/r/shift-prototype") {
+    return (
+      <BrowserRouter>
+        <ShiftReportPrototypePage />
+      </BrowserRouter>
+    );
+  }
   const missing = missingConfig();
   if (missing.length > 0) {
     return <ConfigMissingPage missing={missing} />;
