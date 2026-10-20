@@ -127,7 +127,7 @@ key, its terms and offline behaviour with it - decide those before building.
 
 ### Netlify Functions surface
 
-Shift-report send and sweep, and the Twilio bridge for calls and SMS.
+Shift-report automatic email, and the Twilio bridge for calls and SMS.
 
 **Why deferred:** it's a whole deployment surface, and nothing currently
 blocked needs it.
@@ -262,6 +262,54 @@ Sending the invitation itself needs a server-side Clerk call.
 **Why deferred:** needs the Netlify Functions surface above.
 
 ---
+
+### Shift Reports: automatic email
+
+Today a guard hands in a Shift Report and copies a ready-made subject, body
+and Report Link from a dialog into their own email. Sending it to a
+distribution list automatically is the next step: the summary sentences are
+already a pure function so the email can render them without a browser.
+
+**Why deferred:** it needs the Netlify Functions surface (above) and an email
+transport; copy-and-paste covers the need until then.
+
+### Weekly reports
+
+A report over a week of Shifts for the security supervisor, beside the
+per-shift Shift Report.
+
+**Why deferred:** a separate project, settled 2026-10-20 when the Shift
+Report was designed. It wants Shift Schedules first, to know what the week
+was supposed to contain.
+
+### Shift Schedules
+
+When each Role's shifts are expected to start and end. Without it the system
+cannot tell a guard who is still on shift from one who should have finished
+and hasn't handed in a report: today both show the same "hasn't been handed
+in yet" banner, and the "should have ended" state is the one a supervisor
+most wants to see.
+
+**Why deferred:** rostering is a good-sized feature in its own right.
+
+### Tours need a rethink
+
+Tours are not linked to Shifts; a guard's tour progress is just their
+check-ins since the shift began. So a Tour cannot make a checkpoint
+*expected*, and the Shift Report counts a checkpoint as missed only when a
+checklist Section names it.
+
+**Why deferred:** the owner wants the whole Tour model reconsidered
+(2026-10-20), not patched to feed the report.
+
+### Report Links require sign-in
+
+A Report Link (`/r/shift/<shiftId>`) is public for now: anyone holding the
+URL can read the Shift Report. Once the supervisors have accounts it will
+ask for sign-in, at the same URL. It may or may not move into the app shell
+then.
+
+**Why deferred:** the people the report goes to don't have accounts yet.
 
 ## Resolved by the migration
 

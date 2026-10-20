@@ -138,6 +138,11 @@ Location.
 An item that records an Asset's meter value, feeding that Asset's
 maintenance rules.
 
+**End Shift Item**:
+An item that lets a guard finish their Shift from inside a checklist —
+starting their Clock Out checklist when their Role has one, otherwise going
+straight to the review and hand-in.
+
 ## Audits
 
 **Audit**:
@@ -255,10 +260,20 @@ A timestamped addition to an Incident after its original content has
 locked. The original record is never altered.
 _Avoid_: edit, revision, incident comment
 
+**Incident Update**:
+A permanent record of a change to an Incident's status or assignee. With its
+Addenda, it makes up the Incident's timeline.
+
 **Ticket**:
 A unit of maintenance work, with a priority and an optional link back to
 the Incident that spawned it.
 _Avoid_: work order, job, task
+
+**Ticket Update**:
+A permanent record of one event in a Ticket's life — created, a change of
+status, priority, or assignee, or a comment. Never edited or deleted; the
+Ticket's history, independent of the Activity Log.
+_Avoid_: ticket comment, ticket log
 
 **Attachment Target**:
 The single Location, Checkpoint, Boat, Vehicle, Contact, or Asset that a
@@ -340,8 +355,21 @@ A period of active duty for one guard, started and ended from the
 dashboard. Other records associate with it by timestamp, not by link.
 
 **Shift Report**:
-The end-of-shift summary compiled when a Shift ends, delivered to a
-marina-configured distribution list.
+The record of one guard's Shift, read by their supervisor. Its body is fixed
+when the Shift ends, like a paper report handed in; later changes to the
+Incidents and Tickets it names appear beneath them as updates, never folded
+into the body. Only that guard's own activity.
+_Avoid_: end-of-shift summary, shift log
+
+**Report Link**:
+The one permanent public URL to a Shift Report. Not a Share Link: there is
+one per report, not per recipient, and it neither expires nor counts views.
+_Avoid_: share link, public link
+
+**End of Shift Note**:
+The guard's own free-text note to their supervisor, written while reviewing
+the Shift Report just before handing it in, and part of its fixed body.
+_Avoid_: handover note, shift notes
 
 **Activity Log**:
 The immutable, chronological record of changes, generated as a byproduct of
