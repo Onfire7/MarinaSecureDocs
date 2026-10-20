@@ -1,7 +1,7 @@
 // PROTOTYPE — throwaway. Variant D, the owner's combination (2026-10-20):
 // incidents and tickets keep A's text layout - one column, the record as
 // handed in, then the updates beneath it - dressed in B's styling: the
-// "As handed in" kicker, and the updates on a filled "Since hand-in" band
+// "As handed in" kicker, and the updates on a filled "Since End of Shift" band
 // that leads with the current state. Record by Location is C's board, with
 // each card stating the first and last time anything was recorded there.
 import { describeUpdate, fmtStamp, fmtTime, type Incident, type RecordItem, type ShiftReport, type Ticket, type Update } from "./fixture";
@@ -13,7 +13,7 @@ function Since({ handedIn, updates }: { handedIn: string; updates: Update[] }) {
   return (
     <div className="psd-since">
       <div className="report-kicker">
-        Since hand-in{updates.length > 0 ? ` · ${updates.length} update${updates.length === 1 ? "" : "s"}` : ""}
+        Since End of Shift{updates.length > 0 ? ` · ${updates.length} update${updates.length === 1 ? "" : "s"}` : ""}
       </div>
       {updates.length === 0 ? (
         <div className="muted">No changes. Still {handedIn}.</div>
@@ -46,7 +46,7 @@ function IncidentD({ i }: { i: Incident }) {
   return (
     <article className="psd-doc">
       <div className="psd-orig">
-        <div className="report-kicker">As handed in · {i.status}</div>
+        <div className="report-kicker">At End of Shift · {i.status}</div>
         <strong>{i.title}</strong>
         <div className="muted small">
           {i.type} · {i.location} · {fmtTime(i.at)}
@@ -66,7 +66,7 @@ function TicketD({ t }: { t: Ticket }) {
     <article className="psd-doc">
       <div className="psd-orig">
         <div className="report-kicker">
-          As handed in · {t.status} · {t.priority} · {t.assignee ?? "unassigned"}
+          At End of Shift · {t.status} · {t.priority} · {t.assignee ?? "unassigned"}
         </div>
         <strong>{t.title}</strong>
         <div className="muted small">

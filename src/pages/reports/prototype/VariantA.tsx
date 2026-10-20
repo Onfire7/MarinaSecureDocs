@@ -10,10 +10,10 @@ import { Photos } from "./shared";
 const GLYPH = { ok: "✓", missed: "✗", exception: "!" } as const;
 
 function Thread({ updates }: { updates: Update[] }) {
-  if (updates.length === 0) return <div className="psa-rule muted small">No updates since hand-in</div>;
+  if (updates.length === 0) return <div className="psa-rule muted small">No updates since End of Shift</div>;
   return (
     <>
-      <div className="psa-rule">Since hand-in · {updates.length} update{updates.length === 1 ? "" : "s"}</div>
+      <div className="psa-rule">Since End of Shift · {updates.length} update{updates.length === 1 ? "" : "s"}</div>
       <ol className="psa-thread">
         {updates.map((u, i) => (
           <li key={i}>
@@ -37,7 +37,7 @@ function IncidentA({ i }: { i: Incident }) {
       <div className="psa-doc-head">
         <strong>{i.title}</strong>
         <span className="muted small">
-          {i.type} · {i.location} · {fmtTime(i.at)} · {i.status} at hand-in
+          {i.type} · {i.location} · {fmtTime(i.at)} · {i.status} at End of Shift
         </span>
       </div>
       {i.details.map((p, k) => (
@@ -55,7 +55,7 @@ function TicketA({ t }: { t: Ticket }) {
       <div className="psa-doc-head">
         <strong>{t.title}</strong>
         <span className="muted small">
-          {t.priority} · {t.location} · {fmtTime(t.at)} · from {t.from} · {t.status} at hand-in
+          {t.priority} · {t.location} · {fmtTime(t.at)} · from {t.from} · {t.status} at End of Shift
           {t.assignee ? `, ${t.assignee}` : ", unassigned"}
         </span>
       </div>
@@ -129,7 +129,7 @@ export const VariantA = {
     return (
       <>
         <div className="ps-record-head">
-          <h2>Record by Location</h2>
+          <h2>Locations</h2>
           <label className="small">
             <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} /> Show all items
           </label>

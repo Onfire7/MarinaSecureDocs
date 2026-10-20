@@ -16,7 +16,7 @@ export function Letterhead({ r }: { r: ShiftReport }) {
       </div>
       <div className="report-letterhead-right muted small">
         <div>Ended by {r.endedBy}</div>
-        <div>Handed in {fmtStamp(r.endedAt)}</div>
+        <div>End of Shift {fmtStamp(r.endedAt)}</div>
       </div>
     </div>
   );

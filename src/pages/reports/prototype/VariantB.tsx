@@ -12,7 +12,7 @@ function Since({ handedIn, updates }: { handedIn: string; updates: Update[] }) {
   const last = [...updates].reverse().find((u) => u.kind === "status");
   return (
     <div className="psb-since">
-      <div className="report-kicker">Since hand-in</div>
+      <div className="report-kicker">Since End of Shift</div>
       {updates.length === 0 ? (
         <div className="muted">No changes. Still {handedIn}.</div>
       ) : (
@@ -51,7 +51,7 @@ export const VariantB = {
       {r.incidents.map((i) => (
         <div key={i.id} className="psb-pair">
           <div className="psb-orig">
-            <div className="report-kicker">As handed in · {i.status}</div>
+            <div className="report-kicker">At End of Shift · {i.status}</div>
             <strong>{i.title}</strong>
             <div className="muted small">
               {i.type} · {i.location} · {fmtTime(i.at)}
@@ -73,7 +73,7 @@ export const VariantB = {
         <div key={t.id} className="psb-pair">
           <div className="psb-orig">
             <div className="report-kicker">
-              As handed in · {t.status} · {t.priority}
+              At End of Shift · {t.status} · {t.priority}
             </div>
             <strong>{t.title}</strong>
             <div className="muted small">
@@ -102,7 +102,7 @@ export const VariantB = {
     return (
       <>
         <div className="ps-record-head">
-          <h2>Record by Location</h2>
+          <h2>Locations</h2>
           <div className="report-tabs">
             <button type="button" className={`report-tab ${!all ? "on" : ""}`} onClick={() => setAll(false)}>
               Exceptions ({total - groups.reduce((n, g) => n + g.items.filter((i) => i.mark === "ok").length, 0)})

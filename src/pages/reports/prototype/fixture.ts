@@ -127,7 +127,7 @@ export const report: ShiftReport = {
     { tone: "bad", where: "B Dock", at: T("00:18"), text: "Verify Task rejected: “Dock lights replaced”. B-14 and B-16 still out. Ticket raised." },
     { tone: "warn", where: "Fuel Dock", at: T("00:40"), text: "Manual check-in: “Tag cracked, won't scan.”" },
     { tone: "warn", where: "Campgrounds › Campground Loop", at: T("02:15"), text: "Check-in 68 m from the checkpoint (allowed 30 m)." },
-    { tone: "bad", where: "Fuel Dock", text: "Morning Fuel Dock Prep unfinished at hand-in: 3 of 6, due 6:00 AM. Spill kit and ice machine not done." },
+    { tone: "bad", where: "Fuel Dock", text: "Morning Fuel Dock Prep unfinished at End of Shift: 3 of 6, due 6:00 AM. Spill kit and ice machine not done." },
     { tone: "warn", where: "Campgrounds", at: T("23:55", 19), text: "Incident logged: loud music at site 14, resolved on the spot." },
   ],
   incidents: [
@@ -222,9 +222,9 @@ export const report: ShiftReport = {
         { id: "f5", kind: "simple", label: "Unlock pumps", source: "Morning Fuel Dock Prep", time: T("05:38"), mark: "ok" },
         { id: "f6", kind: "simple", label: "Hoses coiled, nozzles holstered", source: "Morning Fuel Dock Prep", time: T("05:40"), mark: "ok" },
         { id: "f7", kind: "simple", label: "Price board set", source: "Morning Fuel Dock Prep", time: T("05:42"), mark: "ok" },
-        { id: "f8", kind: "simple", label: "Spill kit present and sealed", source: "Morning Fuel Dock Prep", mark: "missed", why: "Not done at hand-in" },
-        { id: "f9", kind: "simple", label: "Ice machine filled", source: "Morning Fuel Dock Prep", mark: "missed", why: "Not done at hand-in" },
-        { id: "f10", kind: "simple", label: "Fire extinguisher tag current", source: "Morning Fuel Dock Prep", mark: "missed", why: "Not done at hand-in" },
+        { id: "f8", kind: "simple", label: "Spill kit present and sealed", source: "Morning Fuel Dock Prep", mark: "missed", why: "Not done at End of Shift" },
+        { id: "f9", kind: "simple", label: "Ice machine filled", source: "Morning Fuel Dock Prep", mark: "missed", why: "Not done at End of Shift" },
+        { id: "f10", kind: "simple", label: "Fire extinguisher tag current", source: "Morning Fuel Dock Prep", mark: "missed", why: "Not done at End of Shift" },
       ],
     },
     {

@@ -2,7 +2,7 @@
 // grid, its edge coloured by the worst thing in it and its header a strip of
 // counts (check-ins visited of expected, exceptions, misses). Problems show
 // open; the routine rest is behind the card's own "show n more". Incidents
-// and tickets lead with a one-line "Updated since hand-in: now Resolved"
+// and tickets lead with a one-line "Updated since End of Shift: now Resolved"
 // callout; the full timeline opens beneath it.
 import { useState } from "react";
 import { describeUpdate, fmtStamp, fmtTime, itemResult, type RecordItem, type ShiftReport, type Update } from "./fixture";
@@ -16,7 +16,7 @@ function Callout({ handedIn, updates }: { handedIn: string; updates: Update[] })
     <div className="psc-callout">
       <button type="button" className="psc-callout-head" onClick={() => setOpen(!open)}>
         <span>
-          <strong>Updated since hand-in</strong>
+          <strong>Updated since End of Shift</strong>
           {last ? ` · now ${last.to} (was ${handedIn})` : ""} · {updates.length} update{updates.length === 1 ? "" : "s"}, latest{" "}
           {fmtStamp(updates[updates.length - 1].at)}
         </span>
@@ -108,7 +108,7 @@ export const VariantC = {
           <article key={i.id} className="card">
             <div className="spread">
               <strong>{i.title}</strong>
-              <span className="badge">{i.status} at hand-in</span>
+              <span className="badge">{i.status} at End of Shift</span>
             </div>
             <div className="muted small">
               {i.type} · {i.location} · {fmtTime(i.at)}
@@ -132,7 +132,7 @@ export const VariantC = {
             <div className="spread">
               <strong>{t.title}</strong>
               <span className="badge">
-                {t.priority} · {t.status} at hand-in
+                {t.priority} · {t.status} at End of Shift
               </span>
             </div>
             <div className="muted small">
@@ -150,7 +150,7 @@ export const VariantC = {
     let parent = "";
     return (
       <>
-        <h2>Record by Location</h2>
+        <h2>Locations</h2>
         <div className="psc-board">
           {r.locations.map((l) => {
             if (l.depth === 0) parent = l.name;
