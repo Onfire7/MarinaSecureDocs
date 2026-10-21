@@ -1,31 +1,37 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { useTranslation } from "react-i18next";
-import { dateTime } from "../../i18n";
-import { shiftWindowMs } from "../../lib/shiftReport";
-import { endShift } from "../../data/shifts";
-import { useEndOfShift, useOpenShiftChecklists } from "../../data/endOfShift";
-import { useHeldVehicles } from "../../data/fleet";
+import { useCurrent } from "../../lib/auth/CurrentUserContext";
+import { compileShiftReport } from "../../lib/shiftReportDoc";
+import type { ShiftReportDoc } from "../../lib/shiftReportDoc";
 import { vehiclesToSettle } from "../../lib/endOfShift";
-import { VehicleUseSection } from "../reports/VehicleUseSection";
+import { useEndOfShift } from "../../data/endOfShift";
+import { useHeldVehicles } from "../../data/fleet";
+import { endShiftWithReport, useShiftReportInputs } from "../../data/shiftReportData";
+import { ShiftReportView } from "../reports/ShiftReportView";
+import { ShiftReportEmailDialog } from "../reports/ShiftReportEmailDialog";
 import { BeforeYouGo } from "./BeforeYouGo";
 
-// The End of Shift review, /shift/end (ActiveChecklistPage.spec.md § Ending
-// the shift). The only place a shift ends. Until the Shift Report is built it
-// is a plain confirmation: the shift, any of its checklists still open, and
-// End Shift and Submit. The report will take this page's place, with the same
-// button at its end.
+// The End of Shift review, /shift/end (ShiftReportPage.spec.md § The End of
+// Shift review; ActiveChecklistPage.spec.md § Ending the shift). The report
+// itself, compiled live, with the End of Shift Note to write and End Shift
+// and Submit at its end: the only place a shift ends. Then the email dialog.
 export function EndOfShiftPage() {
   const current = useCurrent();
   const navigate = useNavigate();
+  const { t } = useTranslation("home");
   const userId = current.user?.id;
   const { shift } = useEndOfShift(userId);
-  const open = useOpenShiftChecklists(userId, shift?.started_at);
   const { data: held } = useHeldVehicles(userId);
+  const [note, setNote] = useState("");
   const [ending, setEnding] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { t } = useTranslation("home");
+  const [submitted, setSubmitted] = useState<ShiftReportDoc | null>(null);
+  const inputs = useShiftReportInputs(shift, note);
+
+  if (submitted) {
+    return <ShiftReportEmailDialog doc={submitted} onClose={() => navigate("/")} />;
+  }
 
   if (!shift) {
     return (
@@ -40,72 +46,65 @@ export function EndOfShiftPage() {
   const unsettled = vehiclesToSettle(shift.started_at, held)[0];
   if (unsettled) return <BeforeYouGo key={unsettled.checkoutId} checkoutId={unsettled.checkoutId} />;
 
+  if (!inputs) {
+    return (
+      <div className="placeholder">
+        <div className="big">{t("endOfShift.loading")}</div>
+      </div>
+    );
+  }
+  const doc = compileShiftReport(inputs);
+
   const submit = async () => {
     if (!current.user) return;
     setEnding(true);
     setError(null);
     try {
-      await endShift(shift.id, { id: current.user.id, name: current.user.name });
-      navigate("/");
+      const stored = await endShiftWithReport(shift, doc, { id: current.user.id, name: current.user.name });
+      setSubmitted(stored);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("endOfShift.couldntEnd"));
       setEnding(false);
     }
   };
 
-  const span = shiftWindowMs(shift);
-  const minutes = Math.max(0, Math.round((span.end - span.start) / 60_000));
-  const started = dateTime(shift.started_at, { weekday: "short", hour: "numeric", minute: "2-digit" });
-
   return (
-    <div style={{ maxWidth: 640 }}>
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">{t("endOfShift.title")}</h1>
-          <div className="page-sub">
-            {minutes >= 60
-              ? t("endOfShift.startedHours", { time: started, hours: Math.floor(minutes / 60), minutes: minutes % 60 })
-              : t("endOfShift.startedMinutes", { time: started, minutes })}
+    <div className="report-page">
+      <ShiftReportView
+        doc={doc}
+        since={null}
+        inApp
+        banner={
+          <div className="badge badge-warn" style={{ display: "block", marginBottom: 12 }} data-testid="report-banner">
+            {t("endOfShift.reviewBanner")}
           </div>
-        </div>
-      </div>
-
-      {open.length > 0 && (
-        <div className="card" data-testid="end-of-shift-open" style={{ marginBottom: 14 }}>
-          <div className="card-title">
-            {t("endOfShift.openChecklists", { count: open.length })}
+        }
+        afterHeader={
+          <div className="field" style={{ maxWidth: 900 }}>
+            <label className="field-label" htmlFor="end-of-shift-note">
+              {t("endOfShift.noteLabel")}
+            </label>
+            <textarea
+              id="end-of-shift-note"
+              className="textarea"
+              rows={4}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={t("endOfShift.notePlaceholder")}
+            />
           </div>
-          <div className="card-meta" style={{ marginBottom: 8 }}>
-            {t("endOfShift.openWarning", { count: open.length })}
-          </div>
-          <div className="stack" style={{ gap: 6 }}>
-            {open.map((c) => (
-              <Link key={c.id} to={`/checklists/${c.id}`}>
-                {c.name}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div style={{ marginBottom: 14 }}>
-        <VehicleUseSection shift={shift} />
-      </div>
-
+        }
+      />
       {error && (
-        <div className="badge badge-bad" style={{ display: "block", marginBottom: 12 }}>
+        <div className="badge badge-bad" style={{ display: "block", margin: "0 20px 12px" }}>
           {error}
         </div>
       )}
-
-      <button
-        type="button"
-        className="btn btn-primary"
-        disabled={ending}
-        onClick={() => void submit()}
-      >
-        {ending ? t("endOfShift.ending") : t("endOfShift.endShiftAndSubmit")}
-      </button>
+      <div className="row report-noprint" style={{ padding: "0 20px 40px" }}>
+        <button type="button" className="btn btn-primary" disabled={ending} onClick={() => void submit()}>
+          {ending ? t("endOfShift.ending") : t("endOfShift.endShiftAndSubmit")}
+        </button>
+      </div>
     </div>
   );
 }

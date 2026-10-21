@@ -1,214 +1,69 @@
 import { useState } from "react";
-import type { ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { statusLabel } from "../../lib/locations";
-import { formatDuration, shiftWindowMs, withinWindow } from "../../lib/shiftReport";
+import { compileShiftReport, updatesSince } from "../../lib/shiftReportDoc";
 import { useShift } from "../../data/shifts";
-import { useCheckInsInWindow } from "../../data/checkins";
-import { useInstances } from "../../data/checklists";
-import { useIncidents } from "../../data/incidents";
-import { useTickets } from "../../data/tickets";
-import { VehicleUseSection } from "./VehicleUseSection";
+import { useShiftReportInputs, useShiftReportSnapshot, useUpdatesSince } from "../../data/shiftReportData";
+import { ShiftReportView } from "./ShiftReportView";
+import { ShiftReportEmailDialog } from "./ShiftReportEmailDialog";
 
-// Reports — Shift Report (see ShiftReportPage.spec.md).
-// Content is compiled live from current data every time it's viewed, so it
-// can legitimately show more than the original email contained — a resend
-// captures this current state, not the original snapshot.
+// Reports — Shift Report, in the app (see ShiftReportPage.spec.md § The
+// in-app page). The snapshot once the shift has ended; compiled live from the
+// device, with a banner, before. Email report opens the dialog; nothing
+// here calls a send function.
 export function ShiftReportPage() {
   const { id: shiftId } = useParams();
   const current = useCurrent();
-  const [sending, setSending] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
+  const { t } = useTranslation("reports");
+  const [emailing, setEmailing] = useState(false);
 
   const { shift } = useShift(shiftId);
-
-  // Association is by timestamp, not reference — and scoped to this guard where
-  // the record carries a person. The window runs to "now" for an open shift, so
-  // viewing mid-shift shows progress so far.
-  const bounds = shift
-    ? shiftWindowMs(shift)
-    : { start: 0, end: 0 };
-  const { data: checkIns } = useCheckInsInWindow(
-    shift?.guard_id,
-    new Date(bounds.start).toISOString(),
-    new Date(bounds.end).toISOString(),
-  );
-  const { data: allChecklists } = useInstances();
-  const { data: allIncidents } = useIncidents();
-  const { data: allTickets } = useTickets();
+  const snapshot = useShiftReportSnapshot(shiftId);
+  // The inputs are read whatever the state: hooks run every render, and a
+  // supervisor's device holds the guard's rows within their sync windows.
+  const inputs = useShiftReportInputs(snapshot ? null : shift);
+  const since = useUpdatesSince(shift?.ended_at);
 
   if (!shift) {
     return (
       <div className="placeholder">
-        <div className="big">Loading…</div>
+        <div className="big">{t("report.loading")}</div>
+      </div>
+    );
+  }
+  const isOwnShift = shift.guard_id === current.user?.id;
+  if (!isOwnShift && !current.can("view_reports")) {
+    return (
+      <div className="placeholder">
+        <div className="big">{t("report.nothingToSee")}</div>
       </div>
     );
   }
 
-  const window = shiftWindowMs(shift);
-  const isOwnShift = shift.guard_id === current.user?.id;
-  const canResend = isOwnShift || current.can("view_reports");
-
-  const guardId = shift.guard_id;
-  const checklists = allChecklists.filter(
-    (c) =>
-      withinWindow(c.completed_at ?? c.started_at, window) &&
-      (!c.assigned_to_id || c.assigned_to_id === guardId),
-  );
-  const incidents = allIncidents.filter((i) => withinWindow(i.created_at, window));
-  const tickets = allTickets.filter((t) => withinWindow(t.created_at, window));
-
-  const resend = async () => {
-    setSending(true);
-    setSendError(null);
-    try {
-      // The send path is a Netlify Function that compiles fresh and hands off
-      // to the Twilio Function for SendGrid delivery. Until that layer is
-      // deployed this returns 404 — surfaced rather than silently swallowed.
-      const res = await fetch(`/api/reports/shift/${shift.id}/send`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error(`Send failed (${res.status})`);
-    } catch (err) {
-      setSendError(
-        err instanceof Error
-          ? `${err.message} — the shift-report function isn't deployed yet.`
-          : "Send failed.",
-      );
-    } finally {
-      setSending(false);
-    }
-  };
-
-  return (
-    <div>
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">
-            Shift report — {shift.guard_name ?? "Unassigned"}
-          </h1>
-          <div className="page-sub">
-            {new Date(shift.started_at).toLocaleString()} ·{" "}
-            {shift.ended_at ? formatDuration(window) : "in progress"}
-          </div>
-        </div>
-        <div className="row">
-          <span className={shift.report_sent_at ? "badge badge-good" : "badge badge-warn"}>
-            {shift.report_sent_at
-              ? `Sent ${new Date(shift.report_sent_at).toLocaleString()}`
-              : "Not sent yet"}
-          </span>
-          {canResend && (
-            <button
-              type="button"
-              className="btn btn-sm"
-              disabled={sending || !navigator.onLine}
-              title={
-                navigator.onLine
-                  ? "Recompiles from current data and emails the distribution list"
-                  : "Sending requires connectivity"
-              }
-              onClick={() => void resend()}
-            >
-              {sending ? "Sending…" : "Resend"}
-            </button>
-          )}
-        </div>
+  const doc = snapshot ?? (inputs ? compileShiftReport(inputs) : null);
+  if (!doc) {
+    return (
+      <div className="placeholder">
+        <div className="big">{t("report.loading")}</div>
       </div>
-
-      {sendError && (
-        <div className="badge badge-bad" style={{ display: "block", marginBottom: 12 }}>
-          {sendError}
-        </div>
-      )}
-
-      <div className="grid-2">
-        <div className="stack">
-          <Section title={`Check-ins (${checkIns.length})`}>
-            {checkIns.map((c) => (
-              <div key={c.id} className="card spread">
-                <span>
-                  {/* A check-in outlives the checkpoint it was made at —
-                      check_ins.checkpoint_id is ON DELETE SET NULL — so a
-                      missing name means retired, not broken. */}
-                  {c.checkpoint_name ?? "Removed checkpoint"}
-                </span>
-                <span className="muted small">
-                  {c.method === "manual" ? "Manual" : "Scanned"}
-                  {c.within_radius === 0 && " · outside radius"} ·{" "}
-                  {new Date(c.timestamp).toLocaleTimeString(undefined, {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
-                </span>
-              </div>
-            ))}
-          </Section>
-
-          <Section title={`Checklists (${checklists.length})`}>
-            {checklists.map((c) => (
-              <Link
-                key={c.id}
-                to={`/checklists/${c.id}`}
-                className="card spread"
-                style={{ textDecoration: "none", color: "inherit" }}
-              >
-                <span>{c.template_name ?? "Checklist"}</span>
-                <span className="badge">{statusLabel(c.status)}</span>
-              </Link>
-            ))}
-          </Section>
-
-          <VehicleUseSection shift={shift} />
-        </div>
-
-        <div className="stack">
-          {current.can("view_incidents") && (
-            <Section title={`Incidents (${incidents.length})`}>
-              {incidents.map((i) => (
-                <Link
-                  key={i.id}
-                  id={`incident-${i.id}`}
-                  to={`/incidents/${i.id}`}
-                  className="card spread"
-                  style={{ textDecoration: "none", color: "inherit" }}
-                >
-                  <span>{i.title}</span>
-                  <span className="badge">{i.status_name}</span>
-                </Link>
-              ))}
-            </Section>
-          )}
-
-          <Section title={`Tickets raised (${tickets.length})`}>
-            {tickets.map((t) => (
-              <Link
-                key={t.id}
-                id={`ticket-${t.id}`}
-                to={`/tickets/${t.id}`}
-                className="card spread"
-                style={{ textDecoration: "none", color: "inherit" }}
-              >
-                <span>{t.title}</span>
-                <span className="badge">{statusLabel(t.priority)}</span>
-              </Link>
-            ))}
-          </Section>
-        </div>
-      </div>
+    );
+  }
+  const banner = snapshot ? null : (
+    <div className="badge badge-warn" style={{ display: "block", marginBottom: 12 }} data-testid="report-banner">
+      {shift.ended_at ? t("report.noReport") : t("report.notEnded")}
     </div>
   );
-}
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  const empty = Array.isArray(children) && children.length === 0;
   return (
-    <div>
-      <div className="section-title">{title}</div>
-      <div className="stack" style={{ gap: 6 }}>
-        {empty ? <span className="muted small">None during this shift.</span> : children}
+    <div className="report-page">
+      <div className="row report-noprint" style={{ justifyContent: "flex-end", padding: "8px 20px 0" }}>
+        <button type="button" className="btn btn-sm btn-primary" onClick={() => setEmailing(true)}>
+          {t("report.emailReport")}
+        </button>
       </div>
+      <ShiftReportView doc={doc} since={snapshot ? updatesSince(doc, shift.ended_at, since) : null} inApp banner={banner} />
+      {emailing && <ShiftReportEmailDialog doc={doc} onClose={() => setEmailing(false)} />}
     </div>
   );
 }

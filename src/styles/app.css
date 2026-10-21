@@ -2598,3 +2598,45 @@ h3 {
 .map-anchor {
   z-index: 1;
 }
+
+/* ---------- Shift report (ShiftReportPage) ----------
+   Variant D of prototype/shift-report. Tokens only; the public page and the
+   in-app page share these with the audit report's .report-* rules above. */
+.ps-eos { margin: 0; padding: 12px 16px; border-left: 4px solid var(--accent); background: var(--panel); border-radius: 0 var(--radius) var(--radius) 0; font-size: 1.02rem; line-height: 1.55; max-width: 900px; white-space: pre-wrap; }
+.ps-checklists { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.ps-chip { font-size: 0.82rem; padding: 3px 9px; border-radius: 999px; background: var(--good-bg); color: var(--good); }
+.ps-chip-bad { background: var(--bad-bg); color: var(--bad); font-weight: 650; }
+.report ul.ps-attn { list-style: none; padding: 0; max-width: 1000px; }
+.ps-attn li { display: grid; grid-template-columns: 220px 1fr auto; gap: 12px; padding: 7px 10px; border-left: 3px solid; background: var(--panel); margin-bottom: 4px; border-radius: 0 6px 6px 0; }
+.ps-attn-bad { border-color: var(--bad) !important; }
+.ps-attn-warn { border-color: var(--warn) !important; }
+.ps-attn-where { font-weight: 650; }
+@media (max-width: 700px) { .ps-attn li { grid-template-columns: 1fr; gap: 2px; } }
+.report ul.ps-notes { list-style: none; padding: 0; }
+.ps-notes li { margin-bottom: 8px; }
+.ps-photos { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.ps-photos img { width: 150px; height: 100px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+.psd-doc { border: 1px solid var(--line-lt); border-radius: var(--radius); background: var(--panel); margin-bottom: 12px; overflow: hidden; max-width: 1000px; }
+.psd-orig { padding: 12px 16px; }
+.psd-orig p { line-height: 1.5; margin: 8px 0; }
+.psd-since { padding: 10px 16px 12px; background: var(--fill); border-top: 1px solid var(--line-lt); }
+.psb-now { font-size: 1.05rem; margin: 4px 0 8px; }
+.report ol.psd-thread { list-style: none; padding: 0; margin: 0; }
+.psd-thread li { padding: 6px 0; border-top: 1px solid var(--line-lt); margin: 0; }
+.psc-board { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); align-items: start; }
+.psc-card { background: var(--panel); border: 1px solid var(--line-lt); border-top: 4px solid var(--good); border-radius: var(--radius); padding: 10px 12px; }
+.psc-card.psc-exception { border-top-color: var(--warn); }
+.psc-card.psc-missed { border-top-color: var(--bad); }
+.psc-card-head { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.psc-counts { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; color: var(--mute); }
+.psc-bad { color: var(--bad); font-weight: 650; }
+.psc-warn { color: var(--warn); font-weight: 650; }
+.psc-good { color: var(--good); }
+.report ul.psc-items { list-style: none; padding: 0; margin: 8px 0 0; }
+.psc-items li { display: flex; justify-content: space-between; gap: 8px; padding: 5px 0; border-top: 1px solid var(--line-lt); margin: 0; }
+.psc-item-missed { color: var(--bad); }
+.psc-item-missed .psc-result, .psc-item-exception .psc-result { color: var(--bad); font-weight: 650; }
+.psc-result { text-align: right; font-size: 0.9rem; max-width: 45%; }
+.psc-more { margin-top: 8px; }
+.ps-vehicles { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); max-width: 1000px; }
+.ps-vehicle .small { margin-top: 3px; }

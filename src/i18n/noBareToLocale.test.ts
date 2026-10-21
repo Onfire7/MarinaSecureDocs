@@ -37,7 +37,6 @@ const BASELINE: Record<string, number> = {
   "src/pages/locations/CheckpointDetailPage.tsx": 1,
   "src/pages/locations/LocationDetailPage.tsx": 3,
   "src/pages/reports/ReportsHomePage.tsx": 2,
-  "src/pages/reports/ShiftReportPage.tsx": 3,
   "src/pages/reservations/NewReservationPage.tsx": 2,
   "src/pages/reservations/ReservationDetailPage.tsx": 8,
   "src/pages/reservations/ReservationListPage.tsx": 4,

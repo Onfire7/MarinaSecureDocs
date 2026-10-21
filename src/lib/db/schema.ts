@@ -1330,6 +1330,20 @@ const services = new Table(
   },
 );
 
+const shift_report_snapshots = new Table(
+  {
+    shift_id: column.text,
+    document: column.text,
+    created_at: column.text,
+    is_recent: column.integer,
+  },
+  {
+    indexes: {
+      by_shift_id: ["shift_id"],
+    },
+  },
+);
+
 const shifts = new Table(
   {
     guard_id: column.text,
@@ -1683,6 +1697,7 @@ export const AppSchema = new Schema({
   service_location_types,
   service_meter_readings,
   services,
+  shift_report_snapshots,
   shifts,
   sms_messages,
   sms_templates,
@@ -1783,6 +1798,7 @@ export const TABLE_NAMES = [
   "service_location_types",
   "service_meter_readings",
   "services",
+  "shift_report_snapshots",
   "shifts",
   "sms_messages",
   "sms_templates",
@@ -1824,5 +1840,6 @@ export const STRUCTURED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   marina_settings: ["shift_report_recipients"],
   phone_lines: ["routing"],
   roles: ["allow", "deny"],
+  shift_report_snapshots: ["document"],
   users: ["dashboard_layout"],
 };

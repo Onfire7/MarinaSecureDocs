@@ -186,6 +186,7 @@ streams:
       - SELECT * FROM checklist_instance_sections WHERE is_recent = true
       - SELECT * FROM checklist_instance_items WHERE is_recent = true
       - SELECT * FROM shifts WHERE is_recent = true
+      - SELECT * FROM shift_report_snapshots WHERE is_recent = true
       - SELECT * FROM service_meter_readings WHERE is_recent = true
 
   incidents:

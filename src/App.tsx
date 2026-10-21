@@ -5,6 +5,7 @@ import { ErrorBoundary } from "./layout/ErrorBoundary";
 import { Splash } from "./layout/Splash";
 import { ConfigMissingPage } from "./pages/shared/ConfigMissingPage";
 import { SharedAuditReportPage } from "./pages/audits/SharedAuditReportPage";
+import { SharedShiftReportPage } from "./pages/reports/SharedShiftReportPage";
 
 // The signed-in app is a separate chunk. A Share Link's page (/r/<key>) is
 // public - no Clerk, no PowerSync, no shell - and is routed here before
@@ -30,6 +31,7 @@ export default function App() {
       <BrowserRouter>
         <ErrorBoundary>
           <Routes>
+            <Route path="/r/shift/:id" element={<SharedShiftReportPage />} />
             <Route path="/r/:key" element={<SharedAuditReportPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

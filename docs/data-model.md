@@ -714,7 +714,7 @@ Shift Checklist, linked when it is created; submitting it no longer sets
 
 The Shift Report's body as compiled on the guard's device at End of Shift
 (`src/pages/reports/ShiftReportPage.spec.md` § The body is fixed).
-`shift_id` (primary key, cascade), `document jsonb not null`, `created_at`,
+`id`, `shift_id` (unique, cascade), `document jsonb not null`, `created_at`,
 `is_recent` (from the shift). Written once, in the transaction that sets
 `ended_at`; no update or delete policy. Served to the public page by
 `shift_report(p_shift uuid)`, security definer, executable by `anon`, which
