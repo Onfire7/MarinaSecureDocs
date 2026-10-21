@@ -30,7 +30,7 @@ import { loadEnv } from "./env.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const env = loadEnv();
-const APP_URL = env.APP_URL ?? "https://beta.marinasecure.com";
+const APP_URL = env.APP_URL ?? "https://beta2.marinasecure.com";
 const APP_ID = env.VITE_INSTANT_APP_ID;
 const CLERK_CLIENT = env.VITE_INSTANT_CLERK_CLIENT_NAME ?? "clerk";
 const STATE_FILE = env.STATE_FILE ?? "/tmp/pw-test/state.json";

@@ -23,7 +23,7 @@ import { chromium } from "playwright";
 import { loadEnv } from "./env.mjs";
 
 const env = loadEnv();
-const APP_URL = env.APP_URL ?? "https://beta.marinasecure.com";
+const APP_URL = env.APP_URL ?? "https://beta2.marinasecure.com";
 const EMAIL = env.LOGIN_EMAIL ?? "gpp@onfire.us";
 
 if (!env.CLERK_SECRET_KEY) {
