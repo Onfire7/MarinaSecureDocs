@@ -50,14 +50,14 @@
       <tr><td>Sections &amp; items</td><td>ChecklistInstance.sections → items, ordered</td><td>Exactly the materialized rows as assigned — every section that existed, every item, grouped under its section heading. Item label/type/config resolve through the pinned template-item version, so the record renders as it was instantiated even after later template edits.</td></tr>
       <tr><td>Section completion time</td><td>Derived at read</td><td>The latest item <code>completed_at</code>, shown on the heading once every item in the section has one — never stored.</td></tr>
       <tr><td>Per-item completion</td><td>item.completed_at / completed_by</td><td>When each item was done and by whom.</td></tr>
-      <tr><td>Linked tickets</td><td>item.linked_ticket</td><td>Shown inline against the item that raised them, linking to <a href="ticket-detail.html">Ticket detail</a>.</td></tr>
+      <tr><td>Linked tickets</td><td>item.linked_ticket</td><td>Shown inline against the item that raised them, linking to <a href="../../src/pages/tickets/TicketDetailPage.spec.md">Ticket detail</a>.</td></tr>
       <tr><td>Nested Location-Based Checks</td><td>Nested ChecklistInstances (via <code>parent_item</code>)</td><td>Shown expandable under their parent item rather than as separate top-level entries.</td></tr>
     </table>
 
     <h2>Actions</h2>
     <table>
       <tr><th>Action</th><th>Gating</th><th>Behavior</th></tr>
-      <tr><td>Open a linked ticket</td><td><code>view_incidents</code> not required for tickets themselves</td><td>Navigates to <a href="ticket-detail.html">Ticket detail</a>.</td></tr>
+      <tr><td>Open a linked ticket</td><td><code>view_incidents</code> not required for tickets themselves</td><td>Navigates to <a href="../../src/pages/tickets/TicketDetailPage.spec.md">Ticket detail</a>.</td></tr>
       <tr><td>Open the location of a Location-Based Check</td><td>None</td><td>Navigates to <a href="location-detail.html">Location detail</a>.</td></tr>
     </table>
     <p>No edit actions exist on this screen — a completed checklist instance is immutable, consistent with it being an <a href="../architecture.md">Activity Log</a>-eligible historical record.</p>

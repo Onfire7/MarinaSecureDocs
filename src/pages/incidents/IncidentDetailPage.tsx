@@ -17,7 +17,7 @@ import {
 import { useIncidentStatuses } from "../../data/lookups";
 import { useUsers } from "../../data/users";
 
-// Incidents — Incident Detail (see pages/incident-detail.html).
+// Incidents — Incident Detail (see IncidentDetailPage.spec.md).
 // Two distinct edit windows: the original content locks to its author at the
 // end of their shift; the addendum thread never locks for anyone holding
 // create_incidents.

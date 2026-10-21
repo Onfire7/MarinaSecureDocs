@@ -147,7 +147,7 @@ bug removed, not relocated.
 
 | Table | Read gated by | Write gated by |
 |---|---|---|
-| `incidents`, `incident_comments` | `view_incidents` | `create_incidents` |
+| `incidents`, `incident_comments`, `incident_updates` | `view_incidents` | `create_incidents` (`incident_updates`: insert only) |
 | `contacts` | `view_owner` | `edit_owner_contact` |
 | `contact_details` | `view_contact` | `edit_owner_contact` |
 | `leases`, `lease_comments` | `view_lease` | `manage_lease` |

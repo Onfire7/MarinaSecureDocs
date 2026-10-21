@@ -317,6 +317,15 @@ the attachment target.
 
 `incident_id`, `body` (markdown), `created_at`, `author_id`.
 
+#### `incident_updates` — **Tier 1: `view_incidents` / `create_incidents`**, insert-only · sync: **age**
+
+An Incident Update (`src/pages/incidents/IncidentDetailPage.spec.md` § The
+timeline; ADR 0008). `incident_id` (cascade), `kind` (`status` / `assignee`),
+`from_value text`, `to_value text` (names at the time), `created_at`,
+`author_id`, `required_permission` (default `view_incidents`), `is_recent`
+(from the parent, in `refresh_child_sync_scopes()`). No update or delete
+policy: history is written once.
+
 #### `ticket_statuses` — lookup · Tier 0 / `manage_marina_settings` · sync: always
 
 `name`, `is_terminal`, `position`. Labels are admin-adjustable.
@@ -339,6 +348,17 @@ the attachment target.
 
 Ticket creation is deliberately ungated — every role may raise one. There is
 no `create_ticket` permission.
+
+#### `ticket_updates` — Tier 0, insert-only · sync: **age**
+
+A Ticket Update (`src/pages/tickets/TicketDetailPage.spec.md` § Ticket
+Updates; ADR 0008). `ticket_id` (cascade), `kind` (`created` / `status` /
+`priority` / `assignee` / `comment`), `from_value text`, `to_value text`
+(names at the time), `body text` (markdown; `comment` only), `created_at`,
+`author_id`, `is_recent` (from the parent). Insert by any active marina
+user; no update or delete policy. Written only by `src/data/tickets.ts`, in
+the transaction that changes the Ticket; a source-scan test holds every
+other module to that.
 
 ## Assets
 

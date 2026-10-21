@@ -14,7 +14,7 @@ import {
 import { useTicketStatuses } from "../../data/lookups";
 import { useUsers } from "../../data/users";
 
-// Tickets — Ticket Detail (see pages/ticket-detail.html).
+// Tickets — Ticket Detail (see TicketDetailPage.spec.md).
 // Status/priority edits are unrestricted; only assignment is gated. A ticket
 // with a source incident shows no trace of it without view_incidents.
 
