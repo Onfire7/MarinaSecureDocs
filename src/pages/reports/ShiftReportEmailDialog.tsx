@@ -25,8 +25,18 @@ export function ShiftReportEmailDialog({ doc, onClose }: { doc: ShiftReportDoc; 
 
   return (
     <div className="dialog-backdrop" role="presentation" onClick={onClose}>
-      <div className="dialog" role="dialog" aria-modal="true" aria-label={t("dialog.title")} data-testid="email-dialog" onClick={(e) => e.stopPropagation()}>
-        <h2 className="dialog-title">{t("dialog.title")}</h2>
+      <div
+        className="dialog-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("dialog.title")}
+        data-testid="email-dialog"
+        style={{ maxWidth: 640, width: "min(640px, 94vw)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="card-title" style={{ marginBottom: 6 }}>
+          {t("dialog.title")}
+        </div>
         <p className="muted small">{t("dialog.hint")}</p>
 
         <Field label={t("dialog.subject")} value={email.subject} rows={1} canCopy={canCopy} testId="email-subject" />
