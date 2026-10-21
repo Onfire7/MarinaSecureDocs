@@ -12,10 +12,12 @@ import {
   type Role,
   type UserWithRoles,
 } from "../../data/users";
+import { createContact, useContacts } from "../../data/contacts";
+import { SearchPicker } from "../shared/SearchPicker";
 import { AdminGate } from "./AdminGate";
 import { AdminHeader } from "./AdminHomePage";
 
-// Admin — Users (see docs/pages/admin-users.html).
+// Admin — Users (AdminUsersPage.spec.md).
 // The only way users enter the system — there's no self-serve signup.
 export function AdminUsersPage() {
   return (
@@ -197,21 +199,42 @@ function EditUser({
   });
   const [roleIds, setRoleIds] = useState(splitIds(user.role_ids));
 
+  // The Contact (AdminUsersPage.spec.md § The Contact). Contacts reach this
+  // device only with view_owner, and writing one takes edit_owner_contact.
+  const canSeeContacts = current.can("view_owner");
+  const canCreateContact = current.can("edit_owner_contact");
+  const { data: contacts } = useContacts();
+  const contactOptions = useMemo(
+    () =>
+      contacts
+        .filter((c) => !c.merged_into_id && c.name)
+        .map((c) => ({
+          id: c.id,
+          name: c.name!,
+          hint: [c.email, c.phone].filter(Boolean).join(" · ") || undefined,
+        })),
+    [contacts],
+  );
+  const [contactId, setContactId] = useState<string | null>(user.contact_id);
+  const [createContactOnSave, setCreateContactOnSave] = useState(false);
+  const contactHeld = contactOptions.some((c) => c.id === contactId);
+
   // Saving no longer writes anything about what this user MAY DO. Their
   // effective permissions are recomputed by a database trigger off the role
   // links — there is no permission cache on the user row for a client to get
   // wrong, which is how ADR 0002's escalation vector closes.
   const save = async () => {
-    await saveUser(
-      user.id,
-      {
-        name: form.name.trim(),
-        email: form.email.trim() || null,
-        phone: form.phone.trim() || null,
-        roleIds,
-      },
-      current.user?.id ?? null,
-    );
+    const actorId = current.user?.id ?? null;
+    const input = {
+      name: form.name.trim(),
+      email: form.email.trim() || null,
+      phone: form.phone.trim() || null,
+    };
+    // Undefined leaves the link as it is; see saveUser().
+    let link: string | null | undefined =
+      contactId === user.contact_id ? undefined : contactId;
+    if (createContactOnSave) link = await createContact(input, actorId);
+    await saveUser(user.id, { ...input, contactId: link, roleIds }, actorId);
     onDone();
   };
 
@@ -258,6 +281,61 @@ function EditUser({
           ))}
           {allRoles.length === 0 && (
             <span className="muted small">No roles defined yet.</span>
+          )}
+        </div>
+      </div>
+      <div className="field" data-testid="user-contact">
+        <span className="field-label">Contact — who this user is on a checkout</span>
+        {canSeeContacts && (
+          <SearchPicker
+            options={contactOptions}
+            value={createContactOnSave ? "" : (contactId ?? "")}
+            onChange={(id) => {
+              setContactId(id);
+              setCreateContactOnSave(false);
+            }}
+            placeholder="Search contacts…"
+            emptyMessage="No contacts on this device"
+          />
+        )}
+        {createContactOnSave ? (
+          <p className="muted small" style={{ marginTop: 4 }}>
+            Save creates a contact named {form.name.trim() || "after this user"} and
+            links it.
+          </p>
+        ) : contactId && !contactHeld ? (
+          <p className="muted small" style={{ marginTop: 4 }}>
+            Linked to a contact this device doesn't hold.
+          </p>
+        ) : (
+          !contactId &&
+          !canSeeContacts && (
+            <p className="muted small" style={{ marginTop: 4 }}>
+              Not linked to a contact.
+            </p>
+          )
+        )}
+        <div className="row" style={{ marginTop: 6, flexWrap: "wrap" }}>
+          {(contactId || createContactOnSave) && (
+            <button
+              type="button"
+              className="btn btn-sm btn-quiet"
+              onClick={() => {
+                setContactId(null);
+                setCreateContactOnSave(false);
+              }}
+            >
+              {createContactOnSave ? "Don't create" : "Unlink"}
+            </button>
+          )}
+          {canCreateContact && !createContactOnSave && (
+            <button
+              type="button"
+              className="btn btn-sm btn-quiet"
+              onClick={() => setCreateContactOnSave(true)}
+            >
+              Create a contact for this user
+            </button>
           )}
         </div>
       </div>

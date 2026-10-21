@@ -40,7 +40,7 @@
     <p class="lede">The entry point for any user with no active local session on this device — authenticates through Clerk, which InstantDB is configured to trust as its auth provider.</p>
 
     <h2>Purpose</h2>
-    <p>Every deployment is a single marina's own subdomain (see <a href="../architecture.md">Architecture</a>), so there's no marina picker here — this screen only ever authenticates a <code>User</code> against the one Clerk application (and one InstantDB instance) that subdomain already points to. There is no self-serve account creation: a user must already exist, created via <a href="admin-users.html">Admin → Users</a> by someone holding <code>manage_users</code>, which provisions them in both Clerk and as an InstantDB <code>User</code> record (<code>clerk_user_id</code> linking the two — see <a href="../data-model.md">Data Model</a>).</p>
+    <p>Every deployment is a single marina's own subdomain (see <a href="../architecture.md">Architecture</a>), so there's no marina picker here — this screen only ever authenticates a <code>User</code> against the one Clerk application (and one InstantDB instance) that subdomain already points to. There is no self-serve account creation: a user must already exist, created via <a href="../../src/pages/admin/AdminUsersPage.spec.md">Admin → Users</a> by someone holding <code>manage_users</code>, which provisions them in both Clerk and as an InstantDB <code>User</code> record (<code>clerk_user_id</code> linking the two — see <a href="../data-model.md">Data Model</a>).</p>
 
     <h2>Data shown</h2>
     <table>

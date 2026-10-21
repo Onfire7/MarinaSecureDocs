@@ -121,6 +121,7 @@ export interface UserInput {
   name: string;
   email?: string | null;
   phone?: string | null;
+  /** A Contact's id, or null to unlink. Left out, saveUser() keeps the link. */
   contactId?: string | null;
   roleIds: string[];
 }
@@ -165,7 +166,9 @@ export async function saveUser(
       name: input.name,
       email: input.email ?? null,
       phone: input.phone ?? null,
-      contact_id: input.contactId ?? null,
+      // Only when asked. Writing `?? null` here cleared the link on every
+      // save from a form that never sent one.
+      ...(input.contactId !== undefined && { contact_id: input.contactId }),
     });
     await setUserRoles(tx, userId, input.roleIds);
     await recordActivity(tx, {
