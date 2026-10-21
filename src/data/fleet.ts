@@ -1,14 +1,20 @@
 import { useQuery } from "@powersync/react";
 import type { LockContext } from "@powersync/web";
-import { stamp } from "../lib/db";
-import { insert, transact, update } from "./sql";
+import { id as newId, stamp } from "../lib/db";
+import { deterministicId } from "../lib/detId";
+import { dataT } from "../i18n";
+import { insert, remove, transact, update } from "./sql";
 import { recordActivity } from "./activity";
 import {
   meterRulesDue,
+  withdrawMeterReading,
   writeMeterReading,
   type AssetRow,
 } from "./assets";
-import { readingChange } from "../lib/fleet";
+import { fireAssetTrigger, undoAssetTrigger } from "./assetTriggers";
+import { FUEL_STEPS, readingChange } from "../lib/fleet";
+import { statusCheckWrites, statusUndoReading, type FleetVehicleResult, type StatusCheckInput } from "../lib/fleetItem";
+import type { VehicleCheckout, VehicleFuelLog } from "../lib/shiftReport";
 
 // Fleet Vehicles — the Dashboard's Fleet card (src/pages/home/FleetCard.spec.md).
 //
@@ -21,9 +27,13 @@ import { readingChange } from "../lib/fleet";
 export interface FleetVehicleRow extends AssetRow {
   checkout_person_id: string | null;
   checkout_odometer_out: number | null;
+  /** Set when the open checkout continues one kept past an End of Shift. */
+  checkout_kept: number | null;
   last_checkin_at: string | null;
   last_checkin_level: number | null;
-  last_fill_at: string | null;
+  /** The newest fuel log row: a fill-up, or a Status Check's level. */
+  last_fuel_at: string | null;
+  last_fuel_level: number | null;
 }
 
 // Every join is on an id: a join on anything else is a full scan per row on
@@ -39,10 +49,12 @@ const FLEET_SELECT = `
          co.time_out AS checked_out_at,
          co.person_id AS checkout_person_id,
          co.odometer_out AS checkout_odometer_out,
+         co.kept_after_shift AS checkout_kept,
          p.name AS checked_out_to,
          lc.time_in AS last_checkin_at,
          lc.fuel_level_in AS last_checkin_level,
-         (SELECT max(f.timestamp) FROM asset_fuel_logs f WHERE f.asset_id = a.id) AS last_fill_at
+         lf.timestamp AS last_fuel_at,
+         lf.level AS last_fuel_level
     FROM assets a
     LEFT JOIN locations l ON l.id = a.location_id
     LEFT JOIN asset_status_logs sl
@@ -59,6 +71,10 @@ const FLEET_SELECT = `
            ON lc.id = (SELECT c3.id FROM asset_checkouts c3
                         WHERE c3.asset_id = a.id AND c3.fuel_level_in IS NOT NULL
                         ORDER BY c3.time_in DESC LIMIT 1)
+    LEFT JOIN asset_fuel_logs lf
+           ON lf.id = (SELECT f2.id FROM asset_fuel_logs f2
+                        WHERE f2.asset_id = a.id
+                        ORDER BY f2.timestamp DESC, f2.id DESC LIMIT 1)
    WHERE a.is_fleet = 1`;
 
 export function useFleetVehicles() {
@@ -95,7 +111,9 @@ export function useFleetPeople() {
 export interface FuelLogRow {
   id: string;
   asset_id: string;
-  gallons: number;
+  /** Null on a Status Check's level reading, which has no fill-up. */
+  gallons: number | null;
+  level: number | null;
   cost: number | null;
   odometer: number | null;
   timestamp: string;
@@ -136,6 +154,7 @@ async function prepareReading(
   vehicle: AssetRow,
   odometer: OdometerEntry,
   ctx: FleetContext,
+  readingId?: string,
 ): Promise<(tx: LockContext) => Promise<string[]>> {
   const change = readingChange(vehicle.meter_reading, odometer.value);
   if (change === "none" || odometer.value == null) return async () => [];
@@ -154,33 +173,85 @@ async function prepareReading(
       ctx.ticketStatusId,
       ctx.actorId,
       due,
+      readingId,
     );
 }
 
+/** A Fleet Vehicle Item answered in the same transaction as what it did. */
+export interface ItemAnswer {
+  itemId: string;
+  result: FleetVehicleResult;
+}
+
+async function answerItem(tx: LockContext, answer: ItemAnswer | undefined, actorId: string | null) {
+  if (!answer) return;
+  await update(tx, "checklist_instance_items", answer.itemId, {
+    result: JSON.stringify(answer.result),
+    completed_at: stamp(),
+    completed_by_id: actorId,
+  });
+}
+
+/** Reopen an item whose effect was just undone. */
+async function reopenItem(tx: LockContext, itemId: string | undefined) {
+  if (!itemId) return;
+  await update(tx, "checklist_instance_items", itemId, {
+    result: null,
+    completed_at: null,
+    completed_by_id: null,
+  });
+}
+
+/** The ids a checkout's own readings take, so an undo can find them. */
+const tripReadingId = (checkoutId: string, end: "out" | "in") =>
+  deterministicId(`fleet-reading:${checkoutId}:${end}`);
+
+/**
+ * Check a vehicle out. From a Fleet Vehicle Item, `item` names it, and it is
+ * answered with the new checkout in the same transaction. Returns the
+ * checkout's id.
+ */
 export async function checkOutFleetVehicle(
   vehicle: AssetRow,
   person: { contactId: string; name: string },
   odometer: OdometerEntry,
   ctx: FleetContext,
-): Promise<string[]> {
-  const writeReading = await prepareReading(vehicle, odometer, ctx);
+  item?: { itemId: string },
+): Promise<string> {
+  const checkoutId = newId();
+  const writeReading = await prepareReading(vehicle, odometer, ctx, tripReadingId(checkoutId, "out"));
   return transact(async (tx) => {
+    const at = stamp();
     await insert(tx, "asset_checkouts", {
+      id: checkoutId,
       asset_id: vehicle.id,
       person_id: person.contactId,
       checked_out_by_id: ctx.actorId,
-      time_out: stamp(),
+      time_out: at,
       odometer_out: odometer.value,
     });
-    const raised = await writeReading(tx);
+    await writeReading(tx);
     await recordActivity(tx, {
       eventType: "asset.checked_out",
-      summary: `${vehicle.name} checked out to ${person.name}`,
+      summary: dataT("fleetActivity.checkedOut", { ns: "home", vehicle: vehicle.name, person: person.name }),
       subjectType: "assets",
       subjectId: vehicle.id,
       actorId: ctx.actorId,
     });
-    return raised;
+    await answerItem(
+      tx,
+      item && {
+        itemId: item.itemId,
+        result: { type: "fleet_vehicle", mode: "take", checkoutId, assetId: vehicle.id },
+      },
+      ctx.actorId,
+    );
+    await fireAssetTrigger(
+      tx,
+      { event: "check_out", asset: vehicle, checkoutId, personContactId: person.contactId, at },
+      ctx.actorId,
+    );
+    return checkoutId;
   });
 }
 
@@ -190,8 +261,9 @@ export async function checkInFleetVehicle(
   trip: { odometer: OdometerEntry; fuelLevel: number; note: string | null },
   postReturnStatus: { id: string; name: string } | null,
   ctx: FleetContext,
+  item?: { itemId: string },
 ): Promise<string[]> {
-  const writeReading = await prepareReading(vehicle, trip.odometer, ctx);
+  const writeReading = await prepareReading(vehicle, trip.odometer, ctx, tripReadingId(checkoutId, "in"));
   return transact(async (tx) => {
     const now = stamp();
     await update(tx, "asset_checkouts", checkoutId, {
@@ -213,13 +285,265 @@ export async function checkInFleetVehicle(
     await recordActivity(tx, {
       eventType: "asset.checked_in",
       summary: trip.note
-        ? `${vehicle.name} returned: ${trip.note}`
-        : `${vehicle.name} returned`,
+        ? dataT("fleetActivity.returnedWithNote", { ns: "home", vehicle: vehicle.name, note: trip.note })
+        : dataT("fleetActivity.returned", { ns: "home", vehicle: vehicle.name }),
       subjectType: "assets",
       subjectId: vehicle.id,
       actorId: ctx.actorId,
     });
+    await answerItem(
+      tx,
+      item && {
+        itemId: item.itemId,
+        result: { type: "fleet_vehicle", mode: "return", checkoutId, assetId: vehicle.id },
+      },
+      ctx.actorId,
+    );
+    const checkout = await tx.getOptional<{ person_id: string | null }>(
+      "SELECT person_id FROM asset_checkouts WHERE id = ?",
+      [checkoutId],
+    );
+    await fireAssetTrigger(
+      tx,
+      { event: "check_in", asset: vehicle, checkoutId, personContactId: checkout?.person_id ?? null, at: now },
+      ctx.actorId,
+    );
     return raised;
+  });
+}
+
+/**
+ * Undo a checkout (ActiveChecklistPage.spec.md § Edit undoes what the item
+ * did): the row goes, with the reading it took and any unanswered work its
+ * trigger created, and the Take item that made or showed it reopens.
+ */
+export async function undoFleetCheckout(
+  vehicle: { id: string; name: string },
+  checkoutId: string,
+  actorId: string | null,
+  itemId?: string,
+): Promise<void> {
+  await transact(async (tx) => {
+    const checkout = await tx.getOptional<{ person_id: string | null; time_out: string; time_in: string | null }>(
+      "SELECT person_id, time_out, time_in FROM asset_checkouts WHERE id = ?",
+      [checkoutId],
+    );
+    if (!checkout) {
+      await reopenItem(tx, itemId);
+      return;
+    }
+    if (checkout.time_in) throw new Error("This vehicle has been checked back in.");
+    await undoAssetTrigger(tx, {
+      event: "check_out",
+      asset: vehicle,
+      checkoutId,
+      personContactId: checkout.person_id,
+      at: checkout.time_out,
+    });
+    await withdrawMeterReading(tx, vehicle.id, tripReadingId(checkoutId, "out"));
+    await remove(tx, "asset_checkouts", checkoutId);
+    await recordActivity(tx, {
+      eventType: "asset.checkout_undone",
+      summary: dataT("fleetActivity.checkoutUndone", { ns: "home", vehicle: vehicle.name }),
+      subjectType: "assets",
+      subjectId: vehicle.id,
+      actorId,
+    });
+    await reopenItem(tx, itemId);
+  });
+}
+
+/**
+ * Undo a check-in: the checkout reopens, and the status entry, reading and
+ * unanswered triggered work the check-in wrote go. Refused once anyone has
+ * taken the vehicle since.
+ */
+export async function undoFleetCheckin(
+  vehicle: { id: string; name: string },
+  checkoutId: string,
+  actorId: string | null,
+  itemId?: string,
+): Promise<void> {
+  await transact(async (tx) => {
+    const checkout = await tx.getOptional<{ person_id: string | null; time_in: string | null }>(
+      "SELECT person_id, time_in FROM asset_checkouts WHERE id = ?",
+      [checkoutId],
+    );
+    if (!checkout?.time_in) {
+      await reopenItem(tx, itemId);
+      return;
+    }
+    const again = await tx.getOptional<{ id: string }>(
+      "SELECT id FROM asset_checkouts WHERE asset_id = ? AND time_in IS NULL LIMIT 1",
+      [vehicle.id],
+    );
+    if (again) throw new Error(`${vehicle.name} has been checked out again since.`);
+    await undoAssetTrigger(tx, {
+      event: "check_in",
+      asset: vehicle,
+      checkoutId,
+      personContactId: checkout.person_id,
+      at: checkout.time_in,
+    });
+    // The post-return status entry carries the check-in's own timestamp,
+    // compared as a time since a synced row may spell it differently.
+    await tx.execute(
+      `DELETE FROM asset_status_logs
+        WHERE asset_id = ? AND note = 'Returned from checkout'
+          AND abs(julianday(timestamp) - julianday(?)) < 0.00002`,
+      [vehicle.id, checkout.time_in],
+    );
+    await withdrawMeterReading(tx, vehicle.id, tripReadingId(checkoutId, "in"));
+    await update(tx, "asset_checkouts", checkoutId, {
+      time_in: null,
+      odometer_in: null,
+      fuel_level_in: null,
+      return_note: null,
+    });
+    await recordActivity(tx, {
+      eventType: "asset.checkin_undone",
+      summary: dataT("fleetActivity.checkinUndone", { ns: "home", vehicle: vehicle.name }),
+      subjectType: "assets",
+      subjectId: vehicle.id,
+      actorId,
+    });
+    await reopenItem(tx, itemId);
+  });
+}
+
+/**
+ * A Status Check, written as it is recorded so a supervisor reading the
+ * Shift Report mid-shift sees it: one fuel row with the level (and the
+ * fill-up, if any), a Meter Reading if the odometer moved, and the item's
+ * answer naming both.
+ */
+export async function recordStatusCheck(
+  vehicle: AssetRow,
+  input: StatusCheckInput,
+  ctx: FleetContext,
+  itemId: string,
+): Promise<void> {
+  const writes = statusCheckWrites(vehicle, input);
+  const fuelLogId = newId();
+  const meterReadingId = writes.reading === "none" ? null : newId();
+  const writeReading =
+    meterReadingId && input.odometer != null
+      ? await prepareReading(
+          vehicle,
+          { value: input.odometer, correctionReason: input.correctionReason },
+          ctx,
+          meterReadingId,
+        )
+      : async () => [];
+  const result: FleetVehicleResult = {
+    type: "fleet_vehicle",
+    mode: "status",
+    assetId: vehicle.id,
+    odometer: writes.fuelLog.odometer,
+    fuelLevel: input.fuelLevel,
+    ...(input.fill ? { fill: input.fill } : {}),
+    fuelLogId,
+    meterReadingId,
+    previousReading: vehicle.meter_reading,
+  };
+  await transact(async (tx) => {
+    await insert(tx, "asset_fuel_logs", {
+      id: fuelLogId,
+      asset_id: vehicle.id,
+      ...writes.fuelLog,
+      timestamp: stamp(),
+      logged_by_id: ctx.actorId,
+    });
+    await writeReading(tx);
+    await recordActivity(tx, {
+      eventType: input.fill ? "asset.fueled" : "asset.status_checked",
+      summary:
+        writes.fuelLog.odometer != null
+          ? dataT("fleetActivity.statusWithOdometer", {
+              ns: "home",
+              vehicle: vehicle.name,
+              odometer: writes.fuelLog.odometer,
+              fuel: FUEL_STEPS[input.fuelLevel],
+            })
+          : dataT("fleetActivity.status", { ns: "home", vehicle: vehicle.name, fuel: FUEL_STEPS[input.fuelLevel] }),
+      subjectType: "assets",
+      subjectId: vehicle.id,
+      actorId: ctx.actorId,
+    });
+    await answerItem(tx, { itemId, result }, ctx.actorId);
+  });
+}
+
+/** Edit on a Status Check: withdraw what it wrote, and reopen the item. */
+export async function withdrawStatusCheck(
+  vehicle: { id: string; name: string; meter_reading: number | null },
+  result: FleetVehicleResult,
+  actorId: string | null,
+  itemId: string,
+): Promise<void> {
+  await transact(async (tx) => {
+    if ("fuelLogId" in result) {
+      await remove(tx, "asset_fuel_logs", result.fuelLogId);
+      if (result.meterReadingId) {
+        await tx.execute("DELETE FROM asset_meter_readings WHERE id = ?", [result.meterReadingId]);
+        const { restore } = statusUndoReading(vehicle.meter_reading, result);
+        if (restore != null) await update(tx, "assets", vehicle.id, { meter_reading: restore });
+      }
+      await recordActivity(tx, {
+        eventType: "asset.status_check_withdrawn",
+        summary: dataT("fleetActivity.statusWithdrawn", { ns: "home", vehicle: vehicle.name }),
+        subjectType: "assets",
+        subjectId: vehicle.id,
+        actorId,
+      });
+    }
+    await reopenItem(tx, itemId);
+  });
+}
+
+/**
+ * Keep a vehicle past End of Shift (ActiveChecklistPage.spec.md § Ending the
+ * shift): its checkout closes here with the readings and the reason, with no
+ * post-return status since it never came back, and a new one opens to the
+ * same person at the same moment, marked kept_after_shift. Fires no trigger:
+ * nothing was really checked out or in.
+ */
+export async function keepFleetVehicle(
+  vehicle: AssetRow,
+  checkoutId: string,
+  keep: { reason: string; odometer: OdometerEntry; fuelLevel: number },
+  ctx: FleetContext,
+): Promise<void> {
+  const writeReading = await prepareReading(vehicle, keep.odometer, ctx);
+  await transact(async (tx) => {
+    const checkout = await tx.getOptional<{ person_id: string | null }>(
+      "SELECT person_id FROM asset_checkouts WHERE id = ?",
+      [checkoutId],
+    );
+    const at = stamp();
+    const odometer = keep.odometer.value ?? vehicle.meter_reading;
+    await update(tx, "asset_checkouts", checkoutId, {
+      time_in: at,
+      odometer_in: odometer,
+      fuel_level_in: keep.fuelLevel,
+      return_note: keep.reason,
+    });
+    await insert(tx, "asset_checkouts", {
+      asset_id: vehicle.id,
+      person_id: checkout?.person_id ?? null,
+      checked_out_by_id: ctx.actorId,
+      time_out: at,
+      odometer_out: odometer,
+      kept_after_shift: 1,
+    });
+    await writeReading(tx);
+    await recordActivity(tx, {
+      eventType: "asset.kept_after_shift",
+      summary: dataT("fleetActivity.kept", { ns: "home", vehicle: vehicle.name, reason: keep.reason }),
+      subjectType: "assets",
+      subjectId: vehicle.id,
+      actorId: ctx.actorId,
+    });
   });
 }
 
@@ -281,4 +605,65 @@ export async function setFleetVehicle(
       actorId,
     });
   });
+}
+
+/** Checkouts of the guard's closed since a moment: Return's "checked in elsewhere". */
+export function useCheckInsSince(contactId: string | null | undefined, since: string | null | undefined) {
+  return useQuery<{ id: string; asset_id: string; time_in: string }>(
+    `SELECT id, asset_id, time_in FROM asset_checkouts
+      WHERE person_id = ? AND time_in IS NOT NULL AND time_in >= ?
+      ORDER BY time_in`,
+    [contactId ?? "", since ?? "9999"],
+  );
+}
+
+/** Fleet Vehicles a user holds: what End of Shift asks about. */
+export function useHeldVehicles(userId: string | undefined) {
+  return useQuery<{ checkoutId: string; name: string; time_out: string; kept_after_shift: number | null }>(
+    `SELECT co.id AS checkoutId, a.name, co.time_out, co.kept_after_shift
+       FROM asset_checkouts co
+       JOIN assets a ON a.id = co.asset_id
+      WHERE co.time_in IS NULL AND a.is_fleet = 1
+        AND co.person_id = (SELECT contact_id FROM users WHERE id = ?)
+      ORDER BY co.time_out`,
+    [userId ?? ""],
+  );
+}
+
+/**
+ * Everything compileVehicleUse() needs for one guard's Shift
+ * (src/pages/reports/ShiftReportPage.spec.md § Vehicles): their checkouts
+ * that could overlap the window, the continuation of any kept at its end
+ * included, and the fuel records they logged in it.
+ */
+export function useShiftVehicleRecords(
+  guardId: string | undefined,
+  shift: { started_at: string; ended_at: string | null } | null,
+) {
+  // From the stored times, never from "now": an open shift's window ends at
+  // the current moment, and a query argument that moves every render
+  // resubscribes forever (CLAUDE.md § Learnings). An open shift reads to the
+  // end of time; compileVehicleUse() applies the live window.
+  const from = shift ? new Date(shift.started_at).toISOString() : "9999";
+  const to = !shift ? "0000" : shift.ended_at ? new Date(Date.parse(shift.ended_at) + 60_000).toISOString() : "9999";
+  const { data: guard } = useQuery<{ contact_id: string | null }>(
+    "SELECT contact_id FROM users WHERE id = ?",
+    [guardId ?? ""],
+  );
+  const contactId = guard[0]?.contact_id ?? null;
+  const { data: checkouts } = useQuery<VehicleCheckout>(
+    `SELECT co.*, a.name AS asset_name, a.has_meter, a.meter_type, a.meter_reading
+       FROM asset_checkouts co
+       JOIN assets a ON a.id = co.asset_id
+      WHERE co.person_id = ? AND co.time_out <= ? AND (co.time_in IS NULL OR co.time_in >= ?)`,
+    [contactId ?? "", to, from],
+  );
+  const { data: fuelLogs } = useQuery<VehicleFuelLog>(
+    `SELECT f.*, a.name AS asset_name, a.has_meter, a.meter_type
+       FROM asset_fuel_logs f
+       JOIN assets a ON a.id = f.asset_id
+      WHERE f.logged_by_id = ? AND f.timestamp >= ? AND f.timestamp <= ?`,
+    [guardId ?? "", from, to],
+  );
+  return { contactId, checkouts, fuelLogs };
 }

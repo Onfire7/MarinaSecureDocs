@@ -44,17 +44,34 @@ export const FUEL_STEPS = ["E", "¼", "½", "¾", "F"] as const;
 export const FULL = FUEL_STEPS.length - 1;
 
 /**
- * The most recent of the level recorded at a check-in and a fill-up, which
- * means full. No record of either is unknown, not empty.
+ * The most recent of the level recorded at a check-in and the newest fuel log
+ * row. A fuel row carries its own level (a Status Check, or a fill-up whose
+ * level was given); a fill-up without one means full. No record of either is
+ * unknown, not empty.
  */
 export function lastFuelLevel(
   lastCheckIn: { at: string; level: number } | null,
-  lastFillAt: string | null,
+  lastFuel: { at: string; level: number | null } | null,
 ): number | null {
-  if (lastFillAt && (!lastCheckIn || Date.parse(lastFillAt) >= Date.parse(lastCheckIn.at))) {
-    return FULL;
+  if (lastFuel && (!lastCheckIn || Date.parse(lastFuel.at) >= Date.parse(lastCheckIn.at))) {
+    return lastFuel.level ?? FULL;
   }
   return lastCheckIn ? lastCheckIn.level : null;
+}
+
+/** A board row's last known fuel level, from the two records it carries. */
+export function vehicleFuelLevel(v: {
+  last_checkin_at: string | null;
+  last_checkin_level: number | null;
+  last_fuel_at: string | null;
+  last_fuel_level: number | null;
+}): number | null {
+  return lastFuelLevel(
+    v.last_checkin_at != null && v.last_checkin_level != null
+      ? { at: v.last_checkin_at, level: v.last_checkin_level }
+      : null,
+    v.last_fuel_at != null ? { at: v.last_fuel_at, level: v.last_fuel_level } : null,
+  );
 }
 
 /** Distance on the meter since check-out, when there's a meter to read. */

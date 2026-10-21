@@ -1,6 +1,7 @@
 import { Fragment, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import { FleetResultSummary } from "./FleetVehicleItem";
 import {
   itemResult,
   useInstance,
@@ -254,6 +255,8 @@ function ResultSummary({ type, result }: { type: string; result: ItemResult | un
           {questionAnswerSummary(result as Extract<ItemResult, { type: "question" }>)}
         </span>
       );
+    case "fleet_vehicle":
+      return <FleetResultSummary result={result as Extract<ItemResult, { type: "fleet_vehicle" }>} />;
     default:
       return <span className="muted">—</span>;
   }

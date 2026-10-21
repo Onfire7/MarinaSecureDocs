@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { compareNames } from "../../lib/locations";
@@ -36,6 +37,7 @@ export function AssetDetailPage() {
   const { id: assetId } = useParams();
   const current = useCurrent();
   const canManage = current.can("manage_assets");
+  const { t } = useTranslation("assets");
   const [dialog, setDialog] = useState<"checkout" | "meter" | "status" | null>(null);
 
   const { asset } = useAsset(assetId);
@@ -63,6 +65,10 @@ export function AssetDetailPage() {
   // Each list is already newest-first from its own query; the open checkout is
   // the one with no time_in.
   const openCheckout = checkouts.find((c) => !c.time_in);
+  // A checkout closed by keeping the vehicle past End of Shift is followed, at
+  // the same moment, by the one that continues it.
+  const keptPast = (c: (typeof checkouts)[number]) =>
+    c.time_in != null && checkouts.some((n) => n.kept_after_shift === 1 && Date.parse(n.time_out) === Date.parse(c.time_in!));
 
   const now = Date.now();
   const upcoming = reservations
@@ -301,6 +307,9 @@ export function AssetDetailPage() {
                       {openCheckout.person_name && (
                         <span> — {openCheckout.person_name}</span>
                       )}
+                      {openCheckout.kept_after_shift === 1 && (
+                        <span className="muted small"> · {t("checkouts.keptFromPrevious")}</span>
+                      )}
                     </span>
                     <span className="muted small">
                       since {new Date(openCheckout.time_out).toLocaleString()}
@@ -324,6 +333,7 @@ export function AssetDetailPage() {
                           {tripSummary(c, meterUnit(asset.meter_type))}
                         </div>
                       )}
+                      {keptPast(c) && <div className="muted small">{t("checkouts.keptPast")}</div>}
                       {c.return_note && <div className="small">“{c.return_note}”</div>}
                     </div>
                   ))}
@@ -340,7 +350,11 @@ export function AssetDetailPage() {
                 {fuelLogs.slice(0, 8).map((f) => (
                   <div key={f.id} className="card spread">
                     <span>
-                      {formatNumber(f.gallons)} gal
+                      {f.gallons != null && f.level != null
+                        ? t("fuel.gallonsAndLevel", { gallons: formatNumber(f.gallons), fuel: FUEL_STEPS[f.level] })
+                        : f.gallons != null
+                          ? t("fuel.gallons", { gallons: formatNumber(f.gallons) })
+                          : t("fuel.level", { fuel: FUEL_STEPS[f.level ?? 0] })}
                       <span className="muted small">
                         {f.cost != null && ` · ${f.cost.toFixed(2)}`}
                         {f.odometer != null &&

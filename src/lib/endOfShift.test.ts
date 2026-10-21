@@ -103,6 +103,47 @@ const template = (trigger_type: string, sections: TemplateShape["sections"]): Te
   sections,
 });
 
+describe("nextEndOfShiftStep — vehicles still out (Fleet Vehicle Item test 6)", () => {
+  const vehicle = (checkoutId: string, timeOut: string, kept = 0) => ({
+    checkoutId,
+    name: `Vehicle ${checkoutId}`,
+    time_out: timeOut,
+    kept_after_shift: kept,
+  });
+
+  it("asks about a vehicle still held after the End of Shift Checklist and before the review, earliest first", () => {
+    expect(
+      nextEndOfShiftStep({
+        ...base,
+        clockOutTemplateReady: true,
+        heldVehicles: [vehicle("v2", at("23:00"))],
+      }).kind,
+    ).toBe("end_of_shift_checklist");
+    expect(
+      nextEndOfShiftStep({
+        ...base,
+        heldVehicles: [vehicle("later", at("23:00")), vehicle("earlier", at("22:30"))],
+      }),
+    ).toEqual({ kind: "vehicle", checkoutId: "earlier", name: "Vehicle earlier" });
+  });
+
+  it("does not ask again about a vehicle kept during this shift", () => {
+    expect(
+      nextEndOfShiftStep({ ...base, heldVehicles: [vehicle("kept", at("23:59"), 1)] }).kind,
+    ).toBe("review");
+  });
+
+  it("asks about a vehicle kept from an earlier shift", () => {
+    expect(
+      nextEndOfShiftStep({ ...base, heldVehicles: [vehicle("old", "2026-10-20T06:00:00.000Z", 1)] }),
+    ).toEqual({ kind: "vehicle", checkoutId: "old", name: "Vehicle old" });
+  });
+
+  it("goes to the review holding nothing", () => {
+    expect(nextEndOfShiftStep({ ...base, heldVehicles: [] }).kind).toBe("review");
+  });
+});
+
 describe("endShiftBlockedReason", () => {
   // 5
   it("allows End Shift only in the last section of a non-Clock-Out template that has none, made with the checklist", () => {

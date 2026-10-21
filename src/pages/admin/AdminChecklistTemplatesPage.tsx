@@ -1,4 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { dataT } from "../../i18n";
+import {
+  FLEET_ITEM_MODES,
+  fleetDefaultLabelKey,
+  fleetItemMode,
+  type FleetItemMode,
+  type FleetVehicleConfig,
+} from "../../lib/fleetItem";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import {
   createItem,
@@ -47,6 +56,7 @@ import {
   type ItemType,
   type QuestionAnswerType,
   type StateCheckType,
+  type AssetEvent,
   type TriggerConfig,
   type YesNoDetailsOn,
 } from "../../lib/checklists";
@@ -310,22 +320,41 @@ type TemplateRow = {
   sections?: SectionRow[];
 };
 
-const TRIGGERS = [
+// Entries added since the copy catalog arrived carry a key instead of a
+// label; the rest convert with the admin area (docs/TODO.md § Localization).
+type TriggerOption = { value: string; label: string } | { value: string; labelKey: AdminKey };
+type AdminKey =
+  | "checklistTemplates.trigger.asset"
+  | "checklistTemplates.sectionTrigger.check_out"
+  | "checklistTemplates.sectionTrigger.check_in";
+
+const TRIGGERS: TriggerOption[] = [
   { value: "manual", label: "Manual" },
   { value: "clock_in", label: "Clock In" },
   { value: "clock_out", label: "Clock Out" },
   { value: "checkpoint", label: "Checkpoint visit" },
+  { value: "asset", labelKey: "checklistTemplates.trigger.asset" },
   { value: "recurring", label: "Recurring" },
 ];
 
-const SECTION_TRIGGERS = [
+/**
+ * An asset section's event is its trigger as far as the editor is concerned,
+ * so the select offers each as its own choice: "asset:check_out" stores
+ * trigger_type "asset" with trigger_config.event "check_out".
+ */
+const SECTION_TRIGGERS: TriggerOption[] = [
   { value: "manual", label: "Always (with the checklist)" },
   { value: "recurring", label: "Recurring days" },
   { value: "checkpoint", label: "Checkpoint scan" },
   { value: "location", label: "Location visit" },
-  { value: "asset", label: "Asset" },
+  { value: "asset:check_out", labelKey: "checklistTemplates.sectionTrigger.check_out" },
+  { value: "asset:check_in", labelKey: "checklistTemplates.sectionTrigger.check_in" },
   { value: "location_status", label: "Location status" },
 ];
+
+function sectionTriggerValue(triggerType: string, cfg: { event?: AssetEvent }): string {
+  return triggerType === "asset" ? `asset:${cfg.event ?? "check_out"}` : triggerType;
+}
 
 const ELLIPSIS = {
   overflow: "hidden",
@@ -401,11 +430,10 @@ function sectionSummary(
  * editor's height before you reached the sections, which are what you came
  * for — so they fold up into this and open on a tap.
  */
-function templateSummary(template: TemplateRow) {
+function templateSummary(template: TemplateRow, t: (key: AdminKey) => string) {
   const parts = [
     template.assignedRole?.name ?? "no role",
-    TRIGGERS.find((t) => t.value === template.triggerType)?.label ??
-      template.triggerType,
+    triggerLabel(TRIGGERS, template.triggerType, t),
   ];
   if (template.hideUntilRule) parts.push(`from ${template.hideUntilRule}`);
   if (template.dueBy?.kind === "time") parts.push(`due ${template.dueBy.time}`);
@@ -502,6 +530,9 @@ function ChipMultiSelect({
  * type's name: a guess nobody wants is worse than no guess.
  */
 function defaultItemLabel(type: ItemType, placeName?: string) {
+  // Written into the template: the marina's language, not the editor's.
+  if (type === "fleet_vehicle")
+    return dataT(fleetDefaultLabelKey("take") as "fleet.defaultLabel.take", { ns: "checklists" });
   if (!placeName || !isStateCheck(type)) return ITEM_TYPE_LABEL[type];
   const { noun } = STATE_CHECK_KINDS[normalizeItemType(type) as StateCheckType];
   return `${placeName} ${noun.charAt(0).toUpperCase()}${noun.slice(1)}`;
@@ -784,6 +815,7 @@ function TemplateCard({
   onToggle: () => void;
   onDuplicated: (templateId: string) => void;
 }) {
+  const { t: tA } = useTranslation("admin");
   const [addingViewerRoles, setAddingViewerRoles] = useState(false);
   const [addingSection, setAddingSection] = useState(false);
   // Closed to start: a template's role and trigger are set once, while its
@@ -927,8 +959,7 @@ function TemplateCard({
       {!expanded && (
         <div className="card-meta">
           <span className="badge">{template.assignedRole?.name ?? "no role"}</span>{" "}
-          {TRIGGERS.find((t) => t.value === template.triggerType)?.label ??
-            template.triggerType}{" "}
+          {triggerLabel(TRIGGERS, template.triggerType, tA)}{" "}
           · {sections.length} section{sections.length === 1 ? "" : "s"} ·{" "}
           {itemCount} item{itemCount === 1 ? "" : "s"}
         </div>
@@ -956,7 +987,7 @@ function TemplateCard({
                     onClick={() => setSettingsOpen(!settingsOpen)}
                   >
                     <span className="muted small" style={ELLIPSIS}>
-                      {templateSummary(template)}
+                      {templateSummary(template, tA)}
                     </span>
                     {(template.viewerRoles ?? []).length > 0 && (
                       <span className="badge-marquee">
@@ -1049,7 +1080,7 @@ function TemplateCard({
                           template.triggerType !== "clock_out"
                         }
                       >
-                        {t.label}
+                        {triggerLabel(TRIGGERS, t.value, tA)}
                       </option>
                     ))}
                   </select>
@@ -1078,6 +1109,11 @@ function TemplateCard({
                   <p className="muted small" style={{ marginTop: 4 }}>
                     Triggered by scanning a checkpoint named on one of this
                     template's sections — attach checkpoints there.
+                  </p>
+                )}
+                {template.triggerType === "asset" && (
+                  <p className="muted small" style={{ marginTop: 4 }}>
+                    {tA("checklistTemplates.assetTemplateHint")}
                   </p>
                 )}
               </div>
@@ -1243,9 +1279,11 @@ function SectionEditor({
 
   const { statuses } = useLocationStatuses();
   const items = section.items;
+  const { t: tA } = useTranslation("admin");
   const cfg = (section.triggerConfig ?? {}) as {
     recurrenceRule?: string;
     statuses?: string[];
+    event?: AssetEvent;
   };
   const selectedStatuses = new Set(cfg.statuses ?? []);
   // The standard set plus any status a location is actually sitting in, so
@@ -1386,9 +1424,11 @@ function SectionEditor({
         sectionId: section.id,
         type,
         label: defaultItemLabel(type, section.location?.name),
-        config: (isStateCheck(type) && section.location
-          ? { locationId: section.location.id }
-          : {}) as never,
+        config: (type === "fleet_vehicle"
+          ? { mode: "take" }
+          : isStateCheck(type) && section.location
+            ? { locationId: section.location.id }
+            : {}) as never,
         position: items.length,
       }).then(async (newId) => {
         // Appended after an End Shift Item; move it back above.
@@ -1538,11 +1578,7 @@ function SectionEditor({
                 onClick={() => setSettingsOpen(!settingsOpen)}
               >
                 <span className="muted small" style={ELLIPSIS}>
-                  {sectionSummary(
-                    section,
-                    SECTION_TRIGGERS.find((t) => t.value === section.triggerType)
-                      ?.label ?? section.triggerType,
-                  )}
+                  {sectionSummary(section, triggerLabel(SECTION_TRIGGERS, sectionTriggerValue(section.triggerType, cfg), tA))}
                 </span>
                 {(section.checkpoints ?? []).length > 0 && (
                   <span className="badge-marquee">
@@ -1563,12 +1599,19 @@ function SectionEditor({
             <span className="field-label">Trigger</span>
             <select
               className="select field-control"
-              value={section.triggerType}
-              onChange={(e) => update({ triggerType: e.target.value })}
+              value={sectionTriggerValue(section.triggerType, cfg)}
+              onChange={(e) => {
+                const [triggerType, event] = e.target.value.split(":");
+                update(
+                  event
+                    ? { triggerType, triggerConfig: { event: event as AssetEvent } }
+                    : { triggerType },
+                );
+              }}
             >
               {SECTION_TRIGGERS.map((t) => (
                 <option key={t.value} value={t.value}>
-                  {t.label}
+                  {triggerLabel(SECTION_TRIGGERS, t.value, tA)}
                 </option>
               ))}
             </select>
@@ -1633,8 +1676,11 @@ function SectionEditor({
             )}
             {section.triggerType === "asset" && (
               <p className="muted small" style={{ marginTop: 4 }}>
-                Nothing creates asset sections automatically yet — attach the
-                assets below so it's ready when that lands.
+                {tA(
+                  (cfg.event ?? "check_out") === "check_out"
+                    ? "checklistTemplates.assetSectionHint.check_out"
+                    : "checklistTemplates.assetSectionHint.check_in",
+                )}
               </p>
             )}
           </div>
@@ -2147,6 +2193,9 @@ function ItemRow({
             <LocationCheckConfig cfg={cfg} setConfig={setConfig} />
           )}
           {item.type === "meter_reading" && <MeterConfig cfg={cfg} setConfig={setConfig} />}
+          {item.type === "fleet_vehicle" && (
+            <FleetModeConfig cfg={cfg} label={item.label} setConfig={setConfig} />
+          )}
           {item.type === "question" && (
             <QuestionConfigFields cfg={cfg} setConfig={setConfig} />
           )}
@@ -2419,6 +2468,47 @@ function QuestionConfigFields({
   );
 }
 
+/**
+ * A Fleet Vehicle Item's one setting. A label still reading as its old mode's
+ * default follows the mode; one the editor typed is left alone.
+ */
+function FleetModeConfig({
+  cfg,
+  label,
+  setConfig,
+}: {
+  cfg: Record<string, unknown>;
+  label: string;
+  setConfig: (patch: Record<string, unknown>, label?: string) => void;
+}) {
+  const { t } = useTranslation("admin");
+  const { t: tc } = useTranslation("checklists");
+  const mode = fleetItemMode(cfg as FleetVehicleConfig);
+  const defaultLabel = (m: FleetItemMode) =>
+    dataT(fleetDefaultLabelKey(m) as "fleet.defaultLabel.take", { ns: "checklists" });
+  return (
+    <div className="field-inline">
+      <span className="field-label">{t("checklistTemplates.fleetMode")}</span>
+      <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+        {FLEET_ITEM_MODES.map((m) => (
+          <button
+            key={m}
+            type="button"
+            className={"btn btn-sm" + (m === mode ? " btn-primary" : "")}
+            aria-pressed={m === mode}
+            onClick={() => {
+              if (m === mode) return;
+              setConfig({ mode: m }, label === defaultLabel(mode) ? defaultLabel(m) : undefined);
+            }}
+          >
+            {tc(`fleet.mode.${m}`)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MeterConfig({
   cfg,
   setConfig,
@@ -2444,4 +2534,15 @@ function MeterConfig({
       </select>
     </div>
   );
+}
+
+/** A trigger option's label: its own, or its catalog key's. */
+function triggerLabel(
+  options: TriggerOption[],
+  value: string,
+  t: (key: AdminKey) => string,
+): string {
+  const option = options.find((o) => o.value === value);
+  if (!option) return value;
+  return "labelKey" in option ? t(option.labelKey) : option.label;
 }

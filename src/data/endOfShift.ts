@@ -5,6 +5,7 @@ import { useRoleIdsFor } from "./users";
 import { nextEndOfShiftStep, type EndOfShiftStep, type ShiftChecklist } from "../lib/endOfShift";
 import type { InstantiableTemplate } from "../lib/checklists";
 import type { ShiftRow } from "./shifts";
+import { useHeldVehicles } from "./fleet";
 
 // What the end of a guard's shift needs to read (src/pages/checklists/
 // ActiveChecklistPage.spec.md § Ending the shift). The decision itself is
@@ -66,6 +67,7 @@ export function useEndOfShift(
   const roleIds = useRoleIdsFor(userId);
   const clockOut = useInstantiableTemplates(["clock_out"]);
   const { data: checklists } = useOpenChecklistsOf(userId);
+  const { data: heldVehicles } = useHeldVehicles(userId);
   const { data: eosRows } = useQuery<{ id: string; status: string }>(
     "SELECT id, status FROM checklist_instances WHERE id = ?",
     [shift?.end_of_shift_checklist_id ?? ""],
@@ -87,6 +89,7 @@ export function useEndOfShift(
       ? (eosRows[0] ?? { id: shift.end_of_shift_checklist_id, status: "in_progress" })
       : null,
     excludeChecklistId,
+    heldVehicles,
   });
   return { shift, step, clockOutTemplate };
 }

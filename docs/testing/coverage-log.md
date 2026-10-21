@@ -43,7 +43,8 @@ specification for the `effective_permissions` SQL view that replaces it (see
 | `data/checklistSubmit.ts` | Deferred effects at submit. |
 | `data/checkpoints.ts` | Checkpoints and tours. |
 | `data/comms.ts` | Calls, SMS, chat. |
-| `data/fleet.ts` | The Fleet card's queries and its four transactions. Its decisions (board order, fuel level, trip, whether an odometer is a reading) are `lib/fleet.ts`, fully covered; the transactions are exercised by `scripts/e2e/fleet-card.mjs`. |
+| `data/fleet.ts` | The Fleet card's and the Fleet Vehicle Item's queries and transactions: check out and in, Status Check, Keep it, and the undos. Their decisions (board order, fuel level, trip, whether an odometer is a reading, what an item reads as answered, what Edit may undo, what a Status Check writes) are `lib/fleet.ts` and `lib/fleetItem.ts`, fully covered; the transactions are exercised by `scripts/e2e/fleet-card.mjs` and `scripts/e2e/fleet-checklist.mjs`. |
+| `data/assetTriggers.ts` | Reads the inputs of an Asset trigger inside a checkout's transaction and writes its plan. The plan is `lib/assetTriggers.ts`, fully covered; the writes are exercised by `scripts/e2e/fleet-checklist.mjs` (tests 17 and 18). |
 | `data/contacts.ts` | Contacts and their details. |
 | `data/files.ts` | Attachment rows and Storage uploads. |
 | `data/incidents.ts` | Incidents, comments, the author-edit window. |

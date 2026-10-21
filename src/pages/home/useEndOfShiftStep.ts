@@ -16,6 +16,7 @@ export function endOfShiftLabel(step: EndOfShiftStep): string {
       return `Finish ${step.name}`;
     case "end_of_shift_checklist":
       return "End of Shift Checklist";
+    case "vehicle":
     case "review":
       return "End of Shift Report";
   }

@@ -203,7 +203,7 @@ once visible, nothing ever re-hides.
 | Column | Type | Notes |
 |---|---|---|
 | name | text not null | |
-| trigger_type | text not null, indexed | `manual` / `clock_in` / `clock_out` / `checkpoint` / `recurring`. |
+| trigger_type | text not null, indexed | `manual` / `clock_in` / `clock_out` / `checkpoint` / `asset` / `recurring`. `asset` is triggered through the assets on its sections being checked out or in (`src/pages/admin/AdminChecklistTemplatesPage.spec.md` § Asset triggers). |
 | trigger_config | jsonb | Recurring: `{recurrenceRule: RRULE}`. Genuinely shape-varying; stays `jsonb`. |
 | assigned_role_id | → roles, on delete set null | The one role whose members work the instances. Null until the editor sets it, and again if the role is deleted — the template survives for reassignment. A roleless template is offered to nobody; any checklist a trigger creates from it goes to whoever triggered it. |
 | assigned_to_user | boolean not null default false | True: assigned to whoever triggered it. False: unclaimed, for any holder of the role. |
@@ -218,8 +218,9 @@ office watching maintenance's progress without holding the role.
 #### `checklist_template_sections` — Tier 0 / `manage_checklists` · sync: always
 
 `template_id`, `name`, `position integer not null`, `is_active boolean not null`
-(inactive sections are never instantiated), `trigger_type`, `trigger_config jsonb`,
-`hide_until_rule`, `due_by jsonb`, `location_id → locations`.
+(inactive sections are never instantiated), `trigger_type`, `trigger_config jsonb`
+(an `asset` section's `{event: "check_out" | "check_in"}`, absent meaning
+check-out), `hide_until_rule`, `due_by jsonb`, `location_id → locations`.
 
 Junctions: `template_section_checkpoints`, `template_section_assets`.
 
@@ -231,7 +232,7 @@ visited, onto an already-open instance.
 
 `section_id` (**nullable** — see below), `type` (`simple_check` /
 `verify_task` / `door_check` / `lock_check` / `location_check` /
-`meter_reading` / `question` / `end_shift`), `label`, `config jsonb`, `position`,
+`meter_reading` / `question` / `end_shift` / `fleet_vehicle`), `label`, `config jsonb`, `position`,
 `version integer not null default 1`,
 `previous_version_id → checklist_template_items`.
 
@@ -383,16 +384,23 @@ removed in favour of deriving from it.
 #### `asset_checkouts` — Tier 0 / `manage_assets` · sync: **age**
 
 `asset_id`, `person_id → contacts`, `checked_out_by_id → users`, `time_out`,
-`time_in` (null while out). Recorded by the Fleet card only, all nullable:
-`odometer_out`, `odometer_in` (numeric), `fuel_level_in` (smallint 0–4,
-quarters of a tank, checked), `return_note`.
+`time_in` (null while out). Recorded by the Fleet card and the Fleet Vehicle
+Item only, all nullable: `odometer_out`, `odometer_in` (numeric),
+`fuel_level_in` (smallint 0–4, quarters of a tank, checked), `return_note`.
+`kept_after_shift boolean not null default false`: set on the checkout that
+continues one closed at End of Shift because the guard kept the vehicle
+(a Kept Vehicle, `CONTEXT.md`). The closed one carries the readings and, as
+its `return_note`, the reason.
 
 #### `asset_fuel_logs` — Tier 0 · sync: always
 
-A Fleet Vehicle's fill-ups. `asset_id` (restrict delete), `gallons numeric >
-0`, `cost numeric >= 0` (nullable, the marina's currency), `odometer`
-(nullable), `timestamp`, `logged_by_id`. In the `marina_config` stream; the
-Fleet card's gauge reads the newest.
+A Fleet Vehicle's fuel: fill-ups and Status Check level readings.
+`asset_id` (restrict delete), `gallons numeric > 0` (nullable: a level
+reading has none), `level smallint` (0–4, nullable: a fill-up from the
+Fleet card has none, and reads as full), `cost numeric >= 0` (nullable, the
+marina's currency), `odometer` (nullable), `timestamp`, `logged_by_id`; a row
+has gallons or a level. In the `marina_config` stream; the Fleet card's
+gauge reads the newer of this and the last check-in level.
 
 #### `asset_meter_readings` — Tier 0 · sync: **age**
 

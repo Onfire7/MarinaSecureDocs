@@ -4,8 +4,8 @@
 //
 // Ending a shift always runs in one order, whichever button starts it: finish
 // any of this shift's checklists still holding an unanswered End Shift Item,
-// then the End of Shift Checklist if one is due, then the review, which alone
-// ends the shift. The Shift card, the End Shift Item and the End of Shift
+// then the End of Shift Checklist if one is due, then any Fleet Vehicle still
+// held, then the review, which alone ends the shift. The Shift card, the End Shift Item and the End of Shift
 // Checklist's submit all ask nextEndOfShiftStep() where to go next.
 
 /** One of the guard's checklists, as much as the next step needs of it. */
@@ -19,10 +19,32 @@ export interface ShiftChecklist {
   endShift: "unanswered" | "answered" | "none";
 }
 
+/** A Fleet Vehicle checkout the guard holds. */
+export interface HeldVehicle {
+  checkoutId: string;
+  name: string;
+  time_out: string | number;
+  /** Set on a checkout opened by keeping the vehicle past an End of Shift. */
+  kept_after_shift: number | boolean | null;
+}
+
 export type EndOfShiftStep =
   | { kind: "finish"; checklistId: string; name: string }
   | { kind: "end_of_shift_checklist"; existingId: string | null }
+  | { kind: "vehicle"; checkoutId: string; name: string }
   | { kind: "review" };
+
+/**
+ * The vehicles End of Shift still has to ask about, earliest taken first. One
+ * opened by keeping it during this Shift has been asked about already; one
+ * kept from an earlier Shift has not.
+ */
+export function vehiclesToSettle(shiftStartedAt: string | number, held: HeldVehicle[]): HeldVehicle[] {
+  const start = new Date(shiftStartedAt).getTime();
+  return held
+    .filter((v) => !(v.kept_after_shift && new Date(v.time_out).getTime() >= start))
+    .sort((a, b) => new Date(a.time_out).getTime() - new Date(b.time_out).getTime());
+}
 
 export function nextEndOfShiftStep(input: {
   shiftStartedAt: string | number;
@@ -33,6 +55,8 @@ export function nextEndOfShiftStep(input: {
   endOfShiftChecklist: { id: string; status: string } | null;
   /** A checklist just submitted, whose new status may not have arrived yet. */
   excludeChecklistId?: string;
+  /** Fleet Vehicles the guard holds. */
+  heldVehicles?: HeldVehicle[];
 }): EndOfShiftStep {
   const start = new Date(input.shiftStartedAt).getTime();
   const finish = input.checklists
@@ -54,6 +78,8 @@ export function nextEndOfShiftStep(input: {
   if (!eos && input.clockOutTemplateReady) {
     return { kind: "end_of_shift_checklist", existingId: null };
   }
+  const vehicle = vehiclesToSettle(input.shiftStartedAt, input.heldVehicles ?? [])[0];
+  if (vehicle) return { kind: "vehicle", checkoutId: vehicle.checkoutId, name: vehicle.name };
   return { kind: "review" };
 }
 

@@ -67,6 +67,7 @@ const asset_checkouts = new Table(
     odometer_in: column.real,
     fuel_level_in: column.integer,
     return_note: column.text,
+    kept_after_shift: column.integer,
   },
   {
     indexes: {
@@ -85,6 +86,7 @@ const asset_fuel_logs = new Table(
     odometer: column.real,
     timestamp: column.text,
     logged_by_id: column.text,
+    level: column.integer,
   },
   {
     indexes: {

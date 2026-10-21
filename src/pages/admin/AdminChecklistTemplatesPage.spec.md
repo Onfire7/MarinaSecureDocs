@@ -18,9 +18,9 @@ visibility; personal checklists will return later as their own feature.
 | Name, assigned role | `checklist_templates.name` / `assigned_role_id` | The role is required and is flagged until it is set. Until then, instances fall back to the user who triggered them, so nothing is created that no query can reach. |
 | Viewer roles | `template_viewer_roles` | A checkbox list of the other roles, giving read-only monitoring. |
 | Assignment | `assigned_to_user` | Either assign each checklist to whoever triggers it, or leave it unclaimed for the role pool. |
-| Trigger | `trigger_type` / `trigger_config` | Manual, Clock In/Out, Checkpoint Visit, or Recurring. Recurring takes an RRULE day rule (days only; the time of day belongs to Hide until). A Checkpoint Visit template is triggered through the checkpoints named on its sections. |
+| Trigger | `trigger_type` / `trigger_config` | Manual, Clock In/Out, Checkpoint Visit, Asset Check Out/In, or Recurring. Recurring takes an RRULE day rule (days only; the time of day belongs to Hide until). A Checkpoint Visit template is triggered through the checkpoints named on its sections, and an Asset Check Out/In template through the assets on its sections (§ Asset triggers). |
 | Expected start, Hide until, Due by | `expected_start` / `hide_until_rule` / `due_by` | Authored rules. They are resolved to concrete timestamps on each instance when it is created, and exist on the template and on every section. |
-| Sections | `checklist_template_sections`, ordered | Each has a name, an active toggle, its own trigger (Always, Recurring days, Checkpoint scan, Location visit, Asset, Location status), one location, checkpoints in that location, assets, its time rules, and its ordered items. |
+| Sections | `checklist_template_sections`, ordered | Each has a name, an active toggle, its own trigger (Always, Recurring days, Checkpoint scan, Location visit, Asset checked out, Asset checked in, Location status), one location, checkpoints in that location, assets, its time rules, and its ordered items. |
 
 ## Actions
 
@@ -73,6 +73,63 @@ The rules live in the editor because a template can't be saved in a state
 that breaks them, and nothing else writes templates. A device reading an old
 template that somehow breaks them still behaves: the Active Checklist only
 ever acts on an End Shift Item when it is tapped, wherever it sits.
+
+## Fleet Vehicle Items
+
+A Fleet Vehicle Item (`src/pages/checklists/ActiveChecklistPage.spec.md`
+§ Fleet Vehicle Item) has one setting, its **mode**, stored as
+`config.mode`:
+
+| Mode | `config.mode` | Default label |
+|---|---|---|
+| Take a Vehicle | `take` | Take a vehicle |
+| Status Check | `status` | Vehicle status check |
+| Return Your Vehicle | `return` | Return your vehicle |
+
+The mode is chosen from three buttons in the item's settings, and changing it
+is an ordinary config edit (a new version if the item is referenced). A
+template may hold any number of Fleet Vehicle Items, in any modes and
+sections: a Clock In checklist with Take, a midnight section with Status
+Check, an End of Shift Checklist with Return. Nothing about which vehicle is
+configured: the guard chooses from the board, because which vehicle is free
+is only known on the night.
+
+## Asset triggers
+
+Checking an Asset out or in is an event a checklist can respond to, as a
+checkpoint scan is. It fires wherever the checkout happens: the Fleet card, a
+Fleet Vehicle Item, or Asset Detail's Checkout / Return. Keeping a vehicle
+past End of Shift fires nothing, since nothing was checked out or in.
+
+- **Section triggers.** A section's trigger is **Asset checked out** or
+  **Asset checked in** (`trigger_type = 'asset'`, `trigger_config.event` =
+  `check_out` / `check_in`), with the assets it watches attached below it.
+  A section saved before this change, with no event, is treated as
+  **Asset checked out**.
+- **Template trigger.** **Asset Check Out/In** (`trigger_type = 'asset'`),
+  triggered through the assets on its sections, like Checkpoint Visit.
+- **Who gets it: the person now holding the asset**, for both events: the
+  marina user whose `contact_id` is the checkout's person, whoever pressed
+  the button. A manager checking the truck out to a guard from Asset Detail
+  sends the work to the guard. A checkout to someone with no user account (a
+  guest, from Asset Detail) fires nothing.
+- **What it adds.** For each active section watching this asset for this
+  event: if the holder has an open checklist from that template, the section
+  is added to it (once; a second checkout adds nothing new). Otherwise, if
+  the template's own trigger is Asset Check Out/In and it is eligible today,
+  a new checklist is created for the holder holding just the triggered
+  sections, as a checkpoint scan does. Ids are derived from the checkout and
+  the event, so a replayed write queue converges rather than duplicating.
+- **In the same transaction** as the checkout or check-in, with a
+  `checklist.created` activity entry naming the vehicle, so a checkout is
+  never recorded without its work.
+- **Undo.** Undoing a checkout or check-in from a Fleet Vehicle Item removes
+  the sections and checklists that event added, if nothing in them has been
+  answered. Answered work stays.
+
+The builder's section editor shows the event as two trigger choices and lists
+the attached assets, as today. Its old note, "Nothing creates asset sections
+automatically yet", goes.
 
 ## Item versions
 
@@ -182,5 +239,6 @@ Two consequences of rules 1 and 4, both accepted:
 - **Checkpoint Visit trigger with no checkpoints on any section.** Shown
   plainly. The template never generates a checklist until a section names a
   checkpoint.
-- **Asset sections.** Configurable now, but no runtime event creates them
-  yet. The builder says so.
+- **Asset Check Out/In template with no assets on any section.** Shown
+  plainly, as for Checkpoint Visit. It never generates a checklist until a
+  section names an asset.

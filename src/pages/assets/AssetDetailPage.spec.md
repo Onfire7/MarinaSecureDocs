@@ -20,8 +20,8 @@ Tickets.
 | Location | `assets.location_id` | Reassignable by `manage_assets`. |
 | Fleet | `assets.is_fleet` | A `manage_assets` holder sees a **Fleet vehicle** toggle; anyone else sees "On the Dashboard's Fleet card" when it is set. |
 | Maintenance rules | `maintenance_rules` | e.g. "every 3,000 miles"; edited in Admin, read-only here. |
-| Checkout log | `asset_checkouts`, newest first | Only for checkoutable assets; the open checkout, if any, highlighted at the top. A returned checkout made from the Fleet card also shows odometer out → in with the trip, the fuel level it came back with, and the return note. |
-| Fuel | `asset_fuel_logs`, newest first | Shown for a Fleet Vehicle, or any asset with fill-ups: gallons, cost, odometer, who and when. |
+| Checkout log | `asset_checkouts`, newest first | Only for checkoutable assets; the open checkout, if any, highlighted at the top. A returned checkout made from the Fleet card also shows odometer out → in with the trip, the fuel level it came back with, and the return note. A checkout closed because its vehicle was kept past End of Shift reads "Kept past End of Shift" in place of a return, and the one that continues it, "Kept from the previous shift". |
+| Fuel | `asset_fuel_logs`, newest first | Shown for a Fleet Vehicle, or any asset with fuel records: fill-ups (gallons, cost) and level readings from a Status Check, each with its level, odometer, who and when. |
 | Reservation config | `assets.reservation_enabled` / `reservation_visibility` / `post_return_status_id` | Read-only summary, with the next upcoming reservation beside the status. |
 
 ## Actions
@@ -29,7 +29,7 @@ Tickets.
 | Action | Gating | Behaviour |
 |---|---|---|
 | Log a status update | `manage_assets` | Appends an `asset_status_logs` entry, which is the new status. Putting an Out of Service vehicle back in service happens here. |
-| Check out / Return | `manage_assets` | The Checkout / Return dialog (`docs/pages/asset-checkout-dialog.html`). Checkout records are within this permission's scope (`docs/permissions.md`). This is where a vehicle someone forgot to check in is returned, and where an out-of-service vehicle is checked out for its maintenance, since the Fleet card offers neither. |
+| Check out / Return | `manage_assets` | The Checkout / Return dialog (`docs/pages/asset-checkout-dialog.html`). Checkout records are within this permission's scope (`docs/permissions.md`). This is where a vehicle someone forgot to check in is returned, and where an out-of-service vehicle is checked out for its maintenance, since the Fleet card offers neither. Both fire checklist Asset triggers, for the person now holding the asset (`src/pages/admin/AdminChecklistTemplatesPage.spec.md` § Asset triggers). |
 | Update the meter | `manage_assets` | The Meter Update dialog. Distinct from a Meter Reading checklist item, which is unrestricted as part of checklist completion. |
 | Fleet vehicle toggle | `manage_assets` | Adds the asset to the Fleet card or takes it off. Turning it on also makes the asset checkoutable, which a Fleet Vehicle must be. |
 | Add a note | None | New Note dialog, pre-attached. |

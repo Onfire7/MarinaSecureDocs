@@ -36,6 +36,8 @@ import { useEndOfShift } from "../../data/endOfShift";
 import { pinEndShiftLast } from "../../lib/endOfShift";
 import { useGoToEndOfShiftStep } from "../home/useEndOfShiftStep";
 import { EndShiftItem } from "./EndShiftItem";
+import { FleetVehicleItem } from "./FleetVehicleItem";
+import { useFleetItems } from "./useFleetItems";
 import {
   DoorCheckItem,
   LockCheckItem,
@@ -139,6 +141,9 @@ export function ChecklistItemsPanel({
   const { data: allInstances } = useInstances();
   const { statuses: incidentStatuses } = useIncidentStatuses();
   const { statuses: ticketStatuses } = useTicketStatuses();
+  // Fleet Vehicle Items can be answered by circumstance (a vehicle already in
+  // hand), so whether one is done reads the fleet, not just its row.
+  const fleet = useFleetItems();
 
   // Who may work this checklist: its assignee, any holder of the template's
   // assignedRole, or anyone at all if the template somehow has no role (the
@@ -239,6 +244,7 @@ export function ChecklistItemsPanel({
   }
 
   const isDone = (item: ItemRow) => {
+    if (item.type === "fleet_vehicle") return fleet.answer(item) != null;
     if (item.result == null) return false;
     if (item.type === "location_check") {
       const nestedId = (itemResult(item) as { nestedChecklistId?: string } | null)
@@ -273,6 +279,13 @@ export function ChecklistItemsPanel({
 
   const runSubmit = async (then: "default" | "end_shift" = "default") => {
     const templateName = checklist.template_name ?? "Checklist";
+    // A Fleet Vehicle Item answered by circumstance is written now, recording
+    // the circumstance at the moment the checklist is handed in.
+    for (const item of allItems) {
+      if (item.type !== "fleet_vehicle" || item.result != null) continue;
+      const answer = fleet.answer(item);
+      if (answer) await completeItem(item.id, answer.result, item.note, current.user?.id ?? null);
+    }
     // Everything the items described while the guard worked — incidents,
     // tickets, meter readings — is written in the same transaction that
     // completes the checklist. Until this point an item could still be reopened
@@ -642,6 +655,9 @@ export function ChecklistItemsPanel({
                             onEndShift={() => void endShiftNow(item)}
                           />
                         );
+                      }
+                      if (item.type === "fleet_vehicle") {
+                        return <FleetVehicleItem item={item} fleet={fleet} editable={canAct} />;
                       }
                       const Component = componentFor(item.type);
                       return (

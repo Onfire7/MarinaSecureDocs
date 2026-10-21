@@ -4,6 +4,10 @@ import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { formatDuration, shiftWindowMs } from "../../lib/shiftReport";
 import { endShift } from "../../data/shifts";
 import { useEndOfShift, useOpenShiftChecklists } from "../../data/endOfShift";
+import { useHeldVehicles } from "../../data/fleet";
+import { vehiclesToSettle } from "../../lib/endOfShift";
+import { VehicleUseSection } from "../reports/VehicleUseSection";
+import { BeforeYouGo } from "./BeforeYouGo";
 
 // The End of Shift review, /shift/end (ActiveChecklistPage.spec.md § Ending
 // the shift). The only place a shift ends. Until the Shift Report is built it
@@ -16,6 +20,7 @@ export function EndOfShiftPage() {
   const userId = current.user?.id;
   const { shift } = useEndOfShift(userId);
   const open = useOpenShiftChecklists(userId, shift?.started_at);
+  const { data: held } = useHeldVehicles(userId);
   const [ending, setEnding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,6 +32,10 @@ export function EndOfShiftPage() {
       </div>
     );
   }
+
+  // A vehicle still held comes first, one at a time (§ Ending the shift).
+  const unsettled = vehiclesToSettle(shift.started_at, held)[0];
+  if (unsettled) return <BeforeYouGo key={unsettled.checkoutId} checkoutId={unsettled.checkoutId} />;
 
   const submit = async () => {
     if (!current.user) return;
@@ -78,6 +87,10 @@ export function EndOfShiftPage() {
           </div>
         </div>
       )}
+
+      <div style={{ marginBottom: 14 }}>
+        <VehicleUseSection shift={shift} />
+      </div>
 
       {error && (
         <div className="badge badge-bad" style={{ display: "block", marginBottom: 12 }}>

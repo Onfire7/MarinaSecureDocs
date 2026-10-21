@@ -62,8 +62,10 @@ on Asset Detail.
 
 **Fuel gauge.** Five steps, E · ¼ · ½ · ¾ · F, filled to the vehicle's last
 known level and coloured as low at ¼ and below. Last known level is the most
-recent of: the level recorded at a check-in, or a fill-up (which means F).
-No record yet shows an empty, uncoloured gauge.
+recent of: the level recorded at a check-in, or an `asset_fuel_logs` row,
+which carries its level (a Status Check, or a fill-up whose level was
+given) or, for a fill-up without one, means F. No record yet
+shows an empty, uncoloured gauge.
 
 ### Motion
 
@@ -122,6 +124,16 @@ All additive, in one migration (`20261020000200_fleet_vehicles.sql`), then
   sync stream, which must then be re-applied to the remote PowerSync
   dashboard.
 - Data: `use_fleet` appended to the predefined Security role's `allow`.
+
+## Checklists
+
+The same vehicles can be taken, checked and returned from a checklist: the
+Fleet Vehicle Item (`src/pages/checklists/ActiveChecklistPage.spec.md`
+§ Fleet Vehicle Item), which shows this card's board and tiles. Checking out
+or in from this card also fires the Asset triggers of checklist templates
+(`src/pages/admin/AdminChecklistTemplatesPage.spec.md` § Asset triggers),
+and a guard who ends a shift still holding a vehicle is asked to check it in
+or keep it (§ Ending the shift there).
 
 ## Related changes elsewhere
 

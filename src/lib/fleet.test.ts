@@ -79,18 +79,33 @@ describe("boardOrder (test 1)", () => {
   });
 });
 
-describe("lastFuelLevel (test 2)", () => {
+describe("lastFuelLevel (test 2; Fleet Vehicle Item test 4)", () => {
+  const fill = (at: string) => ({ at, level: null });
+
   it("is the level recorded at check-in when that is the latest", () => {
     expect(
-      lastFuelLevel({ at: "2026-10-20T10:00:00Z", level: 1 }, "2026-10-19T10:00:00Z"),
+      lastFuelLevel({ at: "2026-10-20T10:00:00Z", level: 1 }, fill("2026-10-19T10:00:00Z")),
     ).toBe(1);
   });
 
-  it("is full when a fill-up is the latest", () => {
+  it("is full when a fill-up with no level is the latest", () => {
     expect(
-      lastFuelLevel({ at: "2026-10-20T10:00:00Z", level: 1 }, "2026-10-20T11:00:00Z"),
+      lastFuelLevel({ at: "2026-10-20T10:00:00Z", level: 1 }, fill("2026-10-20T11:00:00Z")),
     ).toBe(4);
-    expect(lastFuelLevel(null, "2026-10-20T11:00:00Z")).toBe(4);
+    expect(lastFuelLevel(null, fill("2026-10-20T11:00:00Z"))).toBe(4);
+  });
+
+  it("is a fuel log's own level when it carries one: a Status Check, or a fill-up with a level", () => {
+    expect(
+      lastFuelLevel({ at: "2026-10-20T10:00:00Z", level: 4 }, { at: "2026-10-20T11:00:00Z", level: 1 }),
+    ).toBe(1);
+    expect(lastFuelLevel(null, { at: "2026-10-20T11:00:00Z", level: 3 })).toBe(3);
+  });
+
+  it("is the check-in when it is newer than a level reading", () => {
+    expect(
+      lastFuelLevel({ at: "2026-10-20T12:00:00Z", level: 2 }, { at: "2026-10-20T11:00:00Z", level: 0 }),
+    ).toBe(2);
   });
 
   it("keeps an empty tank at empty rather than treating it as unknown", () => {

@@ -143,6 +143,15 @@ The last item of a checklist, which submits that checklist and carries the
 guard on to the end of their Shift: the End of Shift Checklist if one is
 due, then End of Shift.
 
+**Fleet Vehicle Item**:
+An item that takes, checks or returns a Fleet Vehicle from inside a
+checklist, in one of three modes: Take a Vehicle, Status Check, Return Your
+Vehicle. Always optional: "No vehicle this shift" is a full answer.
+
+**Status Check**:
+The Fleet Vehicle Item mode that records a vehicle's odometer and fuel level,
+with any fill-up, without checking it in or out.
+
 **End of Shift Checklist**:
 The Checklist a Clock Out Trigger creates for a guard as their Shift ends.
 Finishing it leads to End of Shift; it does not end the Shift itself.
@@ -310,8 +319,15 @@ Fleet Vehicle whose Asset Status is Out of Service is disabled on the card.
 _Avoid_: Vehicle, which is a guest's
 
 **Fuel Log**:
-A record of a Fleet Vehicle being filled up: gallons, optional cost, and
-the odometer at the pump. After one, the vehicle's fuel gauge reads full.
+A record of a Fleet Vehicle's fuel: a fill-up (gallons, optional cost, the
+odometer at the pump) or a level reading from a Status Check. The fuel gauge reads the newest; a fill-up with no level given
+means full.
+
+**Kept Vehicle**:
+A Fleet Vehicle a guard keeps past their End of Shift. Its checkout is
+closed at End of Shift with the odometer, fuel level and the reason, and a
+new checkout to the same guard opens at once, marked kept after shift. The
+Shift Report shows it as kept, not returned.
 
 **Reservation**:
 A booking of a reservable Location or Asset. An upcoming Reservation never

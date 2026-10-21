@@ -3,6 +3,7 @@ import { db, stamp } from "../lib/db";
 import type { LockContext } from "@powersync/web";
 import { insert, remove, transact, update } from "./sql";
 import { recordActivity } from "./activity";
+import { fireAssetTrigger } from "./assetTriggers";
 import {
   dueMeterMaintenanceRules,
   maintenanceRuleTitle,
@@ -148,6 +149,8 @@ export interface CheckoutRow {
   odometer_in: number | null;
   fuel_level_in: number | null;
   return_note: string | null;
+  /** Opened by keeping the vehicle past an End of Shift. */
+  kept_after_shift: number | null;
   person_name: string | null;
   checked_out_by_name: string | null;
 }
@@ -306,11 +309,12 @@ export async function checkOutAsset(
   actorId: string | null,
 ): Promise<void> {
   await transact(async (tx) => {
-    await insert(tx, "asset_checkouts", {
+    const at = stamp(when);
+    const checkoutId = await insert(tx, "asset_checkouts", {
       asset_id: asset.id,
       person_id: person.id,
       checked_out_by_id: actorId,
-      time_out: stamp(when),
+      time_out: at,
     });
     await recordActivity(tx, {
       eventType: "asset.checked_out",
@@ -319,6 +323,7 @@ export async function checkOutAsset(
       subjectId: asset.id,
       actorId,
     });
+    await fireAssetTrigger(tx, { event: "check_out", asset, checkoutId, personContactId: person.id, at }, actorId);
   });
 }
 
@@ -330,7 +335,8 @@ export async function checkInAsset(
   actorId: string | null,
 ): Promise<void> {
   await transact(async (tx) => {
-    await update(tx, "asset_checkouts", checkoutId, { time_in: stamp(when) });
+    const at = stamp(when);
+    await update(tx, "asset_checkouts", checkoutId, { time_in: at });
     if (postReturnStatus) {
       await insert(tx, "asset_status_logs", {
         asset_id: asset.id,
@@ -347,7 +353,39 @@ export async function checkInAsset(
       subjectId: asset.id,
       actorId,
     });
+    const checkout = await tx.getOptional<{ person_id: string | null }>(
+      "SELECT person_id FROM asset_checkouts WHERE id = ?",
+      [checkoutId],
+    );
+    await fireAssetTrigger(
+      tx,
+      { event: "check_in", asset, checkoutId, personContactId: checkout?.person_id ?? null, at },
+      actorId,
+    );
   });
+}
+
+/**
+ * Withdraw a reading an undo takes back. If it is still the asset's newest,
+ * the asset's reading falls back to the one before it; a later reading
+ * stands. Tickets it raised are real work and stay.
+ */
+export async function withdrawMeterReading(
+  tx: LockContext,
+  assetId: string,
+  readingId: string,
+): Promise<void> {
+  const newest = await tx.getOptional<{ id: string }>(
+    "SELECT id FROM asset_meter_readings WHERE asset_id = ? ORDER BY timestamp DESC, id DESC LIMIT 1",
+    [assetId],
+  );
+  await tx.execute("DELETE FROM asset_meter_readings WHERE id = ?", [readingId]);
+  if (newest?.id !== readingId) return;
+  const previous = await tx.getOptional<{ value: number }>(
+    "SELECT value FROM asset_meter_readings WHERE asset_id = ? ORDER BY timestamp DESC, id DESC LIMIT 1",
+    [assetId],
+  );
+  if (previous) await update(tx, "assets", assetId, { meter_reading: previous.value });
 }
 
 /**
@@ -422,8 +460,11 @@ export async function writeMeterReading(
   ticketStatusId: string | null,
   actorId: string | null,
   due: MeterRule[],
+  /** Given when the writer must be able to withdraw this reading later. */
+  readingId?: string,
 ): Promise<string[]> {
   await insert(tx, "asset_meter_readings", {
+    id: readingId,
     asset_id: asset.id,
     value,
     source,

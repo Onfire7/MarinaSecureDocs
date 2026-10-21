@@ -7,11 +7,10 @@ import { DEFAULT_POST_RETURN_STATUS, formatNumber, meterUnit } from "../../lib/a
 import {
   boardOrder,
   fleetGroup,
-  FUEL_STEPS,
   holderName,
-  lastFuelLevel,
   readingChange,
   tripDistance,
+  vehicleFuelLevel,
   type FleetGroup,
 } from "../../lib/fleet";
 import {
@@ -25,6 +24,7 @@ import {
   type FleetVehicleRow,
 } from "../../data/fleet";
 import { resolveStatusByName, useAssetStatuses, useTicketStatuses } from "../../data/lookups";
+import { FuelGauge } from "./fleetParts";
 
 // Dashboard — the Fleet card (see FleetCard.spec.md).
 // A board of the marina's own vehicles. Yours span the width with their
@@ -202,7 +202,7 @@ export function FleetCard() {
                     {meterText(v)}
                   </div>
                 )}
-                <FuelGauge level={fuelOf(v)} />
+                <FuelGauge level={vehicleFuelLevel(v)} />
               </div>
             </div>
             <div
@@ -270,7 +270,7 @@ export function FleetCard() {
                     {meterText(v)}
                   </div>
                 )}
-                <FuelGauge level={fuelOf(v)} />
+                <FuelGauge level={vehicleFuelLevel(v)} />
               </button>
               {/* The drawer: animating grid rows 0fr → 1fr slides the tile's
                   bottom down to its natural height without measuring it. An
@@ -335,14 +335,6 @@ function transitionName(v: { id: string }): CSSProperties {
   } as CSSProperties;
 }
 
-function fuelOf(v: FleetVehicleRow): number | null {
-  return lastFuelLevel(
-    v.last_checkin_at != null && v.last_checkin_level != null
-      ? { at: v.last_checkin_at, level: v.last_checkin_level }
-      : null,
-    v.last_fill_at,
-  );
-}
 
 function since(ts: string | null): string {
   if (!ts) return "";
@@ -351,51 +343,6 @@ function since(ts: string | null): string {
   return h > 0 ? `${h}h ${minutes % 60}m` : `${minutes}m`;
 }
 
-// ---------------------------------------------------------------- fuel gauge
-
-/** Five steps, E to F. Read-only gauges sit inside tile buttons, so they
- *  can't be buttons themselves. */
-function FuelGauge({ level, onChange }: { level: number | null; onChange?: (level: number) => void }) {
-  const low = level != null && level <= 1;
-  return (
-    <div
-      style={{ display: "flex", gap: 3 }}
-      data-testid="fuel-gauge"
-      data-level={level ?? ""}
-      aria-label={level == null ? "Fuel unknown" : `Fuel ${FUEL_STEPS[level]}`}
-      role={onChange ? "group" : "img"}
-    >
-      {FUEL_STEPS.map((step, i) => {
-        const filled = level != null && i <= level;
-        const style: CSSProperties = {
-          flex: 1,
-          minWidth: onChange ? 36 : 10,
-          height: onChange ? 34 : 6,
-          border: "none",
-          borderRadius: 3,
-          padding: 0,
-          background: filled ? (low ? "var(--bad)" : "var(--good)") : "var(--line)",
-          color: filled ? "#fff" : "var(--mute)",
-          fontSize: "0.8rem",
-          fontWeight: 650,
-        };
-        return onChange ? (
-          <button
-            key={step}
-            type="button"
-            aria-pressed={level === i}
-            style={{ ...style, cursor: "pointer" }}
-            onClick={() => onChange(i)}
-          >
-            {step}
-          </button>
-        ) : (
-          <span key={step} style={style} />
-        );
-      })}
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------- dialogs
 

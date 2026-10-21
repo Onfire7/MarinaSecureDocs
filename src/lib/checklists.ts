@@ -5,6 +5,7 @@
 // rules (hideUntilRule, dueBy, recurrence) into concrete instance timestamps.
 // Trigger rules decide IF a row is created; hideUntil decides WHEN it shows.
 import { rrulestr } from "rrule";
+import type { FleetVehicleConfig, FleetVehicleResult } from "./fleetItem";
 
 export type ItemType =
   | "simple_check"
@@ -14,7 +15,8 @@ export type ItemType =
   | "location_check"
   | "meter_reading"
   | "question"
-  | "end_shift";
+  | "end_shift"
+  | "fleet_vehicle";
 
 /** One-line reading of a recorded answer, for lists and reports. */
 export function questionAnswerSummary(r: QuestionResult): string {
@@ -162,6 +164,7 @@ export type ItemConfig =
   | LocationCheckConfig
   | QuestionConfig
   | MeterReadingConfig
+  | FleetVehicleConfig
   | Record<string, never>;
 
 // ---- Deferred side effects ----
@@ -300,7 +303,8 @@ export type ItemResult =
   | LocationCheckResult
   | MeterReadingResult
   | QuestionResult
-  | EndShiftResult;
+  | EndShiftResult
+  | FleetVehicleResult;
 
 // ---- Template trigger types ----
 
@@ -313,7 +317,8 @@ export type TemplateTriggerType =
   | "clock_in"
   | "clock_out"
   | "checkpoint"
-  | "recurring";
+  | "recurring"
+  | "asset";
 
 export const TEMPLATE_TRIGGER_LABEL: Record<TemplateTriggerType, string> = {
   manual: "Manual",
@@ -321,6 +326,7 @@ export const TEMPLATE_TRIGGER_LABEL: Record<TemplateTriggerType, string> = {
   clock_out: "Clock Out",
   checkpoint: "Checkpoint",
   recurring: "Recurring",
+  asset: "Asset Check Out/In",
 };
 
 export function triggerTypeLabel(t: string | null | undefined): string {
@@ -382,6 +388,7 @@ export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   meter_reading: "Meter Reading",
   question: "Question",
   end_shift: "End Shift",
+  fleet_vehicle: "Fleet Vehicle",
 };
 
 /**
@@ -455,7 +462,16 @@ export interface TriggerConfig {
    * calendar-day gate on creation; any time-of-day component is ignored.
    */
   recurrenceRule?: string;
+  /**
+   * For "asset" sections: whether checking a watched asset out or in creates
+   * the section. Absent reads as check_out — sections saved before the event
+   * existed never fired, and check-out is what they were set up for.
+   */
+  event?: AssetEvent;
 }
+
+/** What happens to an Asset that an "asset" section can respond to. */
+export type AssetEvent = "check_out" | "check_in";
 
 /** The parts of a checklist_template_items row every consumer here relies on. */
 export interface TemplateItemLike {
@@ -620,6 +636,8 @@ export function hideUntilWarning(
       return "Manual checklists start whenever someone taps Start, so one begun after this time hides the row until the same time tomorrow.";
     if (triggerType === "checkpoint")
       return "Checkpoint scans happen at any hour, so a scan after this time hides the row until the same time tomorrow.";
+    if (triggerType === "asset")
+      return "Assets are checked out and in at any hour, so one after this time hides the row until the same time tomorrow.";
     if (triggerType === "clock_out")
       return "Clock-out checklists are created as someone leaves, so anything hidden until later the same day won't be seen on that shift at all.";
     return undefined;
@@ -631,7 +649,7 @@ export function hideUntilWarning(
   if (triggerType === "location")
     return "Location sections appear when the location is visited, which can be any hour — a visit after this time hides the section until the same time tomorrow.";
   if (triggerType === "asset")
-    return "Asset sections appear when the asset is scanned, which can be any hour — a scan after this time hides the section until the same time tomorrow.";
+    return "Asset sections appear when the asset is checked out or in, which can be any hour — one after this time hides the section until the same time tomorrow.";
   return undefined;
 }
 

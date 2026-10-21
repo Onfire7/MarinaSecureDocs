@@ -9,8 +9,9 @@ import { useCheckInsInWindow } from "../../data/checkins";
 import { useInstances } from "../../data/checklists";
 import { useIncidents } from "../../data/incidents";
 import { useTickets } from "../../data/tickets";
+import { VehicleUseSection } from "./VehicleUseSection";
 
-// Reports — Shift Report (see docs/pages/shift-report.html).
+// Reports — Shift Report (see ShiftReportPage.spec.md).
 // Content is compiled live from current data every time it's viewed, so it
 // can legitimately show more than the original email contained — a resend
 // captures this current state, not the original snapshot.
@@ -158,6 +159,8 @@ export function ShiftReportPage() {
               </Link>
             ))}
           </Section>
+
+          <VehicleUseSection shift={shift} />
         </div>
 
         <div className="stack">
