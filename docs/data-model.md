@@ -205,7 +205,7 @@ once visible, nothing ever re-hides.
 | name | text not null | |
 | trigger_type | text not null, indexed | `manual` / `clock_in` / `clock_out` / `checkpoint` / `recurring`. |
 | trigger_config | jsonb | Recurring: `{recurrenceRule: RRULE}`. Genuinely shape-varying; stays `jsonb`. |
-| assigned_role_id | → roles not null | Every template belongs to exactly one role; its members work the instances. |
+| assigned_role_id | → roles, on delete set null | The one role whose members work the instances. Null until the editor sets it, and again if the role is deleted — the template survives for reassignment. A roleless template is offered to nobody; any checklist a trigger creates from it goes to whoever triggered it. |
 | assigned_to_user | boolean not null default false | True: assigned to whoever triggered it. False: unclaimed, for any holder of the role. |
 | hide_until_rule | text | `"HH:MM"`, resolved to `instance.hide_until` at creation. |
 | expected_start | text | `"HH:MM"`, nullable — when this checklist is normally started. It is what gives every `hide_until_rule` in the template (its own and its sections') a **date**: at creation it resolves to `instance.expected_start_at`, the occurrence nearest the creation time (±12h, a tie going to the past), and each hide-until becomes the first occurrence of its clock time at or after that anchor — which may be in the past, meaning "already visible". Without it a hide-until rolls forward from the creation time, which hides a section for a whole shift whenever the checklist is started after the reveal time, and after midnight resolves to the wrong calendar date entirely. Lives on the template, not the shift or the marina's settings, so nothing about who clocked in when can move it. |

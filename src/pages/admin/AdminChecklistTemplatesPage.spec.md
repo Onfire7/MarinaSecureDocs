@@ -173,7 +173,9 @@ Two consequences of rules 1 and 4, both accepted:
 ## States & edge cases
 
 - **Template with no assigned role.** Flagged in the builder. Until a role is
-  set, its instances fall back to whoever triggers them.
+  set, its instances fall back to whoever triggers them. A template has no
+  role when it is new, and again when its role is deleted: the template is
+  kept, not deleted with the role, so it can be given another one.
 - **Deleting a template with open checklists.** Those checklists are
   unaffected and render through the kept item rows. Only future triggers stop.
   There is no banner, because there is no template left to compare against.
