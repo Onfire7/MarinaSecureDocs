@@ -45,6 +45,68 @@ visibility; personal checklists will return later as their own feature.
   keystroke. Duplicate copies the type and config to the end of the list as a
   fresh version-1 row.
 - **Update open checklists.** See below.
+- **Copy a section to locations.** One section per chosen location, modelled
+  on the one you built. See below.
+
+## Copy a section to locations
+
+A section is almost always "the round you do at a place", and a marina has
+many places that get the same round: every slip on a dock, every boathouse,
+every gate. Building that round once and copying it is the only way to set
+up forty of them, so an open section offers **Copy to locations…** beside
+Delete. The source section is the pattern: whatever it asks, wherever it is,
+is what each copy asks at its own place.
+
+### The dialog
+
+- **Which locations.** A parent picker ("Under") and a location-type filter
+  narrow a checkbox list of candidates: the descendants of the parent, of
+  that type, each shown with its ancestor path. Neither filter is required:
+  with no parent, the list is every location. "Select all" ticks the list as
+  filtered. The source's own location is never offered, and a location that
+  already has a section in this template is shown ticked and disabled with
+  "already in this template", so running the copy twice adds nothing.
+- **Checkpoints**, one of three:
+  - **Attach every checkpoint at the location.** Whatever checkpoints exist
+    at each target, all of them.
+  - **Create matching checkpoints.** For each checkpoint attached to the
+    source section, a checkpoint at the target named by the substitution rule
+    below, with a fresh GUID (a new tag to write) and the source's GPS
+    validation radius, and no GPS fix, since that was the source's place.
+    If the target already has a checkpoint of that name, it is attached
+    instead of created again. Disabled, with the reason, when the source has
+    no checkpoints.
+  - **None.** Attach by hand later.
+- **Add N sections** writes everything in one transaction. Nothing is
+  written until then; Cancel writes nothing.
+
+### What each copy gets
+
+- **Name, item labels and created checkpoint names** follow the
+  **substitution rule**: the source location's name is searched for in the
+  text, case-insensitively, and every occurrence is replaced with the
+  target's name. If it is not found, the target's name is appended after a
+  space. "Dock A walk" copied to Dock B becomes "Dock B walk"; "Door check"
+  becomes "Door check Dock B". A source with no location has nothing to
+  search for, so its names are always appended to.
+- **Location** is the target. Trigger, trigger config, Hide until, Due by
+  and the active flag are copied from the source.
+- **Items** are fresh version-1 rows, in the source's order, as Duplicate
+  template makes them. A Door Check or Lock Check whose `config.locationId`
+  is the source's location is repointed to the target; one pointing anywhere
+  else keeps it. An End Shift Item is never copied, because the template may
+  hold only one.
+- **Assets** are attached as on the source. An asset is a thing, not a
+  place, so it is the same asset everywhere.
+- **Position** is directly after the source, in the order the list showed
+  the targets, and the sections that followed the source move down. The
+  copies arrive collapsed; the source stays as it was.
+
+Open checklists see the copies through **Update open checklists**, under its
+rule 7, like any other new section. Nothing in the copy touches an instance.
+
+The plan — which rows, with what names, pointing where — is pure and lives
+in `src/lib/sectionCopy.ts`; `src/data/checklists.ts` only executes it.
 
 ## End Shift Items
 

@@ -10,6 +10,7 @@ import {
 } from "../../lib/fleetItem";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import {
+  copySectionToLocations,
   createItem,
   createSection,
   createTemplate,
@@ -53,6 +54,7 @@ import {
   itemTypeLabel,
   normalizeItemType,
   type DueByRule,
+  type ItemConfig,
   type ItemType,
   type QuestionAnswerType,
   type StateCheckType,
@@ -61,6 +63,13 @@ import {
   type YesNoDetailsOn,
 } from "../../lib/checklists";
 import { LocationPicker } from "../shared/LocationPicker";
+import { locationPathResolver } from "../../lib/checkpoints";
+import {
+  coveredLocationIds,
+  planSectionCopies,
+  type CheckpointMode,
+  type CopySourceSection,
+} from "../../lib/sectionCopy";
 import { compareNames } from "../../lib/locations";
 import { MultiSelectDialog } from "../shared/MultiSelectDialog";
 import { ReorderableList } from "../shared/ReorderableList";
@@ -681,6 +690,309 @@ function NewSectionDialog({
   );
 }
 
+type CopyLocation = {
+  id: string;
+  name: string;
+  parent_id?: string | null;
+  type_name?: string | null;
+  retired_at?: string | null;
+};
+
+const COPY_LIST_LIMIT = 300;
+
+/**
+ * Copy a section to locations (spec § Copy a section to locations). The
+ * section is the pattern; this only chooses where it goes and what to do
+ * about checkpoints. The plan is `planSectionCopies`, pure, and nothing is
+ * written until the button.
+ */
+function CopySectionDialog({
+  section,
+  templateId,
+  templateSections,
+  locations,
+  allCheckpoints,
+  onClose,
+}: {
+  section: SectionRow & { items: TemplateItemRow[] };
+  templateId: string;
+  /** Every section of the template, in order. */
+  templateSections: SectionRow[];
+  locations: CopyLocation[];
+  allCheckpoints: {
+    id: string;
+    name: string;
+    location_id?: string | null;
+    gps_validation_radius?: number | null;
+  }[];
+  onClose: () => void;
+}) {
+  const { t: tA } = useTranslation("admin");
+  const [parentId, setParentId] = useState("");
+  const [typeName, setTypeName] = useState("");
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  const sourceCheckpoints = section.checkpoints ?? [];
+  const [mode, setMode] = useState<CheckpointMode>("none");
+
+  const live = useMemo(() => locations.filter((l) => !l.retired_at), [locations]);
+  const typeNames = useMemo(
+    () =>
+      [...new Set(live.map((l) => l.type_name).filter((n): n is string => Boolean(n)))].sort(
+        compareNames,
+      ),
+    [live],
+  );
+  const pathOf = useMemo(() => locationPathResolver(live), [live]);
+  const covered = useMemo(
+    () =>
+      coveredLocationIds(
+        { locationId: section.location?.id ?? null },
+        templateSections.map((s) => ({ locationId: s.location?.id ?? null })),
+      ),
+    [section.location, templateSections],
+  );
+
+  // The descendants of the parent (every depth), of the type — or everything.
+  const candidates = useMemo(() => {
+    let pool = live;
+    if (parentId) {
+      const children = new Map<string, CopyLocation[]>();
+      for (const l of live) {
+        if (!l.parent_id) continue;
+        const list = children.get(l.parent_id) ?? [];
+        list.push(l);
+        children.set(l.parent_id, list);
+      }
+      pool = [];
+      const queue = [...(children.get(parentId) ?? [])];
+      const seen = new Set<string>();
+      while (queue.length) {
+        const l = queue.shift()!;
+        if (seen.has(l.id)) continue;
+        seen.add(l.id);
+        pool.push(l);
+        queue.push(...(children.get(l.id) ?? []));
+      }
+    }
+    if (typeName) pool = pool.filter((l) => l.type_name === typeName);
+    return pool
+      .map((l) => ({ id: l.id, name: l.name, path: pathOf(l.id), covered: covered.has(l.id) }))
+      .sort((a, b) => compareNames(a.path, b.path));
+  }, [live, parentId, typeName, pathOf, covered]);
+  const selectable = candidates.filter((c) => !c.covered);
+  const tooMany = candidates.length > COPY_LIST_LIMIT;
+
+  const chosen = candidates.filter((c) => selected.has(c.id) && !c.covered);
+  const count = chosen.length;
+
+  const submit = () => {
+    const source: CopySourceSection = {
+      id: section.id,
+      name: section.name,
+      locationId: section.location?.id ?? null,
+      locationName: section.location?.name ?? null,
+      isActive: section.isActive,
+      triggerType: section.triggerType,
+      triggerConfig:
+        section.triggerConfig && Object.keys(section.triggerConfig).length > 0
+          ? JSON.stringify(section.triggerConfig)
+          : null,
+      hideUntilRule: section.hideUntilRule ?? null,
+      dueBy: section.dueBy ? JSON.stringify(section.dueBy) : null,
+      items: section.items.map((i) => ({
+        type: normalizeItemType(i.type) as ItemType,
+        label: i.label,
+        config: (i.config ?? {}) as ItemConfig,
+      })),
+      checkpoints: sourceCheckpoints.map((c) => ({
+        id: c.id,
+        name: c.name,
+        gpsValidationRadius:
+          allCheckpoints.find((a) => a.id === c.id)?.gps_validation_radius ?? null,
+      })),
+      assetIds: (section.assets ?? []).map((a) => a.id),
+    };
+    const plan = planSectionCopies(
+      source,
+      chosen.map((c) => ({ id: c.id, name: c.name })),
+      mode,
+      {
+        templateSections: templateSections.map((s) => ({
+          id: s.id,
+          locationId: s.location?.id ?? null,
+        })),
+        checkpoints: allCheckpoints.map((c) => ({
+          id: c.id,
+          name: c.name,
+          locationId: c.location_id ?? null,
+        })),
+      },
+    );
+    void write("copy that section", copySectionToLocations(templateId, plan));
+    onClose();
+  };
+
+  const modeOption = (value: CheckpointMode, label: string, disabled = false, hint?: string) => (
+    <label className="row" style={{ cursor: disabled ? "default" : "pointer", gap: 6 }}>
+      <input
+        type="radio"
+        name="copy-checkpoints"
+        checked={mode === value}
+        disabled={disabled}
+        onChange={() => setMode(value)}
+      />
+      <span className={`small${disabled ? " muted" : ""}`}>
+        {label}
+        {hint && <span className="muted"> — {hint}</span>}
+      </span>
+    </label>
+  );
+
+  return (
+    <div className="dialog-backdrop" onClick={onClose}>
+      <div
+        className="dialog-card"
+        style={{ maxWidth: 520 }}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-label={tA("checklistTemplates.copy.title", { name: section.name })}
+      >
+        <div className="card-title" style={{ marginBottom: 10 }}>
+          {tA("checklistTemplates.copy.title", { name: section.name })}
+        </div>
+
+        <div className="row" style={{ alignItems: "flex-start", gap: 10 }}>
+          <div className="field" style={{ flex: 2, minWidth: 200 }}>
+            <span className="field-label">{tA("checklistTemplates.copy.under")}</span>
+            <LocationPicker
+              locations={live}
+              value={parentId}
+              onChange={(next) => {
+                setParentId(next);
+                setSelected(new Set());
+              }}
+              noneLabel={tA("checklistTemplates.copy.anywhere")}
+              placeholder={tA("checklistTemplates.copy.anywhere")}
+              autoFocus
+            />
+          </div>
+          <div className="field" style={{ flex: 1, minWidth: 120 }}>
+            <span className="field-label">{tA("checklistTemplates.copy.type")}</span>
+            <select
+              className="input"
+              value={typeName}
+              aria-label={tA("checklistTemplates.copy.type")}
+              onChange={(e) => {
+                setTypeName(e.target.value);
+                setSelected(new Set());
+              }}
+            >
+              <option value="">{tA("checklistTemplates.copy.anyType")}</option>
+              {typeNames.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="field">
+          <div className="spread row-nowrap">
+            <span className="field-label">{tA("checklistTemplates.copy.locations")}</span>
+            {!tooMany && selectable.length > 0 && (
+              <span className="row" style={{ gap: 4 }}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-quiet"
+                  onClick={() => setSelected(new Set(selectable.map((c) => c.id)))}
+                >
+                  {tA("checklistTemplates.copy.selectAll")}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-quiet"
+                  onClick={() => setSelected(new Set())}
+                >
+                  {tA("checklistTemplates.copy.clear")}
+                </button>
+              </span>
+            )}
+          </div>
+          {candidates.length === 0 ? (
+            <span className="muted small">{tA("checklistTemplates.copy.noCandidates")}</span>
+          ) : tooMany ? (
+            <span className="muted small">
+              {tA("checklistTemplates.copy.tooMany", { count: candidates.length })}
+            </span>
+          ) : (
+            <div className="stack" style={{ gap: 2, maxHeight: 260, overflowY: "auto" }}>
+              {candidates.map((c) => (
+                <label
+                  key={c.id}
+                  className="row row-nowrap"
+                  style={{ cursor: c.covered ? "default" : "pointer", gap: 6 }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={c.covered || selected.has(c.id)}
+                    disabled={c.covered}
+                    aria-label={c.path}
+                    onChange={(e) =>
+                      setSelected((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(c.id);
+                        else next.delete(c.id);
+                        return next;
+                      })
+                    }
+                  />
+                  <span className={`small${c.covered ? " muted" : ""}`} style={ELLIPSIS}>
+                    {c.path}
+                    {c.covered && (
+                      <span className="muted"> · {tA("checklistTemplates.copy.alreadyHere")}</span>
+                    )}
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="field">
+          <span className="field-label">{tA("checklistTemplates.copy.checkpoints")}</span>
+          <div className="stack" style={{ gap: 4 }}>
+            {modeOption("all", tA("checklistTemplates.copy.cpAll"))}
+            {modeOption(
+              "create",
+              tA("checklistTemplates.copy.cpCreate"),
+              sourceCheckpoints.length === 0,
+              sourceCheckpoints.length === 0
+                ? tA("checklistTemplates.copy.cpCreateDisabled")
+                : tA("checklistTemplates.copy.cpCreateHint"),
+            )}
+            {modeOption("none", tA("checklistTemplates.copy.cpNone"))}
+          </div>
+        </div>
+
+        <div className="row">
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={count === 0}
+            onClick={submit}
+          >
+            {tA("checklistTemplates.copy.submit", { count })}
+          </button>
+          <button type="button" className="btn btn-quiet" onClick={onClose}>
+            {tA("checklistTemplates.copy.cancel")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * The caret that opens a section or an item — the row's only expand control.
  * One chevron that rotates rather than two swapped glyphs: the turn is what
@@ -1162,6 +1474,8 @@ function TemplateCard({
                 renderItem={(section) => (
                   <SectionEditor
                     section={section}
+                    templateId={template.id}
+                    templateSections={sections}
                     templateShape={shape}
                     expectedStart={template.expectedStart}
                     defaultOpen={section.id === openedSectionId}
@@ -1228,6 +1542,8 @@ function TemplateCard({
 
 function SectionEditor({
   section,
+  templateId,
+  templateSections,
   expectedStart,
   defaultOpen = false,
   locations,
@@ -1236,22 +1552,26 @@ function SectionEditor({
   templateShape,
 }: {
   section: SectionRow & { items: TemplateItemRow[] };
+  templateId: string;
+  /** Every section of the template, in order — what Copy to locations skips. */
+  templateSections: SectionRow[];
   /** The whole template, for the End Shift rules. */
   templateShape: TemplateShape;
   /** The parent template's — it is what dates this section's hide-until. */
   expectedStart?: string;
   /** Just created — mount expanded rather than making you open it again. */
   defaultOpen?: boolean;
-  locations: {
+  locations: (CopyLocation & { status?: string | null })[];
+  allCheckpoints: {
     id: string;
     name: string;
-    status?: string | null;
-    parent?: { id: string } | null;
+    location_id?: string | null;
+    gps_validation_radius?: number | null;
   }[];
-  allCheckpoints: { id: string; name: string; location_id?: string | null }[];
   allAssets: { id: string; name: string }[];
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const [copying, setCopying] = useState(false);
   // Open on a section you just created — you're still describing it. Closed
   // otherwise, where the items are what you came back for.
   const [settingsOpen, setSettingsOpen] = useState(defaultOpen);
@@ -1552,6 +1872,13 @@ function SectionEditor({
             </label>
             <button
               type="button"
+              className="btn btn-sm btn-quiet"
+              onClick={() => setCopying(true)}
+            >
+              {tA("checklistTemplates.copy.action")}
+            </button>
+            <button
+              type="button"
               className="btn btn-sm btn-quiet btn-icon btn-icon-danger"
               title="Delete section"
               aria-label="Delete section"
@@ -1562,6 +1889,17 @@ function SectionEditor({
           </span>
         )}
       </div>
+
+      {copying && (
+        <CopySectionDialog
+          section={section}
+          templateId={templateId}
+          templateSections={templateSections}
+          locations={locations}
+          allCheckpoints={allCheckpoints}
+          onClose={() => setCopying(false)}
+        />
+      )}
 
       {open && (
         <div style={{ marginTop: 8 }}>

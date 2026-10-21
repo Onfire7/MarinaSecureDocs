@@ -32,5 +32,30 @@ export const admin = {
       hasEndShift:
         "This template has an End Shift item. Remove it before making this a Clock Out checklist.",
     },
+    /** Copy a section to locations (AdminChecklistTemplatesPage.spec.md § Copy a section to locations). */
+    copy: {
+      action: "Copy to locations…",
+      title: "Copy “{{name}}” to locations",
+      under: "Under",
+      anywhere: "Anywhere",
+      type: "Type",
+      anyType: "Any type",
+      locations: "Locations",
+      selectAll: "Select all",
+      clear: "Clear",
+      alreadyHere: "already in this template",
+      noCandidates: "No locations match.",
+      tooMany: "{{count}} locations match. Narrow the list with a parent or a type.",
+      checkpoints: "Checkpoints",
+      cpAll: "Attach every checkpoint at the location",
+      cpCreate: "Create matching checkpoints",
+      cpCreateHint:
+        "One for each checkpoint on this section, named for its location, with a new tag to write.",
+      cpCreateDisabled: "This section has no checkpoints to match.",
+      cpNone: "None",
+      submit_one: "Add {{count}} section",
+      submit_other: "Add {{count}} sections",
+      cancel: "Cancel",
+    },
   },
 };

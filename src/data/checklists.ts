@@ -1,4 +1,5 @@
 import { useQuery } from "@powersync/react";
+import type { SectionCopyPlan } from "../lib/sectionCopy";
 import { db, json, stamp } from "../lib/db";
 import { insert, remove, transact, update, type Executor } from "./sql";
 import { recordActivity } from "./activity";
@@ -748,6 +749,70 @@ export async function duplicateTemplate(
       }
     }
     return copyId;
+  });
+}
+
+/**
+ * Execute a section-copy plan (`src/lib/sectionCopy.ts`) in one transaction:
+ * the new sections, their fresh version-1 items, the checkpoints to create,
+ * every attachment, and the sections that move down to make room. Nothing is
+ * written until the plan is final, and a failure writes nothing.
+ */
+export async function copySectionToLocations(
+  templateId: string,
+  plan: SectionCopyPlan,
+): Promise<string[]> {
+  return transact(async (tx) => {
+    const ids: string[] = [];
+    for (const r of plan.reposition) {
+      await update(tx, "checklist_template_sections", r.sectionId, { position: r.position });
+    }
+    for (const s of plan.sections) {
+      const sectionId = await insert(tx, "checklist_template_sections", {
+        template_id: templateId,
+        name: s.name,
+        position: s.position,
+        is_active: s.isActive ? 1 : 0,
+        trigger_type: s.triggerType,
+        trigger_config: s.triggerConfig,
+        hide_until_rule: s.hideUntilRule,
+        due_by: s.dueBy,
+        location_id: s.locationId,
+      });
+      ids.push(sectionId);
+      for (const item of s.items) {
+        await insert(tx, "checklist_template_items", {
+          section_id: sectionId,
+          type: item.type,
+          label: item.label,
+          config: JSON.stringify(item.config),
+          position: item.position,
+          version: 1,
+          previous_version_id: null,
+        });
+      }
+      const checkpointIds = [...s.attachCheckpointIds];
+      for (const cp of s.createCheckpoints) {
+        checkpointIds.push(
+          await insert(tx, "checkpoints", {
+            name: cp.name,
+            guid_url: cp.guidUrl,
+            location_id: cp.locationId,
+            gps_validation_radius: cp.gpsValidationRadius,
+          }),
+        );
+      }
+      for (const checkpointId of checkpointIds) {
+        await insert(tx, "template_section_checkpoints", {
+          section_id: sectionId,
+          checkpoint_id: checkpointId,
+        });
+      }
+      for (const assetId of s.assetIds) {
+        await insert(tx, "template_section_assets", { section_id: sectionId, asset_id: assetId });
+      }
+    }
+    return ids;
   });
 }
 
