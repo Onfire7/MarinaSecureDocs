@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { id } from "../../lib/db";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { createInstanceFromTemplate } from "../../data/checklists";
@@ -10,15 +11,18 @@ import type { EndOfShiftStep } from "../../lib/endOfShift";
 // ActiveChecklistPage.spec.md § Ending the shift). The Shift card and the End
 // Shift Item both go through here, so the two can't disagree about the order.
 
-export function endOfShiftLabel(step: EndOfShiftStep): string {
+/** The Shift card's button label for a step, in the home namespace. */
+export function useEndOfShiftLabel(step: EndOfShiftStep | null): string {
+  const { t } = useTranslation("home");
+  if (!step) return "";
   switch (step.kind) {
     case "finish":
-      return `Finish ${step.name}`;
+      return t("endOfShift.finish", { name: step.name });
     case "end_of_shift_checklist":
-      return "End of Shift Checklist";
+      return t("endOfShift.checklistStep");
     case "vehicle":
     case "review":
-      return "End of Shift Report";
+      return t("endOfShift.reportStep");
   }
 }
 

@@ -1086,7 +1086,7 @@ function TemplateCard({
                   </select>
                   {clockOutReason && template.triggerType !== "clock_out" && (
                     <div className="muted small" style={{ marginTop: 4 }}>
-                      {clockOutReason}
+                      {tA(`checklistTemplates.clockOutBlocked.${clockOutReason}`)}
                     </div>
                   )}
                 </div>
@@ -1404,7 +1404,10 @@ function SectionEditor({
   // next thing you want is the cursor in the field.
   // End Shift rules (AdminChecklistTemplatesPage.spec.md § End Shift Items):
   // hidden where it can never go, disabled with its reason where it could.
-  const endShiftReason = endShiftBlockedReason(templateShape, section.id);
+  const endShiftBlock = endShiftBlockedReason(templateShape, section.id);
+  const endShiftReason = endShiftBlock
+    ? tA(`checklistTemplates.endShiftBlocked.${endShiftBlock}`)
+    : null;
   const menuTypes = (Object.keys(ITEM_TYPE_LABEL) as ItemType[]).filter(
     (t) => t !== "end_shift" || !endShiftHidden(templateShape),
   );
@@ -1835,7 +1838,7 @@ function SectionEditor({
                 {menuTypes.map((t) =>
                   t === "end_shift" && endShiftReason ? (
                     <option key={t} value={t} disabled title={endShiftReason}>
-                      {ITEM_TYPE_LABEL[t]} (last section, made with the checklist)
+                      {tA("checklistTemplates.endShiftUnavailable", { type: ITEM_TYPE_LABEL[t] })}
                     </option>
                   ) : (
                     <option key={t} value={t}>

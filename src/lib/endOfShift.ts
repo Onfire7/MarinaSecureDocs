@@ -99,20 +99,22 @@ export interface TemplateShape {
 const hasEndShift = (t: TemplateShape) =>
   t.sections.some((s) => s.items.some((i) => i.type === "end_shift"));
 
+/** Why End Shift can't go somewhere: a key under admin:checklistTemplates.endShiftBlocked. */
+export type EndShiftBlock = "alreadyHas" | "clockOut" | "notLastSection" | "sectionOff" | "notAlways";
+
 /**
  * Why End Shift can't be added to this section of this template, or null when
  * it can. The editor hides the option for the first two reasons and shows it
- * disabled, with the reason, for the rest.
+ * disabled, with the reason, for the rest. A key, not a sentence, so this
+ * stays pure and the page says it in the user's language.
  */
-export function endShiftBlockedReason(t: TemplateShape, sectionId: string): string | null {
-  if (hasEndShift(t)) return "This template already ends with an End Shift item.";
-  if (t.trigger_type === "clock_out")
-    return "A Clock Out checklist already leads to the end of the shift.";
+export function endShiftBlockedReason(t: TemplateShape, sectionId: string): EndShiftBlock | null {
+  if (hasEndShift(t)) return "alreadyHas";
+  if (t.trigger_type === "clock_out") return "clockOut";
   const last = t.sections[t.sections.length - 1];
-  if (!last || last.id !== sectionId) return "End Shift goes in the template's last section.";
-  if (!last.is_active) return "This section is switched off, so End Shift would never appear.";
-  if (last.trigger_type !== "manual")
-    return "End Shift needs a section made with the checklist (Always). This one is created later, so it might never exist.";
+  if (!last || last.id !== sectionId) return "notLastSection";
+  if (!last.is_active) return "sectionOff";
+  if (last.trigger_type !== "manual") return "notAlways";
   return null;
 }
 
@@ -121,11 +123,9 @@ export function endShiftHidden(t: TemplateShape): boolean {
   return hasEndShift(t) || t.trigger_type === "clock_out";
 }
 
-/** Why this template can't become a Clock Out template, or null when it can. */
-export function clockOutBlockedReason(t: TemplateShape): string | null {
-  return hasEndShift(t)
-    ? "This template has an End Shift item. Remove it before making this a Clock Out checklist."
-    : null;
+/** Why this template can't become a Clock Out template (a key, as above), or null when it can. */
+export function clockOutBlockedReason(t: TemplateShape): "hasEndShift" | null {
+  return hasEndShift(t) ? "hasEndShift" : null;
 }
 
 /**

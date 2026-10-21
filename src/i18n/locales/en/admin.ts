@@ -18,5 +18,19 @@ export const admin = {
         "Created when one of its assets is checked in, for whoever had it: added to their open checklist from this template, if they have one.",
     },
     fleetMode: "Mode",
+    /** The End Shift rules (AdminChecklistTemplatesPage.spec.md § End Shift Items). */
+    endShiftBlocked: {
+      alreadyHas: "This template already ends with an End Shift item.",
+      clockOut: "A Clock Out checklist already leads to the end of the shift.",
+      notLastSection: "End Shift goes in the template's last section.",
+      sectionOff: "This section is switched off, so End Shift would never appear.",
+      notAlways:
+        "End Shift needs a section made with the checklist (Always). This one is created later, so it might never exist.",
+    },
+    endShiftUnavailable: "{{type}} (last section, made with the checklist)",
+    clockOutBlocked: {
+      hasEndShift:
+        "This template has an End Shift item. Remove it before making this a Clock Out checklist.",
+    },
   },
 };

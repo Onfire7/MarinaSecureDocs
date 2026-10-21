@@ -11,7 +11,7 @@ import {
 import { useRoleIdsFor } from "../../data/users";
 import { startShift } from "../../data/shifts";
 import { useEndOfShift } from "../../data/endOfShift";
-import { endOfShiftLabel, useGoToEndOfShiftStep } from "./useEndOfShiftStep";
+import { useEndOfShiftLabel, useGoToEndOfShiftStep } from "./useEndOfShiftStep";
 import { useTickets } from "../../data/tickets";
 import { useIncidents } from "../../data/incidents";
 import { useMissedCalls, useSmsThreads } from "../../data/comms";
@@ -163,6 +163,7 @@ function ShiftCard() {
   // shift: only End Shift and Submit, on the review, does.
   const endOfShift = useEndOfShift(userId);
   const goToNextStep = useGoToEndOfShiftStep();
+  const nextStepLabel = useEndOfShiftLabel(endOfShift.step);
   const activeShift = endOfShift.shift;
 
   // Clock templates are role-scoped like everything else — a maintenance
@@ -237,7 +238,7 @@ function ShiftCard() {
             data-testid="shift-card-next"
             onClick={() => void goToNextStep(endOfShift)}
           >
-            {endOfShiftLabel(endOfShift.step)}
+            {nextStepLabel}
           </button>
         </div>
       )}

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { timeOfDay } from "./checklistItems";
+import { useTranslation } from "react-i18next";
+import { time } from "../../i18n";
 import type { InstanceItemRow } from "../../data/checklists";
 
 // The End Shift Item (ActiveChecklistPage.spec.md § End Shift Item). Not one of
@@ -28,12 +29,17 @@ export function EndShiftItem({
   // The same two-tap rule as Submit: unfinished work is submittable, never by
   // the tap that would submit a finished checklist.
   const [confirming, setConfirming] = useState(false);
+  const { t } = useTranslation("checklists");
 
   if (item.completed_at != null) {
     return (
       <div className="card card-done" id="end-shift" data-testid="end-shift-item">
         <div className="card-title">{item.label}</div>
-        <div className="card-meta">Submitted this checklist · {timeOfDay(item.completed_at)}</div>
+        <div className="card-meta">
+          {t("endShift.submitted", {
+            time: time(item.completed_at, { hour: "numeric", minute: "2-digit" }),
+          })}
+        </div>
       </div>
     );
   }
@@ -41,7 +47,7 @@ export function EndShiftItem({
     return (
       <div className="card" id="end-shift" data-testid="end-shift-item">
         <div className="card-title">{item.label}</div>
-        <div className="card-meta">You're not on shift.</div>
+        <div className="card-meta">{t("endShift.notOnShift")}</div>
       </div>
     );
   }
@@ -49,7 +55,7 @@ export function EndShiftItem({
     <div className="card" id="end-shift" data-testid="end-shift-item">
       <div className="card-title">{item.label}</div>
       <div className="card-meta">
-        Submits this checklist, then takes you to the end of your shift.
+        {t("endShift.hint")}
       </div>
       {editable && (
         <div className="row" style={{ marginTop: 10, gap: 6, flexWrap: "wrap" }}>
@@ -61,11 +67,11 @@ export function EndShiftItem({
                 disabled={busy}
                 onClick={onEndShift}
               >
-                {busy ? "Submitting…" : `Submit anyway — ${othersRemaining} unanswered`}
+                {busy ? t("endShift.submitting") : t("endShift.submitAnyway", { count: othersRemaining })}
               </button>
               {!busy && (
                 <button type="button" className="btn btn-quiet" onClick={() => setConfirming(false)}>
-                  Keep working
+                  {t("endShift.keepWorking")}
                 </button>
               )}
             </>
@@ -78,7 +84,7 @@ export function EndShiftItem({
                 (await countOthersRemaining()) > 0 ? setConfirming(true) : onEndShift()
               }
             >
-              {busy ? "Submitting…" : "End Shift"}
+              {busy ? t("endShift.submitting") : t("endShift.endShift")}
             </button>
           )}
         </div>

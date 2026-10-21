@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { formatDuration, shiftWindowMs } from "../../lib/shiftReport";
+import { useTranslation } from "react-i18next";
+import { dateTime } from "../../i18n";
+import { shiftWindowMs } from "../../lib/shiftReport";
 import { endShift } from "../../data/shifts";
 import { useEndOfShift, useOpenShiftChecklists } from "../../data/endOfShift";
 import { useHeldVehicles } from "../../data/fleet";
@@ -23,12 +25,13 @@ export function EndOfShiftPage() {
   const { data: held } = useHeldVehicles(userId);
   const [ending, setEnding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useTranslation("home");
 
   if (!shift) {
     return (
       <div className="placeholder">
-        <div className="big">You're not on shift</div>
-        <Link to="/">Back to the dashboard</Link>
+        <div className="big">{t("endOfShift.notOnShift")}</div>
+        <Link to="/">{t("endOfShift.backToDashboard")}</Link>
       </div>
     );
   }
@@ -45,24 +48,24 @@ export function EndOfShiftPage() {
       await endShift(shift.id, { id: current.user.id, name: current.user.name });
       navigate("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't end the shift.");
+      setError(err instanceof Error ? err.message : t("endOfShift.couldntEnd"));
       setEnding(false);
     }
   };
+
+  const span = shiftWindowMs(shift);
+  const minutes = Math.max(0, Math.round((span.end - span.start) / 60_000));
+  const started = dateTime(shift.started_at, { weekday: "short", hour: "numeric", minute: "2-digit" });
 
   return (
     <div style={{ maxWidth: 640 }}>
       <div className="page-head">
         <div>
-          <h1 className="page-title">End of Shift</h1>
+          <h1 className="page-title">{t("endOfShift.title")}</h1>
           <div className="page-sub">
-            Started{" "}
-            {new Date(shift.started_at).toLocaleString(undefined, {
-              weekday: "short",
-              hour: "numeric",
-              minute: "2-digit",
-            })}{" "}
-            · {formatDuration(shiftWindowMs(shift))} so far
+            {minutes >= 60
+              ? t("endOfShift.startedHours", { time: started, hours: Math.floor(minutes / 60), minutes: minutes % 60 })
+              : t("endOfShift.startedMinutes", { time: started, minutes })}
           </div>
         </div>
       </div>
@@ -70,13 +73,10 @@ export function EndOfShiftPage() {
       {open.length > 0 && (
         <div className="card" data-testid="end-of-shift-open" style={{ marginBottom: 14 }}>
           <div className="card-title">
-            {open.length === 1
-              ? "1 checklist is still open"
-              : `${open.length} checklists are still open`}
+            {t("endOfShift.openChecklists", { count: open.length })}
           </div>
           <div className="card-meta" style={{ marginBottom: 8 }}>
-            Anything recorded on {open.length === 1 ? "it" : "them"} won't be saved
-            unless {open.length === 1 ? "it's" : "they're"} submitted.
+            {t("endOfShift.openWarning", { count: open.length })}
           </div>
           <div className="stack" style={{ gap: 6 }}>
             {open.map((c) => (
@@ -104,7 +104,7 @@ export function EndOfShiftPage() {
         disabled={ending}
         onClick={() => void submit()}
       >
-        {ending ? "Ending…" : "End Shift and Submit"}
+        {ending ? t("endOfShift.ending") : t("endOfShift.endShiftAndSubmit")}
       </button>
     </div>
   );

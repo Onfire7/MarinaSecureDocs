@@ -1,6 +1,19 @@
 // Copy for src/pages/checklists/. Only the Fleet Vehicle Item so far; the
 // rest of the area converts in its own commit (docs/TODO.md § Localization).
 export const checklists = {
+  /** The End Shift Item (ActiveChecklistPage.spec.md § End Shift Item). */
+  endShift: {
+    endShift: "End Shift",
+    hint: "Submits this checklist, then takes you to the end of your shift.",
+    notOnShift: "You're not on shift.",
+    submitAnyway_one: "Submit anyway — {{count}} unanswered",
+    submitAnyway_other: "Submit anyway — {{count}} unanswered",
+    keepWorking: "Keep working",
+    submitting: "Submitting…",
+    submitted: "Submitted this checklist · {{time}}",
+    /** The read-only result on Checklist Detail. */
+    result: "Ended the shift",
+  },
   fleet: {
     /** Written into the template item as its label: data, through dataT. */
     defaultLabel: {

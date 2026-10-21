@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Fragment, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useIsMobile } from "../../hooks/useIsMobile";
@@ -204,13 +205,18 @@ function ResultCard({ item }: { item: InstanceItemRow }) {
   );
 }
 
+function EndShiftResult() {
+  const { t } = useTranslation("checklists");
+  return <span>{t("endShift.result")}</span>;
+}
+
 function ResultSummary({ type, result }: { type: string; result: ItemResult | undefined }) {
   if (!result) return <span className="muted">Not recorded</span>;
   switch (type) {
     case "simple_check":
       return <span>Complete</span>;
     case "end_shift":
-      return <span>Ended the shift</span>;
+      return <EndShiftResult />;
     case "verify_task": {
       const r = result as Extract<ItemResult, { type: "verify_task" }>;
       if (r.outcome === "confirmed") return <span>Confirmed{r.attempted ? " (after attempt)" : ""}</span>;
