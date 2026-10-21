@@ -26,6 +26,8 @@ export interface UserRow {
   dashboard_layout: string | null;
   created_at: string;
   contact_id: string | null;
+  /** The UI language this person chose; null follows the device. */
+  language: string | null;
 }
 
 export interface RoleRow {
@@ -300,6 +302,15 @@ export async function deleteRole(
 /** Whether a user row is usable — `active` as a boolean rather than 0/1. */
 export function isActive(user: { active: number }): boolean {
   return bool(user.active);
+}
+
+/**
+ * The signed-in user's own UI language (docs/localization.md). `null`
+ * means "follow the device", which is not the same as choosing the language
+ * the device happens to speak today.
+ */
+export async function saveMyLanguage(userId: string, language: string | null): Promise<void> {
+  await update(db, "users", userId, { language });
 }
 
 /**

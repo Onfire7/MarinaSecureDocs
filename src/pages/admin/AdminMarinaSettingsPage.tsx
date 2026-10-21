@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   createPhoneLine,
   deletePhoneLine,
@@ -9,8 +10,9 @@ import {
 import { AdminGate } from "./AdminGate";
 import { DraftInput, DraftNumberInput } from "../shared/DraftInput";
 import { AdminHeader } from "./AdminHomePage";
+import { languageName, pickerLanguages } from "../../i18n";
 
-// Admin — Marina Settings (see docs/pages/admin-marina-settings.html).
+// Admin — Marina Settings (see AdminMarinaSettingsPage.spec.md).
 // Exactly one MarinaSettings record per marina, not a list. Every edit takes
 // effect immediately — no publish/staging step.
 export function AdminMarinaSettingsPage() {
@@ -25,6 +27,7 @@ function MarinaSettings() {
   // The settings row exists from the first migration — this is a singleton
   // table with a fixed id, so there is no "create it" branch to write any more.
   // useMarinaSettings falls back to the documented defaults until it syncs.
+  const { t } = useTranslation("admin");
   const settings = useMarinaSettings();
   const { lines } = usePhoneLines();
   const [recipientDraft, setRecipientDraft] = useState("");
@@ -78,6 +81,25 @@ function MarinaSettings() {
               value={settings.marinaName}
               onCommit={(marinaName) => update({ marinaName })}
             />
+          </div>
+
+          <div className="field">
+            <span className="field-label">{t("marinaSettings.language")}</span>
+            <select
+              className="select select-inline"
+              aria-label={t("marinaSettings.language")}
+              value={settings.language}
+              onChange={(e) => update({ language: e.target.value })}
+            >
+              {pickerLanguages(settings.language).map((code) => (
+                <option key={code} value={code} lang={code}>
+                  {languageName(code)}
+                </option>
+              ))}
+            </select>
+            <p className="muted small" style={{ marginTop: 4 }}>
+              {t("marinaSettings.languageHint")}
+            </p>
           </div>
 
           <div className="field">

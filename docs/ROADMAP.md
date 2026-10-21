@@ -311,6 +311,42 @@ then.
 
 **Why deferred:** the people the report goes to don't have accounts yet.
 
+### Language switcher on public pages
+
+Public pages (`/r/<key>`) speak the device's last language or the
+browser's (`docs/localization.md`). They will get an on-page language
+switcher.
+
+**Why deferred:** there is one language until the Spanish catalogs exist,
+so a switcher would have nothing to switch to.
+
+### English written by SQL functions
+
+`apply_location_proposal` writes English Activity Log summaries (`created by
+audit "…"`, `retired by audit "…"`, `… applied from audit "…"`). The audit
+functions also store `'closed early'`, `'nothing was on file'` and `'retired
+by Audit "…"'` as display text. These ignore the marina's data language
+(ADR 0009). `'closed early'` is also matched as a value by `reopen_audit`,
+so it is a machine key as well as copy, and needs a code column before it
+can be translated.
+
+**Why deferred:** translating inside Postgres needs a catalog there too. The
+cheaper fix is to have the function store structure and let the app write
+the text, and that is a change to the audit design, not to localization.
+
+### Rows found by their English name
+
+`resolveStatusByName` looks up "Vacant", "Occupied", "In Use", "Available"
+and "Needs Cleaning" by name (`src/data/lookups.ts`, `src/lib/assets.ts`,
+the Setup Wizard, Reservation Detail). A marina whose statuses are named
+anything else (in Spanish, or just differently) silently gets null, and the
+status change is skipped. It needs a stable code or a flag on the status
+row.
+
+**Why deferred:** it predates localization and is not caused by it. ADR
+0009 keeps database text untranslated, so nothing here gets worse, but a
+marina set up in Spanish would hit it on day one.
+
 ## Resolved by the migration
 
 Recorded rather than deleted, because "why is this no longer a problem" is

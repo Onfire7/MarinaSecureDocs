@@ -8,6 +8,7 @@ import { ActiveCallPanel } from "../pages/comms/ActiveCallPanel";
 import { MissedCommsBadge } from "../pages/comms/MissedCommsBadge";
 import { CheckpointScanModal } from "../pages/checklists/CheckpointScanModal";
 import { ThemeToggle } from "./ThemeToggle";
+import { LanguageSelect } from "./LanguageSelect";
 import { ADMIN_SECTIONS } from "../pages/admin/adminSections";
 import { InstallAppButton } from "./InstallAppButton";
 import { UpdateButton } from "./UpdateButton";
@@ -85,6 +86,9 @@ export function AppShell() {
           <div className="sidenav-roles">{current.roleNames.join(" · ")}</div>
           <div style={{ marginBottom: 10 }}>
             <ThemeToggle />
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <LanguageSelect />
           </div>
           <div className="row" style={{ flexWrap: "wrap" }}>
             <button

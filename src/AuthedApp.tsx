@@ -9,6 +9,7 @@ import {
 import { useSyncConfigError } from "./lib/auth/syncStatus";
 import { AppShell } from "./layout/AppShell";
 import { ErrorBoundary } from "./layout/ErrorBoundary";
+import { LanguageSync } from "./layout/LanguageSync";
 import { SignInPage } from "./pages/access/SignInPage";
 import { DevicePositionWatcher } from "./pages/shared/DevicePositionWatcher";
 import { UserSwitchPage } from "./pages/access/UserSwitchPage";
@@ -200,6 +201,7 @@ function RequireAuth() {
   }
   return (
     <CurrentUserProvider>
+      <LanguageSync />
       <ProvisionGate />
     </CurrentUserProvider>
   );

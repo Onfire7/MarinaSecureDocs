@@ -49,7 +49,7 @@
       <tr><td>Name</td><td>Checkpoint.name</td><td>Edited inline on the row.</td></tr>
       <tr><td>Location</td><td>Checkpoint.location</td><td>Not shown on the row at all — checkpoints are <strong>grouped under their parent location</strong>, with the group heading carrying the full ancestor path. That is what lets a checkpoint simply be called "Gate": three doors at the Main Office read as Back Door / Conference Door / Front Door under one heading, instead of each name having to repeat where it is. Checkpoints with no location group last under "No location", since that's a defect to fix rather than a place to look.</td></tr>
       <tr><td>Usage</td><td>Checkpoint.tours + Checkpoint.checklist_templates</td><td>How many tours include it and how many templates it triggers. Both empty earns an <strong>Unused</strong> badge — a checkpoint nothing references is almost always an oversight, and is otherwise invisible.</td></tr>
-      <tr><td>GPS &amp; radius</td><td>Checkpoint.gps_coordinates / gps_validation_radius</td><td>Under Details. Radius falls back to the marina-wide default from <a href="admin-marina-settings.html">Marina Settings</a> when empty.</td></tr>
+      <tr><td>GPS &amp; radius</td><td>Checkpoint.gps_coordinates / gps_validation_radius</td><td>Under Details. Radius falls back to the marina-wide default from <a href="../../src/pages/admin/AdminMarinaSettingsPage.spec.md">Marina Settings</a> when empty.</td></tr>
       <tr><td>Scan URL</td><td>Checkpoint.guid_url</td><td>Copyable, as on <a href="admin-locations.html">Location setup</a> — the two places the GUID URL is exposed. Still not shown on <a href="checkpoint-detail.html">Checkpoint detail</a>.</td></tr>
     </table>
 

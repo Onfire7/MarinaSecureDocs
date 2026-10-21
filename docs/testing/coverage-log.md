@@ -88,6 +88,7 @@ permissions, checklist rule resolution, contact merging, shift windows — live 
 | `theme.ts` | `matchMedia`, `localStorage` |
 | `nfc.ts` | `NDEFReader` (Web NFC) — the reader and writer only. `checkpointGuidFromUrl` and `nfcPermissionGranted` are pure and covered by `nfc.test.ts`. |
 | `config.ts` | `import.meta.env` — build-time values with no logic beyond a missing-key list |
+| `i18n/index.ts` | `location.search`, `localStorage`, `navigator.languages`, `<html lang>`. It is the wiring only: the resolution order it applies is `resolveLanguage.ts`, the localizer is `localizer.ts`, and both are covered. Reported at 100% because no test loads it, not because one does. `scripts/e2e/language.mjs` drives it. |
 
 Each needs jsdom plus hand-written mocks, and what the test would then verify
 is that the mocks were called. The actual risk is device behaviour — an

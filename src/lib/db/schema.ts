@@ -1187,6 +1187,7 @@ const marina_settings = new Table(
     haul_out_mode: column.text,
     audit_gps_radius: column.integer,
     audit_gps_accuracy: column.integer,
+    language: column.text,
   },
 );
 
@@ -1524,6 +1525,7 @@ const users = new Table(
     dashboard_layout: column.text,
     created_at: column.text,
     contact_id: column.text,
+    language: column.text,
   },
   {
     indexes: {

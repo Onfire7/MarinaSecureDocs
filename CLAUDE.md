@@ -72,6 +72,16 @@ spec-approval time and expensive afterward.
   Migration in progress — most components still name a `docs/pages/*.html`
   spec in their header comment. Convert a page's spec when you touch it,
   folding in its wireframe, and delete the HTML pair.
+- **No copy outside the catalog.** Every string the app shows (text,
+  `placeholder`, `title`, `aria-label`, toasts, errors) is a key in
+  `src/i18n/locales/en/<area>.ts`, rendered with `t()`. Text read from the
+  database is data and is never translated. Text the app *writes into* the
+  database uses `dataT` (the marina's language), never `t`. Whole sentences
+  with `{{values}}` (never concatenated fragments), plurals by `count`, and
+  dates and numbers through `src/i18n`'s formatters. Rules and the reasons
+  for them: `docs/localization.md`. Migration in progress: an unconverted
+  area may still hard-code copy. Convert an area's copy when you change it,
+  as with specs.
 - **Commit messages** are multi-paragraph and explain the *why*. Trailer:
   `Co-Authored-By: <model> <noreply@anthropic.com>`.
 - **Schema changes are additive only.** *(InstantDB only.)* Removing an
@@ -110,6 +120,15 @@ field. Its strict `node_modules` means a transitive dependency is not
 importable unless it's declared — if a build fails to resolve a module you
 never imported directly, declare it rather than reaching for
 `--shamefully-hoist`.
+
+**Language coverage.** Copy that escapes the catalog renders fine in
+English and fails no test. It is found by looking, so look: after converting
+an area, after any change that adds visible copy, and whenever `docs/TODO.md`
+runs out of open tasks, run `pnpm run i18n:coverage` against the deployment
+(after `agent-login.mjs`). Then read `/tmp/pw-test/i18n-coverage.txt` and
+move any copy it lists into the catalog. The crawler only follows links, so
+also open the dialogs and menus you touched with `?lng=keys` (`?lng=` turns
+it off). In keys mode, readable English is either data or a miss.
 
 Nothing is verified until a real signed-in session has exercised it.
 Screenshots or it didn't happen.

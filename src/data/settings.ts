@@ -20,6 +20,7 @@ export interface MarinaSettingsRow {
   shift_report_recipients: string | null;
   allow_overlapping_reservations: number;
   haul_out_mode: string | null;
+  language: string | null;
 }
 
 export interface MarinaSettings {
@@ -36,6 +37,8 @@ export interface MarinaSettings {
   shiftReportRecipients: string[];
   allowOverlappingReservations: boolean;
   haulOutMode: string;
+  /** What the app writes stored text in (ADR 0009). Not the UI language. */
+  language: string;
 }
 
 const DEFAULTS: Omit<MarinaSettings, "id"> = {
@@ -49,6 +52,7 @@ const DEFAULTS: Omit<MarinaSettings, "id"> = {
   shiftReportRecipients: [],
   allowOverlappingReservations: false,
   haulOutMode: "off",
+  language: "en",
 };
 
 function toSettings(row: MarinaSettingsRow | undefined): MarinaSettings {
@@ -67,6 +71,7 @@ function toSettings(row: MarinaSettingsRow | undefined): MarinaSettings {
     shiftReportRecipients: jsonArray(row.shift_report_recipients),
     allowOverlappingReservations: bool(row.allow_overlapping_reservations),
     haulOutMode: row.haul_out_mode ?? DEFAULTS.haulOutMode,
+    language: row.language ?? DEFAULTS.language,
   };
 }
 
@@ -102,6 +107,7 @@ export async function saveMarinaSettings(
     shiftReportRecipients: string[];
     allowOverlappingReservations: boolean;
     haulOutMode: string;
+    language: string;
   }>,
 ): Promise<void> {
   await update(db, "marina_settings", id, {
@@ -133,6 +139,7 @@ export async function saveMarinaSettings(
           ? 1
           : 0,
     haul_out_mode: changes.haulOutMode,
+    language: changes.language,
   });
 }
 

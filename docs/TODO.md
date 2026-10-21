@@ -63,6 +63,45 @@ The code is on `beta2`; the remote still needs, in this order:
 - [ ] **One manual pass on beta2** with screenshots: launch, a finding from a
       phone, close, finalize.
 
+## Localization
+
+Spec: `docs/localization.md`, ADR 0009. The infrastructure is on `beta2`.
+
+- [x] **Push migration `20261021000100_languages.sql`**: done 2026-10-21
+      with `supabase db push`, after `--dry-run` and a rolled-back live run
+      of test 150's assertions. It had to go *before* the client
+      deployed: a write to a column Postgres lacks comes back as
+      `PGRST204`, which the connector does not treat as fatal, so PowerSync
+      retries it forever and every later write on that phone queues behind
+      it. Sync rules needed no change: both tables sync with `SELECT *`.
+- [ ] **Run the unrun tests** where a local stack exists:
+      `supabase/tests/150_language.sql` and `scripts/e2e/language.mjs`. Also
+      `pnpm run schema:check`, because `schema.ts` was mirrored by hand.
+
+Then one commit per area: pages *and* the `src/lib` / `src/data` strings
+the area writes (through `dataT`), each checked on beta2 in English and
+with `pnpm run i18n:coverage`, and each shrinking `noBareToLocale.test.ts`'s
+baseline:
+
+- [ ] layout + shared
+- [ ] home
+- [ ] checklists
+- [ ] locations
+- [ ] tickets
+- [ ] incidents
+- [ ] reservations
+- [ ] boats
+- [ ] contacts
+- [ ] assets
+- [ ] comms
+- [ ] activity
+- [ ] reports
+- [ ] audits
+- [ ] access
+- [ ] admin
+- [ ] **Spanish**: `src/i18n/locales/es/`, `satisfies Catalog`, reviewed by
+      a Spanish speaker before it ships.
+
 ## Small things found in use
 
 - [x] **Attachment bytes never left InstantDB.** The `attachments` rows came

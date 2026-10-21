@@ -1,0 +1,7 @@
+# Strings i18n-coverage.mjs leaves out of its report: recurring *data* that
+# is not copy and would bury the copy that is. One exact string per line, or
+# a /regex/. Never add copy here — copy goes in the catalog.
+# The product name: copy, but never translated.
+MarinaSecure
+Sean Goheen
+gpp@onfire.us

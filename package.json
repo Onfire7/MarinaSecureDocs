@@ -17,6 +17,7 @@
     "schema:check": "node scripts/generate-client-schema.mjs --check",
     "test:db": "supabase test db",
     "seed": "node scripts/seed/index.mjs",
+    "i18n:coverage": "node scripts/e2e/i18n-coverage.mjs",
     "ps:up": "docker compose -f powersync/docker-compose.yaml --env-file powersync/local.env up -d",
     "ps:down": "docker compose -f powersync/docker-compose.yaml --env-file powersync/local.env down",
     "ps:reset": "docker compose -f powersync/docker-compose.yaml --env-file powersync/local.env down -v && docker compose -f powersync/docker-compose.yaml --env-file powersync/local.env up -d",
@@ -29,8 +30,10 @@
     "@powersync/web": "^2.2.0",
     "@supabase/supabase-js": "^2.112.4",
     "exceljs": "^4.4.0",
+    "i18next": "^26.5.3",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "react-i18next": "^17.1.0",
     "react-router-dom": "^7.18.1",
     "rrule": "^2.8.1",
     "workbox-window": "^7.4.1"

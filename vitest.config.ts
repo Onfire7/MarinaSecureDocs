@@ -24,7 +24,9 @@ export default defineConfig({
       // src/data is in scope. It is the layer the rewrite created, and leaving
       // it out would mean the "every untested file is a decision" rule quietly
       // stopped applying to the newest half of the codebase.
-      include: ["src/lib/**/*.ts", "src/data/**/*.ts"],
+      // src/i18n too: its resolution order and checks are pure logic, and
+      // the browser wiring in index.ts is a logged decision, not an accident.
+      include: ["src/lib/**/*.ts", "src/data/**/*.ts", "src/i18n/**/*.ts"],
       exclude: ["src/lib/db/**", "src/lib/auth/**"],
       reporter: ["text", "json-summary"],
     },
