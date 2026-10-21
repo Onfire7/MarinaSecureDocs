@@ -51,6 +51,20 @@ checked, ordered by first use:
   reading mid-shift sees the vehicle as it is now.
 - **Return note**, quoted; for a kept vehicle, that note is the reason it
   was kept, labelled "Kept: …".
+- **Status** lines: every Asset Status the guard set on the vehicle in the
+  window, the post-return status a check-in writes included: "Status →
+  Needs Cleaning · 5:58 AM", with the log's note when it has one. Set from
+  the Fleet card, Asset Detail or a check-in alike.
+- **Mileage** lines: a reading the guard logged on the vehicle in the window
+  that no checkout, check-in or Status Check already shows (the Fleet card's
+  **Mileage** on a cart nobody took, say): "Mileage: 18,240 mi · 2:10 AM".
+  A reading written by a checkout, check-in or Status Check is matched by
+  its timestamp and not repeated.
+- **Incidents and Tickets** the guard raised with the vehicle as their
+  target, one line each: "Incident: {title}" / "Ticket: {title}", linking to
+  the full entry in this report's own Incidents or Tickets section. A
+  pointer, never a second copy; incident pointers only with
+  `view_incidents`, like the section they point to.
 
 A vehicle the guard only fueled or status-checked, without holding it, still
 gets an entry, with no time span. With no vehicle use at all the section
@@ -66,9 +80,34 @@ Which records count:
 - **Kept vehicles**: a checkout closed during the window that is followed,
   at the same moment, by a `kept_after_shift` checkout of the same vehicle
   to the same person. It reads as kept, not returned.
+- **Status log rows** (`asset_status_logs`) on a Fleet Vehicle, logged by the
+  guard inside the window.
+- **Meter readings** (`asset_meter_readings`) on a Fleet Vehicle, logged by
+  the guard inside the window, less those a checkout, check-in or Status
+  Check wrote.
+- **Incidents and Tickets** whose target is a Fleet Vehicle, created by the
+  guard inside the window.
+
+Each record attaches to the trip of that vehicle whose span contains it,
+else to the vehicle's own no-span entry, which is created for it if needed.
 
 The End of Shift review (`/shift/end`) shows this same section, so the guard
 sees what the report will say before ending the shift.
+
+## In the redesign
+
+Settled 2026-10-21, with the owner. When the Shift Report takes its settled
+shape (fixed body, End of Shift Note, Needs attention, Variant D of
+`prototype/shift-report`), Vehicles:
+
+- sits after Notes and before Locations: a record, but one a supervisor
+  reads more often than the per-location detail;
+- adds one summary sentence when a vehicle was used: "{guard} drove the
+  {vehicle} {distance} and returned it at {fuel}." (one per vehicle; "still
+  has" / "kept" in place of "returned" as the trip ended);
+- feeds **Needs attention** with: a vehicle kept past End of Shift, with its
+  reason; a vehicle set Out of Service; any return note; a vehicle returned
+  at ¼ tank or below. Routine trips stay in the Vehicles section only.
 
 ## Actions
 
