@@ -1,136 +1,254 @@
 # Shift Report
 
-`/reports/shifts/:id`. A compiled report of one guard's Shift, and resending
-it.
+The record of one guard's Shift, read by their supervisor and, when
+something notable happened, by other guards. One document, three places:
 
-The Shift Report's settled redesign (a body fixed at End of Shift, the End of
-Shift Note, the Report Link) is in `CONTEXT.md` and ADR 0008 and is not
-built yet; this spec describes the page as it is, plus its **Vehicles**
-section. When the redesign lands, Vehicles moves into the fixed body
-unchanged.
+| Where | Route | Who | What it shows |
+|---|---|---|---|
+| **The End of Shift review** | `/shift/end` | The guard, on shift | The report compiled live from the device, with the End of Shift Note to write and **End Shift and Submit** at the end. |
+| **In the app** | `/reports/shifts/:id` | The shift's guard, or `view_reports` | The snapshot once the shift has ended; live, with a banner, before. Names link to their records. |
+| **The Report Link** | `/r/shift/:id` | Anyone holding the URL | The snapshot, with no shell, sign-in or local database. |
 
-## Purpose
+Settled by prototype: Variant D on `prototype/shift-report` (2026-10-20,
+owner's combination), with Vehicles added 2026-10-21. Vocabulary is in
+`CONTEXT.md` (Shift Report, End of Shift, End of Shift Note, Report Link,
+Ticket Update, Incident Update). ADR 0008 records why the updates beneath
+incidents and tickets exist.
 
-Reached from Reports home. Shows the same content that was, or will be,
-emailed to the marina's `marina_settings.shift_report_recipients`
-(`docs/architecture.md` § Shift report delivery).
+## The body is fixed at End of Shift
 
-## Data shown
+The report's body is compiled **on the guard's device** when they tap End
+Shift and Submit, and stored as a snapshot (`shift_report_snapshots`, one
+row per shift, the document as jsonb) in the same transaction that sets
+`shifts.ended_at`. The device is the only place that is guaranteed to hold
+everything the guard recorded, including what hasn't uploaded yet. From
+then on every view, in-app or public, renders that snapshot verbatim: the
+paper report as handed in. It is never reopened or recompiled.
 
-| Field | Source | Notes |
-|---|---|---|
-| Guard, shift window | `shifts.guard_id` / `started_at` / `ended_at` | |
-| Delivery status | `shifts.report_sent_at` | Null means not sent yet: still within the shift, or waiting on the scheduled backstop sweep if the shift ended offline. |
-| Check-ins, checklists, incidents, tickets | Rows whose timestamps fall within the shift's window | Association by timestamp, not by a Shift reference (`docs/data-model.md` § Shift). Incidents only with `view_incidents`. |
-| Vehicles | § Vehicles | |
+What changes afterwards appears **beneath** the incidents and tickets it
+concerns, read live: Addenda and Incident Updates made after `ended_at`,
+and Ticket Updates made after `ended_at`. The body never moves.
 
-## Vehicles
+**Before End of Shift**, the in-app page and the review compile the report
+live from the device, headed by a banner: *This shift hasn't ended yet.
+The report may be incomplete.* The public page shows only the header and
+that sentence, because a public viewer has no device data and the server
+does not compile reports; the snapshot appears there once it syncs. A
+supervisor who needs the mid-shift picture uses the in-app page.
 
-Every use of a Fleet Vehicle by this guard during the Shift, however it was
-recorded: the Fleet card, a Fleet Vehicle Item, or Asset Detail. "This
-guard" means a checkout whose person is the guard's linked Contact, and fuel
-and status records the guard logged.
+## Who it is about
 
-One entry per trip (checkout), and one for each vehicle only fueled or
-checked, ordered by first use:
+Only this guard's own activity: their check-ins, their checklists, the
+Incidents they authored, the Tickets they created, the Notes they wrote,
+their Fleet Vehicle use. Another guard on an overlapping shift has their own
+report. Association is by timestamp inside the shift's window and by the
+guard's id, never by a link to the shift (`docs/data-model.md` § Shift).
 
-- **Name**, and the time span: "{out} – {in}", or "{out} – still out", or
-  "{out} – kept past End of Shift". A checkout begun before the Shift
-  started shows its real time out; one continued from an earlier Shift's
-  Kept Vehicle reads "kept from the previous shift" in place of a time out.
-- **Odometer**: "{out} → {in} (+{n} mi)", ending at the check-in (for a
-  kept vehicle, the reading taken at End of Shift), or at the latest reading
-  so far. Omitted for a vehicle with no meter. In the vehicle's own unit
-  (miles or hours).
-- **Fuel**: the level it came back with, or, when kept, the level recorded
-  at End of Shift.
-- **Fill-ups** the guard logged on it in the window: "⛽ {gallons} gal at
-  {time}", with cost if given.
-- **Status Checks** the guard recorded on it: "{time}: {odometer}, fuel
-  {level}". They appear as soon as they are recorded, so a supervisor
-  reading mid-shift sees the vehicle as it is now.
-- **Return note**, quoted; for a kept vehicle, that note is the reason it
-  was kept, labelled "Kept: …".
-- **Status** lines: every Asset Status the guard set on the vehicle in the
-  window, the post-return status a check-in writes included: "Status →
-  Needs Cleaning · 5:58 AM", with the log's note when it has one. Set from
-  the Fleet card, Asset Detail or a check-in alike.
-- **Mileage** lines: a reading the guard logged on the vehicle in the window
-  that no checkout, check-in or Status Check already shows (the Fleet card's
-  **Mileage** on a cart nobody took, say): "Mileage: 18,240 mi · 2:10 AM".
-  A reading written by a checkout, check-in or Status Check is matched by
-  its timestamp and not repeated.
-- **Incidents and Tickets** the guard raised with the vehicle as their
-  target, one line each: "Incident: {title}" / "Ticket: {title}", linking to
-  the full entry in this report's own Incidents or Tickets section. A
-  pointer, never a second copy; incident pointers only with
-  `view_incidents`, like the section they point to.
+## The document
 
-A vehicle the guard only fueled or status-checked, without holding it, still
-gets an entry, with no time span. With no vehicle use at all the section
-reads "No vehicle used this shift." It is not gated: fleet use is not
-sensitive, and the report already goes to the guard's supervisor.
+In this order. Each section's rules follow.
 
-Which records count:
+1. **Header.** Marina name; the guard; start and end, duration; *Ended by
+   {End of Shift Checklist name}* or *Ended by End Shift*; End of Shift
+   time.
+2. **End of Shift Note.** The guard's own words, verbatim, when they wrote
+   any. Omitted when empty.
+3. **Summary.** Sentences, not numbers, from a pure function the email
+   reuses (§ The email): check-ins done of expected and checklists complete
+   of total; incidents logged and tickets raised; one sentence per vehicle
+   driven ("{guard} drove the {vehicle} {distance} and returned it at
+   {fuel}", or "still has it" / "kept it past End of Shift"); "{n} things
+   need attention."
+4. **Needs attention.** One line per item, never truncated, in time order,
+   each with where it happened and when. What qualifies:
+   - an Incident logged (every one; "bad" when its status is still open at
+     End of Shift, else "warn");
+   - a **missed check-in**: an expected checkpoint (§ Expected checkpoints)
+     with no check-in in the window;
+   - a Door or Lock Check found other than expected;
+   - a rejected Verify Task;
+   - a Manual Check-In, with its reason;
+   - a check-in outside the checkpoint's GPS radius;
+   - a checklist unfinished at End of Shift: name, done of total, due time
+     if it had one;
+   - a vehicle kept past End of Shift, with its reason; a vehicle set Out of
+     Service; a return note; a vehicle returned at ¼ tank or below.
+5. **Incidents.** Each in full: title, type, target, time, status at End of
+   Shift, details. Beneath, *Since End of Shift*: Addenda and Incident
+   Updates after `ended_at`, by time, leading with *Now {status} (was
+   {status})* when the status moved; *No changes. Still {status}.* when
+   none. Gated by `view_incidents` in the app; the public page shows them
+   (the report goes to the guard's supervisor by design, § Report Link).
+6. **Tickets raised.** Each: title, priority, target, time, origin (the
+   `created` Ticket Update's origin), status and assignee at End of Shift,
+   description. Beneath, *Since End of Shift*: Ticket Updates after
+   `ended_at`, the same way.
+7. **Notes.** The guard's Notes in the window: target, time, body.
+8. **Vehicles.** The existing section, unchanged in content
+   (`VehicleUseSection`; rules below under § Vehicles).
+9. **Locations.** One card per Location that had any of this guard's
+   work, in tree order (parent before child, siblings by name). Under each:
+   the check-ins expected there and the checklist items whose section is
+   bound there, **as one list of items**, in time order, each with its
+   result and time, misses and exceptions marked. Check-ins read as items:
+   *Check-in · {checkpoint}: Scanned 10:31 PM* / *Manual, "tag cracked"* /
+   *Not visited*. Routine items are folded behind the card's **Show {n}
+   more**; the card's edge is coloured by the worst thing in it, and its
+   header gives *{visited} of {expected} check-ins*, misses and exceptions,
+   and the first and last time anything was recorded there. Items from
+   sections with no Location go under a final card named for their
+   checklist.
 
-- **Checkouts** whose person is the guard's Contact and whose span overlaps
-  the window (out before the window ends, and in after it starts or not in).
-- **Fuel log rows** (`asset_fuel_logs`) logged by the guard inside the
-  window.
-- **Kept vehicles**: a checkout closed during the window that is followed,
-  at the same moment, by a `kept_after_shift` checkout of the same vehicle
-  to the same person. It reads as kept, not returned.
-- **Status log rows** (`asset_status_logs`) on a Fleet Vehicle, logged by the
-  guard inside the window.
-- **Meter readings** (`asset_meter_readings`) on a Fleet Vehicle, logged by
-  the guard inside the window, less those a checkout, check-in or Status
-  Check wrote.
-- **Incidents and Tickets** whose target is a Fleet Vehicle, created by the
-  guard inside the window.
+**Photos.** Incidents and Tickets carry no attachments yet. When they do,
+each appears inline under its record, by the attachment's public URL; the
+document already has a `photos` array per record, empty for now
+(`docs/ROADMAP.md`).
 
-Each record attaches to the trip of that vehicle whose span contains it,
-else to the vehicle's own no-span entry, which is created for it if needed.
+**Left out, on purpose.** Calls and SMS, asset checkouts that are not Fleet
+Vehicles, Reservations, Activity Log entries, other guards' records.
 
-The End of Shift review (`/shift/end`) shows this same section, so the guard
-sees what the report will say before ending the shift.
+### Which checklists belong to the shift
 
-## In the redesign
+A checklist belongs to the shift when any of its items was answered in the
+window, or was expected to be: it was created in the window, or one of its
+sections came due in it. In the report it shows only that shift's items;
+the rest are summarized as *{n} items done in the previous shift*. Items
+still open at End of Shift count as missed in this shift.
 
-Settled 2026-10-21, with the owner. When the Shift Report takes its settled
-shape (fixed body, End of Shift Note, Needs attention, Variant D of
-`prototype/shift-report`), Vehicles:
+### Expected checkpoints
 
-- sits after Notes and before Locations: a record, but one a supervisor
-  reads more often than the per-location detail;
-- adds one summary sentence when a vehicle was used: "{guard} drove the
-  {vehicle} {distance} and returned it at {fuel}." (one per vehicle; "still
-  has" / "kept" in place of "returned" as the trip ended);
-- feeds **Needs attention** with: a vehicle kept past End of Shift, with its
-  reason; a vehicle set Out of Service; any return note; a vehicle returned
-  at ¼ tank or below. Routine trips stay in the Vehicles section only.
+A checkpoint is expected when a Section of one of the shift's checklists
+names it (`template_section_checkpoints` through the instance section's
+`template_section_id`). Tours create no expectations; that needs the Tour
+rethink on the ROADMAP. A check-in at a checkpoint nobody expected still
+appears under its Location, marked *(not expected)*, and counts as neither
+done nor missed.
 
-## Actions
+### Vehicles
 
-| Action | Gating | Behaviour |
-|---|---|---|
-| Resend | The shift's own guard, or `view_reports` | Calls `POST /reports/shift/:shiftId/send` (`docs/api-structure.md`), the same function as the original send. It compiles fresh from current data and hands off to the Twilio Function, which sends through SendGrid and sets `report_sent_at`. |
+As specified for the interim section, now part of the fixed body: every
+checkout overlapping the window whose person is the guard's Contact; fuel
+logs, status logs, standalone readings, and Incidents and Tickets the guard
+raised on a Fleet Vehicle in the window; kept vehicles read as kept, not
+returned. Compiled by `compileVehicleUse()`.
+
+## The Report Link
+
+`/r/shift/<shiftId>` on the deployment's public address (`publicOrigin()`,
+from `VITE_PUBLIC_URL`; never `window.location.origin`, for the reason
+`canonicalTarget()` gives). One permanent URL per shift; the shift id is an
+unguessable UUID and is the whole credential for now. **Public**: the
+supervisors it goes to do not have accounts yet. When they do, the same URL
+asks for sign-in (`docs/ROADMAP.md` § Report Links require sign-in).
+
+The page is routed in `App.tsx`'s public branch, before the signed-in
+chunk is requested, and reads through `src/data/sharedShiftReport.ts`, an
+anon-key client that imports nothing from `src/lib/db` (the same rule as
+`sharedReport.ts`; the e2e test asserts on request URLs). One RPC,
+`shift_report(p_shift uuid)`, security definer, executable by `anon`:
+returns `{ status: "ended", document, updates }` when a snapshot exists,
+`{ status: "not_ended", header }` when the shift exists but has not ended,
+and null for an unknown id, which renders as one neutral page.
+
+`updates` is what moved since `ended_at`, gathered by the RPC from
+`incident_comments`, `incident_updates` and `ticket_updates` for the ids the
+document names, so the public page needs nothing else.
+
+## The in-app page
+
+`/reports/shifts/:id`, for the shift's guard or `view_reports`. Renders the
+same document through the same component; differences: it sits in the
+shell, record names link to their pages, and before End of Shift it
+compiles live from the device (the device of a supervisor holds the guard's
+rows: check-ins, checklists, incidents, tickets, shifts all sync marina-wide
+within their windows). Reached from Reports home's shift list.
+
+**Email report** replaces Resend: it opens the dialog (§ The email). The
+unbuilt send function is no longer called from anywhere.
+
+## The End of Shift review
+
+`/shift/end` is this report, compiled live, with two additions: the **End of
+Shift Note** box after the header (*Anything your supervisor should know?*,
+optional), and **End Shift and Submit** at the end. *Before you go* (a
+vehicle still out) still comes first, as `ActiveChecklistPage.spec.md`
+§ Ending the shift says. The *Needs attention* lines link to where each can
+be fixed: an unfinished checklist opens it; a missed check-in opens the
+checklist section that expected it. Nothing blocks submitting; no reason is
+required for anything.
+
+**End Shift and Submit**, in one transaction: compile the document with the
+note, insert the snapshot, set `shifts.ended_at`, write the Activity Log
+entry. Then open the email dialog. If the device is offline the snapshot
+uploads with everything else; the dialog says so (§ The email).
+
+## The email
+
+A pure function, `shiftReportEmail(document, link)`, gives:
+
+- **Subject**: *Shift report: {guard}, {day}, {start}–{end}*.
+- **Body**, plain text: the summary sentences; the End of Shift Note,
+  quoted, if any; every *Needs attention* line, unlimited; a blank line; the
+  Report Link; one line saying who to ask if the link doesn't open. No
+  greeting or sign-off, so whoever pastes it adds their own.
+
+The **dialog** (`ShiftReportEmailDialog`) shows the subject, the body and the
+link, each with its own Copy button, plus **Copy all** and an *Open in mail*
+`mailto:` link (a convenience; long bodies get cut by some mail clients).
+Copy uses the clipboard API and says *Copied* for two seconds. When the
+snapshot row has not uploaded yet, a line under the link reads *Saved on
+this device; the link will work once you're back online.* (read from the
+PowerSync upload queue's state, as the sidenav's *All changes sent* is).
+
+Available to the shift's guard and to `view_reports` holders, from the
+review's End Shift and Submit and from the in-app page's **Email report**.
+The sentences are the same pure function the automatic email will use
+(`docs/ROADMAP.md` § Shift Reports: automatic email).
+
+## Data changes
+
+One migration, then `schema.ts` by hand (`document` joins
+`STRUCTURED_COLUMNS`). All additive.
+
+- `shift_report_snapshots`: `shift_id uuid primary key references shifts
+  on delete cascade`, `document jsonb not null`, `created_at`, `is_recent`
+  (from the shift, in `refresh_child_sync_scopes()`). Tier 0, **insert
+  only**: the body is never rewritten. Joins the `work` sync stream.
+- `shift_report(p_shift uuid) returns jsonb`, security definer, `anon` and
+  `authenticated` may execute; as above.
+- `docs/data-model.md` § Shifts follows.
+
+## Copy
+
+All new copy in the `reports` namespace, through `t()`; the public page uses
+the device's language (`docs/localization.md` § Public pages). The summary
+sentences and the email are built from the catalog too, in the viewer's
+language; the snapshot stores facts, never sentences, so a Spanish-speaking
+supervisor reads a Spanish report of the same shift. Times in the report are
+the marina's local time.
 
 ## States and edge cases
 
-- **Not sent yet.** A pending badge rather than a blank status; the content
-  is fully viewable, compiled live.
-- **Resend while offline.** Disabled: sending is online-only. The content
-  stays viewable offline.
-- **Content changes after the shift ends** (a late incident comment, a kept
-  vehicle checked in the next morning). Viewing always compiles fresh, so it
-  can show more than the email did; a resend captures the current state. A
-  kept vehicle still reads "kept past End of Shift" with its End of Shift
-  readings, because those are what this Shift handed over; the check-in
-  belongs to whoever's Shift it fell in.
-- **Guard with no linked Contact.** Checkouts can't be matched to them, so
-  only fuel and status records appear.
+- **Opened mid-shift, in the app.** Live, with the banner. Every open
+  recompiles.
+- **Opened before the snapshot has synced, publicly.** The header and *This
+  shift hasn't ended yet*, since the server cannot tell "not ended" from
+  "ended on a device that is still offline". Once the row lands, the report.
+- **Shift ended some other way** (an admin closing a shift, a row with
+  `ended_at` and no snapshot). The in-app page compiles live from whatever
+  the device holds, with a banner *No report was handed in for this shift*;
+  the public page says the same. Nothing is ever compiled on the server.
+- **A guard with no linked Contact.** Vehicles shows only fuel and status
+  records, as before.
+- **Two shifts by the same guard overlapping** (a shift never ended). Each
+  compiles over its own window; a record can appear in both. The Shift
+  Schedule work on the ROADMAP is what prevents it.
+- **The dialog on a device with no clipboard API** (an old WebView). The
+  text is selectable; Copy is hidden.
 
 ## Mobile and desktop
 
-The same read-only layout at any width: two columns on desktop, one on a
-phone. Vehicles sits in the first column, under Checklists.
+The report reads at any width: the audit report's tokens and layout rules,
+Variant D's card grids for Vehicles and Locations, two columns on desktop
+for incidents' "since" panels, one on a phone. Print is always light and
+drops every control.

@@ -710,6 +710,17 @@ proposal's `decision` is null; finalize applies approved proposals in
 Shift Checklist, linked when it is created; submitting it no longer sets
 `ended_at`, End Shift and Submit does).
 
+#### `shift_report_snapshots` — Tier 0, insert-only · sync: **age**
+
+The Shift Report's body as compiled on the guard's device at End of Shift
+(`src/pages/reports/ShiftReportPage.spec.md` § The body is fixed).
+`shift_id` (primary key, cascade), `document jsonb not null`, `created_at`,
+`is_recent` (from the shift). Written once, in the transaction that sets
+`ended_at`; no update or delete policy. Served to the public page by
+`shift_report(p_shift uuid)`, security definer, executable by `anon`, which
+returns the document with what moved beneath its incidents and tickets since
+`ended_at`.
+
 #### `activity_log_entries` — Tier 0 read · sync: **age**
 
 | Column | Type | Notes |

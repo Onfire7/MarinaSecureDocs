@@ -250,15 +250,14 @@ any, then the **End of Shift review**, which ends the shift.
 to the review instead. This replaces the old behaviour, where its submit set
 `ended_at` in the same transaction.
 
-Until the Shift Report exists (`docs/ROADMAP.md`; settled design in
-`CONTEXT.md`), the review is a plain confirmation: the Shift's start time and
-length, any of the guard's checklists from this Shift still open - "2
-checklists are still open; anything recorded on them won't be saved unless
-they're submitted", each a link to finish it - the Shift Report's
-**Vehicles** section (`src/pages/reports/ShiftReportPage.spec.md`), and
-**End Shift and Submit**.
-When the Shift Report is built, the review becomes that report, with the
-same button at its end.
+The review is the Shift Report itself, compiled live on the device, with
+the End of Shift Note to write and **End Shift and Submit** at its end
+(`src/pages/reports/ShiftReportPage.spec.md` § The End of Shift review).
+Its *Needs attention* list names any of the guard's checklists from this
+Shift still open, each a link to finish it, because an unsubmitted
+checklist has written none of its findings. End Shift and Submit stores
+the report's body as a snapshot and sets `ended_at` in one transaction,
+then opens the email dialog.
 
 ## Actions
 

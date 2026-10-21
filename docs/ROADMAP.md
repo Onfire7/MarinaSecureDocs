@@ -273,6 +273,29 @@ already a pure function so the email can render them without a browser.
 **Why deferred:** it needs the Netlify Functions surface (above) and an email
 transport; copy-and-paste covers the need until then.
 
+### Photos on Incidents and Tickets
+
+The Shift Report was designed to show an Incident's or Ticket's photos
+inline, and the `attachments` bucket is already public-read. But neither
+record can carry an attachment today: the only attachment links in the
+model are chat messages and marina maps. The report document carries an
+empty `photos` array per record so the day a link table exists, the
+photos appear with no change to the report.
+
+**Why deferred:** attaching photos is a feature of the New Incident and New
+Ticket forms first, and nobody has asked for it yet (2026-10-21).
+
+### The public Report Link before End of Shift
+
+Before the snapshot exists, `/r/shift/<id>` shows only the header and "This
+shift hasn't ended yet". A live mid-shift picture for someone without an
+account would mean compiling the report on the server, a second
+implementation of `src/lib/shiftReportDoc.ts` in SQL. Supervisors with
+accounts get the live view in the app.
+
+**Why deferred:** the people the link goes to don't have accounts yet, and
+the cost is a parallel compiler to keep in step.
+
 ### Weekly reports
 
 A report over a week of Shifts for the security supervisor, beside the
