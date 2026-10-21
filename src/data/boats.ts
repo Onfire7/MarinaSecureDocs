@@ -1,6 +1,7 @@
 import { useQuery } from "@powersync/react";
 import { db } from "../lib/db";
 import { insert, remove, transact, update } from "./sql";
+import { insertTicket } from "./tickets";
 import { recordActivity } from "./activity";
 
 // Boats and vehicles, and the contacts attached to them.
@@ -254,16 +255,18 @@ export async function haulOutBoat(
       actorId,
     });
     if (byMarina && ticketStatusId) {
-      await insert(tx, "tickets", {
-        title: `Haul out ${boat.name}`,
-        description: `Marina haul-out from ${from.name}.`,
-        priority: "medium",
-        status_id: ticketStatusId,
-        auto_generated: 0,
-        created_at: new Date().toISOString(),
-        created_by_id: actorId,
-        boat_id: boat.id,
-      });
+      await insertTicket(
+        tx,
+        {
+          title: `Haul out ${boat.name}`,
+          description: `Marina haul-out from ${from.name}.`,
+          priority: "medium",
+          statusId: ticketStatusId,
+          target: { type: "boat", id: boat.id, label: boat.name },
+        },
+        actorId,
+        "haulOut",
+      );
     }
   });
 }

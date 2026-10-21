@@ -180,6 +180,7 @@ streams:
     auto_subscribe: true
     queries:
       - SELECT * FROM tickets WHERE is_recent = true
+      - SELECT * FROM ticket_updates WHERE is_recent = true
       - SELECT * FROM notes WHERE is_recent = true
       - SELECT * FROM checklist_instances WHERE is_recent = true
       - SELECT * FROM checklist_instance_sections WHERE is_recent = true
@@ -196,6 +197,10 @@ streams:
              SELECT permission FROM user_permissions WHERE clerk_user_id = auth.user_id())
       - |
         SELECT * FROM incident_comments WHERE is_recent = true
+           AND required_permission IN (
+             SELECT permission FROM user_permissions WHERE clerk_user_id = auth.user_id())
+      - |
+        SELECT * FROM incident_updates WHERE is_recent = true
            AND required_permission IN (
              SELECT permission FROM user_permissions WHERE clerk_user_id = auth.user_id())
 

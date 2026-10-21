@@ -33,7 +33,6 @@ const BASELINE: Record<string, number> = {
   "src/pages/contacts/ContactDetailPage.tsx": 1,
   "src/pages/contacts/LeaseDetailPage.tsx": 3,
   "src/pages/home/cards.tsx": 4,
-  "src/pages/incidents/IncidentDetailPage.tsx": 2,
   "src/pages/incidents/IncidentListPage.tsx": 1,
   "src/pages/locations/CheckpointDetailPage.tsx": 1,
   "src/pages/locations/LocationDetailPage.tsx": 3,
@@ -43,7 +42,6 @@ const BASELINE: Record<string, number> = {
   "src/pages/reservations/ReservationDetailPage.tsx": 8,
   "src/pages/reservations/ReservationListPage.tsx": 4,
   "src/pages/shared/TargetActivity.tsx": 1,
-  "src/pages/tickets/TicketDetailPage.tsx": 2,
 };
 
 /** A locale-sensitive call whose language argument is missing or `undefined`. */

@@ -873,6 +873,25 @@ const incident_comments = new Table(
   },
 );
 
+const incident_updates = new Table(
+  {
+    incident_id: column.text,
+    kind: column.text,
+    from_value: column.text,
+    to_value: column.text,
+    created_at: column.text,
+    author_id: column.text,
+    required_permission: column.text,
+    is_recent: column.integer,
+  },
+  {
+    indexes: {
+      by_author_id: ["author_id"],
+      by_incident_id: ["incident_id"],
+    },
+  },
+);
+
 const incident_statuses = new Table(
   {
     name: column.text,
@@ -1428,6 +1447,25 @@ const ticket_statuses = new Table(
   },
 );
 
+const ticket_updates = new Table(
+  {
+    ticket_id: column.text,
+    kind: column.text,
+    from_value: column.text,
+    to_value: column.text,
+    body: column.text,
+    created_at: column.text,
+    author_id: column.text,
+    is_recent: column.integer,
+  },
+  {
+    indexes: {
+      by_author_id: ["author_id"],
+      by_ticket_id: ["ticket_id"],
+    },
+  },
+);
+
 const tickets = new Table(
   {
     title: column.text,
@@ -1619,6 +1657,7 @@ export const AppSchema = new Schema({
   contacts,
   incident_comments,
   incident_statuses,
+  incident_updates,
   incident_types,
   incidents,
   lease_comments,
@@ -1652,6 +1691,7 @@ export const AppSchema = new Schema({
   template_section_checkpoints,
   template_viewer_roles,
   ticket_statuses,
+  ticket_updates,
   tickets,
   tour_checkpoints,
   tours,
@@ -1717,6 +1757,7 @@ export const TABLE_NAMES = [
   "contacts",
   "incident_comments",
   "incident_statuses",
+  "incident_updates",
   "incident_types",
   "incidents",
   "lease_comments",
@@ -1750,6 +1791,7 @@ export const TABLE_NAMES = [
   "template_section_checkpoints",
   "template_viewer_roles",
   "ticket_statuses",
+  "ticket_updates",
   "tickets",
   "tour_checkpoints",
   "tours",

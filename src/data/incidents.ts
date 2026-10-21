@@ -1,6 +1,7 @@
 import { useQuery } from "@powersync/react";
 import { stamp } from "../lib/db";
-import { insert, transact, update } from "./sql";
+import { dataT } from "../i18n";
+import { insert, transact, update, type Executor } from "./sql";
 import { recordActivity } from "./activity";
 import {
   attachmentColumns,
@@ -16,6 +17,11 @@ import {
 // the others cannot: the nav hides the section, RLS refuses a direct read, and
 // the sync stream never puts the row on the device in the first place. Only the
 // last one holds in a dead zone, which is where a guard actually is.
+//
+// Every write to `incidents` is in this file; status and assignee changes
+// write their Incident Update in the same transaction (IncidentDetailPage
+// .spec.md § The timeline, ADR 0008). src/lib/ownedWrites.test.ts holds
+// every other module to that.
 
 export interface IncidentRow extends AttachedRow {
   id: string;
@@ -91,6 +97,85 @@ export function useIncidentComments(incidentId: string | undefined) {
   );
 }
 
+export interface IncidentUpdateRow {
+  id: string;
+  incident_id: string;
+  kind: string;
+  from_value: string | null;
+  to_value: string | null;
+  created_at: string;
+  author_id: string | null;
+  author_name: string | null;
+}
+
+/** An Incident's status and assignee changes, oldest first. */
+export function useIncidentUpdates(incidentId: string | undefined) {
+  return useQuery<IncidentUpdateRow>(
+    `SELECT u.*, a.name AS author_name
+       FROM incident_updates u
+       LEFT JOIN users a ON a.id = u.author_id
+      WHERE u.incident_id = ?
+      ORDER BY u.created_at, u.id`,
+    [incidentId ?? ""],
+  );
+}
+
+async function writeUpdate(
+  tx: Executor,
+  incidentId: string,
+  row: { kind: "status" | "assignee"; from: string | null; to: string },
+  actorId: string | null,
+): Promise<void> {
+  await insert(tx, "incident_updates", {
+    incident_id: incidentId,
+    kind: row.kind,
+    from_value: row.from,
+    to_value: row.to,
+    created_at: stamp(),
+    author_id: actorId,
+  });
+}
+
+/**
+ * Create an incident inside a caller's transaction (a checklist submit).
+ * The caller writes its own Activity Log line.
+ */
+export async function insertIncident(
+  tx: Executor,
+  row: {
+    id?: string;
+    title: string;
+    details?: string | null;
+    typeId?: string | null;
+    statusId: string;
+    assigneeId?: string | null;
+    createdAt?: string;
+    target: AttachmentTarget | null;
+  },
+  actorId: string | null,
+): Promise<string> {
+  return insert(tx, "incidents", {
+    id: row.id,
+    title: row.title,
+    details: row.details || null,
+    incident_type_id: row.typeId || null,
+    status_id: row.statusId,
+    assigned_to_id: row.assigneeId || null,
+    created_at: row.createdAt ?? stamp(),
+    author_id: actorId,
+    ...attachmentColumns(row.target),
+  });
+}
+
+/**
+ * Re-point every incident of one type at another, for a type merge in Admin
+ * (lookups.ts). Not an Update: the incident's status and assignee are
+ * untouched, and its type is the marina's catalogue, not its handling.
+ */
+export async function retypeIncidents(tx: Executor, fromTypeId: string, toTypeId: string): Promise<void> {
+  await tx.execute("UPDATE incidents SET incident_type_id = ? WHERE incident_type_id = ?", [toTypeId, fromTypeId]);
+}
+
 export interface LinkedTicket {
   id: string;
   title: string;
@@ -148,19 +233,10 @@ export async function createIncident(
   actorId: string | null,
 ): Promise<string> {
   return transact(async (tx) => {
-    const incidentId = await insert(tx, "incidents", {
-      title: input.title,
-      details: input.details || null,
-      incident_type_id: input.typeId || null,
-      status_id: input.statusId,
-      assigned_to_id: input.assigneeId || null,
-      created_at: stamp(),
-      author_id: actorId,
-      ...attachmentColumns(input.target),
-    });
+    const incidentId = await insertIncident(tx, input, actorId);
     await recordActivity(tx, {
       eventType: "incident.created",
-      summary: `Incident "${input.title}" logged on ${input.target.label}`,
+      summary: dataT("activity.created", { ns: "incidents", title: input.title, target: input.target.label }),
       subjectType: "incidents",
       subjectId: incidentId,
       actorId,
@@ -170,15 +246,17 @@ export async function createIncident(
 }
 
 export async function setIncidentStatus(
-  incident: { id: string; title: string },
+  incident: { id: string; title: string; status_id?: string; status_name?: string | null },
   status: { id: string; name: string },
   actorId: string | null,
 ): Promise<void> {
+  if (incident.status_id === status.id) return;
   await transact(async (tx) => {
     await update(tx, "incidents", incident.id, { status_id: status.id });
+    await writeUpdate(tx, incident.id, { kind: "status", from: incident.status_name ?? null, to: status.name }, actorId);
     await recordActivity(tx, {
       eventType: "incident.status_changed",
-      summary: `"${incident.title}" set to ${status.name}`,
+      summary: dataT("activity.status", { ns: "incidents", title: incident.title, status: status.name }),
       subjectType: "incidents",
       subjectId: incident.id,
       actorId,
@@ -187,15 +265,17 @@ export async function setIncidentStatus(
 }
 
 export async function assignIncident(
-  incident: { id: string; title: string },
+  incident: { id: string; title: string; assigned_to_id?: string | null; assignee_name?: string | null },
   assignee: { id: string; name: string },
   actorId: string | null,
 ): Promise<void> {
+  if (incident.assigned_to_id === assignee.id) return;
   await transact(async (tx) => {
     await update(tx, "incidents", incident.id, { assigned_to_id: assignee.id });
+    await writeUpdate(tx, incident.id, { kind: "assignee", from: incident.assignee_name ?? null, to: assignee.name }, actorId);
     await recordActivity(tx, {
       eventType: "incident.assigned",
-      summary: `"${incident.title}" assigned to ${assignee.name}`,
+      summary: dataT("activity.assigned", { ns: "incidents", title: incident.title, name: assignee.name }),
       subjectType: "incidents",
       subjectId: incident.id,
       actorId,
@@ -218,7 +298,7 @@ export async function addIncidentComment(
     });
     await recordActivity(tx, {
       eventType: "incident.commented",
-      summary: `Addendum added to "${incident.title}"`,
+      summary: dataT("activity.commented", { ns: "incidents", title: incident.title }),
       subjectType: "incidents",
       subjectId: incident.id,
       actorId,
@@ -239,7 +319,7 @@ export async function editIncidentOriginal(
     });
     await recordActivity(tx, {
       eventType: "incident.edited",
-      summary: `"${title}" edited by its author`,
+      summary: dataT("activity.edited", { ns: "incidents", title }),
       subjectType: "incidents",
       subjectId: incidentId,
       actorId,

@@ -1,6 +1,7 @@
 import { useQuery } from "@powersync/react";
 import { db, bool } from "../lib/db";
 import { insert, remove, transact, update } from "./sql";
+import { retypeIncidents } from "./incidents";
 import { statusKey } from "../lib/locations";
 
 // The admin-defined lookup tables: statuses and types.
@@ -98,10 +99,7 @@ export async function mergeIncidentTypes(
   targetId: string,
 ): Promise<void> {
   await transact(async (tx) => {
-    await tx.execute(
-      "UPDATE incidents SET incident_type_id = ? WHERE incident_type_id = ?",
-      [targetId, sourceId],
-    );
+    await retypeIncidents(tx, sourceId, targetId);
     await remove(tx, "incident_types", sourceId);
   });
 }

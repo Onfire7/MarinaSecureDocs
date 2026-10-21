@@ -44,7 +44,7 @@ export function TicketQueuePage() {
   const take = (ticketId: string, title: string) => {
     if (!current.user) return;
     void assignTicket(
-      { id: ticketId, title },
+      { id: ticketId, title, assigned_to_id: null },
       { id: current.user.id, name: current.user.name },
       current.user.id,
     );

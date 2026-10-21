@@ -3,11 +3,13 @@ import { assets } from "./assets";
 import { checklists } from "./checklists";
 import { common } from "./common";
 import { home } from "./home";
+import { incidents } from "./incidents";
 import { reports } from "./reports";
+import { tickets } from "./tickets";
 
 // English is the source of truth: a key exists when it is here. One
 // namespace per area of src/pages/, plus `common`.
-const en = { admin, assets, checklists, common, home, reports };
+const en = { admin, assets, checklists, common, home, incidents, reports, tickets };
 
 export type Catalog = typeof en;
 export default en;
