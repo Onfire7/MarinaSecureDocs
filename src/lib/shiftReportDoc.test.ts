@@ -61,23 +61,23 @@ const simple = (id: string, section_id: string, label: string, completed_at: str
   note: null,
 });
 
-describe("expected checkpoints (test 1)", () => {
-  it("counts a visit at an expected checkpoint, marks the unvisited one missed, and shows an unexpected one as such", () => {
+describe("check-ins (test 1)", () => {
+  it("lists every check-in under its location, names the checklist whose section named the checkpoint, and never calls a checkpoint missed", () => {
     const input = base();
     input.checkIns = [
       { id: "ci-1", checkpoint_id: "cp-a", checkpoint_name: "A Dock head", timestamp: T("22:31"), method: "scan", reason: null, within_radius: 1 },
       { id: "ci-2", checkpoint_id: "cp-x", checkpoint_name: "Boatyard Gate", timestamp: T("01:50", 21), method: "scan", reason: null, within_radius: 1 },
     ];
     const doc = compileShiftReport(input);
-    expect(doc.checkIns).toEqual({ done: 1, expected: 2, extra: 1 });
-    const b = doc.locations.find((l) => l.name === "B Dock")!;
-    expect(b.items.map((i) => [i.kind, i.mark, i.result.key])).toEqual([["checkin", "missed", "notVisited"]]);
+    expect(doc.checkIns).toBe(2);
+    const a = doc.locations.find((l) => l.name === "A Dock")!;
+    expect(a.items.map((i) => [i.kind, i.mark, i.result.key, i.source])).toEqual([["checkin", "ok", "scanned", "Dock Walk"]]);
+    expect(a.checkIns).toBe(1);
     const yard = doc.locations.find((l) => l.name === "Boatyard")!;
-    expect(yard.items[0].notExpected).toBe(true);
-    expect(yard.checkIns).toEqual({ visited: 0, expected: 0 });
-    expect(doc.attention.map((a) => a.kind)).toEqual(["missedCheckin"]);
-    expect(doc.attention[0].values.checkpoint).toBe("End of B Dock");
-    expect(doc.attention[0].checklistId).toBe("walk");
+    expect(yard.items[0].source).toBeNull();
+    // Nothing was checked at B Dock, so there is no card and no miss.
+    expect(doc.locations.find((l) => l.name === "B Dock")).toBeUndefined();
+    expect(doc.attention).toEqual([]);
   });
 });
 
@@ -181,8 +181,8 @@ function vehicle(over: Partial<VehicleUse>): VehicleUse {
   };
 }
 
-describe("locations in tree order (test 4)", () => {
-  it("orders parent before child and siblings by name, interleaves items by time, and puts section-less items last", () => {
+describe("locations worst first, then tree order (test 4)", () => {
+  it("puts cards with a miss first, then exceptions, then the rest in tree order; interleaves items by time; section-less items last in their group", () => {
     const input = base();
     input.sections.push(
       { id: "s-loop", instance_id: "walk", template_section_id: null, label: "Loop", location_id: "loop", due_by: null },
@@ -190,20 +190,25 @@ describe("locations in tree order (test 4)", () => {
       { id: "s-none", instance_id: "walk", template_section_id: null, label: "Closing", location_id: null, due_by: null },
     );
     input.items = [
-      simple("l1", "s-loop", "Loop item", T("02:00", 21)),
+      simple("l1", "s-loop", "Loop item", null),
       simple("c1", "s-camp", "Camp item", T("23:58")),
       simple("n1", "s-none", "Keys in the box", T("06:00", 21)),
       simple("a2", "s-a", "After the scan", T("22:40")),
       simple("a1", "s-a", "Before the scan", T("22:20")),
     ];
-    input.checkIns = [{ id: "ci-a", checkpoint_id: "cp-a", checkpoint_name: "A Dock head", timestamp: T("22:31"), method: "scan", reason: null, within_radius: 1 }];
+    input.checkIns = [
+      { id: "ci-a", checkpoint_id: "cp-a", checkpoint_name: "A Dock head", timestamp: T("22:31"), method: "scan", reason: null, within_radius: 1 },
+      { id: "ci-b", checkpoint_id: "cp-b", checkpoint_name: "End of B Dock", timestamp: T("22:52"), method: "manual", reason: "Tag cracked", within_radius: 1 },
+    ];
     const doc = compileShiftReport(input);
-    expect(doc.locations.map((l) => l.name)).toEqual(["A Dock", "B Dock", "Campgrounds", "Campground Loop", "Dock Walk"]);
-    expect(doc.locations[0].items.map((i) => i.label)).toEqual(["Before the scan", "A Dock head", "After the scan"]);
-    expect(doc.locations[3].path).toEqual(["Marina", "Campgrounds"]);
+    // Loop has a miss (red), B Dock an exception (orange), the rest are green in tree order.
+    expect(doc.locations.map((l) => l.name)).toEqual(["Campground Loop", "B Dock", "A Dock", "Campgrounds", "Dock Walk"]);
+    expect(doc.locations[2].items.map((i) => i.label)).toEqual(["Before the scan", "A Dock head", "After the scan"]);
+    expect(doc.locations[0].path).toEqual(["Marina", "Campgrounds"]);
     expect(doc.locations.at(-1)!.id).toBeNull();
-    expect(worstMark(doc.locations[0].items)).toBe("ok");
-    expect(worstMark(doc.locations[1].items)).toBe("missed");
+    expect(worstMark(doc.locations[0].items)).toBe("missed");
+    expect(worstMark(doc.locations[1].items)).toBe("exception");
+    expect(worstMark(doc.locations[2].items)).toBe("ok");
   });
 });
 
@@ -219,7 +224,7 @@ describe("summary sentences (test 5)", () => {
     const facts = summaryFacts(compileShiftReport(input));
     expect(facts.map((f) => f.key)).toEqual(["checkIns", "raised", "droveReturned", "droveStillOut", "droveKept", "attention"]);
     // A checklist with nothing in it counts as complete.
-    expect(facts[0].values).toEqual({ guard: "Dana", done: "0", expected: "2", complete: "1", total: "1" });
+    expect(facts[0].values).toEqual({ guard: "Dana", checkIns: "0", complete: "1", total: "1" });
     expect(facts[2].values).toMatchObject({ vehicle: "Patrol Truck", distance: "42", fuel: "2" });
   });
 });

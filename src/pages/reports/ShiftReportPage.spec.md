@@ -54,8 +54,7 @@ In this order. Each section's rules follow.
 2. **End of Shift Note.** The guard's own words, verbatim, when they wrote
    any. Omitted when empty.
 3. **Summary.** Sentences, not numbers, from a pure function the email
-   reuses (§ The email): check-ins done of expected and checklists complete
-   of total; incidents logged and tickets raised; one sentence per vehicle
+   reuses (§ The email): check-ins made and checklists complete of total; incidents logged and tickets raised; one sentence per vehicle
    driven ("{guard} drove the {vehicle} {distance} and returned it at
    {fuel}", or "still has it" / "kept it past End of Shift"); "{n} things
    need attention."
@@ -63,8 +62,6 @@ In this order. Each section's rules follow.
    each with where it happened and when. What qualifies:
    - an Incident logged (every one; "bad" when its status is still open at
      End of Shift, else "warn");
-   - a **missed check-in**: an expected checkpoint (§ Expected checkpoints)
-     with no check-in in the window;
    - a Door or Lock Check found other than expected;
    - a rejected Verify Task;
    - a Manual Check-In, with its reason;
@@ -87,17 +84,18 @@ In this order. Each section's rules follow.
 8. **Vehicles.** The existing section, unchanged in content
    (`VehicleUseSection`; rules below under § Vehicles).
 9. **Locations.** One card per Location that had any of this guard's
-   work, in tree order (parent before child, siblings by name). Under each:
-   the check-ins expected there and the checklist items whose section is
-   bound there, **as one list of items**, in time order, each with its
-   result and time, misses and exceptions marked. Check-ins read as items:
-   *Check-in · {checkpoint}: Scanned 10:31 PM* / *Manual, "tag cracked"* /
-   *Not visited*. Routine items are folded behind the card's **Show {n}
-   more**; the card's edge is coloured by the worst thing in it, and its
-   header gives *{visited} of {expected} check-ins*, misses and exceptions,
-   and the first and last time anything was recorded there. Items from
-   sections with no Location go under a final card named for their
-   checklist.
+   work, **worst first**: cards with a miss, then cards with an exception,
+   then cards where all was as expected; inside each group, tree order
+   (parent before child, siblings by name). Under each: the check-ins made
+   there and the checklist items whose section is bound there, **as one
+   list of items**, in time order, each with its result and time, misses
+   and exceptions marked. Check-ins read as items: *Check-in ·
+   {checkpoint}: Scanned 10:31 PM* / *Manual, "tag cracked"*. Routine items
+   are folded behind the card's **Show {n} more**; the card's edge is
+   coloured by the worst thing in it, and its header gives the number of
+   check-ins, misses and exceptions, and the first and last time anything
+   was recorded there. Items from sections with no Location go under a
+   final card named for their checklist.
 
 **Photos.** Incidents and Tickets carry no attachments yet. When they do,
 each appears inline under its record, by the attachment's public URL; the
@@ -115,14 +113,15 @@ sections came due in it. In the report it shows only that shift's items;
 the rest are summarized as *{n} items done in the previous shift*. Items
 still open at End of Shift count as missed in this shift.
 
-### Expected checkpoints
+### Checkpoints are never "missed"
 
-A checkpoint is expected when a Section of one of the shift's checklists
-names it (`template_section_checkpoints` through the instance section's
-`template_section_id`). Tours create no expectations; that needs the Tour
-rethink on the ROADMAP. A check-in at a checkpoint nobody expected still
-appears under its Location, marked *(not expected)*, and counts as neither
-done nor missed.
+The report records the check-ins the guard made and nothing about the ones
+they didn't. Settled with the owner 2026-10-21: some checkpoints exist for
+convenience and are not required on every shift, and a checkpoint whose
+tag has not been deployed yet would read as missed on a night the guard
+demonstrably visited the place. Which checkpoints a shift *requires* is
+the Checkpoint reporting work on the ROADMAP, with the Tour rethink; until
+then a missed visit is only visible as an unfinished checklist item.
 
 ### Vehicles
 

@@ -80,8 +80,8 @@ const link = await dialog.getByTestId("email-link").inputValue();
 const ended = await until("the shift to end", `select ended_at is not null from shifts where id = '${shiftId}'`, "t");
 const snapshotStored = await until("the snapshot to upload", `select count(*) from shift_report_snapshots where shift_id = '${shiftId}'`, "1");
 await page.screenshot({ path: `${OUT}/shift-report-11-dialog.png` });
-check("11. the review shows the live report with its banner and the misses; End Shift and Submit stores the snapshot, ends the shift and opens the email",
-  banner11 === 1 && /Report CP B e2e/.test(attention11) && /Report door e2e found Unlocked/.test(attention11)
+check("11. the review shows the live report with its banner and the unlocked door, never a missed checkpoint; End Shift and Submit stores the snapshot, ends the shift and opens the email",
+  banner11 === 1 && !/Report CP B e2e/.test(attention11) && /Report door e2e found Unlocked/.test(attention11)
     && /^Shift report: /.test(subject) && /Quiet night apart from the gate post/.test(body) && link.endsWith(`/r/shift/${shiftId}`)
     && ended && snapshotStored,
   `banner ${banner11}, attention ${JSON.stringify(attention11.slice(0, 200))}, subject ${JSON.stringify(subject)}, link ${link}, ended ${ended}, snapshot ${snapshotStored}`);

@@ -40,7 +40,8 @@ export const reports = {
     now: "Now {{status}}",
     was: "(was {{status}})",
     noLocation: "No location",
-    checkInsCount: "{{visited}}/{{expected}} check-ins",
+    checkInsCount_one: "{{count}} check-in",
+    checkInsCount_other: "{{count}} check-ins",
     missed_one: "{{count}} missed",
     missed_other: "{{count}} missed",
     exceptions_one: "{{count}} exception",
@@ -48,11 +49,10 @@ export const reports = {
     allAsExpected: "all as expected",
     showMore: "Show {{count}} more",
     showProblemsOnly: "Show problems only",
-    notExpected: "(not expected)",
   },
   /** The summary's sentences, from summaryFacts(). */
   summary: {
-    checkIns: "{{guard}} checked in at {{done}} of {{expected}} expected checkpoints and completed {{complete}} of {{total}} checklists.",
+    checkIns: "{{guard}} made {{checkIns}} check-ins and completed {{complete}} of {{total}} checklists.",
     raised: "{{incidents}} incidents were logged and {{tickets}} tickets raised.",
     droveReturned: "{{guard}} drove the {{vehicle}} {{distance}} {{unit}} and returned it at {{fuel}}/4 tank.",
     droveStillOut: "{{guard}} drove the {{vehicle}} {{distance}} {{unit}} and still has it.",
@@ -62,7 +62,6 @@ export const reports = {
   /** Needs attention lines, by AttentionLine.kind. */
   attention: {
     incident: "Incident logged: {{title}}",
-    missedCheckin: "Missed check-in: {{checkpoint}} ({{checklist}})",
     doorFound: "{{door}} found {{found}}, expected {{expected}}; left {{left}}.",
     verifyRejected: "Verify Task rejected: “{{task}}”. {{reason}}",
     manualCheckin: "Manual check-in at {{checkpoint}}: “{{reason}}”",
@@ -80,7 +79,6 @@ export const reports = {
     scanned: "Scanned",
     manual: "Manual: “{{reason}}”",
     outsideRadius: "Scanned · outside radius",
-    notVisited: "Not visited",
     state: "{{state}}",
     foundLeft: "Found {{found}}, left {{left}}",
     confirmed: "Confirmed",

@@ -9,14 +9,14 @@ const doc: ShiftReportDoc = {
   marinaName: "Harbor Point",
   shift: { id: "s", guardId: "g", guardName: "Dana Ruiz", startedAt: "2026-10-20T22:00:00.000Z", endedAt: "2026-10-21T06:00:00.000Z", endedBy: { kind: "button" } },
   note: "Quiet night apart from the truck.",
-  checkIns: { done: 21, expected: 22, extra: 2 },
+  checkIns: 21,
   checklists: [{ id: "c", name: "Dock Walk", done: 14, total: 14, completedAt: null, dueBy: null, previousShiftItems: 0 }],
   attention: Array.from({ length: 23 }, (_, i) => ({
-    kind: "missedCheckin",
-    tone: "bad" as const,
+    kind: "manualCheckin",
+    tone: "warn" as const,
     where: `Dock ${i}`,
     at: i % 2 ? "2026-10-21T03:20:00.000Z" : null,
-    values: { checkpoint: `CP ${i}`, checklist: "Dock Walk" },
+    values: { checkpoint: `CP ${i}`, reason: "No tag" },
   })),
   incidents: [],
   tickets: [],
@@ -42,7 +42,7 @@ describe("shiftReportEmail", () => {
     expect(lines[0]).toMatch(/^summary\.checkIns\{guard=Dana/);
     expect(lines).toContain("“Quiet night apart from the truck.”");
     expect(lines.filter((l) => l.startsWith("- ")).length).toBe(23);
-    expect(lines).toContain("- Dock 1: attention.missedCheckin{checkpoint=CP 1,checklist=Dock Walk} (03:20)");
+    expect(lines).toContain("- Dock 1: attention.manualCheckin{checkpoint=CP 1,reason=No tag} (03:20)");
     expect(lines).toContain("https://beta2.marinasecure.com/r/shift/s");
     expect(lines.at(-1)).toBe("email.ifLinkFails{marina=Harbor Point}");
     expect(email.body).not.toMatch(/^(Hi|Hello|Dear)/m);

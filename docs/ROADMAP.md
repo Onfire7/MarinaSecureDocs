@@ -315,6 +315,20 @@ most wants to see.
 
 **Why deferred:** rostering is a good-sized feature in its own right.
 
+### Checkpoint reporting
+
+The Shift Report lists the check-ins a guard made and never calls a
+checkpoint missed. It did, briefly, by treating every checkpoint a
+checklist section names as required, and that was wrong two ways: some
+checkpoints exist for convenience and are not expected on every shift, and
+a checkpoint whose tag has not been deployed read as missed on a night the
+checklist showed the place was visited. Reporting missed checkpoints needs
+a way to say which ones a shift requires, which belongs with the Tour
+rethink below.
+
+**Why deferred:** the owner's call, 2026-10-21; a wrong "missed" is worse
+than none.
+
 ### Tours need a rethink
 
 Tours are not linked to Shifts; a guard's tour progress is just their

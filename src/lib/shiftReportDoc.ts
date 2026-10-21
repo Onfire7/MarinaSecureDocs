@@ -26,8 +26,6 @@ export interface RecordItem {
   result: Phrase;
   note: string | null;
   mark: Mark;
-  /** A check-in nobody expected: counted as neither done nor missed. */
-  notExpected?: boolean;
 }
 
 export interface LocationCard {
@@ -36,7 +34,7 @@ export interface LocationCard {
   /** Ancestor names, root first; empty at the root. */
   path: string[];
   items: RecordItem[];
-  checkIns: { visited: number; expected: number };
+  checkIns: number;
   firstAt: string | null;
   lastAt: string | null;
 }
@@ -98,7 +96,7 @@ export interface ShiftReportDoc {
     endedBy: { kind: "checklist"; name: string } | { kind: "button" } | null;
   };
   note: string | null;
-  checkIns: { done: number; expected: number; extra: number };
+  checkIns: number;
   checklists: DocChecklist[];
   attention: AttentionLine[];
   incidents: DocIncident[];
@@ -322,7 +320,6 @@ export function compileShiftReport(input: CompileInputs): ShiftReportDoc {
   const mineIds = new Set(mine.map((i) => i.id));
   const sections = input.sections.filter((s) => mineIds.has(s.instance_id));
   const instanceById = new Map(mine.map((i) => [i.id, i]));
-  const templateSectionIds = new Set(sections.map((s) => s.template_section_id).filter(Boolean) as string[]);
 
   const attention: AttentionLine[] = [];
   const cards = new Map<string, LocationCard>();
@@ -336,7 +333,7 @@ export function compileShiftReport(input: CompileInputs): ShiftReportDoc {
         name: l?.name ?? fallbackName,
         path: l ? pathOf(l.id, locById) : [],
         items: [],
-        checkIns: { visited: 0, expected: 0 },
+        checkIns: 0,
         firstAt: null,
         lastAt: null,
       };
@@ -415,21 +412,19 @@ export function compileShiftReport(input: CompileInputs): ShiftReportDoc {
     }
   }
 
-  // ---- check-ins: expected checkpoints, visits, misses, extras
-  const expected = new Map<string, { checkpoint: InCheckpoint; section: InSection }>();
+  // ---- check-ins: the visits the guard made. Never "missed": which
+  // checkpoints a shift requires is ROADMAP work (spec § Checkpoints are
+  // never "missed"). A check-in's checklist is the one whose section names
+  // its checkpoint, when there is one.
+  const checklistNaming = new Map<string, string>();
   for (const sc of input.sectionCheckpoints) {
-    if (!templateSectionIds.has(sc.section_id)) continue;
-    const cp = cpById.get(sc.checkpoint_id);
     const section = sections.find((s) => s.template_section_id === sc.section_id);
-    if (cp && section && !expected.has(cp.id)) expected.set(cp.id, { checkpoint: cp, section });
+    const name = section ? instanceById.get(section.instance_id)?.template_name : undefined;
+    if (name && !checklistNaming.has(sc.checkpoint_id)) checklistNaming.set(sc.checkpoint_id, name);
   }
   const visits = input.checkIns.filter((c) => inWindow(c.timestamp, window));
-  let doneCount = 0;
-  let extra = 0;
-  const seenCheckpoints = new Set<string>();
   for (const c of visits) {
     const cp = c.checkpoint_id ? cpById.get(c.checkpoint_id) : undefined;
-    const exp = c.checkpoint_id ? expected.get(c.checkpoint_id) : undefined;
     const name = cp?.name ?? c.checkpoint_name ?? "";
     const manual = c.method === "manual";
     const outside = c.within_radius != null && !truthy(c.within_radius);
@@ -439,7 +434,7 @@ export function compileShiftReport(input: CompileInputs): ShiftReportDoc {
       id: c.id,
       kind: "checkin",
       label: name,
-      source: exp ? (instanceById.get(exp.section.instance_id)?.template_name ?? null) : null,
+      source: (c.checkpoint_id && checklistNaming.get(c.checkpoint_id)) || null,
       at: c.timestamp,
       result: manual
         ? { key: "manual", values: { reason: c.reason ?? "" } }
@@ -448,46 +443,13 @@ export function compileShiftReport(input: CompileInputs): ShiftReportDoc {
           : { key: "scanned" },
       note: null,
       mark,
-      notExpected: !exp || undefined,
     });
-    if (exp) {
-      if (!seenCheckpoints.has(exp.checkpoint.id)) {
-        seenCheckpoints.add(exp.checkpoint.id);
-        doneCount++;
-        card.checkIns.visited++;
-      }
-    } else {
-      extra++;
-    }
+    card.checkIns++;
     if (manual) {
       attention.push({ kind: "manualCheckin", tone: "warn", where: where(cp?.location_id) || name, at: c.timestamp, values: { checkpoint: name, reason: c.reason ?? "" } });
     } else if (outside) {
       attention.push({ kind: "outsideRadius", tone: "warn", where: where(cp?.location_id) || name, at: c.timestamp, values: { checkpoint: name } });
     }
-  }
-  for (const { checkpoint, section } of expected.values()) {
-    const card = cardFor(checkpoint.location_id, checkpoint.name);
-    card.checkIns.expected++;
-    if (seenCheckpoints.has(checkpoint.id)) continue;
-    const source = instanceById.get(section.instance_id)?.template_name ?? null;
-    push(card, {
-      id: `missed:${checkpoint.id}`,
-      kind: "checkin",
-      label: checkpoint.name,
-      source,
-      at: null,
-      result: { key: "notVisited" },
-      note: null,
-      mark: "missed",
-    });
-    attention.push({
-      kind: "missedCheckin",
-      tone: "bad",
-      where: where(checkpoint.location_id) || checkpoint.name,
-      at: null,
-      values: { checkpoint: checkpoint.name, checklist: source ?? "" },
-      checklistId: section.instance_id,
-    });
   }
 
   // ---- incidents, tickets, notes
@@ -553,12 +515,15 @@ export function compileShiftReport(input: CompileInputs): ShiftReportDoc {
 
   // ---- order
   attention.sort((a, b) => (a.at ? ms(a.at) : Infinity) - (b.at ? ms(b.at) : Infinity));
+  // Worst first (missed, then exception, then all as expected), tree order
+  // inside each group: a card with no location goes last; otherwise the
+  // full path, which puts a parent before its children and siblings by name.
+  const rank = { missed: 0, exception: 1, ok: 2 } as const;
   const locations = [...cards.values()]
     .map((c) => ({ ...c, items: [...c.items].sort((a, b) => (a.at ? ms(a.at) : Infinity) - (b.at ? ms(b.at) : Infinity)) }))
     .sort((a, b) => {
-      // Tree order: a card with no location goes last; otherwise compare the
-      // full path, which puts a parent before its children and siblings by
-      // name.
+      const byTone = rank[worstMark(a.items)] - rank[worstMark(b.items)];
+      if (byTone !== 0) return byTone;
       if (a.id === null || b.id === null) return a.id === null ? (b.id === null ? a.name.localeCompare(b.name) : 1) : -1;
       const pa = [...a.path, a.name];
       const pb = [...b.path, b.name];
@@ -589,7 +554,7 @@ export function compileShiftReport(input: CompileInputs): ShiftReportDoc {
       endedBy,
     },
     note: input.note?.trim() ? input.note.trim() : null,
-    checkIns: { done: doneCount, expected: expected.size, extra },
+    checkIns: visits.length,
     checklists,
     attention,
     incidents,
@@ -616,8 +581,7 @@ export function summaryFacts(doc: ShiftReportDoc): Phrase[] {
       key: "checkIns",
       values: {
         guard: first,
-        done: String(doc.checkIns.done),
-        expected: String(doc.checkIns.expected),
+        checkIns: String(doc.checkIns),
         complete: String(complete),
         total: String(doc.checklists.length),
       },

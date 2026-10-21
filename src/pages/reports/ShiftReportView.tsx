@@ -243,7 +243,7 @@ function LocationCardView({ card, hm }: { card: LocationCard; hm: (iso: string) 
           {span && <div className="muted small">{span}</div>}
         </div>
         <div className="psc-counts small">
-          {card.checkIns.expected > 0 && <span>{t("report.checkInsCount", { visited: card.checkIns.visited, expected: card.checkIns.expected })}</span>}
+          {card.checkIns > 0 && <span>{t("report.checkInsCount", { count: card.checkIns })}</span>}
           {missed > 0 && <span className="psc-bad">{t("report.missed", { count: missed })}</span>}
           {exceptions > 0 && <span className="psc-warn">{t("report.exceptions", { count: exceptions })}</span>}
           {missed + exceptions === 0 && <span className="psc-good">{t("report.allAsExpected")}</span>}
@@ -273,7 +273,6 @@ function ItemRow({ item: i, hm }: { item: RecordItem; hm: (iso: string) => strin
       <span>
         {i.kind === "checkin" ? "📍 " : ""}
         {i.label}
-        {i.notExpected && <span className="muted"> {t("report.notExpected")}</span>}
         <div className="muted small">
           {[i.source, i.at ? hm(i.at) : null, i.note].filter(Boolean).join(" · ")}
         </div>
