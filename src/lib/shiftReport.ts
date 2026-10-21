@@ -72,7 +72,45 @@ export interface VehicleFuelLog {
   meter_type: string | null;
 }
 
-/** One trip, or one vehicle only fueled or checked. */
+/** An Asset Status the guard set on a Fleet Vehicle. */
+export interface VehicleStatusLog {
+  id: string;
+  asset_id: string;
+  asset_name: string;
+  status_name: string | null;
+  note: string | null;
+  timestamp: string;
+  logged_by_id: string | null;
+  has_meter: number;
+  meter_type: string | null;
+}
+
+/** A meter reading the guard logged on a Fleet Vehicle. */
+export interface VehicleMeterReading {
+  id: string;
+  asset_id: string;
+  asset_name: string;
+  value: number;
+  timestamp: string;
+  logged_by_id: string | null;
+  has_meter: number;
+  meter_type: string | null;
+}
+
+/** An Incident or Ticket whose target is a Fleet Vehicle. */
+export interface VehicleRaised {
+  kind: "incident" | "ticket";
+  id: string;
+  asset_id: string;
+  asset_name: string;
+  title: string;
+  created_at: string;
+  created_by_id: string | null;
+  has_meter: number;
+  meter_type: string | null;
+}
+
+/** One trip, or one vehicle only fueled, checked, read or written about. */
 export interface VehicleUse {
   assetId: string;
   name: string;
@@ -92,6 +130,12 @@ export interface VehicleUse {
   keptReason: string | null;
   fills: { at: string; gallons: number; cost: number | null }[];
   statusChecks: { at: string; odometer: number | null; level: number }[];
+  /** Asset Statuses the guard set, the post-return one included. */
+  statuses: { at: string; name: string; note: string | null }[];
+  /** Readings no checkout, check-in or Status Check already shows. */
+  readings: { at: string; value: number }[];
+  /** What the guard raised on the vehicle: pointers into the report's own lists. */
+  raised: { kind: "incident" | "ticket"; id: string; title: string; at: string }[];
   firstAt: number;
 }
 
@@ -103,7 +147,9 @@ const flag = (v: number | boolean | null) => v === true || v === 1;
  * overlap the window, and the fill-ups and Status Checks they logged in it.
  * `checkouts` should hold all of the guard's checkouts that might qualify,
  * including the continuation of a kept one, which is how a kept trip is told
- * from a returned one.
+ * from a returned one. Status changes, standalone readings and what was
+ * raised attach to the trip whose span holds them, else to the vehicle's
+ * own no-span entry.
  */
 export function compileVehicleUse(input: {
   window: { start: number; end: number };
@@ -111,6 +157,9 @@ export function compileVehicleUse(input: {
   guardUserId: string;
   checkouts: VehicleCheckout[];
   fuelLogs: VehicleFuelLog[];
+  statusLogs?: VehicleStatusLog[];
+  readings?: VehicleMeterReading[];
+  raised?: VehicleRaised[];
 }): VehicleUse[] {
   const { window } = input;
   const mine = input.guardContactId
@@ -146,23 +195,29 @@ export function compileVehicleUse(input: {
         keptReason: kept ? c.return_note : null,
         fills: [],
         statusChecks: [],
+        statuses: [],
+        readings: [],
+        raised: [],
         firstAt: ms(c.time_out),
       } satisfies VehicleUse;
     });
 
-  const logs = input.fuelLogs
-    .filter((f) => f.logged_by_id === input.guardUserId && withinWindow(f.timestamp, window))
-    .sort((a, b) => ms(a.timestamp) - ms(b.timestamp));
-  for (const f of logs) {
-    const at = ms(f.timestamp);
-    let use = uses.find(
-      (u) => u.assetId === f.asset_id && u.out != null && ms(u.out) <= at && (u.end?.at == null || at <= ms(u.end.at)),
-    ) ?? uses.find((u) => u.assetId === f.asset_id && u.checkoutId == null);
+  // The entry a vehicle's record goes under: the trip whose span holds its
+  // moment (the span's end is inclusive, so a check-in's own status counts),
+  // else the vehicle's no-span entry, made on first need.
+  const entryFor = (
+    rec: { asset_id: string; asset_name: string; has_meter: number; meter_type: string | null },
+    at: number,
+  ): VehicleUse => {
+    let use =
+      uses.find(
+        (u) => u.assetId === rec.asset_id && u.out != null && ms(u.out) <= at && (u.end?.at == null || at <= ms(u.end.at)),
+      ) ?? uses.find((u) => u.assetId === rec.asset_id && u.checkoutId == null);
     if (!use) {
       use = {
-        assetId: f.asset_id,
-        name: f.asset_name,
-        meterType: f.has_meter === 1 ? f.meter_type : null,
+        assetId: rec.asset_id,
+        name: rec.asset_name,
+        meterType: rec.has_meter === 1 ? rec.meter_type : null,
         checkoutId: null,
         out: null,
         keptFromPrevious: false,
@@ -175,12 +230,53 @@ export function compileVehicleUse(input: {
         keptReason: null,
         fills: [],
         statusChecks: [],
+        statuses: [],
+        readings: [],
+        raised: [],
         firstAt: at,
       };
       uses.push(use);
     }
+    use.firstAt = Math.min(use.firstAt, at);
+    return use;
+  };
+
+  const logs = input.fuelLogs
+    .filter((f) => f.logged_by_id === input.guardUserId && withinWindow(f.timestamp, window))
+    .sort((a, b) => ms(a.timestamp) - ms(b.timestamp));
+  for (const f of logs) {
+    const use = entryFor(f, ms(f.timestamp));
     if (f.gallons != null) use.fills.push({ at: f.timestamp, gallons: f.gallons, cost: f.cost });
     if (f.level != null) use.statusChecks.push({ at: f.timestamp, odometer: f.odometer, level: f.level });
+  }
+
+  const mineInWindow = <T extends { logged_by_id?: string | null; created_by_id?: string | null; timestamp?: string; created_at?: string }>(
+    rows: T[],
+  ) =>
+    rows
+      .filter((r) => (r.logged_by_id ?? r.created_by_id) === input.guardUserId)
+      .filter((r) => withinWindow(r.timestamp ?? r.created_at, window))
+      .sort((a, b) => ms(a.timestamp ?? a.created_at!) - ms(b.timestamp ?? b.created_at!));
+
+  for (const sl of mineInWindow(input.statusLogs ?? [])) {
+    entryFor(sl, ms(sl.timestamp)).statuses.push({ at: sl.timestamp, name: sl.status_name ?? "", note: sl.note });
+  }
+
+  // A reading a checkout, check-in or Status Check wrote is already shown by
+  // that line; matched by its moment, the one thing both rows share.
+  const shown = new Set<string>();
+  for (const c of mine) {
+    shown.add(`${c.asset_id}@${ms(c.time_out)}`);
+    if (c.time_in) shown.add(`${c.asset_id}@${ms(c.time_in)}`);
+  }
+  for (const f of logs) if (f.level != null) shown.add(`${f.asset_id}@${ms(f.timestamp)}`);
+  for (const r of mineInWindow(input.readings ?? [])) {
+    if (shown.has(`${r.asset_id}@${ms(r.timestamp)}`)) continue;
+    entryFor(r, ms(r.timestamp)).readings.push({ at: r.timestamp, value: r.value });
+  }
+
+  for (const x of mineInWindow(input.raised ?? [])) {
+    entryFor(x, ms(x.created_at)).raised.push({ kind: x.kind, id: x.id, title: x.title, at: x.created_at });
   }
 
   return uses.sort((a, b) => a.firstAt - b.firstAt);

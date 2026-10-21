@@ -169,6 +169,7 @@ export function ShiftReportPage() {
               {incidents.map((i) => (
                 <Link
                   key={i.id}
+                  id={`incident-${i.id}`}
                   to={`/incidents/${i.id}`}
                   className="card spread"
                   style={{ textDecoration: "none", color: "inherit" }}
@@ -184,6 +185,7 @@ export function ShiftReportPage() {
             {tickets.map((t) => (
               <Link
                 key={t.id}
+                id={`ticket-${t.id}`}
                 to={`/tickets/${t.id}`}
                 className="card spread"
                 style={{ textDecoration: "none", color: "inherit" }}

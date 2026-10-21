@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { number, time } from "../../i18n";
 import { FUEL_STEPS } from "../../lib/fleet";
 import { compileVehicleUse, shiftWindowMs, type VehicleUse } from "../../lib/shiftReport";
@@ -14,13 +15,22 @@ export function VehicleUseSection({
   shift: { guard_id: string; started_at: string; ended_at: string | null };
 }) {
   const { t } = useTranslation("reports");
-  const { contactId, checkouts, fuelLogs } = useShiftVehicleRecords(shift.guard_id, shift);
+  const current = useCurrent();
+  const { contactId, checkouts, fuelLogs, statusLogs, readings, raised } = useShiftVehicleRecords(
+    shift.guard_id,
+    shift,
+  );
+  // Incident pointers follow the gate of the section they point to.
+  const canSeeIncidents = current.can("view_incidents");
   const uses = compileVehicleUse({
     window: shiftWindowMs(shift),
     guardContactId: contactId,
     guardUserId: shift.guard_id,
     checkouts,
     fuelLogs,
+    statusLogs,
+    readings,
+    raised: canSeeIncidents ? raised : raised.filter((r) => r.kind !== "incident"),
   });
 
   return (
@@ -99,8 +109,28 @@ function VehicleUseCard({ use: u }: { use: VehicleUse }) {
             : t("vehicles.statusCheckNoMeter", { time: hm(c.at), fuel: FUEL_STEPS[c.level] })}
         </div>
       ))}
+      {u.readings.map((r) => (
+        <div key={`reading-${r.at}`} className="small muted">
+          {t("vehicles.reading", { value: number(r.value), unit, time: hm(r.at) })}
+        </div>
+      ))}
+      {u.statuses.map((st) => (
+        <div key={`status-${st.at}`} className="small">
+          {st.note
+            ? t("vehicles.statusNote", { status: st.name, time: hm(st.at), note: st.note })
+            : t("vehicles.status", { status: st.name, time: hm(st.at) })}
+        </div>
+      ))}
       {u.note && <div className="small">{t("vehicles.note", { note: u.note })}</div>}
       {u.keptReason && <div className="small">{t("vehicles.kept", { reason: u.keptReason })}</div>}
+      {u.raised.map((r) => (
+        <div key={`${r.kind}-${r.id}`} className="small">
+          {/* A pointer into this report's own Incidents or Tickets list, never a second copy. */}
+          <a href={`#${r.kind}-${r.id}`}>
+            {t(r.kind === "incident" ? "vehicles.incident" : "vehicles.ticket", { title: r.title })}
+          </a>
+        </div>
+      ))}
     </div>
   );
 }

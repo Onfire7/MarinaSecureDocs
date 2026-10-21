@@ -14,7 +14,13 @@ import {
 import { fireAssetTrigger, undoAssetTrigger } from "./assetTriggers";
 import { FUEL_STEPS, readingChange } from "../lib/fleet";
 import { statusCheckWrites, statusUndoReading, type FleetVehicleResult, type StatusCheckInput } from "../lib/fleetItem";
-import type { VehicleCheckout, VehicleFuelLog } from "../lib/shiftReport";
+import type {
+  VehicleCheckout,
+  VehicleFuelLog,
+  VehicleMeterReading,
+  VehicleRaised,
+  VehicleStatusLog,
+} from "../lib/shiftReport";
 
 // Fleet Vehicles — the Dashboard's Fleet card (src/pages/home/FleetCard.spec.md).
 //
@@ -665,5 +671,38 @@ export function useShiftVehicleRecords(
       WHERE f.logged_by_id = ? AND f.timestamp >= ? AND f.timestamp <= ?`,
     [guardId ?? "", from, to],
   );
-  return { contactId, checkouts, fuelLogs };
+  // Status changes, standalone readings, and what was raised on a Fleet
+  // Vehicle (ShiftReportPage.spec.md § Vehicles). Each joins assets on id and
+  // reads the status name by a correlated subquery, never a join on a
+  // non-id column (CLAUDE.md § Learnings).
+  const { data: statusLogs } = useQuery<VehicleStatusLog>(
+    `SELECT sl.id, sl.asset_id, a.name AS asset_name, sl.note, sl.timestamp, sl.logged_by_id,
+            a.has_meter, a.meter_type,
+            (SELECT st.name FROM asset_statuses st WHERE st.id = sl.status_id) AS status_name
+       FROM asset_status_logs sl
+       JOIN assets a ON a.id = sl.asset_id
+      WHERE a.is_fleet = 1 AND sl.logged_by_id = ? AND sl.timestamp >= ? AND sl.timestamp <= ?`,
+    [guardId ?? "", from, to],
+  );
+  const { data: readings } = useQuery<VehicleMeterReading>(
+    `SELECT r.id, r.asset_id, a.name AS asset_name, r.value, r.timestamp, r.logged_by_id,
+            a.has_meter, a.meter_type
+       FROM asset_meter_readings r
+       JOIN assets a ON a.id = r.asset_id
+      WHERE a.is_fleet = 1 AND r.logged_by_id = ? AND r.timestamp >= ? AND r.timestamp <= ?`,
+    [guardId ?? "", from, to],
+  );
+  const { data: raised } = useQuery<VehicleRaised>(
+    `SELECT 'incident' AS kind, i.id, i.asset_id, a.name AS asset_name, i.title, i.created_at,
+            i.author_id AS created_by_id, a.has_meter, a.meter_type
+       FROM incidents i JOIN assets a ON a.id = i.asset_id
+      WHERE a.is_fleet = 1 AND i.author_id = ? AND i.created_at >= ? AND i.created_at <= ?
+     UNION ALL
+     SELECT 'ticket' AS kind, t.id, t.asset_id, a.name AS asset_name, t.title, t.created_at,
+            t.created_by_id, a.has_meter, a.meter_type
+       FROM tickets t JOIN assets a ON a.id = t.asset_id
+      WHERE a.is_fleet = 1 AND t.created_by_id = ? AND t.created_at >= ? AND t.created_at <= ?`,
+    [guardId ?? "", from, to, guardId ?? "", from, to],
+  );
+  return { contactId, checkouts, fuelLogs, statusLogs, readings, raised };
 }
