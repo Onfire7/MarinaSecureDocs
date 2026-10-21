@@ -54,7 +54,8 @@ A section is almost always "the round you do at a place", and a marina has
 many places that get the same round: every slip on a dock, every boathouse,
 every gate. Building that round once and copying it is the only way to set
 up forty of them, so an open section offers **Copy to locations…** beside
-Delete. The source section is the pattern: whatever it asks, wherever it is,
+Delete, as an icon button (⧉, the same glyph as Duplicate) so the name field
+keeps its width. The source section is the pattern: whatever it asks, wherever it is,
 is what each copy asks at its own place.
 
 ### The dialog

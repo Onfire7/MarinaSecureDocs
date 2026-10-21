@@ -1870,12 +1870,16 @@ function SectionEditor({
               />
               <span className="small muted">Active</span>
             </label>
+            {/* An icon, like Duplicate on items and templates: a worded
+                button here squeezed the name field to a few characters. */}
             <button
               type="button"
-              className="btn btn-sm btn-quiet"
+              className="btn btn-sm btn-quiet btn-icon"
+              title={tA("checklistTemplates.copy.action")}
+              aria-label={tA("checklistTemplates.copy.action")}
               onClick={() => setCopying(true)}
             >
-              {tA("checklistTemplates.copy.action")}
+              ⧉
             </button>
             <button
               type="button"
