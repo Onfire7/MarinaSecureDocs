@@ -71,6 +71,53 @@ export function NeedsAttention({ r }: { r: ShiftReport }) {
   );
 }
 
+/** Vehicles: after Notes, before Locations (ShiftReportPage.spec.md § In the redesign). */
+export function Vehicles({ r }: { r: ShiftReport }) {
+  return (
+    <>
+      <h2>Vehicles ({r.vehicles.length})</h2>
+      <div className="ps-vehicles">
+        {r.vehicles.map((v) => {
+          const span = v.out
+            ? `${fmtTime(v.out)} – ${v.end?.kind === "in" ? fmtTime(v.end.at) : v.end?.kind === "kept" ? "kept past End of Shift" : "still out"}`
+            : null;
+          return (
+            <div key={v.name} className="card ps-vehicle">
+              <div className="spread" style={{ alignItems: "baseline" }}>
+                <strong>{v.name}</strong>
+                {span && <span className="muted small">{span}</span>}
+              </div>
+              {v.odometer && (
+                <div className="small">
+                  {v.odometer.out.toLocaleString()} → {v.odometer.end.toLocaleString()} (+{v.odometer.end - v.odometer.out} {v.odometer.unit})
+                  {v.fuelBack && ` · fuel back ${v.fuelBack}`}
+                </div>
+              )}
+              {v.fills.map((f) => (
+                <div key={f.at} className="small muted">⛽ {f.gallons} gal at {fmtTime(f.at)}{f.cost != null && ` · ${f.cost.toFixed(2)}`}</div>
+              ))}
+              {v.statusChecks.map((c) => (
+                <div key={c.at} className="small muted">{fmtTime(c.at)}: {c.odometer?.toLocaleString()} {v.odometer?.unit}, fuel {c.fuel}</div>
+              ))}
+              {v.readings.map((x) => (
+                <div key={x.at} className="small muted">Mileage: {x.value.toLocaleString()} {x.unit} · {fmtTime(x.at)}</div>
+              ))}
+              {v.statuses.map((st) => (
+                <div key={st.at} className="small">Status → {st.name} · {fmtTime(st.at)}{st.note && ` · “${st.note}”`}</div>
+              ))}
+              {v.note && <div className="small">“{v.note}”</div>}
+              {v.keptReason && <div className="small">Kept: {v.keptReason}</div>}
+              {v.raised.map((x) => (
+                <div key={x.id} className="small"><a href={`#${x.id}`}>{x.kind === "incident" ? "Incident" : "Ticket"}: {x.title}</a></div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 export function Notes({ r }: { r: ShiftReport }) {
   return (
     <>

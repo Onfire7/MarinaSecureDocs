@@ -89,3 +89,6 @@
 .psd-since { padding: 10px 16px 12px; background: var(--fill); border-top: 1px solid var(--line-lt); }
 .report ol.psd-thread { list-style: none; padding: 0; margin: 0; }
 .psd-thread li { padding: 6px 0; border-top: 1px solid var(--line-lt); margin: 0; }
+
+.ps-vehicles { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); max-width: 1000px; }
+.ps-vehicle .small { margin-top: 3px; }

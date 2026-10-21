@@ -78,6 +78,21 @@ export interface ChecklistLine {
   due?: string;
 }
 
+export interface VehicleUse {
+  name: string;
+  out?: string;
+  end?: { kind: "in" | "kept" | "still_out"; at?: string };
+  odometer?: { out: number; end: number; unit: string };
+  fuelBack?: string;
+  note?: string;
+  keptReason?: string;
+  fills: { at: string; gallons: number; cost?: number }[];
+  statusChecks: { at: string; odometer?: number; fuel: string }[];
+  readings: { at: string; value: number; unit: string }[];
+  statuses: { at: string; name: string; note?: string }[];
+  raised: { kind: "incident" | "ticket"; id: string; title: string }[];
+}
+
 export interface ShiftReport {
   marina: string;
   guard: string;
@@ -91,6 +106,7 @@ export interface ShiftReport {
   incidents: Incident[];
   tickets: Ticket[];
   notes: { at: string; target: string; text: string }[];
+  vehicles: VehicleUse[];
   locations: LocationNode[];
   /** Items whose Section names no Location, grouped by checklist. */
   unlocated: { checklist: string; items: RecordItem[] }[];
@@ -129,6 +145,8 @@ export const report: ShiftReport = {
     { tone: "warn", where: "Campgrounds › Campground Loop", at: T("02:15"), text: "Check-in 68 m from the checkpoint (allowed 30 m)." },
     { tone: "bad", where: "Fuel Dock", text: "Morning Fuel Dock Prep unfinished at End of Shift: 3 of 6, due 6:00 AM. Spill kit and ice machine not done." },
     { tone: "warn", where: "Campgrounds", at: T("23:55", 19), text: "Incident logged: loud music at site 14, resolved on the spot." },
+    { tone: "bad", where: "Golf Cart 1", at: T("02:12"), text: "Set Out of Service: “Rear tire flat”." },
+    { tone: "warn", where: "Patrol Truck", at: T("05:58"), text: "Returned with a note: “Mud on the seats from the boatyard.”" },
   ],
   incidents: [
     {
@@ -190,6 +208,29 @@ export const report: ShiftReport = {
       description: "Marked as replaced on Friday's ticket, but both fixtures are still dark.",
       photos: [],
       updates: [],
+    },
+  ],
+  vehicles: [
+    {
+      name: "Patrol Truck",
+      out: T("22:05", 19),
+      end: { kind: "in", at: T("05:58") },
+      odometer: { out: 48000, end: 48042, unit: "mi" },
+      fuelBack: "½",
+      note: "Mud on the seats from the boatyard.",
+      fills: [{ at: T("00:50"), gallons: 14.2, cost: 51.6 }],
+      statusChecks: [{ at: T("02:30"), odometer: 48027, fuel: "¾" }],
+      readings: [],
+      statuses: [{ at: T("05:58"), name: "Needs Cleaning", note: "Returned from checkout" }],
+      raised: [{ kind: "incident", id: "inc-1", title: "Unattended pickup inside boatyard after gate lock" }],
+    },
+    {
+      name: "Golf Cart 1",
+      fills: [],
+      statusChecks: [],
+      readings: [{ at: T("02:10"), value: 1284, unit: "hrs" }],
+      statuses: [{ at: T("02:12"), name: "Out of Service", note: "Rear tire flat" }],
+      raised: [{ kind: "ticket", id: "tkt-2", title: "B Dock lights out at B-14 and B-16" }],
     },
   ],
   notes: [
@@ -333,6 +374,13 @@ export function summarySentences(r: ShiftReport): string[] {
   return [
     `${first} checked in at ${r.checkIns.done} of ${r.checkIns.expected} expected checkpoints and completed ${complete} of ${r.checklists.length} checklists.`,
     `${r.incidents.length} incidents were logged and ${r.tickets.length} tickets raised.`,
+    ...r.vehicles
+      .filter((v) => v.odometer)
+      .map((v) => {
+        const d = v.odometer!.end - v.odometer!.out;
+        const how = v.end?.kind === "kept" ? "kept it past End of Shift" : v.end?.kind === "in" ? `returned it at ${v.fuelBack} tank` : "still has it";
+        return `${first} drove the ${v.name} ${d} ${v.odometer!.unit} and ${how}.`;
+      }),
     `${r.attention.length} things need attention.`,
   ];
 }

@@ -6,7 +6,7 @@
 import { useSearchParams } from "react-router-dom";
 import { PrototypeSwitcher } from "../../shared/PrototypeSwitcher";
 import { report } from "./fixture";
-import { EndOfShiftNote, Letterhead, NeedsAttention, Notes, Summary } from "./shared";
+import { EndOfShiftNote, Letterhead, NeedsAttention, Notes, Summary, Vehicles } from "./shared";
 import { VariantA } from "./VariantA";
 import { VariantB } from "./VariantB";
 import { VariantC } from "./VariantC";
@@ -35,6 +35,7 @@ export function ShiftReportPrototypePage() {
         <V.Incidents r={r} />
         <V.Tickets r={r} />
         <Notes r={r} />
+        <Vehicles r={r} />
         <V.Record r={r} />
       </div>
       <PrototypeSwitcher variants={Object.entries(VARIANTS).map(([k, v]) => ({ key: k, name: v.name }))} />

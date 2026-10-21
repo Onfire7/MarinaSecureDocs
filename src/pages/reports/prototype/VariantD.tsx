@@ -44,7 +44,7 @@ function Since({ handedIn, updates }: { handedIn: string; updates: Update[] }) {
 
 function IncidentD({ i }: { i: Incident }) {
   return (
-    <article className="psd-doc">
+    <article className="psd-doc" id={i.id}>
       <div className="psd-orig">
         <div className="report-kicker">At End of Shift · {i.status}</div>
         <strong>{i.title}</strong>
@@ -63,7 +63,7 @@ function IncidentD({ i }: { i: Incident }) {
 
 function TicketD({ t }: { t: Ticket }) {
   return (
-    <article className="psd-doc">
+    <article className="psd-doc" id={t.id}>
       <div className="psd-orig">
         <div className="report-kicker">
           At End of Shift · {t.status} · {t.priority} · {t.assignee ?? "unassigned"}
