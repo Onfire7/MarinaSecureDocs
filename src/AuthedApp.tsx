@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { ClerkProvider, useAuth, useClerk } from "@clerk/clerk-react";
 import { CLERK_PUBLISHABLE_KEY } from "./lib/config";
 import { PowerSyncProvider } from "./lib/db/PowerSyncProvider";
@@ -208,6 +209,7 @@ function RequireAuth() {
 }
 
 function ProvisionGate() {
+  const { t } = useTranslation("layout");
   const current = useCurrent();
   const syncConfigError = useSyncConfigError();
   const { signOut } = useClerk();
@@ -242,17 +244,15 @@ function ProvisionGate() {
       <div className="auth-screen">
         <div className="auth-brand">
           <div className="marina-name">
-            {fromScan ? "Unable to check in" : "Unable to sign in"}
+            {fromScan ? t("access.cantCheckIn") : t("access.cantSignIn")}
           </div>
           <div className="product">MarinaSecure</div>
         </div>
         <p className="muted" style={{ maxWidth: 380, textAlign: "center" }}>
-          {fromScan
-            ? "This account can’t access this marina, so the check-in wasn’t recorded. Check with a manager."
-            : "This account can’t access this marina. Check with a manager if you believe this is an error."}
+          {fromScan ? t("access.cantCheckInBody") : t("access.cantSignInBody")}
         </p>
         <button type="button" className="btn" onClick={() => void signOut()}>
-          Back to sign in
+          {t("access.backToSignIn")}
         </button>
       </div>
     );
@@ -265,16 +265,15 @@ function ProvisionGate() {
 // on. Everything else in this app works offline; this is the single moment
 // that cannot, because there is genuinely no data on the device yet.
 function FirstSyncScreen() {
+  const { t } = useTranslation("layout");
   return (
     <div className="auth-screen">
       <div className="auth-brand">
-        <div className="marina-name">Setting up this device</div>
+        <div className="marina-name">{t("access.firstSyncTitle")}</div>
         <div className="product">MarinaSecure</div>
       </div>
       <p className="muted" style={{ maxWidth: 380, textAlign: "center" }}>
-        This device hasn’t downloaded the marina’s data yet, and there’s no
-        connection right now. Move somewhere with signal or Wi-Fi and it will
-        finish on its own — after that the app works offline.
+        {t("access.firstSyncBody")}
       </p>
     </div>
   );
@@ -285,16 +284,15 @@ function FirstSyncScreen() {
 // URL doesn't match this Clerk application, or Supabase isn't configured to
 // trust Clerk as a third-party auth provider.
 function SyncConfigErrorScreen({ message }: { message: string }) {
+  const { t } = useTranslation(["layout", "common"]);
   return (
     <div className="auth-screen">
       <div className="auth-brand">
-        <div className="marina-name">Can’t reach the marina database</div>
+        <div className="marina-name">{t("access.syncConfigTitle")}</div>
         <div className="product">MarinaSecure</div>
       </div>
       <p className="muted" style={{ maxWidth: 420, textAlign: "center" }}>
-        You signed in, but the marina’s database turned the connection away,
-        so nothing can load. More signal will not help — this is a setup
-        problem with the app. Send this message to whoever maintains it:
+        {t("access.syncConfigBody")}
       </p>
       <pre
         className="small"
@@ -311,7 +309,7 @@ function SyncConfigErrorScreen({ message }: { message: string }) {
         className="btn"
         onClick={() => window.location.reload()}
       >
-        Retry
+        {t("common:retry")}
       </button>
     </div>
   );

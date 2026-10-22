@@ -1,4 +1,5 @@
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
+import { useTranslation } from "react-i18next";
 import {
   attributeChoices,
   saveLocationAmenity,
@@ -41,6 +42,7 @@ export function useHasCatalogue(typeId: string | null | undefined): boolean {
 }
 
 export function LocationServicesPanel({ locationId, typeId, editable = false }: { locationId: string; typeId: string; /** Offer the controls. Still gated by manage_locations. */ editable?: boolean }) {
+  const { t } = useTranslation("shared");
   const current = useCurrent();
   const canEdit = editable && current.can("manage_locations");
   const { data: services } = useServices();
@@ -60,7 +62,7 @@ export function LocationServicesPanel({ locationId, typeId, editable = false }: 
     <>
       {validAttributes.length > 0 && (
         <div className="field">
-          <span className="field-label">Attributes</span>
+          <span className="field-label">{t("services.attributes")}</span>
           <div className="field-value stack" style={{ gap: 4 }}>
             {/* Always applicable to a valid type — never toggled on or off.
                 Only the value is optional; leaving it blank clears it. */}
@@ -86,7 +88,7 @@ export function LocationServicesPanel({ locationId, typeId, editable = false }: 
                             )
                           }
                         >
-                          <option value="">none</option>
+                          <option value="">{t("services.none")}</option>
                           {attributeChoices(a).map((c) => (
                             <option key={c} value={c}>
                               {c}
@@ -98,7 +100,7 @@ export function LocationServicesPanel({ locationId, typeId, editable = false }: 
                           <DraftNumberInput
                             className="input select-inline"
                             style={{ width: 90 }}
-                            placeholder="none"
+                            placeholder={t("services.none")}
                             value={row?.value ?? null}
                             onCommit={(value) =>
                               void saveLocationAttributeValue(
@@ -134,7 +136,7 @@ export function LocationServicesPanel({ locationId, typeId, editable = false }: 
                       {row?.note ? ` — ${row.note}` : ""}
                     </span>
                   ) : (
-                    <span className="muted small">none set</span>
+                    <span className="muted small">{t("services.noneSet")}</span>
                   )}
                 </div>
               );
@@ -144,7 +146,7 @@ export function LocationServicesPanel({ locationId, typeId, editable = false }: 
       )}
       {validServices.length > 0 && (
         <div className="field">
-          <span className="field-label">Services</span>
+          <span className="field-label">{t("services.services")}</span>
           <div className="field-value stack" style={{ gap: 4 }}>
             {validServices.map((s) => {
               const row = here.find((r) => r.service_id === s.id);
@@ -160,14 +162,14 @@ export function LocationServicesPanel({ locationId, typeId, editable = false }: 
                   {row && (
                     <>
                       <span className={`badge ${row.working ? "badge-good" : "badge-bad"}`} onClick={() => canEdit && void saveLocationService(row.id, { working: !row.working })} style={{ cursor: canEdit ? "pointer" : undefined }}>
-                        {row.working ? "working" : "not working"}
+                        {row.working ? t("services.working") : t("services.notWorking")}
                       </span>
                       {canEdit ? (
                         <label className="muted small">
-                          <input type="checkbox" checked={row.metered === 1} onChange={(e) => void saveLocationService(row.id, { metered: e.target.checked })} /> metered
+                          <input type="checkbox" checked={row.metered === 1} onChange={(e) => void saveLocationService(row.id, { metered: e.target.checked })} /> {t("services.metered")}
                         </label>
                       ) : (
-                        row.metered === 1 && <span className="muted small">metered{s.unit ? ` (${s.unit})` : ""}</span>
+                        row.metered === 1 && <span className="muted small">{s.unit ? t("services.meteredUnit", { unit: s.unit }) : t("services.metered")}</span>
                       )}
                       {canEdit ? (
                         <ServiceNote kind="service" entryId={s.id} value={row.note ?? ""} onCommit={(note) => void saveLocationService(row.id, { note: note || null })} />
@@ -184,7 +186,7 @@ export function LocationServicesPanel({ locationId, typeId, editable = false }: 
       )}
       {validAmenities.length > 0 && (
         <div className="field">
-          <span className="field-label">Amenities</span>
+          <span className="field-label">{t("services.amenities")}</span>
           <div className="field-value stack" style={{ gap: 4 }}>
             {validAmenities.map((a) => {
               const row = hereA.find((r) => r.amenity_id === a.id);
@@ -214,11 +216,12 @@ export function LocationServicesPanel({ locationId, typeId, editable = false }: 
 }
 
 function ServiceNote({ kind, entryId, value, onCommit }: { kind: "service" | "amenity" | "attribute"; entryId: string; value: string; onCommit: (v: string) => void }) {
+  const { t } = useTranslation("shared");
   const suggestions = useNoteSuggestions(kind, entryId);
   const listId = `loc-notes-${kind}-${entryId}`;
   return (
     <>
-      <DraftInput className="input select-inline" list={listId} placeholder="note" value={value} onCommit={onCommit} style={{ width: 160 }} />
+      <DraftInput className="input select-inline" list={listId} placeholder={t("services.note")} value={value} onCommit={onCommit} style={{ width: 160 }} />
       <datalist id={listId}>
         {suggestions.map((s) => (
           <option key={s} value={s} />

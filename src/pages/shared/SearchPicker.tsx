@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { matchesTerms, queryTerms } from "../../lib/search";
 
 export interface SearchPickerOption {
@@ -21,8 +22,8 @@ export function SearchPicker({
   options,
   value,
   onChange,
-  placeholder = "Search…",
-  emptyMessage = "No matches",
+  placeholder,
+  emptyMessage,
   autoFocus = false,
 }: {
   options: SearchPickerOption[];
@@ -32,6 +33,7 @@ export function SearchPicker({
   emptyMessage?: string;
   autoFocus?: boolean;
 }) {
+  const { t } = useTranslation("common");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -72,7 +74,7 @@ export function SearchPicker({
           className="input"
           autoFocus={autoFocus}
           value={open ? query : selectedText}
-          placeholder={selected ? selectedText : placeholder}
+          placeholder={selected ? selectedText : (placeholder ?? t("search"))}
           onChange={(e) => {
             setQuery(e.target.value);
             setOpen(true);
@@ -113,7 +115,7 @@ export function SearchPicker({
           ))}
           {results.length === 0 && (
             <div className="picker-option muted small">
-              {options.length === 0 ? emptyMessage : "No matches"}
+              {options.length === 0 ? (emptyMessage ?? t("noMatches")) : t("noMatches")}
             </div>
           )}
         </div>

@@ -12,7 +12,6 @@ import { describe, expect, it } from "vitest";
 // a file over its count fails (a new call slipped in), and a file under it
 // fails too, so the list is kept honest as each area is converted.
 const BASELINE: Record<string, number> = {
-  "src/layout/SaveIndicator.tsx": 1,
   "src/lib/assets.ts": 1,
   "src/lib/auditReport.ts": 2,
   "src/pages/activity/ActivityLogPage.tsx": 1,
@@ -40,7 +39,6 @@ const BASELINE: Record<string, number> = {
   "src/pages/reservations/NewReservationPage.tsx": 2,
   "src/pages/reservations/ReservationDetailPage.tsx": 8,
   "src/pages/reservations/ReservationListPage.tsx": 4,
-  "src/pages/shared/TargetActivity.tsx": 1,
 };
 
 /** A locale-sensitive call whose language argument is missing or `undefined`. */

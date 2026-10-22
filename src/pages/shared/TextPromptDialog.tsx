@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 /**
  * In-app replacement for `window.prompt`.
@@ -56,6 +57,7 @@ function TextPromptDialog({
   onSubmit: (value: string) => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation("common");
   const [value, setValue] = useState(initial);
   return (
     <div className="dialog-backdrop" onClick={onCancel}>
@@ -82,10 +84,10 @@ function TextPromptDialog({
             disabled={!value.trim()}
             onClick={() => onSubmit(value)}
           >
-            OK
+            {t("ok")}
           </button>
           <button type="button" className="btn btn-quiet" onClick={onCancel}>
-            Cancel
+            {t("cancel")}
           </button>
         </div>
       </div>

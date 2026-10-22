@@ -71,7 +71,9 @@ spec-approval time and expensive afterward.
   co-located: `src/pages/x/ThingPage.spec.md` beside `ThingPage.tsx`.
   Migration in progress — most components still name a `docs/pages/*.html`
   spec in their header comment. Convert a page's spec when you touch it,
-  folding in its wireframe, and delete the HTML pair.
+  folding in its wireframe, and delete the HTML pair. Moving a page's copy
+  into the i18n catalog does not count as touching it: that changes no
+  behaviour, and would turn every area conversion into a docs migration.
 - **No copy outside the catalog.** Every string the app shows (text,
   `placeholder`, `title`, `aria-label`, toasts, errors) is a key in
   `src/i18n/locales/en/<area>.ts`, rendered with `t()`. Text read from the

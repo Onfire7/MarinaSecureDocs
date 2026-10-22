@@ -7,25 +7,33 @@ import { KEYS_MODE, keysModeAfterQuery, resolveUiLanguage } from "./resolveLangu
 // The app's localizer (docs/localization.md). Imported once by main.tsx,
 // before the first render. It must not import Clerk or PowerSync: the public
 // report page loads it too.
+//
+// Data modules import it too (for dataT and display fallbacks), and the unit
+// suite runs those in Node, where there is no location, localStorage or
+// document. So every browser global is reached through a guard, and outside
+// a browser the localizer starts in English (src/test/setup.ts pins it).
 
 export { LANGUAGES, KEYS_MODE };
 
 const DEVICE_KEY = "ms.lng";
 const KEYS_KEY = "ms.keys";
 
+const browser = typeof window !== "undefined" && typeof document !== "undefined";
+const store: Pick<Storage, "getItem" | "setItem" | "removeItem"> | null = browser ? window.localStorage : null;
+
 const keysMode = keysModeAfterQuery(
-  new URLSearchParams(location.search).get("lng"),
-  localStorage.getItem(KEYS_KEY) === "1",
+  browser ? new URLSearchParams(window.location.search).get("lng") : null,
+  store?.getItem(KEYS_KEY) === "1",
 );
-if (keysMode) localStorage.setItem(KEYS_KEY, "1");
-else localStorage.removeItem(KEYS_KEY);
+if (keysMode) store?.setItem(KEYS_KEY, "1");
+else store?.removeItem(KEYS_KEY);
 
 function resolve(user: string | null | undefined): string {
   return resolveUiLanguage({
     keysMode,
     user,
-    device: localStorage.getItem(DEVICE_KEY),
-    navigator: navigator.languages,
+    device: store?.getItem(DEVICE_KEY) ?? null,
+    navigator: browser ? navigator.languages : [],
     available: LANGUAGES,
   });
 }
@@ -39,8 +47,8 @@ export const { date, time, dateTime, number } = makeFormatters(localizer.uiLocal
 
 function settle(language: string) {
   localizer.setUiLanguage(language);
-  document.documentElement.lang = localizer.uiLocale();
-  if (language !== KEYS_MODE) localStorage.setItem(DEVICE_KEY, language);
+  if (browser) document.documentElement.lang = localizer.uiLocale();
+  if (language !== KEYS_MODE) store?.setItem(DEVICE_KEY, language);
 }
 
 settle(resolve(undefined));

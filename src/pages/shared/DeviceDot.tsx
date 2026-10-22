@@ -6,9 +6,11 @@
 // in percent, so it scales with the image. The dot itself stays dot-sized
 // at any zoom through the `--zs` variable the zoomable layers set.
 import type { MapFit } from "../../lib/mapFit";
+import { useTranslation } from "react-i18next";
 import type { DevicePosition } from "./useDevicePosition";
 
 export function DeviceDot({ fit, position }: { fit: MapFit | null; position: DevicePosition | null }) {
+  const { t } = useTranslation("shared");
   if (!fit || !position) return null;
   const at = fit.toMap(position.lat, position.lng);
   if (!Number.isFinite(at.cx) || !Number.isFinite(at.cy)) return null;
@@ -25,7 +27,7 @@ export function DeviceDot({ fit, position }: { fit: MapFit | null; position: Dev
         style={{ left: `${at.cx}%`, top: `${at.cy}%` }}
         data-testid="device-dot"
         data-inside={at.inside ? "1" : "0"}
-        title={at.inside ? `You, ±${Math.round(position.accuracy)} m` : "You - outside the part of the map that has been calibrated"}
+        title={at.inside ? t("map.you", { metres: Math.round(position.accuracy) }) : t("map.youOutside")}
       />
     </>
   );

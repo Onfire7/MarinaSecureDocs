@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 /**
  * Short terms (1–2 chars) must match the start of a whole word; longer ones
@@ -33,9 +34,9 @@ export function LocationPicker({
   locations,
   value,
   onChange,
-  placeholder = "Search locations…",
+  placeholder,
   allowNone = true,
-  noneLabel = "None",
+  noneLabel,
   excludeId,
   maxResults = 60,
   autoFocus = false,
@@ -52,6 +53,7 @@ export function LocationPicker({
   excludeId?: string;
   maxResults?: number;
 }) {
+  const { t } = useTranslation(["shared", "common"]);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -143,7 +145,7 @@ export function LocationPicker({
           className="input"
           autoFocus={autoFocus}
           value={open ? query : selectedPath}
-          placeholder={selected ? selectedPath : placeholder}
+          placeholder={selected ? selectedPath : (placeholder ?? t("locationPicker.placeholder"))}
           onChange={(e) => {
             setQuery(e.target.value);
             setOpen(true);
@@ -173,8 +175,8 @@ export function LocationPicker({
             type="button"
             className="btn btn-sm btn-quiet picker-clear"
             onClick={() => onChange("")}
-            title="Clear"
-            aria-label="Clear location"
+            title={t("common:clear")}
+            aria-label={t("locationPicker.clear")}
           >
             ✕
           </button>
@@ -189,7 +191,7 @@ export function LocationPicker({
               className="picker-option"
               onClick={() => pick("")}
             >
-              {noneLabel}
+              {noneLabel ?? t("common:none")}
             </button>
           )}
           {results.map((l) => {
@@ -219,11 +221,11 @@ export function LocationPicker({
             );
           })}
           {results.length === 0 && (
-            <div className="picker-option muted">No matches</div>
+            <div className="picker-option muted">{t("common:noMatches")}</div>
           )}
           {results.length === maxResults && (
             <div className="picker-option muted small">
-              Showing the first {maxResults} — keep typing to narrow.
+              {t("locationPicker.firstN", { count: maxResults })}
             </div>
           )}
         </div>

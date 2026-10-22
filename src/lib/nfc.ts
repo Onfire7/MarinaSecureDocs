@@ -2,6 +2,8 @@
 // no capability to feature-test beyond the constructor's presence; both
 // reading and writing only fail once actually attempted.
 
+import type { TFunction } from "i18next";
+
 function nfcSupported(): boolean {
   return typeof window !== "undefined" && "NDEFReader" in window;
 }
@@ -176,16 +178,16 @@ export function vibrateWriteAck(): void {
 }
 
 /** A short, guard-facing explanation for a failed read or write. */
-export function nfcErrorMessage(err: unknown): string {
+export function nfcErrorMessage(err: unknown, t: TFunction<"shared">): string {
   const name = err instanceof DOMException ? err.name : "";
   switch (name) {
     case "NotSupportedError":
-      return "This device doesn't support NFC, or NFC is turned off.";
+      return t("nfc.error.notSupported");
     case "NotAllowedError":
-      return "NFC permission was denied. Allow NFC access for this site and try again.";
+      return t("nfc.error.notAllowed");
     case "NetworkError":
-      return "The tag was removed too soon, or couldn't be read/written. Hold it steady and try again.";
+      return t("nfc.error.network");
     default:
-      return "Couldn't reach the tag. Try again.";
+      return t("nfc.error.other");
   }
 }

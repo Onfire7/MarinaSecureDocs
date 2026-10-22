@@ -1,10 +1,12 @@
 import { useState, type ReactElement } from "react";
+import { useTranslation } from "react-i18next";
 import { getStoredTheme, setTheme, type ThemePref } from "../lib/theme";
 
-const OPTIONS: { value: ThemePref; label: string; icon: ReactElement }[] = [
+// `label` is the key into layout:theme.
+const OPTIONS: { value: ThemePref; label: "light" | "system" | "dark"; icon: ReactElement }[] = [
   {
     value: "light",
-    label: "Light",
+    label: "light",
     icon: (
       <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
         <circle cx="10" cy="10" r="3.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -19,7 +21,7 @@ const OPTIONS: { value: ThemePref; label: string; icon: ReactElement }[] = [
   },
   {
     value: "system",
-    label: "System",
+    label: "system",
     icon: (
       <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
         <rect x="2" y="3.5" width="16" height="10.5" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -29,7 +31,7 @@ const OPTIONS: { value: ThemePref; label: string; icon: ReactElement }[] = [
   },
   {
     value: "dark",
-    label: "Dark",
+    label: "dark",
     icon: (
       <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
         <path
@@ -45,11 +47,12 @@ const OPTIONS: { value: ThemePref; label: string; icon: ReactElement }[] = [
 ];
 
 export function ThemeToggle() {
+  const { t } = useTranslation("layout");
   const [pref, setPref] = useState<ThemePref>(getStoredTheme);
   const activeIndex = OPTIONS.findIndex((o) => o.value === pref);
 
   return (
-    <div className="theme-switch" role="radiogroup" aria-label="Theme">
+    <div className="theme-switch" role="radiogroup" aria-label={t("theme.label")}>
       <div
         className="theme-switch-thumb"
         style={{ transform: `translateX(${activeIndex * 100}%)` }}
@@ -60,7 +63,7 @@ export function ThemeToggle() {
           type="button"
           role="radio"
           aria-checked={pref === o.value}
-          title={o.label}
+          title={t(`theme.${o.label}`)}
           className={"theme-switch-option" + (pref === o.value ? " active" : "")}
           onClick={() => {
             setTheme(o.value);
@@ -68,7 +71,7 @@ export function ThemeToggle() {
           }}
         >
           {o.icon}
-          <span className="sr-only">{o.label}</span>
+          <span className="sr-only">{t(`theme.${o.label}`)}</span>
         </button>
       ))}
     </div>

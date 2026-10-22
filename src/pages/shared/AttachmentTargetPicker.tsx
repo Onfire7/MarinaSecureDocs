@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   TARGET_TYPES,
   useAttachmentOptions,
@@ -16,6 +17,7 @@ export function AttachmentTargetPicker({
   value: AttachmentTarget | null;
   onChange: (target: AttachmentTarget | null) => void;
 }) {
+  const { t } = useTranslation(["shared", "common"]);
   const [type, setType] = useState<TargetType | "">(value?.type ?? "");
 
   // The label column differs per kind — a vehicle has a description where
@@ -34,10 +36,10 @@ export function AttachmentTargetPicker({
           onChange(null);
         }}
       >
-        <option value="">Attach to…</option>
-        {TARGET_TYPES.map((t) => (
-          <option key={t.key} value={t.key}>
-            {t.label}
+        <option value="">{t("target.attachTo")}</option>
+        {TARGET_TYPES.map((k) => (
+          <option key={k.key} value={k.key}>
+            {t(`target.${k.key}`)}
           </option>
         ))}
       </select>
@@ -50,7 +52,7 @@ export function AttachmentTargetPicker({
           onChange(opt && type ? { type, id: opt.id, label: opt.label } : null);
         }}
       >
-        <option value="">Select…</option>
+        <option value="">{t("common:select")}</option>
         {options.map((o) => (
           <option key={o.id} value={o.id}>
             {o.label}

@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
 import {
   appUpdateReady,
   applyAppUpdate,
@@ -17,16 +18,17 @@ import {
  * it can't be a component's job.
  */
 export function UpdateButton() {
+  const { t } = useTranslation("layout");
   const ready = useSyncExternalStore(subscribeAppUpdate, appUpdateReady);
   if (!ready) return null;
   return (
     <button
       type="button"
       className="btn btn-sm btn-update"
-      title="A new version is ready"
+      title={t("update.title")}
       onClick={() => void applyAppUpdate()}
     >
-      Update
+      {t("update.button")}
     </button>
   );
 }

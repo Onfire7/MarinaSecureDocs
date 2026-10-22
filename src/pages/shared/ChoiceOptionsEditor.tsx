@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 /**
  * The options of anything a person picks from: an Audit Question of kind
@@ -12,12 +13,13 @@ import { useState } from "react";
 export function ChoiceOptionsEditor({
   choices,
   onChange,
-  emptyMessage = "No options yet — the answer has nothing to pick from.",
+  emptyMessage,
 }: {
   choices: string[];
   onChange: (choices: string[]) => void;
   emptyMessage?: string;
 }) {
+  const { t } = useTranslation("shared");
   const [draft, setDraft] = useState("");
   const add = () => {
     const value = draft.trim();
@@ -38,7 +40,7 @@ export function ChoiceOptionsEditor({
           <button
             type="button"
             className="btn btn-sm btn-bare"
-            aria-label="Remove option"
+            aria-label={t("choices.remove")}
             onClick={() => onChange(choices.filter((_, j) => j !== i))}
           >
             ✕
@@ -49,16 +51,16 @@ export function ChoiceOptionsEditor({
         <input
           className="input"
           value={draft}
-          placeholder="Add an option…"
+          placeholder={t("choices.placeholder")}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
           style={{ flex: 1 }}
         />
         <button type="button" className="btn btn-sm" onClick={add} disabled={!draft.trim()}>
-          + option
+          {t("choices.add")}
         </button>
       </div>
-      {choices.length === 0 && <span className="muted small">{emptyMessage}</span>}
+      {choices.length === 0 && <span className="muted small">{emptyMessage ?? t("choices.empty")}</span>}
     </div>
   );
 }

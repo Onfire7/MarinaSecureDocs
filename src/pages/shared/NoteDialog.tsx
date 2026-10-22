@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import type { AttachmentTarget } from "../../data/attachments";
 import { createNote } from "../../data/notes";
@@ -13,6 +14,7 @@ export function NoteDialog({
   target: AttachmentTarget;
   onClose: () => void;
 }) {
+  const { t } = useTranslation(["shared", "common"]);
   const current = useCurrent();
   const [body, setBody] = useState("");
 
@@ -25,7 +27,7 @@ export function NoteDialog({
     <div className="dialog-backdrop" onClick={onClose}>
       <div className="dialog-card" onClick={(e) => e.stopPropagation()}>
         <div className="card-title" style={{ marginBottom: 10 }}>
-          New note — {target.label}
+          {t("note.title", { target: target.label })}
         </div>
         <div className="field">
           <textarea
@@ -33,7 +35,7 @@ export function NoteDialog({
             rows={4}
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder="What's worth noting?"
+            placeholder={t("note.placeholder")}
           />
         </div>
         <div className="row">
@@ -43,10 +45,10 @@ export function NoteDialog({
             disabled={!body.trim()}
             onClick={() => void save()}
           >
-            Save note
+            {t("note.save")}
           </button>
           <button type="button" className="btn btn-quiet" onClick={onClose}>
-            Cancel
+            {t("common:cancel")}
           </button>
         </div>
       </div>

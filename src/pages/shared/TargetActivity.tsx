@@ -1,12 +1,17 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
-import { statusLabel } from "../../lib/locations";
 import { targetColumn, type AttachmentTarget } from "../../data/attachments";
 import { useNotesForTarget } from "../../data/notes";
 import { useTicketsForTarget } from "../../data/tickets";
 import { useIncidentsForTarget } from "../../data/incidents";
 import { NoteDialog } from "./NoteDialog";
+import { dateTime } from "../../i18n";
+import type { Catalog } from "../../i18n/locales/en";
+
+/** ticket_priority; the row types it as text. */
+type Priority = keyof Catalog["common"]["priority"];
 
 // The attached notes/incidents/tickets lists + create actions every attachment
 // target's detail page shares — locations, boats, vehicles, contacts, assets,
@@ -21,6 +26,7 @@ import { NoteDialog } from "./NoteDialog";
 // also returns nothing — the rows were never synced — so the permission check
 // here is about the empty-state text, not about withholding data.
 export function TargetActivity({ target }: { target: AttachmentTarget }) {
+  const { t } = useTranslation(["shared", "common"]);
   const current = useCurrent();
   const navigate = useNavigate();
   const [showNote, setShowNote] = useState(false);
@@ -34,7 +40,7 @@ export function TargetActivity({ target }: { target: AttachmentTarget }) {
     <div className="stack">
       <div className="row" style={{ flexWrap: "wrap" }}>
         <button type="button" className="btn btn-sm" onClick={() => setShowNote(true)}>
-          + Note
+          {t("activity.addNote")}
         </button>
         {current.can("create_incidents") && (
           <button
@@ -42,7 +48,7 @@ export function TargetActivity({ target }: { target: AttachmentTarget }) {
             className="btn btn-sm"
             onClick={() => navigate("/incidents/new", { state: { target } })}
           >
-            + Incident
+            {t("activity.addIncident")}
           </button>
         )}
         <button
@@ -50,19 +56,19 @@ export function TargetActivity({ target }: { target: AttachmentTarget }) {
           className="btn btn-sm"
           onClick={() => navigate("/tickets/new", { state: { target } })}
         >
-          + Ticket
+          {t("activity.addTicket")}
         </button>
       </div>
 
       <div>
-        <div className="section-title">Notes ({notes.length})</div>
+        <div className="section-title">{t("activity.notes", { count: notes.length })}</div>
         <div className="stack" style={{ gap: 6 }}>
           {notes.map((n) => (
             <div key={n.id} className="card">
               <div className="small" style={{ whiteSpace: "pre-wrap" }}>{n.body}</div>
               <div className="card-meta">
                 {n.author_name ?? "—"} ·{" "}
-                {new Date(n.created_at).toLocaleString(undefined, {
+                {dateTime(n.created_at, {
                   month: "short",
                   day: "numeric",
                   hour: "numeric",
@@ -71,13 +77,13 @@ export function TargetActivity({ target }: { target: AttachmentTarget }) {
               </div>
             </div>
           ))}
-          {notes.length === 0 && <span className="muted small">No notes yet.</span>}
+          {notes.length === 0 && <span className="muted small">{t("activity.noNotes")}</span>}
         </div>
       </div>
 
       {current.can("view_incidents") && (
         <div>
-          <div className="section-title">Incidents ({incidents.length})</div>
+          <div className="section-title">{t("activity.incidents", { count: incidents.length })}</div>
           <div className="stack" style={{ gap: 6 }}>
             {incidents.map((i) => (
               <Link
@@ -90,32 +96,32 @@ export function TargetActivity({ target }: { target: AttachmentTarget }) {
                 <span className="badge">{i.status_name}</span>
               </Link>
             ))}
-            {incidents.length === 0 && <span className="muted small">No incidents.</span>}
+            {incidents.length === 0 && <span className="muted small">{t("activity.noIncidents")}</span>}
           </div>
         </div>
       )}
 
       <div>
-        <div className="section-title">Tickets ({tickets.length})</div>
+        <div className="section-title">{t("activity.tickets", { count: tickets.length })}</div>
         <div className="stack" style={{ gap: 6 }}>
-          {tickets.map((t) => (
+          {tickets.map((k) => (
             <Link
-              key={t.id}
-              to={`/tickets/${t.id}`}
+              key={k.id}
+              to={`/tickets/${k.id}`}
               className="card spread"
               style={{ textDecoration: "none", color: "inherit" }}
             >
-              <span>{t.title}</span>
+              <span>{k.title}</span>
               <span
                 className={
-                  t.priority === "urgent" || t.priority === "high" ? "badge badge-bad" : "badge"
+                  k.priority === "urgent" || k.priority === "high" ? "badge badge-bad" : "badge"
                 }
               >
-                {statusLabel(t.priority)}
+                {t(`common:priority.${k.priority as Priority}`)}
               </span>
             </Link>
           ))}
-          {tickets.length === 0 && <span className="muted small">No tickets.</span>}
+          {tickets.length === 0 && <span className="muted small">{t("activity.noTickets")}</span>}
         </div>
       </div>
 

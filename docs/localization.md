@@ -58,6 +58,13 @@ stores:
 - Status-log notes ("Returned from checkout", "Reservation check-in"),
   audit displaced notes, and default names ("New template", "X (copy)").
 
+Every key `dataT` uses lives in one namespace, **`records`**
+(`src/i18n/locales/en/records.ts`), and nothing else lives there. So the
+namespace says which kind a key is: `t("records:…")` in a page, or `dataT`
+with any other namespace, is wrong on sight. The values a stored sentence
+names (`{{target}}`, `{{status}}`) are data, so they pass through
+untranslated, and every language must keep them all (`catalogs.test.ts`).
+
 Data modules get a fixed translator for this. They never use the UI `t`:
 `dataT(key, opts)` from `src/i18n/index.ts`, bound to the marina's
 language. `dataT` ignores keys mode: a key written into the Activity Log
@@ -111,6 +118,17 @@ src/i18n/
 - **Enum labels** (machine values like `clock_in`, `not_audited`, `medium`
   priority) are translated at display time by key (`t(\`trigger.${v}\`)`).
   The stored value never changes.
+- **Outside React's reach**, use `i18n.t` from `src/i18n`. The
+  `ErrorBoundary` is a class component, and it renders when the tree under
+  it has failed. The screens shown before a user row exists (sign-in
+  failure, first sync, sync-config error) are ordinary components and use
+  the hook. They speak the device's last language or the browser's, since
+  there is no user yet.
+- **Sentences with markup inside** (`<code>`, `<b>`, a link) use
+  react-i18next's `<Trans>` with `components`, so the markup stays inside
+  the sentence where a translator can move it.
+- **Code-side labels** that pages render (`ATTACHMENT_KINDS`, nav
+  sections) carry a key, not English, and the page translates it.
 - **Pages** use `useTranslation("<area>")`. Non-React code in `src/lib`
   that returns display text takes a `t` parameter, or returns a key and
   its values for the caller to render, so it stays pure and unit-testable.

@@ -1,3 +1,5 @@
+import { Trans, useTranslation } from "react-i18next";
+
 interface Props {
   missing: string[];
 }
@@ -6,24 +8,19 @@ interface Props {
 // is absent — each marina deployment supplies its own InstantDB app and Clerk
 // application (see docs: Stack & Architecture — Per-marina isolation).
 export function ConfigMissingPage({ missing }: Props) {
+  const { t } = useTranslation("shared");
+  const code = { code: <code /> };
   return (
     <div className="config-missing">
-      <h1 style={{ marginBottom: 8 }}>Marina not configured</h1>
+      <h1 style={{ marginBottom: 8 }}>{t("configMissing.title")}</h1>
       <p className="muted">
-        This build has no marina environment attached. Copy{" "}
-        <code>.env.example</code> to <code>.env.local</code> and fill in this
-        marina's values:
+        <Trans t={t} i18nKey="configMissing.intro" components={code} />
       </p>
       <pre>
         {missing.map((k) => `${k}=…`).join("\n")}
       </pre>
       <p className="muted small">
-        <code>VITE_INSTANT_APP_ID</code> — the marina's InstantDB app id.{" "}
-        <code>VITE_CLERK_PUBLISHABLE_KEY</code> — the marina's Clerk
-        application publishable key (with multi-session enabled, and a JWT
-        template registered on the InstantDB app —{" "}
-        <code>VITE_INSTANT_CLERK_CLIENT_NAME</code> if named something other
-        than “clerk”).
+        <Trans t={t} i18nKey="configMissing.vars" components={code} />
       </p>
     </div>
   );

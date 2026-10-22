@@ -2,7 +2,9 @@
 //
 // See src/layout/SaveIndicator.spec.md for the states and, more to the point,
 // for why "saved here" and "reached the office" must never again look
-// the same.
+// the same. The words come from layout:save, through the caller's `t`.
+
+import type { TFunction } from "i18next";
 
 export interface SaveInputs {
   /** Writes in the device's upload queue. */
@@ -31,28 +33,26 @@ const STUCK_AFTER_MS = 60_000;
 const STUCK_AFTER_MS_IF_TOKEN_EXPIRED = 5 * 60_000;
 const TOKEN_EXPIRED = /PSYNC_S2103|PGRST303|JWT (has )?expired/i;
 
-const changes = (n: number) => `${n} change${n === 1 ? "" : "s"}`;
-
-export function saveState(i: SaveInputs): SaveState {
+export function saveState(i: SaveInputs, t: TFunction<"layout">): SaveState {
   // First, because a clean queue proves nothing here: the queue is clean
   // BECAUSE the write was thrown away.
   if (i.rejected > 0) {
     return {
       kind: "rejected",
       tone: "danger",
-      label: `${changes(i.rejected)} rejected by the office`,
+      label: t("save.rejected", { count: i.rejected }),
     };
   }
   if (i.queued === 0) {
-    return { kind: "sent", tone: "quiet", label: "✓ All changes sent" };
+    return { kind: "sent", tone: "quiet", label: t("save.sent") };
   }
   if (!i.connected) {
     // Not an error however long it lasts. The work is saved, and says so.
     return {
       kind: "waiting",
       tone: "amber",
-      label: `${changes(i.queued)} saved here`,
-      detail: "Will send when there's a connection.",
+      label: t("save.waiting", { count: i.queued }),
+      detail: t("save.waitingDetail"),
     };
   }
   const limit =
@@ -63,9 +63,9 @@ export function saveState(i: SaveInputs): SaveState {
     return {
       kind: "stuck",
       tone: "danger",
-      label: `${changes(i.queued)} not sending`,
-      detail: i.uploadError ?? "Connected, but nothing is getting through.",
+      label: t("save.stuck", { count: i.queued }),
+      detail: i.uploadError ?? t("save.stuckDetail"),
     };
   }
-  return { kind: "sending", tone: "quiet", label: `Sending ${changes(i.queued)}…` };
+  return { kind: "sending", tone: "quiet", label: t("save.sending", { count: i.queued }) };
 }

@@ -28,3 +28,22 @@ export function missingPluralForms(catalog: Tree, language: string): string[] {
   const bases = new Set([...keys].filter((k) => PLURAL_SUFFIX.test(k)).map((k) => k.replace(PLURAL_SUFFIX, "")));
   return [...bases].flatMap((b) => categories.map((c) => `${b}_${c}`).filter((k) => !keys.has(k)));
 }
+
+const VALUE = /{{\s*([^,}\s]+)[^}]*}}/g;
+
+function valueNames(text: string): string {
+  return [...text.matchAll(VALUE)].map((m) => m[1]).sort().join(",");
+}
+
+/**
+ * Keys whose `{{value}}` names differ between `source` and `other`. Order
+ * may change between languages and format arguments may differ; the set of
+ * names may not, or a stored sentence silently drops what it is about.
+ */
+export function interpolationDifferences(source: Tree, other: Tree, prefix = ""): string[] {
+  return Object.entries(source).flatMap(([k, v]) => {
+    const o = other[k];
+    if (typeof v === "string") return typeof o === "string" && valueNames(v) !== valueNames(o) ? [prefix + k] : [];
+    return o && typeof o === "object" ? interpolationDifferences(v, o, `${prefix}${k}.`) : [];
+  });
+}

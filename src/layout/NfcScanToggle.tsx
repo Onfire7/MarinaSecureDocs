@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   checkpointGuidFromUrl,
   nfcErrorMessage,
@@ -29,6 +30,8 @@ export function NfcScanToggle({
   onScan: (checkpointGuid: string) => void;
   autoStart?: boolean;
 }) {
+  const { t } = useTranslation("layout");
+  const { t: tShared } = useTranslation("shared");
   const supported = nfcReadSupported();
   const [active, setActive] = useState(false);
   const [error, setError] = useState("");
@@ -79,7 +82,7 @@ export function NfcScanToggle({
     } catch (err) {
       controllerRef.current = null;
       setActive(false);
-      setError(nfcErrorMessage(err));
+      setError(nfcErrorMessage(err, tShared));
     }
   };
 
@@ -95,15 +98,10 @@ export function NfcScanToggle({
     <button
       type="button"
       className={"btn btn-sm" + (active ? " btn-primary" : error ? " btn-danger" : "")}
-      title={
-        error ||
-        (active
-          ? "Scanning for checkpoint NFC tags — tap to stop"
-          : "Tap to scan checkpoint NFC tags without leaving the app")
-      }
+      title={error || (active ? t("nfc.scanning") : t("nfc.idle"))}
       onClick={() => void (active ? stop() : start())}
     >
-      {active ? "NFC ●" : "NFC"}
+      {active ? t("nfc.buttonActive") : t("nfc.button")}
     </button>
   );
 }

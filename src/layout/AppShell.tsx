@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useClerk } from "@clerk/clerk-react";
 import { useCurrent } from "../lib/auth/CurrentUserContext";
@@ -18,6 +19,7 @@ import { NfcScanToggle } from "./NfcScanToggle";
 // Responsive shell: persistent left sidenav on desktop, app bar + bottom tab
 // bar on mobile (see wireframes — Dashboard frames for both breakpoints).
 export function AppShell() {
+  const { t } = useTranslation("layout");
   const current = useCurrent();
   const { signOut } = useClerk();
   const navigate = useNavigate();
@@ -61,7 +63,7 @@ export function AppShell() {
                   "sidenav-item" + (isActive ? " active" : "")
                 }
               >
-                {s.label}
+                {t(`nav.${s.key}`)}
               </NavLink>
               {s.path === "/admin" && adminExpanded && (
                 <div className="sidenav-subnav">
@@ -96,7 +98,7 @@ export function AppShell() {
               className="btn btn-sm"
               onClick={() => navigate("/switch-user")}
             >
-              Switch user
+              {t("switchUser")}
             </button>
             <SaveIndicator />
             <InstallAppButton />
@@ -107,7 +109,7 @@ export function AppShell() {
               className="btn btn-sm btn-quiet"
               onClick={() => void signOut()}
             >
-              Sign out
+              {t("signOut")}
             </button>
           </div>
         </div>
@@ -115,7 +117,7 @@ export function AppShell() {
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <header className="appbar">
-          <span>{activeSection?.label ?? "MarinaSecure"}</span>
+          <span>{activeSection ? t(`nav.${activeSection.key}`) : "MarinaSecure"}</span>
           <span className="row" style={{ gap: 6 }}>
             <SaveIndicator />
             <UpdateButton />
@@ -145,7 +147,7 @@ export function AppShell() {
             className={({ isActive }) => "tab" + (isActive ? " active" : "")}
           >
             <span className="tab-icon">{s.icon}</span>
-            {s.label === "Home" ? "Home" : s.label.split(" ")[0]}
+            {t(`tab.${s.key}`)}
           </NavLink>
         ))}
         <NavLink
@@ -155,7 +157,7 @@ export function AppShell() {
           }
         >
           <span className="tab-icon">⋯</span>
-          Other
+          {t("tab.other")}
         </NavLink>
       </nav>
     </div>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { ReactNode } from "react";
 
 /**
@@ -30,6 +31,7 @@ export function ReorderableList<T extends { id: string }>({
    *  onReorder (the End Shift Item stays last). */
   pinned?: (item: T) => boolean;
 }) {
+  const { t } = useTranslation("shared");
   const [dragOrder, setDragOrder] = useState<string[] | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const rowRefs = useRef(new Map<string, HTMLDivElement>());
@@ -136,7 +138,7 @@ export function ReorderableList<T extends { id: string }>({
             <button
               type="button"
               className="reorder-handle"
-              aria-label={`Reorder — item ${i + 1} of ${ordered.length}. Use arrow keys to move.`}
+              aria-label={t("reorder", { index: i + 1, count: ordered.length })}
               onPointerDown={(e) => onPointerDown(e, item.id)}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}

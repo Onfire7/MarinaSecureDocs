@@ -1,4 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+// i18n.t, not the hook: this is a class component, and it renders when the
+// tree beneath it has failed, so it leans on as little of it as it can.
+import { i18n } from "../i18n";
 
 // An uncaught throw during render unmounts the whole React tree, which shows
 // up as a blank white page with nothing in the console the user would think
@@ -28,16 +31,16 @@ export class ErrorBoundary extends Component<
   render() {
     const { error } = this.state;
     if (!error) return this.props.children;
+    const t = i18n.getFixedT(null, "layout");
 
     return (
       <div className="auth-screen">
         <div className="auth-brand">
-          <div className="marina-name">Something went wrong</div>
+          <div className="marina-name">{t("error.title")}</div>
           <div className="product">MarinaSecure</div>
         </div>
         <p className="muted" style={{ maxWidth: 420, textAlign: "center" }}>
-          This screen failed to load. Reloading may clear it; if it keeps
-          happening, send this message to whoever maintains the app.
+          {t("error.body")}
         </p>
         <pre
           className="small"
@@ -55,7 +58,7 @@ export class ErrorBoundary extends Component<
           className="btn"
           onClick={() => window.location.reload()}
         >
-          Reload
+          {t("error.reload")}
         </button>
       </div>
     );

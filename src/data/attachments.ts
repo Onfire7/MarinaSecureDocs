@@ -1,4 +1,6 @@
 import { useQuery } from "@powersync/react";
+import { useTranslation } from "react-i18next";
+import { i18n } from "../i18n";
 
 // Attachment targets, resolved in SQL.
 //
@@ -13,13 +15,14 @@ import { useQuery } from "@powersync/react";
 // second query per list — 200 tickets, 200 lookups. The joins below cost
 // nothing on an indexed local SQLite and collapse it to one.
 
+// Each kind's name is shared:target.<key>.
 export const TARGET_TYPES = [
-  { key: "location", label: "Location", column: "location_id" },
-  { key: "checkpoint", label: "Checkpoint", column: "checkpoint_id" },
-  { key: "boat", label: "Boat", column: "boat_id" },
-  { key: "vehicle", label: "Vehicle", column: "vehicle_id" },
-  { key: "contact", label: "Contact", column: "contact_id" },
-  { key: "asset", label: "Asset", column: "asset_id" },
+  { key: "location", column: "location_id" },
+  { key: "checkpoint", column: "checkpoint_id" },
+  { key: "boat", column: "boat_id" },
+  { key: "vehicle", column: "vehicle_id" },
+  { key: "contact", column: "contact_id" },
+  { key: "asset", column: "asset_id" },
 ] as const;
 
 export type TargetType = (typeof TARGET_TYPES)[number]["key"];
@@ -90,14 +93,11 @@ export function attachmentOf(row: AttachedRow): AttachmentTarget | null {
 
 // A target whose row is not on this device — outside the sync window, or
 // deleted. Naming the kind is still more use than an empty string, and it is
-// honest about what is missing.
+// honest about what is missing. In the reader's language: it is shown, and
+// the one place it can be stored (a note's Activity Log line) is the rare
+// case of a note on something this device cannot see.
 function fallbackLabel(type: TargetType): string {
-  switch (type) {
-    case "contact":
-      return "Unnamed contact";
-    default:
-      return TARGET_TYPES.find((t) => t.key === type)!.label;
-  }
+  return i18n.t(type === "contact" ? "target.unnamedContact" : `target.${type}`, { ns: "shared" });
 }
 
 /** The column on notes/incidents/tickets that holds this kind of target. */
@@ -159,8 +159,12 @@ export function attachmentColumns(
  * An empty `type` yields no rows, which is the picker's initial state.
  */
 export function useAttachmentOptions(type: TargetType | "") {
+  const { t } = useTranslation("shared");
   const sql = ATTACHMENT_OPTION_SQL[type as TargetType] ?? "SELECT '' AS id, '' AS label WHERE 0";
-  return useQuery<{ id: string; label: string }>(sql);
+  // The nameless-contact placeholder goes in as a parameter, so it sorts
+  // among the names in whatever language it is in.
+  const params = type === "contact" ? [t("target.unnamedContact")] : [];
+  return useQuery<{ id: string; label: string }>(sql, params);
 }
 
 const ATTACHMENT_OPTION_SQL: Record<TargetType, string> = {
@@ -169,6 +173,6 @@ const ATTACHMENT_OPTION_SQL: Record<TargetType, string> = {
   boat: "SELECT id, name AS label FROM boats ORDER BY name",
   vehicle: "SELECT id, description AS label FROM vehicles ORDER BY description",
   contact:
-    "SELECT id, COALESCE(NULLIF(TRIM(name), ''), 'Unnamed contact') AS label FROM contacts ORDER BY label",
+    "SELECT id, COALESCE(NULLIF(TRIM(name), ''), ?) AS label FROM contacts ORDER BY label",
   asset: "SELECT id, name AS label FROM assets ORDER BY name",
 };

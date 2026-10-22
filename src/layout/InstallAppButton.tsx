@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { promptInstall, useCanInstall } from "../lib/pwaInstall";
 
 /**
@@ -7,11 +8,12 @@ import { promptInstall, useCanInstall } from "../lib/pwaInstall";
  * only distribution channel, so this is the whole "get the app" path.
  */
 export function InstallAppButton({ className = "btn btn-sm" }: { className?: string }) {
+  const { t } = useTranslation("layout");
   const canInstall = useCanInstall();
   if (!canInstall) return null;
   return (
     <button type="button" className={className} onClick={() => void promptInstall()}>
-      Install app
+      {t("installApp")}
     </button>
   );
 }

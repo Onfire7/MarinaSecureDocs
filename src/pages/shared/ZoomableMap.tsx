@@ -10,6 +10,7 @@
 // Fingers come from touch events, which hand over the whole list every
 // time, so a lifted finger cannot linger (CLAUDE.md).
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 const MAX_ZOOM = 8;
 
@@ -40,6 +41,7 @@ export function ZoomableMap({
   onClick?: () => void;
   testId?: string;
 }) {
+  const { t } = useTranslation("shared");
   const boxRef = useRef<HTMLDivElement | null>(null);
   const [view, setView] = useState<View>({ s: 1, tx: 0, ty: 0 });
   const viewRef = useRef(view);
@@ -225,8 +227,8 @@ export function ZoomableMap({
         <button
           type="button"
           className="zmap-reset"
-          title="Show the whole map"
-          aria-label="Show the whole map"
+          title={t("map.showWhole")}
+          aria-label={t("map.showWhole")}
           onClick={(e) => {
             e.stopPropagation();
             commit({ s: 1, tx: 0, ty: 0 });

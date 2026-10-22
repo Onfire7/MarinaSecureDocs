@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { matchesTerms, queryTerms } from "../../lib/search";
 
 export interface MultiSelectOption {
@@ -26,8 +27,8 @@ export function MultiSelectDialog({
   options,
   onConfirm,
   onClose,
-  confirmLabel = "Add",
-  emptyMessage = "Nothing left to add.",
+  confirmLabel,
+  emptyMessage,
 }: {
   title: string;
   /** Already-selected entries should be filtered out by the caller. */
@@ -37,6 +38,7 @@ export function MultiSelectDialog({
   confirmLabel?: string;
   emptyMessage?: string;
 }) {
+  const { t } = useTranslation(["shared", "common"]);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -98,7 +100,7 @@ export function MultiSelectDialog({
           <input
             className="input select-inline"
             style={{ flex: "1 1 220px" }}
-            placeholder="Filter…"
+            placeholder={t("multiSelect.filter")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             autoFocus
@@ -109,8 +111,11 @@ export function MultiSelectDialog({
               className="btn btn-sm btn-quiet"
               onClick={() => setMany(visibleIds, !allVisibleSelected)}
             >
-              {allVisibleSelected ? "Clear" : `Select all ${visibleIds.length}`}
-              {query.trim() && !allVisibleSelected ? " matching" : ""}
+              {allVisibleSelected
+                ? t("common:clear")
+                : query.trim()
+                  ? t("multiSelect.selectAllMatching", { count: visibleIds.length })
+                  : t("multiSelect.selectAll", { count: visibleIds.length })}
             </button>
           )}
         </div>
@@ -128,7 +133,7 @@ export function MultiSelectDialog({
                     className="btn btn-sm btn-quiet"
                     onClick={() => setMany(ids, !allOn)}
                   >
-                    {allOn ? "None" : "All"}
+                    {allOn ? t("common:none") : t("common:all")}
                   </button>
                 </div>
                 {items.map((o) => (
@@ -146,7 +151,7 @@ export function MultiSelectDialog({
           })}
           {visible.length === 0 && (
             <div className="picker-option muted small">
-              {options.length === 0 ? emptyMessage : "No matches"}
+              {options.length === 0 ? (emptyMessage ?? t("multiSelect.empty")) : t("common:noMatches")}
             </div>
           )}
         </div>
@@ -161,10 +166,10 @@ export function MultiSelectDialog({
               onClose();
             }}
           >
-            {confirmLabel} {selected.size || ""}
+            {confirmLabel ?? t("multiSelect.add")} {selected.size || ""}
           </button>
           <button type="button" className="btn btn-quiet" onClick={onClose}>
-            Cancel
+            {t("common:cancel")}
           </button>
         </div>
       </div>

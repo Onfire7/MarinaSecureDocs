@@ -4,6 +4,7 @@
 // when the map's fit can place it. Not an editor - tapping it opens one.
 // The placement check, the wizard's GPS page and the admin row show this.
 import { placementStyle, type LabelShape, type MapPoint } from "../../lib/locations";
+import { useTranslation } from "react-i18next";
 import type { MapFit } from "../../lib/mapFit";
 import { labelShapeOf, type MapAnchorRow, type MapLabelRow, type MarinaMapRow } from "../../data/locations";
 import { attachmentUrl } from "../../data/files";
@@ -44,6 +45,7 @@ export function MapPreview({
   onOpen?: () => void;
   testId?: string;
 }) {
+  const { t } = useTranslation("shared");
   const imageUrl = attachmentUrl(map.image_path);
   const show = useMapShow();
   const showLabels = show.labels;
@@ -63,7 +65,7 @@ export function MapPreview({
           <div className="pc-toolbar">
             <MapShowToggle compact />
           </div>
-          {onOpen && <span className="pc-zoom-hint">tap to edit · pinch to zoom</span>}
+          {onOpen && <span className="pc-zoom-hint">{t("map.editHint")}</span>}
         </>
       }
     >
@@ -96,7 +98,7 @@ export function MapPreview({
               key={a.id}
               className={`map-anchor ${a.location_id === null ? "map-anchor-free" : "map-anchor-other"}`}
               style={{ left: `${a.cx}%`, top: `${a.cy}%` }}
-              title={a.location_id === null ? (a.label ?? "Calibration point") : (a.location_name ?? "")}
+              title={a.location_id === null ? (a.label ?? t("map.calibrationPoint")) : (a.location_name ?? "")}
               aria-hidden
             />
           ))}
@@ -108,12 +110,12 @@ export function MapPreview({
           return <span key={i} className={`map-mark map-mark-${m.kind} ${at.inside ? "" : "outside"}`} style={{ left: `${at.cx}%`, top: `${at.cy}%` }} title={m.title} data-testid={`${testId}-mark-${m.kind}`} />;
         })}
       {showLabels && label && label.showText !== false && (
-        <span className={`map-rect pc-mine ${proposed ? "pc-proposed-label" : ""}`} style={placementStyle(label)} title={proposed ? "Proposed placement — waits for approval" : undefined} data-testid={`${testId}-label`}>
+        <span className={`map-rect pc-mine ${proposed ? "pc-proposed-label" : ""}`} style={placementStyle(label)} title={proposed ? t("map.proposed") : undefined} data-testid={`${testId}-label`}>
           {subject.name}
         </span>
       )}
       {showAnchors && anchor && (apart || !showLabels) && (
-        <span className="map-anchor" style={{ left: `${anchor.cx}%`, top: `${anchor.cy}%` }} title={`${subject.name} is here`} data-testid={`${testId}-anchor`} />
+        <span className="map-anchor" style={{ left: `${anchor.cx}%`, top: `${anchor.cy}%` }} title={t("map.isHere", { name: subject.name })} data-testid={`${testId}-anchor`} />
       )}
     </ZoomableMap>
   );

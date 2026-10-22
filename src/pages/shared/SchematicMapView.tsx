@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { placementStyle } from "../../lib/locations";
 import {
   labelShapeOf,
@@ -48,6 +49,7 @@ export function SchematicMapView({
    *  map that acts on it. */
   onActiveMapChange?: (map: MarinaMapRow | null) => void;
 }) {
+  const { t } = useTranslation(["shared", "common"]);
   const { data: maps } = useMarinaMaps();
   const { data: allPlacements } = useMapLabels();
   const { data: allAnchors } = useMapAnchors();
@@ -82,7 +84,7 @@ export function SchematicMapView({
   if (!active) {
     return (
       <div className="stack">
-        <div className="section-title">Choose a property</div>
+        <div className="section-title">{t("map.chooseProperty")}</div>
         {rootMaps.map((m) => (
           <button
             key={m.id}
@@ -93,14 +95,14 @@ export function SchematicMapView({
           >
             <span className="card-title">{m.scope_name ?? m.name}</span>
             <span className="muted small">
-              {(placementsByMap.get(m.id) ?? []).length} plotted
+              {t("map.plotted", { count: (placementsByMap.get(m.id) ?? []).length })}
             </span>
           </button>
         ))}
         {rootMaps.length === 0 && (
           <div className="placeholder">
-            <div className="big">No overview map uploaded yet</div>
-            Maps are uploaded and plotted in Admin → Locations.
+            <div className="big">{t("map.noOverview")}</div>
+            {t("map.noOverviewHint")}
           </div>
         )}
       </div>
@@ -119,7 +121,7 @@ export function SchematicMapView({
             className="btn btn-sm btn-quiet"
             onClick={() => setMapStack(mapStack.slice(0, -1))}
           >
-            ← Back
+            {t("common:back")}
           </button>
         )}
         <span className="section-title" style={{ marginBottom: 0 }}>
@@ -136,7 +138,7 @@ export function SchematicMapView({
             .filter((a) => a.location_id === null || !include || include(a.location_id))
             .map((a) =>
               a.location_id === null ? (
-                <span key={a.id} className="map-anchor map-anchor-free" style={{ left: `${a.cx}%`, top: `${a.cy}%` }} title={a.label ?? "Calibration point"} aria-hidden />
+                <span key={a.id} className="map-anchor map-anchor-free" style={{ left: `${a.cx}%`, top: `${a.cy}%` }} title={a.label ?? t("map.calibrationPoint")} aria-hidden />
               ) : (
                 <button
                   key={a.id}

@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useStatus } from "@powersync/react";
 import { useUploadQueue } from "../data/sync";
 import { dismissRejectedWrites, useRejectedWrites } from "../lib/db/rejectedWrites";
 import { errorMessage } from "../lib/db/syncErrors";
 import { saveState } from "../lib/saveState";
+import { dateTime } from "../i18n";
 
 /**
  * Whether what a guard just did has reached the office.
  * Spec: SaveIndicator.spec.md, beside this file.
  */
 export function SaveIndicator() {
+  const { t } = useTranslation(["layout", "common"]);
   const status = useStatus();
   const queued = useUploadQueue();
   const rejected = useRejectedWrites();
@@ -52,7 +55,7 @@ export function SaveIndicator() {
     uploadError: uploadError ? errorMessage(uploadError) : null,
     unchangedForMs: Math.max(0, now - mark.current.since),
     rejected: rejected.length,
-  });
+  }, t);
 
   return (
     <>
@@ -60,7 +63,7 @@ export function SaveIndicator() {
         type="button"
         className={"save-indicator save-" + state.tone}
         onClick={() => setOpen(true)}
-        title="Tap for details"
+        title={t("save.tapForDetails")}
       >
         {state.label}
       </button>
@@ -69,15 +72,7 @@ export function SaveIndicator() {
           <div className="dialog-card" onClick={(e) => e.stopPropagation()}>
             <div className="card-title">{state.label}</div>
             <p className="muted small" style={{ marginTop: 8 }}>
-              {state.kind === "sent"
-                ? "Everything done on this device has reached the office."
-                : state.kind === "waiting"
-                  ? "Your work is saved on this device and will send by itself when there's a connection. Nothing is lost by waiting."
-                  : state.kind === "sending"
-                    ? "Saved on this device; sending to the office now."
-                    : state.kind === "stuck"
-                      ? "Your work is saved on this device, but it isn't reaching the office. Keep the app installed and signed in, and show this to whoever maintains it:"
-                      : "The office refused these changes for good, so they were not saved there. Anything listed here may need doing again."}
+              {t(`save.explain.${state.kind}`)}
             </p>
             {state.kind === "stuck" && state.detail && (
               <pre className="small" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
@@ -87,7 +82,7 @@ export function SaveIndicator() {
             {rejected.map((w) => (
               <div key={w.at + w.table} className="small" style={{ marginTop: 8 }}>
                 <strong>{w.table.replace(/_/g, " ")}</strong> ·{" "}
-                {new Date(w.at).toLocaleString()}
+                {dateTime(w.at)}
                 <div className="muted" style={{ wordBreak: "break-word" }}>
                   {w.message || w.code} ({w.code})
                 </div>
@@ -103,11 +98,11 @@ export function SaveIndicator() {
                     setOpen(false);
                   }}
                 >
-                  Dismiss
+                  {t("save.dismiss")}
                 </button>
               )}
               <button type="button" className="btn" onClick={() => setOpen(false)}>
-                Close
+                {t("common:close")}
               </button>
             </div>
           </div>

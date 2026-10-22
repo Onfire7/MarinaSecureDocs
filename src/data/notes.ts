@@ -2,6 +2,7 @@ import { useQuery } from "@powersync/react";
 import { stamp } from "../lib/db";
 import { insert, transact } from "./sql";
 import { recordActivity } from "./activity";
+import { dataT } from "../i18n";
 import {
   attachmentColumns,
   attachmentJoins,
@@ -50,7 +51,7 @@ export async function createNote(
     });
     await recordActivity(tx, {
       eventType: "note.created",
-      summary: `Note added on ${target.label}`,
+      summary: dataT("noteAdded", { ns: "records", target: target.label }),
       subjectType: "notes",
       subjectId: noteId,
       actorId,

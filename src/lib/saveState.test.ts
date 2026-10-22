@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { saveState, type SaveInputs } from "./saveState";
+import { i18n } from "../i18n";
+import { saveState as decide, type SaveInputs } from "./saveState";
+
+// The real English catalog, so these assertions check the wording too.
+const saveState = (i: SaveInputs) => decide(i, i18n.getFixedT("en", "layout"));
 
 const base: SaveInputs = {
   queued: 0,

@@ -1,8 +1,12 @@
 import type { CurrentUser } from "../lib/auth/useCurrentUser";
+import type { Catalog } from "../i18n/locales/en";
+
+/** A section's key into layout:nav (its name) and layout:tab (its tab word). */
+export type NavKey = keyof Catalog["layout"]["nav"];
 
 export interface NavSection {
   path: string;
-  label: string;
+  key: NavKey;
   icon: string; // emoji glyph for the mobile tab bar
   /** Omit from nav unless this returns true. Absent = visible to everyone. */
   visible?: (current: CurrentUser) => boolean;
@@ -11,32 +15,32 @@ export interface NavSection {
 // Top-level sections, in sidenav order. This list is the authority for that
 // order; the wireframe that once drew it is gone.
 export const NAV_SECTIONS: NavSection[] = [
-  { path: "/", label: "Home", icon: "⌂" },
-  { path: "/checklists", label: "Checklists", icon: "☑" },
-  { path: "/locations", label: "Locations", icon: "⚓" },
-  { path: "/audits", label: "Audits", icon: "🔍" },
-  { path: "/comms", label: "Comms", icon: "☎" },
-  { path: "/tickets", label: "Tickets", icon: "🔧" },
+  { path: "/", key: "home", icon: "⌂" },
+  { path: "/checklists", key: "checklists", icon: "☑" },
+  { path: "/locations", key: "locations", icon: "⚓" },
+  { path: "/audits", key: "audits", icon: "🔍" },
+  { path: "/comms", key: "comms", icon: "☎" },
+  { path: "/tickets", key: "tickets", icon: "🔧" },
   {
     path: "/incidents",
-    label: "Incidents",
+    key: "incidents",
     icon: "⚠",
     visible: (c) => c.can("view_incidents") || c.can("create_incidents"),
   },
-  { path: "/reservations", label: "Reservations", icon: "📅" },
-  { path: "/boats", label: "Boats & Vehicles", icon: "⛵" },
-  { path: "/contacts", label: "Owners & Contacts", icon: "👤" },
-  { path: "/assets", label: "Assets", icon: "🧰" },
-  { path: "/activity", label: "Activity Log", icon: "≡" },
+  { path: "/reservations", key: "reservations", icon: "📅" },
+  { path: "/boats", key: "boats", icon: "⛵" },
+  { path: "/contacts", key: "contacts", icon: "👤" },
+  { path: "/assets", key: "assets", icon: "🧰" },
+  { path: "/activity", key: "activity", icon: "≡" },
   {
     path: "/reports",
-    label: "Reports",
+    key: "reports",
     icon: "▤",
     visible: (c) => c.can("view_reports"),
   },
   {
     path: "/admin",
-    label: "Admin",
+    key: "admin",
     icon: "⚙",
     visible: (c) => c.isAdmin,
   },

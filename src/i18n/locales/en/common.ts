@@ -4,4 +4,28 @@ export const common = {
   languageName: "English",
   language: "Language",
   deviceDefault: "Device default",
+
+  // Actions and fallbacks every area uses.
+  cancel: "Cancel",
+  close: "Close",
+  done: "Done",
+  ok: "OK",
+  clear: "Clear",
+  retry: "Retry",
+  remove: "Remove",
+  add: "Add",
+  none: "None",
+  all: "All",
+  back: "← Back",
+  noMatches: "No matches",
+  search: "Search…",
+  select: "Select…",
+
+  /** ticket_priority, by stored value. */
+  priority: {
+    low: "Low",
+    medium: "Medium",
+    high: "High",
+    urgent: "Urgent",
+  },
 };

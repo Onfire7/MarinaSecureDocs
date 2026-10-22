@@ -27,6 +27,7 @@
 // Cancel hands back nothing. Rendered through a portal so whatever listens
 // to touches beneath it (the wizard owns its touch stream) hears nothing.
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import { placementStyle, type LabelShape, type MapPoint } from "../../lib/locations";
 import { DEFAULT_LABEL_STYLE, loadLabelStyle, newLabel, saveLabelStyle } from "../../lib/mapLabelStyle";
@@ -40,19 +41,21 @@ import { MapShowToggle } from "./MapShowToggle";
 import { LocationPicker, type PickerLocation } from "./LocationPicker";
 import { MapOutlines } from "./MapOutlines";
 import { cleanOutline, outlineCentre } from "../../lib/outline";
+import { dataT } from "../../i18n";
 
 type Tool = "label" | "anchor" | "outline" | "fontSize" | "paddingX" | "paddingY" | "rotation" | null;
 type Slider = Exclude<Tool, null | "label" | "anchor" | "outline">;
 
-const TOOLS: { key: Exclude<Tool, null>; icon: string; label: string; min?: number; max?: number }[] = [
-  { key: "label", icon: "✥", label: "Label" },
-  { key: "anchor", icon: "◎", label: "Anchor" },
+// Each tool's name is shared:mapEditor.tool.<key>.
+const TOOLS: { key: Exclude<Tool, null>; icon: string; min?: number; max?: number }[] = [
+  { key: "label", icon: "✥" },
+  { key: "anchor", icon: "◎" },
   // Trace the location's shape: tap each corner (lib/outline.ts).
-  { key: "outline", icon: "⬠", label: "Outline" },
-  { key: "fontSize", icon: "A", label: "Size", min: 2, max: 32 },
-  { key: "paddingX", icon: "↔", label: "Width", min: 0, max: 24 },
-  { key: "paddingY", icon: "↕", label: "Height", min: 0, max: 24 },
-  { key: "rotation", icon: "⟳", label: "Angle", min: -180, max: 180 },
+  { key: "outline", icon: "⬠" },
+  { key: "fontSize", icon: "A", min: 2, max: 32 },
+  { key: "paddingX", icon: "↔", min: 0, max: 24 },
+  { key: "paddingY", icon: "↕", min: 0, max: 24 },
+  { key: "rotation", icon: "⟳", min: -180, max: 180 },
 ];
 const MAX_ZOOM = 8;
 
@@ -90,7 +93,7 @@ export function MapLabelEditor({
   point,
   coords = false,
   removable,
-  removeLabel = "Remove from this map",
+  removeLabel: removeLabelProp,
   onAddNext,
   addLocations = [],
   onDone,
@@ -127,6 +130,8 @@ export function MapLabelEditor({
   onRemove?: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation(["shared", "common"]);
+  const removeLabel = removeLabelProp ?? t("mapEditor.removeFromMap");
   const free = subject.locationId === null;
   const [draftAnchor, setDraftAnchor] = useState<MapPoint | null>(anchor);
   const [draftLabel, setDraftLabel] = useState<LabelShape | null>(label);
@@ -417,7 +422,8 @@ export function MapLabelEditor({
     return {
       anchor: a,
       label: free ? null : l,
-      point: wantsCoords ? { name: free ? pointName.trim() || "Calibration point" : subject.name, lat: num(pointLat), lng: num(pointLng) } : undefined,
+      // A default name is stored, so it is in the marina's language.
+      point: wantsCoords ? { name: free ? pointName.trim() || dataT("calibrationPoint", { ns: "records" }) : subject.name, lat: num(pointLat), lng: num(pointLng) } : undefined,
     };
   };
   const finish = () => onDone(collect());
@@ -432,42 +438,42 @@ export function MapLabelEditor({
   const freePoints = anchors.filter((a) => a.location_id === null && !(free && point && a.label === point.name && a.cx === anchor?.cx && a.cy === anchor?.cy));
   const hint = !draftAnchor && !draftLabel
     ? tool === "outline"
-      ? `Tap each corner of ${subject.name}. Drag a corner to move it.`
+      ? t("mapEditor.hintOutline", { name: subject.name })
       : mode === "anchor"
       ? free
-        ? "Tap the spot on the map this point marks."
-        : `Tap where you are standing - where ${subject.name} is.`
-      : `Tap where ${subject.name} is.`
+        ? t("mapEditor.hintPoint")
+        : t("mapEditor.hintStanding", { name: subject.name })
+      : t("mapEditor.hintPlace", { name: subject.name })
     : mode === "anchor" || tool === "anchor"
-      ? "Drag the dot, or tap where it should be."
+      ? t("mapEditor.hintDragDot")
       : tool === "label"
-        ? "Drag the label, or tap where it should be."
+        ? t("mapEditor.hintDragLabel")
         : tool === "outline"
-          ? `Tap each corner of ${subject.name}. Drag a corner to move it.`
+          ? t("mapEditor.hintOutline", { name: subject.name })
           : null;
   const showLabel = mode === "label" && tool !== "anchor" && draftLabel;
   const body = (
-    <div className="mle-layer" ref={layerRef} role="dialog" aria-label={`${subject.name} on ${map.scope_name ?? map.name}`}>
+    <div className="mle-layer" ref={layerRef} role="dialog" aria-label={t("mapEditor.dialog", { name: subject.name, map: map.scope_name ?? map.name })}>
       <div className="mle-top">
         <button type="button" className="btn btn-sm btn-bare" onClick={onCancel}>
-          Cancel
+          {t("common:cancel")}
         </button>
         <div className="mle-title">
-          <b>{free ? pointName || "Calibration point" : subject.name}</b>
-          <span className="muted small">{mode === "anchor" ? (free ? "calibration point" : "where it is") : map.scope_name ?? map.name}</span>
+          <b>{free ? pointName || t("map.calibrationPoint") : subject.name}</b>
+          <span className="muted small">{mode === "anchor" ? (free ? t("mapEditor.calibrationPoint") : t("mapEditor.whereItIs")) : map.scope_name ?? map.name}</span>
         </div>
         <button type="button" className="btn btn-sm btn-primary" data-testid="mle-done" disabled={!canFinish} onClick={finish}>
-          Done
+          {t("common:done")}
         </button>
       </div>
       {onAddNext && (
         <div className="mle-addbar">
-          <span className="muted small">{canFinish ? "Save this and add" : "Add"}</span>
+          <span className="muted small">{canFinish ? t("mapEditor.saveAndAdd") : t("common:add")}</span>
           <button type="button" className="btn btn-sm" data-testid="mle-add-location" aria-expanded={picking} onClick={() => setPicking((v) => !v)}>
-            + Location
+            {t("mapEditor.addLocation")}
           </button>
           <button type="button" className="btn btn-sm" data-testid="mle-add-point" onClick={() => addNext({ kind: "point" })}>
-            + Point
+            {t("mapEditor.addPoint")}
           </button>
           {picking && (
             <div className="mle-pick" data-testid="mle-pick">
@@ -478,7 +484,7 @@ export function MapLabelEditor({
                   const loc = addLocations.find((l) => l.id === id);
                   if (loc) addNext({ kind: "location", locationId: loc.id, name: loc.name });
                 }}
-                placeholder="Which location next?"
+                placeholder={t("mapEditor.whichNext")}
                 allowNone={false}
                 autoFocus
               />
@@ -527,7 +533,7 @@ export function MapLabelEditor({
                   key={a.id}
                   className={`map-anchor ${a.location_id === null ? "map-anchor-free" : "map-anchor-other"}`}
                   style={{ left: `${a.cx}%`, top: `${a.cy}%` }}
-                  title={a.location_id === null ? (a.label ?? "Calibration point") : (a.location_name ?? "")}
+                  title={a.location_id === null ? (a.label ?? t("map.calibrationPoint")) : (a.location_name ?? "")}
                   aria-hidden
                 />
               ))}
@@ -552,7 +558,7 @@ export function MapLabelEditor({
                 data-anchor
                 data-testid="mle-anchor"
                 style={{ left: `${draftAnchor.cx}%`, top: `${draftAnchor.cy}%` }}
-                title={`${subject.name} is here`}
+                title={t("map.isHere", { name: subject.name })}
               />
             </>
           )}
@@ -565,17 +571,17 @@ export function MapLabelEditor({
       <div className="mle-bar">
         {mode === "label" && tool === "outline" && (
           <div className="mle-outline-bar" data-testid="mle-outline-bar">
-            <span className="muted small">{draftLabel?.outline?.length ?? 0} corners</span>
+            <span className="muted small">{t("mapEditor.corners", { count: draftLabel?.outline?.length ?? 0 })}</span>
             <button
               type="button"
               className="btn btn-sm"
               disabled={!draftLabel?.outline?.length}
               onClick={() => draftLabel && setDraftLabel({ ...draftLabel, outline: (draftLabel.outline ?? []).slice(0, -1) })}
             >
-              Undo corner
+              {t("mapEditor.undoCorner")}
             </button>
             <button type="button" className="btn btn-sm btn-bare" disabled={!draftLabel?.outline?.length} onClick={() => draftLabel && setDraftLabel({ ...draftLabel, outline: null, showText: true })}>
-              Clear
+              {t("common:clear")}
             </button>
             <label className="row small" style={{ gap: 4, cursor: "pointer" }}>
               <input
@@ -586,14 +592,14 @@ export function MapLabelEditor({
                 disabled={!draftLabel || (draftLabel.outline?.length ?? 0) < 3}
                 onChange={(e) => draftLabel && setDraftLabel({ ...draftLabel, showText: e.target.checked })}
               />
-              Show name
+              {t("mapEditor.showName")}
             </label>
           </div>
         )}
         {mode === "label" && active && (
           <div className="mle-slider">
             <span className="mle-slider-label">
-              {active.label} · {value(active.key as Slider)}
+              {t(`mapEditor.tool.${active.key}`)} · {value(active.key as Slider)}
               {active.key === "rotation" ? "°" : "px"}
             </span>
             <input
@@ -601,27 +607,27 @@ export function MapLabelEditor({
               min={active.min}
               max={active.max}
               value={value(active.key as Slider)}
-              aria-label={active.label}
+              aria-label={t(`mapEditor.tool.${active.key}`)}
               onChange={(e) => draftLabel && setDraftLabel({ ...draftLabel, [active.key]: Number(e.target.value) })}
             />
           </div>
         )}
         {mode === "label" && (
           <div className="mle-tools">
-            {TOOLS.map((t) => (
+            {TOOLS.map((tl) => (
               <button
-                key={t.key}
+                key={tl.key}
                 type="button"
-                className={`mle-tool ${tool === t.key ? "on" : ""}`}
-                disabled={t.key === "outline" ? false : !canFinish || (t.key !== "label" && t.key !== "anchor" && !draftLabel)}
-                aria-label={t.label}
-                aria-pressed={tool === t.key}
-                onClick={() => pick(t.key)}
+                className={`mle-tool ${tool === tl.key ? "on" : ""}`}
+                disabled={tl.key === "outline" ? false : !canFinish || (tl.key !== "label" && tl.key !== "anchor" && !draftLabel)}
+                aria-label={t(`mapEditor.tool.${tl.key}`)}
+                aria-pressed={tool === tl.key}
+                onClick={() => pick(tl.key)}
               >
                 <span className="mle-tool-icon" aria-hidden>
-                  {t.icon}
+                  {tl.icon}
                 </span>
-                <span className="mle-tool-label">{t.label}</span>
+                <span className="mle-tool-label">{t(`mapEditor.tool.${tl.key}`)}</span>
               </button>
             ))}
             {removable && onRemove && (
@@ -629,36 +635,36 @@ export function MapLabelEditor({
                 <span className="mle-tool-icon" aria-hidden>
                   ✕
                 </span>
-                <span className="mle-tool-label">Remove</span>
+                <span className="mle-tool-label">{t("common:remove")}</span>
               </button>
             )}
           </div>
         )}
         {mode === "anchor" && !free && !coords && (
           <div className="mle-anchor-note muted small">
-            {draftAnchor ? "The dot is where the coordinates you just captured belong on this map." : "Zoom in, then tap the spot you are standing on."}
+            {draftAnchor ? t("mapEditor.anchorPlaced") : t("mapEditor.anchorPrompt")}
           </div>
         )}
         {coords && !free && (
           <div className="mle-point-form" data-testid="mle-coords">
             <div className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-              <span className="muted small">GPS</span>
-              <input className="input select-inline" style={{ width: 120 }} placeholder="latitude" aria-label="Latitude" inputMode="decimal" value={pointLat} onChange={(e) => { typed.current = true; setPointLat(e.target.value); }} />
-              <input className="input select-inline" style={{ width: 120 }} placeholder="longitude" aria-label="Longitude" inputMode="decimal" value={pointLng} onChange={(e) => { typed.current = true; setPointLng(e.target.value); }} />
+              <span className="muted small">{t("mapEditor.gps")}</span>
+              <input className="input select-inline" style={{ width: 120 }} placeholder={t("mapEditor.latitude")} aria-label={t("mapEditor.latitudeLabel")} inputMode="decimal" value={pointLat} onChange={(e) => { typed.current = true; setPointLat(e.target.value); }} />
+              <input className="input select-inline" style={{ width: 120 }} placeholder={t("mapEditor.longitude")} aria-label={t("mapEditor.longitudeLabel")} inputMode="decimal" value={pointLng} onChange={(e) => { typed.current = true; setPointLng(e.target.value); }} />
               <button type="button" className="btn btn-sm" disabled={!device} data-testid="mle-use-position" onClick={() => device && (setPointLat(device.lat.toFixed(7)), setPointLng(device.lng.toFixed(7)))}>
-                Use my position{device ? ` · ±${Math.round(device.accuracy)} m` : ""}
+                {device ? t("mapEditor.useMyPositionWithin", { metres: Math.round(device.accuracy) }) : t("mapEditor.useMyPosition")}
               </button>
             </div>
           </div>
         )}
         {mode === "anchor" && free && (
           <div className="mle-point-form">
-            <input className="input" placeholder="What this point is (NE dock corner)" aria-label="Name" value={pointName} onChange={(e) => setPointName(e.target.value)} />
+            <input className="input" placeholder={t("mapEditor.pointName")} aria-label={t("mapEditor.pointNameLabel")} value={pointName} onChange={(e) => setPointName(e.target.value)} />
             <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
-              <input className="input select-inline" style={{ width: 130 }} placeholder="latitude" aria-label="Latitude" inputMode="decimal" value={pointLat} onChange={(e) => { typed.current = true; setPointLat(e.target.value); }} />
-              <input className="input select-inline" style={{ width: 130 }} placeholder="longitude" aria-label="Longitude" inputMode="decimal" value={pointLng} onChange={(e) => { typed.current = true; setPointLng(e.target.value); }} />
+              <input className="input select-inline" style={{ width: 130 }} placeholder={t("mapEditor.latitude")} aria-label={t("mapEditor.latitudeLabel")} inputMode="decimal" value={pointLat} onChange={(e) => { typed.current = true; setPointLat(e.target.value); }} />
+              <input className="input select-inline" style={{ width: 130 }} placeholder={t("mapEditor.longitude")} aria-label={t("mapEditor.longitudeLabel")} inputMode="decimal" value={pointLng} onChange={(e) => { typed.current = true; setPointLng(e.target.value); }} />
               <button type="button" className="btn btn-sm" disabled={!device} onClick={() => device && (setPointLat(device.lat.toFixed(7)), setPointLng(device.lng.toFixed(7)))}>
-                Use my position{device ? ` · ±${Math.round(device.accuracy)} m` : ""}
+                {device ? t("mapEditor.useMyPositionWithin", { metres: Math.round(device.accuracy) }) : t("mapEditor.useMyPosition")}
               </button>
               {removable && onRemove && (
                 <button type="button" className="btn btn-sm btn-bare" style={{ color: "var(--bad)" }} onClick={onRemove}>

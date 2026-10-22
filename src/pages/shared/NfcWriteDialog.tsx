@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { nfcErrorMessage, nfcWriteSupported, vibrateWriteAck, writeNfcUrl } from "../../lib/nfc";
 
 /**
@@ -15,6 +16,7 @@ export function NfcWriteDialog({
   url: string;
   onClose: () => void;
 }) {
+  const { t } = useTranslation(["shared", "common"]);
   const supported = nfcWriteSupported();
   const [status, setStatus] = useState<"idle" | "writing" | "success" | "error">(
     supported ? "idle" : "error",
@@ -22,7 +24,7 @@ export function NfcWriteDialog({
   const [errorMessage, setErrorMessage] = useState(
     supported
       ? ""
-      : "NFC tag writing isn't supported in this browser. Use Chrome on Android with NFC turned on.",
+      : t("nfc.unsupported"),
   );
   const controllerRef = useRef<AbortController | null>(null);
 
@@ -41,7 +43,7 @@ export function NfcWriteDialog({
         setStatus("idle");
         return;
       }
-      setErrorMessage(nfcErrorMessage(err));
+      setErrorMessage(nfcErrorMessage(err, t));
       setStatus("error");
     }
   };
@@ -55,14 +57,13 @@ export function NfcWriteDialog({
     <div className="dialog-backdrop" onClick={onClose}>
       <div className="dialog-card" onClick={(e) => e.stopPropagation()}>
         <div className="card-title" style={{ marginBottom: 10 }}>
-          Write NFC tag — {checkpointName}
+          {t("nfc.title", { name: checkpointName })}
         </div>
 
         {status === "idle" && (
           <>
             <p className="muted small">
-              Hold a blank NFC tag near the back of this device, then tap Write.
-              The tag will be programmed with this checkpoint's scan URL.
+              {t("nfc.instructions")}
             </p>
             <code
               className="small muted"
@@ -72,10 +73,10 @@ export function NfcWriteDialog({
             </code>
             <div className="row">
               <button type="button" className="btn btn-primary" onClick={() => void start()}>
-                Write tag
+                {t("nfc.write")}
               </button>
               <button type="button" className="btn btn-quiet" onClick={onClose}>
-                Cancel
+                {t("common:cancel")}
               </button>
             </div>
           </>
@@ -84,11 +85,11 @@ export function NfcWriteDialog({
         {status === "writing" && (
           <>
             <div className="badge badge-accent" style={{ display: "block", marginBottom: 10 }}>
-              Waiting for tag — hold it near the back of the device…
+              {t("nfc.waiting")}
             </div>
             <div className="row">
               <button type="button" className="btn btn-quiet" onClick={cancel}>
-                Cancel
+                {t("common:cancel")}
               </button>
             </div>
           </>
@@ -97,14 +98,14 @@ export function NfcWriteDialog({
         {status === "success" && (
           <>
             <div className="badge badge-good" style={{ display: "block", marginBottom: 10 }}>
-              Tag written ✓
+              {t("nfc.written")}
             </div>
             <div className="row">
               <button type="button" className="btn" onClick={() => setStatus("idle")}>
-                Write another
+                {t("nfc.another")}
               </button>
               <button type="button" className="btn btn-primary" onClick={onClose}>
-                Done
+                {t("common:done")}
               </button>
             </div>
           </>
@@ -118,11 +119,11 @@ export function NfcWriteDialog({
             <div className="row">
               {supported && (
                 <button type="button" className="btn btn-primary" onClick={() => void start()}>
-                  Try again
+                  {t("nfc.tryAgain")}
                 </button>
               )}
               <button type="button" className="btn btn-quiet" onClick={onClose}>
-                Close
+                {t("common:close")}
               </button>
             </div>
           </>
