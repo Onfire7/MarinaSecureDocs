@@ -89,8 +89,8 @@ export async function fireAssetTrigger(
     await recordActivity(tx, {
       eventType: "checklist.created",
       summary: dataT(
-        e.event === "check_out" ? "fleetActivity.createdByCheckOut" : "fleetActivity.createdByCheckIn",
-        { ns: "home", template: template.name, vehicle: e.asset.name },
+        e.event === "check_out" ? "fleet.createdByCheckOut" : "fleet.createdByCheckIn",
+        { ns: "records", template: template.name, vehicle: e.asset.name },
       ),
       subjectType: "checklist_instances",
       subjectId: instanceId,

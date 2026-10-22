@@ -1,7 +1,112 @@
-// Copy for src/pages/home/. Only the end of a shift and the fleet records it
-// writes so far; the rest of the area converts in its own commit
-// (docs/TODO.md § Localization).
+// Copy for src/pages/home/: the Dashboard, its cards, the Fleet card and
+// the end of a shift. What the area stores is in records.
 export const home = {
+  title: "Home",
+  editLayout: "Edit layout",
+  reset: "Reset to role defaults",
+  resetTitle: "Discard saved layout and recompute from current roles",
+  moveUp: "Move up",
+  moveDown: "Move down",
+  hide: "Hide",
+  show: "Show",
+  addCard: "Add card",
+  empty: "No cards on your dashboard",
+  emptyHint: "Use “Edit layout” to add cards you have access to.",
+  /** Card titles, by CardId. */
+  card: {
+    clock: "Clock",
+    shift: "Shift",
+    ticket_summary: "Ticket summary",
+    incident_summary: "Incident summary",
+    missed_comms: "Missed comms",
+    upcoming_reservations: "Upcoming reservations",
+    admin_shortcuts: "Admin shortcuts",
+    fleet: "Fleet",
+  },
+  shift: {
+    none: "No active shift",
+    start: "Start Shift",
+    onShift: "On shift · {{elapsed}}",
+    started: "Started {{time}}",
+  },
+  tickets: {
+    open: "{{count}} open",
+    urgent: "{{count}} urgent",
+    high: "{{count}} high",
+    calm: "No urgent or high-priority tickets",
+  },
+  incidents: {
+    open: "{{count}} open",
+    underReview: "{{count}} under review",
+    hint: "Recent and open incidents",
+  },
+  comms: {
+    missedCalls_one: "{{count}} missed call",
+    missedCalls_other: "{{count}} missed calls",
+    unreadTexts_one: "{{count}} unread text",
+    unreadTexts_other: "{{count}} unread texts",
+    hint: "Tap to review missed calls and texts",
+  },
+  reservations: {
+    none: "No upcoming reservations",
+    today: "today",
+    tomorrow: "tomorrow",
+  },
+  /** Admin pages, by name, on the Admin shortcuts card. */
+  shortcut: {
+    users: "Users",
+    roles: "Roles & Permissions",
+    checklistTemplates: "Checklist Templates",
+    locations: "Locations",
+    assets: "Assets",
+    settings: "Marina Settings",
+  },
+  fleet: {
+    checkIn: "Check in",
+    checkOut: "Check out",
+    fuel: "Fuel",
+    mileage: "Mileage",
+    incident: "Incident",
+    ticket: "Ticket",
+    withYou: "With you · {{since}}",
+    thisTrip: "{{distance}} {{unit}} this trip",
+    available: "Available",
+    withPerson: "With {{name}} · {{since}}",
+    outOfService: "Out of service",
+    /** src/lib/fleet.ts holderName, when no name for the holder is on the device. */
+    checkedOut: "Checked out",
+    fuelUnknown: "Fuel unknown",
+    fuelLevel: "Fuel {{level}}",
+    /** Undoing a Fleet item on a checklist (src/data/fleet.ts). */
+    error: {
+      checkedBackIn: "This vehicle has been checked back in.",
+      checkedOutAgain: "{{name}} has been checked out again since.",
+    },
+    dialog: {
+      out: "Check out {{name}}",
+      in: "Check in {{name}}",
+      mileage: "Log mileage — {{name}}",
+      fuel: "Log fuel — {{name}}",
+      person: "Person",
+      selectPerson: "Select someone…",
+      notLinked: "Your account isn't linked to a contact, so it can't be checked out to you.",
+      gallons: "Gallons",
+      cost: "Cost (optional)",
+      odometer: "Odometer ({{unit}})",
+      odometerStart: "Odometer ({{unit}}), starting",
+      odometerEnd: "Odometer ({{unit}}), ending",
+      lastRecorded: "Last recorded {{reading}} {{unit}}",
+      lastRecordedTrip: "Last recorded {{reading}} {{unit}} · this trip +{{distance}} {{unit}}",
+      noReading: "No reading yet",
+      noReadingTrip: "No reading yet · this trip +{{distance}} {{unit}}",
+      lower: "Lower than the current reading",
+      reason: "Reason — required",
+      reasonPlaceholder: "e.g. previous entry was a typo",
+      fuelLevel: "Fuel level",
+      report: "Anything to report? (optional)",
+      reportPlaceholder: "e.g. left mirror loose",
+    },
+  },
   endOfShift: {
     /** The Shift card's button, by next step (DashboardPage.spec.md § The Shift card). */
     finish: "Finish {{name}}",
@@ -31,19 +136,5 @@ export const home = {
     whyKeep: "Why are you keeping it? — required",
     keepAndContinue: "Keep it and continue",
     cancel: "Cancel",
-  },
-  /** Activity Log summaries: written into the database, through dataT. */
-  fleetActivity: {
-    checkedOut: "{{vehicle}} checked out to {{person}}",
-    returned: "{{vehicle}} returned",
-    returnedWithNote: "{{vehicle}} returned: {{note}}",
-    kept: "{{vehicle}} kept past End of Shift: {{reason}}",
-    status: "{{vehicle}} status check: fuel {{fuel}}",
-    statusWithOdometer: "{{vehicle}} status check: {{odometer}}, fuel {{fuel}}",
-    statusWithdrawn: "{{vehicle}} status check withdrawn",
-    checkoutUndone: "{{vehicle}} checkout undone",
-    checkinUndone: "{{vehicle}} check-in undone",
-    createdByCheckOut: "{{template}} created by {{vehicle}} being checked out",
-    createdByCheckIn: "{{template}} created by {{vehicle}} being checked in",
   },
 };

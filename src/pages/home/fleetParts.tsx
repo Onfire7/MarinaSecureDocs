@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { FUEL_STEPS } from "../../lib/fleet";
 
 // The fuel gauge the Fleet card shares with the Fleet Vehicle Item
@@ -10,13 +11,14 @@ import { FUEL_STEPS } from "../../lib/fleet";
 /** Five steps, E to F. Read-only gauges sit inside tile buttons, so they
  *  can't be buttons themselves. */
 export function FuelGauge({ level, onChange }: { level: number | null; onChange?: (level: number) => void }) {
+  const { t } = useTranslation("home");
   const low = level != null && level <= 1;
   return (
     <div
       style={{ display: "flex", gap: 3 }}
       data-testid="fuel-gauge"
       data-level={level ?? ""}
-      aria-label={level == null ? "Fuel unknown" : `Fuel ${FUEL_STEPS[level]}`}
+      aria-label={level == null ? t("fleet.fuelUnknown") : t("fleet.fuelLevel", { level: FUEL_STEPS[level] })}
       role={onChange ? "group" : "img"}
     >
       {FUEL_STEPS.map((step, i) => {

@@ -43,7 +43,10 @@ const localizer = createLocalizer(CATALOGS, resolve(undefined), [initReactI18nex
 export const i18n = localizer.i18n;
 export const dataT = localizer.dataT;
 export const uiLocale = localizer.uiLocale;
-export const { date, time, dateTime, number } = makeFormatters(localizer.uiLocale);
+export const { date, time, dateTime, number, duration } = makeFormatters(
+  localizer.uiLocale,
+  localizer.i18n.getFixedT(null, "common"),
+);
 
 function settle(language: string) {
   localizer.setUiLanguage(language);

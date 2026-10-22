@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import type { ComponentType } from "react";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
@@ -18,6 +19,8 @@ import { useIncidents } from "../../data/incidents";
 import { useMissedCalls, useSmsThreads } from "../../data/comms";
 import { useReservations } from "../../data/reservations";
 import { FleetCard } from "./FleetCard";
+import type { TFunction } from "i18next";
+import { date, duration, time } from "../../i18n";
 
 // Dashboard cards (see DashboardPage.spec.md § Cards).
 // A card's availability gate is exactly the permission that governs the data
@@ -40,9 +43,9 @@ export interface CardContext {
   fleetVehicles: number;
 }
 
+// A card's title is home:card.<id>.
 export interface CardDef {
   id: CardId;
-  title: string;
   available: (current: CurrentUser, context: CardContext) => boolean;
   /** Role names (predefined set) whose default layout includes this card. */
   defaultForRoles: string[] | "all";
@@ -54,56 +57,48 @@ const ALL_MANAGER_ROLES = ["Marina Manager", "Owner"];
 export const CARD_REGISTRY: CardDef[] = [
   {
     id: "clock",
-    title: "Clock",
     available: () => true,
     defaultForRoles: "all",
     Component: ClockCard,
   },
   {
     id: "shift",
-    title: "Shift",
     available: () => true,
     defaultForRoles: ["Security"],
     Component: ShiftCard,
   },
   {
     id: "ticket_summary",
-    title: "Ticket summary",
     available: () => true,
     defaultForRoles: ["Maintenance", "Office"],
     Component: TicketSummaryCard,
   },
   {
     id: "incident_summary",
-    title: "Incident summary",
     available: (c) => c.can("view_incidents"),
     defaultForRoles: ["Security", ...ALL_MANAGER_ROLES],
     Component: IncidentSummaryCard,
   },
   {
     id: "missed_comms",
-    title: "Missed comms",
     available: (c) => c.can("view_calls") || c.can("view_sms"),
     defaultForRoles: ["Office"],
     Component: MissedCommsCard,
   },
   {
     id: "upcoming_reservations",
-    title: "Upcoming reservations",
     available: () => true,
     defaultForRoles: ["Office", ...ALL_MANAGER_ROLES],
     Component: UpcomingReservationsCard,
   },
   {
     id: "admin_shortcuts",
-    title: "Admin shortcuts",
     available: (c) => c.isAdmin,
     defaultForRoles: ALL_MANAGER_ROLES,
     Component: AdminShortcutsCard,
   },
   {
     id: "fleet",
-    title: "Fleet",
     available: (c, ctx) => c.can("use_fleet") && ctx.fleetVehicles > 0,
     defaultForRoles: ["Security"],
     Component: FleetCard,
@@ -126,20 +121,20 @@ export function defaultLayout(roleNames: string[]): LayoutEntry[] {
 function ClockCard() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
+    const tick = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(tick);
   }, []);
   return (
     <div>
       <div className="dash-clock">
-        {now.toLocaleTimeString(undefined, {
+        {time(now, {
           hour: "numeric",
           minute: "2-digit",
           second: "2-digit",
         })}
       </div>
       <div className="card-meta">
-        {now.toLocaleDateString(undefined, {
+        {date(now, {
           weekday: "short",
           month: "short",
           day: "numeric",
@@ -153,6 +148,7 @@ function ClockCard() {
 // ---------------------------------------------------------------- Shift
 
 function ShiftCard() {
+  const { t } = useTranslation("home");
   const current = useCurrent();
   const navigate = useNavigate();
   const userId = current.user?.id;
@@ -194,7 +190,7 @@ function ShiftCard() {
     const created: string[] = [];
     for (const template of clockInTemplatesDue) {
       created.push(
-        await createInstanceFromTemplate({ template, userId, reason: "clock-in" }),
+        await createInstanceFromTemplate({ template, userId, reason: { kind: "clockIn" } }),
       );
     }
     if (created.length === 1) navigate(`/checklists/${created[0]}`);
@@ -204,14 +200,14 @@ function ShiftCard() {
   if (!activeShift) {
     return (
       <div>
-        <div className="card-title">No active shift</div>
+        <div className="card-title">{t("shift.none")}</div>
         <div style={{ marginTop: 10 }}>
           <button
             type="button"
             className="btn btn-primary"
             onClick={() => void begin()}
           >
-            Start Shift
+            {t("shift.start")}
           </button>
         </div>
       </div>
@@ -221,13 +217,11 @@ function ShiftCard() {
   return (
     <div>
       <div className="card-title">
-        On shift · {formatElapsed(activeShift.started_at)}
+        {t("shift.onShift", { elapsed: duration(Date.now() - new Date(activeShift.started_at).getTime()) })}
       </div>
       <div className="card-meta">
-        Started{" "}
-        {new Date(activeShift.started_at).toLocaleTimeString(undefined, {
-          hour: "numeric",
-          minute: "2-digit",
+        {t("shift.started", {
+          time: time(activeShift.started_at, { hour: "numeric", minute: "2-digit" }),
         })}
       </div>
       {endOfShift.step && (
@@ -246,17 +240,10 @@ function ShiftCard() {
   );
 }
 
-function formatElapsed(startedAt: string | number): string {
-  const ms = Date.now() - new Date(startedAt).getTime();
-  const totalMinutes = Math.max(0, Math.floor(ms / 60_000));
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
-}
-
 // ---------------------------------------------------------------- Tickets
 
 function TicketSummaryCard() {
+  const { t } = useTranslation("home");
   // "Open" is any status the marina has not flagged terminal, so a marina that
   // adds "Waiting on parts" gets it counted without a code change.
   const { data: tickets } = useTickets();
@@ -265,11 +252,11 @@ function TicketSummaryCard() {
   const high = open.filter((t) => t.priority === "high").length;
   return (
     <Link to="/tickets" style={{ textDecoration: "none", color: "inherit" }}>
-      <div className="dash-count">{open.length} open</div>
+      <div className="dash-count">{t("tickets.open", { count: open.length })}</div>
       <div className="card-meta">
-        {urgent > 0 && <span className="badge badge-bad">{urgent} urgent </span>}{" "}
-        {high > 0 && <span className="badge badge-warn">{high} high</span>}
-        {urgent === 0 && high === 0 && "No urgent or high-priority tickets"}
+        {urgent > 0 && <span className="badge badge-bad">{t("tickets.urgent", { count: urgent })} </span>}{" "}
+        {high > 0 && <span className="badge badge-warn">{t("tickets.high", { count: high })}</span>}
+        {urgent === 0 && high === 0 && t("tickets.calm")}
       </div>
     </Link>
   );
@@ -278,6 +265,7 @@ function TicketSummaryCard() {
 // ---------------------------------------------------------------- Incidents
 
 function IncidentSummaryCard() {
+  const { t } = useTranslation("home");
   const { data: incidents } = useIncidents();
   const open = incidents.filter((i) => i.status_is_terminal === 0);
   const underReview = open.filter(
@@ -285,11 +273,11 @@ function IncidentSummaryCard() {
   ).length;
   return (
     <Link to="/incidents" style={{ textDecoration: "none", color: "inherit" }}>
-      <div className="dash-count">{open.length} open</div>
+      <div className="dash-count">{t("incidents.open", { count: open.length })}</div>
       <div className="card-meta">
         {underReview > 0
-          ? `${underReview} under review`
-          : "Recent and open incidents"}
+          ? t("incidents.underReview", { count: underReview })
+          : t("incidents.hint")}
       </div>
     </Link>
   );
@@ -298,6 +286,7 @@ function IncidentSummaryCard() {
 // ---------------------------------------------------------------- Missed comms
 
 function MissedCommsCard() {
+  const { t } = useTranslation("home");
   const current = useCurrent();
   const canCalls = current.can("view_calls");
   const canSms = current.can("view_sms");
@@ -310,13 +299,13 @@ function MissedCommsCard() {
   const missedCalls = canCalls ? calls.length : 0;
   const unreadSms = canSms ? threads.filter((t) => t.unread === 1).length : 0;
   const parts = [
-    ...(canCalls ? [`${missedCalls} missed call${missedCalls === 1 ? "" : "s"}`] : []),
-    ...(canSms ? [`${unreadSms} unread text${unreadSms === 1 ? "" : "s"}`] : []),
+    ...(canCalls ? [t("comms.missedCalls", { count: missedCalls })] : []),
+    ...(canSms ? [t("comms.unreadTexts", { count: unreadSms })] : []),
   ];
   return (
     <Link to="/comms" style={{ textDecoration: "none", color: "inherit" }}>
       <div className="card-title">{parts.join(" · ")}</div>
-      <div className="card-meta">Tap to review missed calls and texts</div>
+      <div className="card-meta">{t("comms.hint")}</div>
     </Link>
   );
 }
@@ -324,6 +313,7 @@ function MissedCommsCard() {
 // ---------------------------------------------------------------- Reservations
 
 function UpcomingReservationsCard() {
+  const { t } = useTranslation("home");
   const { data: reservations } = useReservations();
   const soon = reservations
     .filter(
@@ -342,7 +332,7 @@ function UpcomingReservationsCard() {
       style={{ textDecoration: "none", color: "inherit" }}
     >
       {soon.length === 0 ? (
-        <div className="card-title muted">No upcoming reservations</div>
+        <div className="card-title muted">{t("reservations.none")}</div>
       ) : (
         <div className="stack" style={{ gap: 6 }}>
           {soon.map(({ r, checkin }) => (
@@ -351,7 +341,7 @@ function UpcomingReservationsCard() {
                 {r.location_name ?? r.asset_name ?? "—"}
               </span>
               <span className="muted small">
-                {formatCheckin(checkin)}
+                {formatCheckin(checkin, t)}
                 {r.contact_name ? ` · ${r.contact_name}` : ""}
               </span>
             </div>
@@ -362,28 +352,30 @@ function UpcomingReservationsCard() {
   );
 }
 
-function formatCheckin(ts: number): string {
-  const date = new Date(ts);
+function formatCheckin(ts: number, t: TFunction<"home">): string {
+  const when = new Date(ts);
   const today = new Date();
   const tomorrow = new Date(today.getTime() + 24 * 3600_000);
   const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
-  if (sameDay(date, today)) return "today";
-  if (sameDay(date, tomorrow)) return "tomorrow";
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  if (sameDay(when, today)) return t("reservations.today");
+  if (sameDay(when, tomorrow)) return t("reservations.tomorrow");
+  return date(when, { month: "short", day: "numeric" });
 }
 
 // ---------------------------------------------------------------- Admin
 
-const ADMIN_SHORTCUTS: { label: string; to: string; requires: string }[] = [
-  { label: "Users", to: "/admin/users", requires: "manage_users" },
-  { label: "Roles & Permissions", to: "/admin/roles", requires: "manage_roles" },
-  { label: "Checklist Templates", to: "/admin/checklist-templates", requires: "manage_checklists" },
-  { label: "Locations", to: "/admin/locations", requires: "manage_locations" },
-  { label: "Assets", to: "/admin/assets", requires: "manage_assets" },
-  { label: "Marina Settings", to: "/admin/settings", requires: "manage_marina_settings" },
+// `label` is the key into home:shortcut.
+const ADMIN_SHORTCUTS: { label: "users" | "roles" | "checklistTemplates" | "locations" | "assets" | "settings"; to: string; requires: string }[] = [
+  { label: "users", to: "/admin/users", requires: "manage_users" },
+  { label: "roles", to: "/admin/roles", requires: "manage_roles" },
+  { label: "checklistTemplates", to: "/admin/checklist-templates", requires: "manage_checklists" },
+  { label: "locations", to: "/admin/locations", requires: "manage_locations" },
+  { label: "assets", to: "/admin/assets", requires: "manage_assets" },
+  { label: "settings", to: "/admin/settings", requires: "manage_marina_settings" },
 ];
 
 function AdminShortcutsCard() {
+  const { t } = useTranslation("home");
   const current = useCurrent();
   const links = ADMIN_SHORTCUTS.filter((s) =>
     current.permissions.has(s.requires as never),
@@ -392,7 +384,7 @@ function AdminShortcutsCard() {
     <div className="row" style={{ flexWrap: "wrap" }}>
       {links.map((s) => (
         <Link key={s.to} to={s.to} className="btn btn-sm">
-          {s.label}
+          {t(`shortcut.${s.label}`)}
         </Link>
       ))}
     </div>

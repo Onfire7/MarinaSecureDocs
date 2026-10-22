@@ -49,7 +49,7 @@ export function useGoToEndOfShiftStep() {
           template: clockOutTemplate,
           userId: current.user.id,
           instanceId: checklistId,
-          reason: "clock-out",
+          reason: { kind: "clockOut" },
         });
         await attachEndOfShiftChecklist(shift.id, checklistId);
       }

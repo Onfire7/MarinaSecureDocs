@@ -24,6 +24,7 @@ import {
   type Collected,
   type MaintenanceCheck,
 } from "./checklistSubmit";
+import { checklistCreatedSummary, type InstanceReason } from "./checklistReason";
 
 // Checklists — templates, and the instances made from them.
 //
@@ -1157,7 +1158,7 @@ export async function createInstanceFromTemplate(opts: {
   template: InstantiableTemplate;
   userId: string;
   instanceId?: string;
-  reason: string;
+  reason: InstanceReason;
   now?: Date;
 }): Promise<string> {
   const instanceId = opts.instanceId ?? newId();
@@ -1170,7 +1171,7 @@ export async function createInstanceFromTemplate(opts: {
     });
     await recordActivity(tx, {
       eventType: "checklist.created",
-      summary: `${opts.template.name} created by ${opts.reason}`,
+      summary: checklistCreatedSummary(opts.template.name, opts.reason),
       subjectType: "checklist_instances",
       subjectId: instanceId,
       actorId: opts.userId,

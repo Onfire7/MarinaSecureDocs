@@ -75,7 +75,7 @@ export function ChecklistListPage() {
     const instanceId = await createInstanceFromTemplate({
       template,
       userId,
-      reason: `${current.user?.name ?? "a user"} starting it manually`,
+      reason: { kind: "manual", name: current.user?.name ?? null },
     });
     setStarting(null);
     navigate(`/checklists/${instanceId}`);
@@ -108,7 +108,7 @@ export function ChecklistListPage() {
           template: t,
           userId,
           instanceId: recurringInstanceId(t.id, today),
-          reason: "its recurring schedule",
+          reason: { kind: "schedule" },
           now: today,
         }),
       ),

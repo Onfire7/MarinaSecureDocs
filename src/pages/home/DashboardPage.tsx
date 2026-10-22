@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { saveDashboardLayout } from "../../data/users";
 import { json } from "../../lib/db";
@@ -14,6 +15,7 @@ import {
 // Role-adaptive default card set; per-user show/hide/reorder persisted on
 // User.dashboardLayout (null = derive from current roles).
 export function DashboardPage() {
+  const { t } = useTranslation(["home", "common"]);
   const current = useCurrent();
   const [editing, setEditing] = useState(false);
 
@@ -69,7 +71,7 @@ export function DashboardPage() {
     <div>
       <div className="page-head">
         <div>
-          <h1 className="page-title">Home</h1>
+          <h1 className="page-title">{t("title")}</h1>
           <div className="page-sub">{current.user?.name}</div>
         </div>
         <div className="row">
@@ -78,9 +80,9 @@ export function DashboardPage() {
               type="button"
               className="btn btn-sm btn-quiet"
               onClick={() => persist(null)}
-              title="Discard saved layout and recompute from current roles"
+              title={t("resetTitle")}
             >
-              Reset to role defaults
+              {t("reset")}
             </button>
           )}
           <button
@@ -88,7 +90,7 @@ export function DashboardPage() {
             className="btn btn-sm"
             onClick={() => setEditing((e) => !e)}
           >
-            {editing ? "Done" : "Edit layout"}
+            {editing ? t("common:done") : t("editLayout")}
           </button>
         </div>
       </div>
@@ -100,7 +102,7 @@ export function DashboardPage() {
             className={"card" + (!entry.visible ? " card-hidden" : "")}
           >
             <div className="card-kicker">
-              <span>{def.title}</span>
+              <span>{t(`card.${def.id}`)}</span>
               {editing && (
                 <span className="card-edit-controls">
                   <button
@@ -108,7 +110,7 @@ export function DashboardPage() {
                     className="btn btn-sm btn-quiet"
                     disabled={i === 0}
                     onClick={() => move(def.id, -1)}
-                    aria-label="Move up"
+                    aria-label={t("moveUp")}
                   >
                     ↑
                   </button>
@@ -117,7 +119,7 @@ export function DashboardPage() {
                     className="btn btn-sm btn-quiet"
                     disabled={i === arr.length - 1}
                     onClick={() => move(def.id, 1)}
-                    aria-label="Move down"
+                    aria-label={t("moveDown")}
                   >
                     ↓
                   </button>
@@ -126,7 +128,7 @@ export function DashboardPage() {
                     className="btn btn-sm btn-quiet"
                     onClick={() => setVisible(def.id, !entry.visible)}
                   >
-                    {entry.visible ? "Hide" : "Show"}
+                    {entry.visible ? t("hide") : t("show")}
                   </button>
                 </span>
               )}
@@ -137,7 +139,7 @@ export function DashboardPage() {
 
         {editing && addable.length > 0 && (
           <div className="card card-hidden">
-            <div className="card-kicker">Add card</div>
+            <div className="card-kicker">{t("addCard")}</div>
             <div className="row" style={{ flexWrap: "wrap" }}>
               {addable.map((d) => (
                 <button
@@ -146,7 +148,7 @@ export function DashboardPage() {
                   className="btn btn-sm"
                   onClick={() => addCard(d.id)}
                 >
-                  + {d.title}
+                  + {t(`card.${d.id}`)}
                 </button>
               ))}
             </div>
@@ -156,8 +158,8 @@ export function DashboardPage() {
 
       {visibleEntries.length === 0 && !editing && (
         <div className="placeholder">
-          <div className="big">No cards on your dashboard</div>
-          Use “Edit layout” to add cards you have access to.
+          <div className="big">{t("empty")}</div>
+          {t("emptyHint")}
         </div>
       )}
     </div>

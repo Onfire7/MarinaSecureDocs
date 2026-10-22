@@ -2,7 +2,7 @@ import { useQuery } from "@powersync/react";
 import type { LockContext } from "@powersync/web";
 import { id as newId, stamp } from "../lib/db";
 import { deterministicId } from "../lib/detId";
-import { dataT } from "../i18n";
+import { dataT, i18n } from "../i18n";
 import { insert, remove, transact, update } from "./sql";
 import { recordActivity } from "./activity";
 import {
@@ -239,7 +239,7 @@ export async function checkOutFleetVehicle(
     await writeReading(tx);
     await recordActivity(tx, {
       eventType: "asset.checked_out",
-      summary: dataT("fleetActivity.checkedOut", { ns: "home", vehicle: vehicle.name, person: person.name }),
+      summary: dataT("fleet.checkedOut", { ns: "records", vehicle: vehicle.name, person: person.name }),
       subjectType: "assets",
       subjectId: vehicle.id,
       actorId: ctx.actorId,
@@ -282,7 +282,7 @@ export async function checkInFleetVehicle(
       await insert(tx, "asset_status_logs", {
         asset_id: vehicle.id,
         status_id: postReturnStatus.id,
-        note: "Returned from checkout",
+        note: dataT("fleet.returnedNote", { ns: "records" }),
         timestamp: now,
         logged_by_id: ctx.actorId,
       });
@@ -291,8 +291,8 @@ export async function checkInFleetVehicle(
     await recordActivity(tx, {
       eventType: "asset.checked_in",
       summary: trip.note
-        ? dataT("fleetActivity.returnedWithNote", { ns: "home", vehicle: vehicle.name, note: trip.note })
-        : dataT("fleetActivity.returned", { ns: "home", vehicle: vehicle.name }),
+        ? dataT("fleet.returnedWithNote", { ns: "records", vehicle: vehicle.name, note: trip.note })
+        : dataT("fleet.returned", { ns: "records", vehicle: vehicle.name }),
       subjectType: "assets",
       subjectId: vehicle.id,
       actorId: ctx.actorId,
@@ -338,7 +338,7 @@ export async function undoFleetCheckout(
       await reopenItem(tx, itemId);
       return;
     }
-    if (checkout.time_in) throw new Error("This vehicle has been checked back in.");
+    if (checkout.time_in) throw new Error(i18n.t("fleet.error.checkedBackIn", { ns: "home" }));
     await undoAssetTrigger(tx, {
       event: "check_out",
       asset: vehicle,
@@ -350,7 +350,7 @@ export async function undoFleetCheckout(
     await remove(tx, "asset_checkouts", checkoutId);
     await recordActivity(tx, {
       eventType: "asset.checkout_undone",
-      summary: dataT("fleetActivity.checkoutUndone", { ns: "home", vehicle: vehicle.name }),
+      summary: dataT("fleet.checkoutUndone", { ns: "records", vehicle: vehicle.name }),
       subjectType: "assets",
       subjectId: vehicle.id,
       actorId,
@@ -383,7 +383,7 @@ export async function undoFleetCheckin(
       "SELECT id FROM asset_checkouts WHERE asset_id = ? AND time_in IS NULL LIMIT 1",
       [vehicle.id],
     );
-    if (again) throw new Error(`${vehicle.name} has been checked out again since.`);
+    if (again) throw new Error(i18n.t("fleet.error.checkedOutAgain", { ns: "home", name: vehicle.name }));
     await undoAssetTrigger(tx, {
       event: "check_in",
       asset: vehicle,
@@ -408,7 +408,7 @@ export async function undoFleetCheckin(
     });
     await recordActivity(tx, {
       eventType: "asset.checkin_undone",
-      summary: dataT("fleetActivity.checkinUndone", { ns: "home", vehicle: vehicle.name }),
+      summary: dataT("fleet.checkinUndone", { ns: "records", vehicle: vehicle.name }),
       subjectType: "assets",
       subjectId: vehicle.id,
       actorId,
@@ -465,13 +465,13 @@ export async function recordStatusCheck(
       eventType: input.fill ? "asset.fueled" : "asset.status_checked",
       summary:
         writes.fuelLog.odometer != null
-          ? dataT("fleetActivity.statusWithOdometer", {
-              ns: "home",
+          ? dataT("fleet.statusWithOdometer", {
+              ns: "records",
               vehicle: vehicle.name,
               odometer: writes.fuelLog.odometer,
               fuel: FUEL_STEPS[input.fuelLevel],
             })
-          : dataT("fleetActivity.status", { ns: "home", vehicle: vehicle.name, fuel: FUEL_STEPS[input.fuelLevel] }),
+          : dataT("fleet.status", { ns: "records", vehicle: vehicle.name, fuel: FUEL_STEPS[input.fuelLevel] }),
       subjectType: "assets",
       subjectId: vehicle.id,
       actorId: ctx.actorId,
@@ -497,7 +497,7 @@ export async function withdrawStatusCheck(
       }
       await recordActivity(tx, {
         eventType: "asset.status_check_withdrawn",
-        summary: dataT("fleetActivity.statusWithdrawn", { ns: "home", vehicle: vehicle.name }),
+        summary: dataT("fleet.statusWithdrawn", { ns: "records", vehicle: vehicle.name }),
         subjectType: "assets",
         subjectId: vehicle.id,
         actorId,
@@ -545,7 +545,7 @@ export async function keepFleetVehicle(
     await writeReading(tx);
     await recordActivity(tx, {
       eventType: "asset.kept_after_shift",
-      summary: dataT("fleetActivity.kept", { ns: "home", vehicle: vehicle.name, reason: keep.reason }),
+      summary: dataT("fleet.kept", { ns: "records", vehicle: vehicle.name, reason: keep.reason }),
       subjectType: "assets",
       subjectId: vehicle.id,
       actorId: ctx.actorId,
@@ -580,7 +580,7 @@ export async function logFuel(
     const raised = await writeReading(tx);
     await recordActivity(tx, {
       eventType: "asset.fueled",
-      summary: `${vehicle.name} filled with ${fill.gallons} gal`,
+      summary: dataT("fleet.filled", { ns: "records", vehicle: vehicle.name, gallons: fill.gallons }),
       subjectType: "assets",
       subjectId: vehicle.id,
       actorId: ctx.actorId,
@@ -604,8 +604,8 @@ export async function setFleetVehicle(
     await recordActivity(tx, {
       eventType: "asset.fleet_changed",
       summary: isFleet
-        ? `${asset.name} added to the fleet`
-        : `${asset.name} removed from the fleet`,
+        ? dataT("fleet.added", { ns: "records", vehicle: asset.name })
+        : dataT("fleet.removed", { ns: "records", vehicle: asset.name }),
       subjectType: "assets",
       subjectId: asset.id,
       actorId,

@@ -2,6 +2,7 @@ import { useQuery } from "@powersync/react";
 import { db, stamp } from "../lib/db";
 import { insert, transact, update } from "./sql";
 import { recordActivity } from "./activity";
+import { dataT } from "../i18n";
 
 // Shifts — when a guard was on duty.
 //
@@ -59,7 +60,7 @@ export async function startShift(
     });
     await recordActivity(tx, {
       eventType: "shift.started",
-      summary: `Shift started by ${user.name}`,
+      summary: dataT("shiftStarted", { ns: "records", name: user.name }),
       subjectType: "shifts",
       subjectId: shiftId,
       actorId: user.id,
@@ -80,7 +81,7 @@ export async function endShift(
     });
     await recordActivity(tx, {
       eventType: "shift.ended",
-      summary: `Shift ended by ${user.name}`,
+      summary: dataT("shiftEnded", { ns: "records", name: user.name }),
       subjectType: "shifts",
       subjectId: shiftId,
       actorId: user.id,

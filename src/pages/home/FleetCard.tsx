@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { CSSProperties, ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { useNavigate } from "react-router-dom";
@@ -25,6 +26,7 @@ import {
 } from "../../data/fleet";
 import { resolveStatusByName, useAssetStatuses, useTicketStatuses } from "../../data/lookups";
 import { FuelGauge } from "./fleetParts";
+import { duration } from "../../i18n";
 
 // Dashboard — the Fleet card (see FleetCard.spec.md).
 // A board of the marina's own vehicles. Yours span the width with their
@@ -42,6 +44,7 @@ const RING: Record<FleetGroup, string> = {
 };
 
 export function FleetCard() {
+  const { t } = useTranslation("home");
   const current = useCurrent();
   const navigate = useNavigate();
   const { data: rows } = useFleetVehicles();
@@ -131,33 +134,33 @@ export function FleetCard() {
     primary:
       group === "yours" ? (
         <button type="button" className="btn btn-primary" onClick={() => open("in", v)}>
-          Check in
+          {t("fleet.checkIn")}
         </button>
       ) : group === "available" ? (
         <button type="button" className="btn btn-primary" onClick={() => open("out", v)}>
-          Check out
+          {t("fleet.checkOut")}
         </button>
       ) : null,
     secondary: [
       <button key="fuel" type="button" className="btn btn-sm" onClick={() => open("fuel", v)}>
-        Fuel
+        {t("fleet.fuel")}
       </button>,
       ...(v.has_meter === 1
         ? [
             <button key="mileage" type="button" className="btn btn-sm" onClick={() => open("mileage", v)}>
-              Mileage
+              {t("fleet.mileage")}
             </button>,
           ]
         : []),
       ...(current.can("create_incidents")
         ? [
             <button key="incident" type="button" className="btn btn-sm" onClick={() => navigate("/incidents/new", { state: target(v) })}>
-              Incident
+              {t("fleet.incident")}
             </button>,
           ]
         : []),
       <button key="ticket" type="button" className="btn btn-sm" onClick={() => navigate("/tickets/new", { state: target(v) })}>
-        Ticket
+        {t("fleet.ticket")}
       </button>,
     ],
   });
@@ -192,8 +195,8 @@ export function FleetCard() {
               <div>
                 <div style={{ fontWeight: 650, fontSize: "1.05rem" }}>{v.name}</div>
                 <div className="muted small">
-                  With you · {since(v.checked_out_at)}
-                  {trip != null && ` · ${formatNumber(trip)} ${meterUnit(v.meter_type)} this trip`}
+                  {t("fleet.withYou", { since: since(v.checked_out_at) })}
+                  {trip != null && ` · ${t("fleet.thisTrip", { distance: formatNumber(trip), unit: meterUnit(v.meter_type) })}`}
                 </div>
               </div>
               <div style={{ width: 80, flexShrink: 0 }}>
@@ -260,10 +263,13 @@ export function FleetCard() {
               >
                 <div style={{ fontWeight: 650, fontSize: "0.92rem" }}>{v.name}</div>
                 <div className="muted small">
-                  {group === "available" && "Available"}
+                  {group === "available" && t("fleet.available")}
                   {group === "others" &&
-                    `With ${holderName(v.checkout_person_id, people, v.checked_out_to)} · ${since(v.checked_out_at)}`}
-                  {group === "out_of_service" && "Out of service"}
+                    t("fleet.withPerson", {
+                      name: holderName(v.checkout_person_id, people, v.checked_out_to),
+                      since: since(v.checked_out_at),
+                    })}
+                  {group === "out_of_service" && t("fleet.outOfService")}
                 </div>
                 {meterText(v) && (
                   <div className="muted small" style={{ margin: "4px 0" }}>
@@ -337,10 +343,7 @@ function transitionName(v: { id: string }): CSSProperties {
 
 
 function since(ts: string | null): string {
-  if (!ts) return "";
-  const minutes = Math.max(0, Math.floor((Date.now() - new Date(ts).getTime()) / 60_000));
-  const h = Math.floor(minutes / 60);
-  return h > 0 ? `${h}h ${minutes % 60}m` : `${minutes}m`;
+  return ts ? duration(Date.now() - new Date(ts).getTime()) : "";
 }
 
 
@@ -361,6 +364,7 @@ function FleetDialog({
   morph: (v: FleetVehicleRow, write: () => Promise<unknown>) => Promise<void>;
   onClose: () => void;
 }) {
+  const { t } = useTranslation(["home", "common"]);
   const current = useCurrent();
   const { statuses } = useAssetStatuses();
   const hasMeter = vehicle.has_meter === 1;
@@ -400,12 +404,7 @@ function FleetDialog({
     (kind === "fuel" &&
       (!(gallonsValue > 0) || (costValue != null && (Number.isNaN(costValue) || costValue < 0))));
 
-  const title = {
-    out: `Check out ${vehicle.name}`,
-    in: `Check in ${vehicle.name}`,
-    mileage: `Log mileage — ${vehicle.name}`,
-    fuel: `Log fuel — ${vehicle.name}`,
-  }[kind];
+  const title = t(`fleet.dialog.${kind}`, { name: vehicle.name });
 
   const save = async () => {
     setSaving(true);
@@ -458,13 +457,13 @@ function FleetDialog({
 
         {kind === "out" && (
           <label className="field">
-            <span className="field-label">Person</span>
+            <span className="field-label">{t("fleet.dialog.person")}</span>
             <select
               className="select"
               value={personContact}
               onChange={(e) => setPersonContact(e.target.value)}
             >
-              <option value="">Select someone…</option>
+              <option value="">{t("fleet.dialog.selectPerson")}</option>
               {people.map((p) => (
                 <option key={p.id} value={p.contact_id!}>
                   {p.name}
@@ -473,7 +472,7 @@ function FleetDialog({
             </select>
             {!current.user?.contact_id && (
               <span className="muted small">
-                Your account isn't linked to a contact, so it can't be checked out to you.
+                {t("fleet.dialog.notLinked")}
               </span>
             )}
           </label>
@@ -482,7 +481,7 @@ function FleetDialog({
         {kind === "fuel" && (
           <div className="row">
             <label className="field" style={{ flex: 1 }}>
-              <span className="field-label">Gallons</span>
+              <span className="field-label">{t("fleet.dialog.gallons")}</span>
               <input
                 className="input"
                 inputMode="decimal"
@@ -492,7 +491,7 @@ function FleetDialog({
               />
             </label>
             <label className="field" style={{ flex: 1 }}>
-              <span className="field-label">Cost (optional)</span>
+              <span className="field-label">{t("fleet.dialog.cost")}</span>
               <input
                 className="input"
                 inputMode="decimal"
@@ -506,7 +505,7 @@ function FleetDialog({
         {hasMeter && (
           <label className="field">
             <span className="field-label">
-              Odometer ({unit}){kind === "out" ? ", starting" : kind === "in" ? ", ending" : ""}
+              {t(kind === "out" ? "fleet.dialog.odometerStart" : kind === "in" ? "fleet.dialog.odometerEnd" : "fleet.dialog.odometer", { unit })}
             </span>
             <input
               className="input"
@@ -516,10 +515,13 @@ function FleetDialog({
               autoFocus={kind === "mileage"}
             />
             <span className="muted small" data-testid="fleet-trip">
-              {currentReading != null
-                ? `Last recorded ${formatNumber(currentReading)} ${unit}`
-                : "No reading yet"}
-              {trip != null && trip >= 0 && ` · this trip +${formatNumber(trip)} ${unit}`}
+              {trip != null && trip >= 0
+                ? currentReading != null
+                  ? t("fleet.dialog.lastRecordedTrip", { reading: formatNumber(currentReading), unit, distance: formatNumber(trip) })
+                  : t("fleet.dialog.noReadingTrip", { unit, distance: formatNumber(trip) })
+                : currentReading != null
+                  ? t("fleet.dialog.lastRecorded", { reading: formatNumber(currentReading), unit })
+                  : t("fleet.dialog.noReading")}
             </span>
           </label>
         )}
@@ -527,15 +529,15 @@ function FleetDialog({
         {needsReason && (
           <label className="field">
             <span className="badge badge-warn" style={{ marginBottom: 6 }}>
-              Lower than the current reading
+              {t("fleet.dialog.lower")}
             </span>
-            <span className="field-label">Reason — required</span>
+            <span className="field-label">{t("fleet.dialog.reason")}</span>
             <textarea
               className="textarea"
               rows={2}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g. previous entry was a typo"
+              placeholder={t("fleet.dialog.reasonPlaceholder")}
             />
           </label>
         )}
@@ -543,16 +545,16 @@ function FleetDialog({
         {kind === "in" && (
           <>
             <div className="field">
-              <span className="field-label">Fuel level</span>
+              <span className="field-label">{t("fleet.dialog.fuelLevel")}</span>
               <FuelGauge level={fuel} onChange={setFuel} />
             </div>
             <label className="field">
-              <span className="field-label">Anything to report? (optional)</span>
+              <span className="field-label">{t("fleet.dialog.report")}</span>
               <input
                 className="input"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="e.g. left mirror loose"
+                placeholder={t("fleet.dialog.reportPlaceholder")}
               />
             </label>
           </>
@@ -562,7 +564,7 @@ function FleetDialog({
 
         <div className="row" style={{ justifyContent: "flex-end" }}>
           <button type="button" className="btn btn-quiet" onClick={onClose}>
-            Cancel
+            {t("common:cancel")}
           </button>
           <button
             type="button"
@@ -570,7 +572,7 @@ function FleetDialog({
             disabled={invalid || saving}
             onClick={() => void save()}
           >
-            {kind === "out" ? "Check out" : kind === "in" ? "Check in" : "Save"}
+            {kind === "out" ? t("fleet.checkOut") : kind === "in" ? t("fleet.checkIn") : t("common:save")}
           </button>
         </div>
       </div>

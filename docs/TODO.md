@@ -85,7 +85,9 @@ baseline:
 
 - [x] layout + shared: the shell, nav, pre-sign-in screens, `src/pages/shared/`,
       attachment kinds and the note summary. Started the `records` namespace.
-- [ ] home
+- [x] home: Dashboard, cards, Fleet card; Fleet and shift sentences in
+      `records`; a checklist's "created by" reason is a typed value, so its
+      sentence is whole in every language.
 - [ ] checklists
 - [ ] locations
 - [ ] tickets
@@ -102,8 +104,8 @@ baseline:
 - [ ] admin
 - [ ] **Move the stored sentences written before `records` existed** as
       their areas convert: `tickets:activity.*` and `tickets:origin.*`
-      (tickets), `home:fleetActivity.*` (home), and the `dataT` keys in
-      `src/data/incidents.ts` and `src/data/assetTriggers.ts`. Until then
+      (tickets), and the `dataT` keys in `src/data/incidents.ts`. (Home's
+      moved to `records.fleet` 2026-10-21.) Until then
       `catalogs.test.ts` cannot check that their translations keep every
       `{{value}}`.
 - [ ] **`ConfigMissingPage` still describes InstantDB variables**

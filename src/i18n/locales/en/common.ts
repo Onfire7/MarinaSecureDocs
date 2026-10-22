@@ -13,6 +13,7 @@ export const common = {
   clear: "Clear",
   retry: "Retry",
   remove: "Remove",
+  save: "Save",
   add: "Add",
   none: "None",
   all: "All",
@@ -20,6 +21,12 @@ export const common = {
   noMatches: "No matches",
   search: "Search…",
   select: "Select…",
+
+  /** An elapsed time (src/i18n/format.ts duration). */
+  duration: {
+    hm: "{{h}}h {{m}}m",
+    m: "{{m}}m",
+  },
 
   /** ticket_priority, by stored value. */
   priority: {

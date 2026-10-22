@@ -825,7 +825,7 @@ export function LocationCheckItem({ item, checklistId, onSaved }: ItemProps) {
         template,
         userId: current.user.id,
         instanceId: nestedId,
-        reason: `a location check on ${item.label}`,
+        reason: { kind: "locationCheck", label: item.label },
       });
       // Whoever opened it works it, whatever the template's assignment says —
       // and parent_item_id keeps it out of the main checklist list.

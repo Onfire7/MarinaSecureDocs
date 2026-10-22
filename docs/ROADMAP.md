@@ -380,6 +380,12 @@ anything else (in Spanish, or just differently) silently gets null, and the
 status change is skipped. It needs a stable code or a flag on the status
 row.
 
+The Dashboard does the same with roles and an incident status
+(`src/pages/home/cards.tsx`): each card's `defaultForRoles` names "Security",
+"Maintenance", "Office", "Marina Manager" and "Owner", so a user whose roles
+are named otherwise starts with an empty dashboard; and the Incident summary
+counts incidents whose status is literally "under review".
+
 **Why deferred:** it predates localization and is not caused by it. ADR
 0009 keeps database text untranslated, so nothing here gets worse, but a
 marina set up in Spanish would hit it on day one.

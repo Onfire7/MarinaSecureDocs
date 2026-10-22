@@ -4,6 +4,7 @@
 // has gone, and whether an odometer entry is a reading at all. Kept free of
 // the database so the card's rules are tested without one.
 import { compareNames, statusKey } from "./locations";
+import { i18n } from "../i18n";
 
 export type FleetGroup = "yours" | "available" | "others" | "out_of_service";
 
@@ -110,5 +111,5 @@ export function holderName(
     const user = users.find((u) => u.contact_id === personId);
     if (user) return user.name;
   }
-  return contactName ?? "Checked out";
+  return contactName ?? i18n.t("fleet.checkedOut", { ns: "home" });
 }
