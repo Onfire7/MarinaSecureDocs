@@ -6,7 +6,7 @@ import { AuditsSection } from "../audits/AuditsSection";
 
 // A Checklist's own status decides which screen opens it — Not Started /
 // In Progress goes to the interactive Active Checklist, Complete goes to the
-// read-only Checklist Detail (see pages/checklist-list.html — Actions).
+// read-only Checklist Detail (see ChecklistListPage.spec.md § Actions).
 export function ChecklistRoute() {
   const { id } = useParams();
   const { instance, isLoading } = useInstance(id);

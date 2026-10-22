@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { manualStartOptions } from "../../lib/checklistStart";
 import { useCurrent } from "../../lib/auth/CurrentUserContext";
 import { eligibleToday, isVisibleNow, triggerTypeLabel } from "../../lib/checklists";
 import {
@@ -18,7 +20,7 @@ import { TourSection } from "./TourSection";
 import { AuditsSection } from "../audits/AuditsSection";
 import { useShiftVisits } from "./useShiftVisits";
 
-// Checklists & Tours — Checklist List (see pages/checklist-list.html).
+// Checklists & Tours — Checklist List (see ChecklistListPage.spec.md).
 //
 // A guard's work queue, not an audit table. Open work — in-progress and
 // not-started checklists, then each tour's remaining checkpoints — sits
@@ -51,15 +53,16 @@ export function ChecklistListPage() {
 
   const roleIds = useRoleIdsFor(userId);
 
-  // Manual templates feed the Start button; recurring ones feed the
+  const { t } = useTranslation("checklists");
+  // Every template feeds the Start picker (ChecklistListPage.spec.md
+  // § Starting a checklist by hand); recurring ones also feed the
   // auto-create effect below. Both need the full instantiation shape.
-  const templates = useInstantiableTemplates(["manual", "recurring"]);
+  const templates = useInstantiableTemplates([]);
   const myTemplates = templates.filter(
     (t) => t.assigned_role_id && roleIds.includes(t.assigned_role_id),
   );
-  const manualTemplates = myTemplates.filter((t) => t.trigger_type === "manual");
 
-  const startChecklist = async (template: (typeof manualTemplates)[number]) => {
+  const startChecklist = async (template: (typeof myTemplates)[number]) => {
     if (!userId || starting) return;
     // Silently doing nothing after someone taps Start is worse than the
     // empty checklist would have been.
@@ -114,6 +117,10 @@ export function ChecklistListPage() {
 
   const { data: mine } = useMyChecklists(userId, roleIds);
   const { data: monitored } = useMonitoredChecklists(roleIds);
+  // Manual first, then triggered templates without an open instance of mine.
+  const startOptions = manualStartOptions(templates, roleIds, userId, mine);
+  const manualOptions = startOptions.filter((o) => o.manual);
+  const triggeredOptions = startOptions.filter((o) => !o.manual);
 
   const checklists = mine;
 
@@ -172,30 +179,44 @@ export function ChecklistListPage() {
       <div className="page-head">
         <h1 className="page-title">Checklists</h1>
         <div className="row">
-          {manualTemplates.length > 0 && (
+          {startOptions.length > 0 && (
             <>
               <select
                 className="select"
                 value={manualTemplateId}
+                aria-label={t("start.picker")}
                 onChange={(e) => setManualTemplateId(e.target.value)}
               >
-                <option value="">Start a checklist…</option>
-                {manualTemplates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
+                <option value="">{t("start.picker")}</option>
+                {manualOptions.length > 0 && (
+                  <optgroup label={t("start.manualGroup")}>
+                    {manualOptions.map((o) => (
+                      <option key={o.template.id} value={o.template.id}>
+                        {o.template.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {triggeredOptions.length > 0 && (
+                  <optgroup label={t("start.triggeredGroup")}>
+                    {triggeredOptions.map((o) => (
+                      <option key={o.template.id} value={o.template.id}>
+                        {t("start.triggeredOption", { name: o.template.name, trigger: o.triggerLabel })}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
               <button
                 type="button"
                 className="btn btn-sm"
                 disabled={!manualTemplateId || starting !== null}
                 onClick={() => {
-                  const template = manualTemplates.find((t) => t.id === manualTemplateId);
-                  if (template) void startChecklist(template);
+                  const option = startOptions.find((o) => o.template.id === manualTemplateId);
+                  if (option) void startChecklist(option.template);
                 }}
               >
-                Start checklist
+                {t("start.button")}
               </button>
             </>
           )}
@@ -215,9 +236,7 @@ export function ChecklistListPage() {
 
       {nothingToStart && (
         <div className="badge badge-warn" style={{ display: "block", marginBottom: 10 }}>
-          Nothing to do in "{nothingToStart}" right now — none of its sections
-          are switched on. A section gated on a location's status only runs
-          when that location is in one of the statuses it names.
+          {t("start.nothingToDo", { name: nothingToStart })}
         </div>
       )}
 

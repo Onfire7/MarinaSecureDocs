@@ -160,7 +160,7 @@ export function ChecklistItemsPanel({
 
   // Opening a Not Started checklist starts it — and, for a role-assigned
   // instance nobody has claimed yet, claims it for whoever opened it (see
-  // pages/checklist-list.html — "opens (and implicitly claims) it"). Keyed by
+  // ChecklistListPage.spec.md — "opens, and implicitly claims, it"). Keyed by
   // checklist id since navigating into a nested Location-Based Check reuses
   // this same component with a different id. Read-only viewers do neither.
   const started = useRef<string | null>(null);

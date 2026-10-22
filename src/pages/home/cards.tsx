@@ -9,6 +9,7 @@ import {
   useInstantiableTemplates,
 } from "../../data/checklists";
 import { useRoleIdsFor } from "../../data/users";
+import { clockInTemplates } from "../../lib/checklistStart";
 import { startShift } from "../../data/shifts";
 import { useEndOfShift } from "../../data/endOfShift";
 import { useEndOfShiftLabel, useGoToEndOfShiftStep } from "./useEndOfShiftStep";
@@ -170,12 +171,10 @@ function ShiftCard() {
   // clock-in checklist shouldn't fire for a security guard. A template with
   // nothing switched on right now generates nothing — see hasWorkAtCreation.
   // Empty checklists are noise, and with status-gated sections an empty one is
-  // an ordinary outcome, not a mistake.
-  const clockInTemplate = clockIn.find(
-    (t) =>
-      t.assigned_role_id &&
-      roleIds.includes(t.assigned_role_id) &&
-      hasWorkAtCreation(t),
+  // an ordinary outcome, not a mistake. Every matching template, not the
+  // first: a role may hold several (DashboardPage.spec.md § The Shift card).
+  const clockInTemplatesDue = clockInTemplates(clockIn, roleIds, (t) =>
+    hasWorkAtCreation(t),
   );
 
   // Re-render each minute so elapsed time stays fresh.
@@ -188,17 +187,18 @@ function ShiftCard() {
   const begin = async () => {
     if (!userId || !current.user) return;
     await startShift({ id: userId, name: current.user.name });
-    // Clock In may itself be a checklist trigger — the checklist opens
-    // immediately, in its own transaction so a failure to build it cannot
-    // roll back the fact that the shift started.
-    if (clockInTemplate) {
-      const checklistId = await createInstanceFromTemplate({
-        template: clockInTemplate,
-        userId,
-        reason: "clock-in",
-      });
-      navigate(`/checklists/${checklistId}`);
+    // Clock In may itself be a checklist trigger — each checklist is built in
+    // its own transaction so a failure to build one cannot roll back the fact
+    // that the shift started, or the others. One opens immediately; several
+    // land on the Checklists page, where they are the open work.
+    const created: string[] = [];
+    for (const template of clockInTemplatesDue) {
+      created.push(
+        await createInstanceFromTemplate({ template, userId, reason: "clock-in" }),
+      );
     }
+    if (created.length === 1) navigate(`/checklists/${created[0]}`);
+    else if (created.length > 1) navigate("/checklists");
   };
 
   if (!activeShift) {

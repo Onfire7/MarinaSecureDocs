@@ -38,9 +38,14 @@ none, and a card that reads no marina data (Clock) is always available.
 ## The Shift card
 
 **No active Shift.** **Start Shift** creates a Shift (guard = current user,
-`started_at` = now). If the guard's Role has a Clock In template with
-something to do, that checklist is created and opens immediately, in its own
-transaction, so a failure to build it cannot undo the start of the shift.
+`started_at` = now). Then **every** Clock In template of the guard's Roles
+with something to do (`hasWorkAtCreation`) is created, in name order, each in
+its own transaction, so a failure to build one cannot undo the start of the
+shift or the others. One checklist opens immediately; several land on the
+Checklists page, where they are the open work. Until 2026-10-21 the card
+took the *first* matching template and silently dropped the rest, which is
+how a second Clock In template for Security never produced a checklist. The
+choice of templates is `clockInTemplates()` in `src/lib/checklistStart.ts`.
 
 **On shift.** One button, whose label and destination are the next step of
 ending the shift. The steps and their order are specified in

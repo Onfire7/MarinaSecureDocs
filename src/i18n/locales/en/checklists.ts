@@ -1,6 +1,16 @@
 // Copy for src/pages/checklists/. Only the Fleet Vehicle Item so far; the
 // rest of the area converts in its own commit (docs/TODO.md § Localization).
 export const checklists = {
+  /** The Start picker (ChecklistListPage.spec.md § Starting a checklist by hand). */
+  start: {
+    picker: "Start a checklist…",
+    manualGroup: "Manual",
+    triggeredGroup: "Triggered",
+    triggeredOption: "{{name}} · {{trigger}}",
+    button: "Start checklist",
+    nothingToDo:
+      "Nothing to do in “{{name}}” right now — none of its sections are switched on. A section gated on a location's status only runs when that location is in one of the statuses it names.",
+  },
   /** The End Shift Item (ActiveChecklistPage.spec.md § End Shift Item). */
   endShift: {
     endShift: "End Shift",

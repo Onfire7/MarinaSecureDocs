@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { groupByLocation } from "../../lib/checkpoints";
 
 // Checklists & Tours — the per-tour section rendered inline on the Checklist
-// list (see pages/checklist-list.html and pages/tour-progress.html). A guard
+// list (see ChecklistListPage.spec.md and pages/tour-progress.html). A guard
 // typically has exactly one active tour, so its steps live directly on the
 // work-queue page under a small heading rather than behind a navigation hop.
 //

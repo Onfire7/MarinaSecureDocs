@@ -84,6 +84,11 @@ Spec: `docs/localization.md`, ADR 0009. The infrastructure is on `beta2`.
       (tests 11 and 12 of "Copy a section to locations", added 2026-10-21;
       seed with `scripts/e2e/seed-copy-section.sql`). The unit tests and a
       signed-in round trip on beta2 have run; the e2e has not.
+- [ ] **Run `scripts/e2e/checklist-start.mjs`** where a local stack exists
+      (tests 8 and 9 of clock-in creating every Clock In checklist and the
+      Start picker's Triggered group, added 2026-10-21; seed with
+      `scripts/e2e/seed-checklist-start.sql`). Unit tests and a beta2 round
+      trip have run; the e2e has not.
 
 Then one commit per area: pages *and* the `src/lib` / `src/data` strings
 the area writes (through `dataT`), each checked on beta2 in English and
