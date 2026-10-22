@@ -321,6 +321,15 @@ Screenshots or it didn't happen.
   read scalar attributes (JSON-array flattening is undocumented);
   `asUser({email})` impersonation only works for identities that have
   actually signed in.
+- **A headless browser closed while "Sending N changes…" shows loses the
+  rest of the queue.** PowerSync's upload queue lives in the browser's own
+  storage, which `storageState` does not capture, so `browser.close()` mid-upload
+  drops every write still queued on both ends. A Playwright drive that started
+  a 33-section checklist on beta2 closed after its screenshot and left 14
+  sections on the server; "Update open checklists" on the template page
+  repaired it. Before closing any session that wrote, poll the sidebar until
+  "Sending" is gone **and** Postgres shows the counts you expect
+  (`scripts/e2e/checklist-start.mjs` shows the loop).
 - **The testing loop that caught every real bug**: verification trio →
   commit and push `beta2` → poll the deployment until the `index-*.js` hash
   changes → `agent-login.mjs`, read the printed screen text, **open the
