@@ -123,7 +123,11 @@ export function ShiftReportView({
       <h2>{t("report.tickets", { count: doc.tickets.length })}</h2>
       {doc.tickets.length === 0 && <p className="muted">{t("report.none")}</p>}
       {doc.tickets.map((k) => (
-        <article key={k.id} className="psd-doc" id={`ticket-${k.id}`}>
+        <article
+          key={k.id}
+          className={`psd-doc psd-ticket${k.closed === undefined ? "" : k.closed ? " psd-closed" : " psd-open"}`}
+          id={`ticket-${k.id}`}
+        >
           <div className="psd-orig">
             <div className="report-kicker">
               {t("report.atEndOfShiftTicket", { status: k.status, priority: k.priority, assignee: k.assignee ?? t("report.unassigned") })}

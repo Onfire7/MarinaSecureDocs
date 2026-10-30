@@ -149,6 +149,8 @@ export function useShiftReportInputs(shift: ShiftRow | null, note: string | null
           target_label: attachmentOf(t)?.label ?? null,
           created_at: t.created_at,
           status_name: t.status_name,
+          status_is_terminal: t.status_is_terminal,
+          status_position: t.status_position,
           assignee_name: t.assignee_name,
           description: t.description,
           origin: originOf.get(t.id) ?? null,

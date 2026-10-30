@@ -37,6 +37,7 @@ export interface TicketRow extends AttachedRow {
   source_checklist_item_id: string | null;
   status_name: string;
   status_is_terminal: number;
+  status_position: number;
   assignee_name: string | null;
   creator_name: string | null;
   source_incident_title: string | null;
@@ -46,6 +47,7 @@ const TICKET_SELECT = `
   SELECT t.*,
          s.name AS status_name,
          s.is_terminal AS status_is_terminal,
+         s.position AS status_position,
          au.name AS assignee_name,
          cu.name AS creator_name,
          si.title AS source_incident_title,

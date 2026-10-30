@@ -69,6 +69,8 @@ export interface DocTicket {
   createdAt: string;
   origin: string | null;
   status: string;
+  /** Its status is terminal at End of Shift. Absent on reports stored before 2026-10-30. */
+  closed?: boolean;
   assignee: string | null;
   description: string | null;
   photos: string[];
@@ -173,6 +175,9 @@ export interface InTicket {
   target_label: string | null;
   created_at: string;
   status_name: string;
+  status_is_terminal: number | boolean;
+  /** The status's place in the marina's list (ticket_statuses.position). */
+  status_position: number;
   assignee_name: string | null;
   description: string | null;
   origin: string | null;
@@ -475,9 +480,15 @@ export function compileShiftReport(input: CompileInputs): ShiftReportDoc {
       values: { title: i.title },
     });
   }
+  // Open tickets first, then by the marina's status order, then by time.
   const tickets: DocTicket[] = input.tickets
     .filter((t) => inWindow(t.created_at, window))
-    .sort((a, b) => ms(a.created_at) - ms(b.created_at))
+    .sort(
+      (a, b) =>
+        Number(truthy(a.status_is_terminal)) - Number(truthy(b.status_is_terminal)) ||
+        a.status_position - b.status_position ||
+        ms(a.created_at) - ms(b.created_at),
+    )
     .map((t) => ({
       id: t.id,
       title: t.title,
@@ -486,6 +497,7 @@ export function compileShiftReport(input: CompileInputs): ShiftReportDoc {
       createdAt: t.created_at,
       origin: t.origin,
       status: t.status_name,
+      closed: truthy(t.status_is_terminal),
       assignee: t.assignee_name,
       description: t.description,
       photos: [],

@@ -81,7 +81,11 @@ In this order. Each section's rules follow.
 6. **Tickets raised.** Each: title, priority, target, time, origin (the
    `created` Ticket Update's origin), status and assignee at End of Shift,
    description. Beneath, *Since End of Shift*: Ticket Updates after
-   `ended_at`, the same way.
+   `ended_at`, the same way. **Open first**: tickets whose status was not
+   terminal at End of Shift, then the closed ones; within each, by the
+   marina's status order, then by time. Each card has a coloured top edge,
+   as the Location cards do: orange while open, green once closed.
+   Reports stored before 2026-10-30 keep their order and have no edge.
 7. **Notes.** The guard's Notes in the window: target, time, body.
 8. **Vehicles.** The existing section, unchanged in content
    (`VehicleUseSection`; rules below under § Vehicles).

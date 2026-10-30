@@ -230,6 +230,25 @@ describe("summary sentences (test 5)", () => {
   });
 });
 
+describe("tickets open first", () => {
+  it("puts open tickets before closed ones, then by status order, then by time, and marks which are closed", () => {
+    const input = base();
+    const ticket = (id: string, at: string, status: string, terminal: number, position: number) => ({
+      id, title: id, priority: "medium", target_label: null, created_at: T(at), status_name: status,
+      status_is_terminal: terminal, status_position: position, assignee_name: null, description: null, origin: null,
+    });
+    input.tickets = [
+      ticket("closed-early", "22:10", "Closed", 1, 3),
+      ticket("progress", "22:20", "In Progress", 0, 1),
+      ticket("open-late", "23:30", "Open", 0, 0),
+      ticket("open-early", "22:30", "Open", 0, 0),
+    ];
+    const doc = compileShiftReport(input);
+    expect(doc.tickets.map((t) => t.id)).toEqual(["open-early", "open-late", "progress", "closed-early"]);
+    expect(doc.tickets.map((t) => t.closed)).toEqual([false, false, false, true]);
+  });
+});
+
 describe("vehicle sentences in English", () => {
   it("say miles or hours, pluralised by the distance", () => {
     const input = base();
@@ -248,7 +267,7 @@ describe("updates since End of Shift (test 7)", () => {
   it("keeps only what came after ended_at, grouped under its record by time, with the status now only when it moved", () => {
     const input = base();
     input.incidents = [{ id: "inc", title: "x", type_name: null, target_label: null, created_at: T("01:00", 21), status_name: "Open", status_is_terminal: 0, details: null }];
-    input.tickets = [{ id: "tkt", title: "y", priority: "medium", target_label: null, created_at: T("01:10", 21), status_name: "Open", assignee_name: null, description: null, origin: null }];
+    input.tickets = [{ id: "tkt", title: "y", priority: "medium", target_label: null, created_at: T("01:10", 21), status_name: "Open", status_is_terminal: 0, status_position: 0, assignee_name: null, description: null, origin: null }];
     const doc = compileShiftReport(input);
     const since = updatesSince(doc, END, {
       incidentComments: [
