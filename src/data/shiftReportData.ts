@@ -4,7 +4,6 @@ import { stamp } from "../lib/db";
 import { insert, transact, update } from "./sql";
 import { recordActivity } from "./activity";
 import { attachmentJoins, attachmentOf, attachmentSelect, type AttachedRow } from "./attachments";
-import { useCheckInsInWindow } from "./checkins";
 import { useCheckpoints } from "./checkpoints";
 import { useLocations } from "./locations";
 import { useIncidents } from "./incidents";
@@ -66,7 +65,6 @@ export function useShiftReportInputs(shift: ShiftRow | null, note: string | null
   const back = shift ? new Date(Date.parse(shift.started_at) - 2 * 86_400_000).toISOString() : "9999";
 
   const settings = useMarinaSettings();
-  const { data: checkIns } = useCheckInsInWindow(guard || undefined, from, to);
   const { data: checkpoints } = useCheckpoints();
   const { data: locations } = useLocations();
   const { data: instances } = useQuery<InstanceLite>(
@@ -120,7 +118,10 @@ export function useShiftReportInputs(shift: ShiftRow | null, note: string | null
         end_of_shift_checklist_id: shift.end_of_shift_checklist_id,
       },
       note,
-      checkIns,
+      // Check-ins are left out of the report for now (owner's call,
+      // 2026-10-30). The compiler still handles them; pass the guard's
+      // useCheckInsInWindow() rows here to bring them back.
+      checkIns: [],
       checkpoints,
       locations,
       instances,
@@ -164,7 +165,7 @@ export function useShiftReportInputs(shift: ShiftRow | null, note: string | null
         raised: vehicleRecords.raised,
       }),
     } satisfies CompileInputs;
-  }, [shift, note, settings.marinaName, checkIns, checkpoints, locations, instances, sections, items, sectionCheckpoints, allIncidents, allTickets, origins, notes, vehicleRecords]);
+  }, [shift, note, settings.marinaName, checkpoints, locations, instances, sections, items, sectionCheckpoints, allIncidents, allTickets, origins, notes, vehicleRecords]);
 }
 
 /** The stored body, parsed; null until End of Shift has synced to this device. */

@@ -3,7 +3,7 @@
 // supplies the translator so the text is in the viewer's language.
 import { summaryFacts, type ShiftReportDoc } from "./shiftReportDoc";
 
-export type Translate = (key: string, values?: Record<string, string>) => string;
+export type Translate = (key: string, values?: Record<string, string | number>) => string;
 
 export interface ShiftReportEmail {
   subject: string;

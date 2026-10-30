@@ -15,7 +15,7 @@ export function ShiftReportEmailDialog({ doc, onClose }: { doc: ShiftReportDoc; 
   const queued = useUploadQueue();
   const link = `${publicOrigin()}/r/shift/${doc.shift.id}`;
   // A loose translator for the pure email builder, which addresses keys as strings.
-  const tr = (key: string, values?: Record<string, string>) => String((t as unknown as (k: string, v?: Record<string, string>) => string)(key, values));
+  const tr = (key: string, values?: Record<string, string | number>) => String((t as unknown as (k: string, v?: Record<string, string | number>) => string)(key, values));
   const email = shiftReportEmail(doc, link, tr, {
     day: (iso) => date(iso, { weekday: "short", month: "short", day: "numeric" }),
     time: (iso) => time(iso, { hour: "numeric", minute: "2-digit" }),

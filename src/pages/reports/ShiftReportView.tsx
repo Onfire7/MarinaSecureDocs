@@ -71,7 +71,7 @@ export function ShiftReportView({
       <div className="report-prose" data-testid="report-summary">
         {summaryFacts(doc).map((p, i) => (
           <p key={p.key + i} className={i === 0 ? "lede" : undefined}>
-            {t(`summary.${p.key}` as "summary.attention", p.values as { count: string })}
+            {t(`summary.${p.key}` as "summary.attention", p.values as { count: number })}
           </p>
         ))}
       </div>

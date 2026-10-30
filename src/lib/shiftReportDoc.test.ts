@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { i18n } from "../i18n";
 import {
   checklistsInShift,
   compileShiftReport,
@@ -222,10 +223,24 @@ describe("summary sentences (test 5)", () => {
       vehicle({ name: "No meter", distance: null, odometerOut: null }),
     ];
     const facts = summaryFacts(compileShiftReport(input));
-    expect(facts.map((f) => f.key)).toEqual(["checkIns", "raised", "droveReturned", "droveStillOut", "droveKept", "attention"]);
+    expect(facts.map((f) => f.key)).toEqual(["checklists", "raised", "droveReturned", "droveStillOut", "droveKept", "attention"]);
     // A checklist with nothing in it counts as complete.
-    expect(facts[0].values).toEqual({ guard: "Dana", checkIns: "0", complete: "1", total: "1" });
-    expect(facts[2].values).toMatchObject({ vehicle: "Patrol Truck", distance: "42", fuel: "2" });
+    expect(facts[0].values).toEqual({ guard: "Dana", complete: "1", total: "1" });
+    expect(facts[2].values).toMatchObject({ vehicle: "Patrol Truck", count: 42, context: "mileage", fuel: "2" });
+  });
+});
+
+describe("vehicle sentences in English", () => {
+  it("say miles or hours, pluralised by the distance", () => {
+    const input = base();
+    input.vehicles = [
+      vehicle({ name: "Security Car", distance: 33, fuelBack: 1 }),
+      vehicle({ name: "Golf Cart", meterType: "hours", distance: 1, end: { kind: "still_out", at: null }, fuelBack: null }),
+    ];
+    const t = i18n.getFixedT("en", "reports");
+    const lines = summaryFacts(compileShiftReport(input)).map((f) => t(`summary.${f.key}` as "summary.attention", f.values as { count: number }));
+    expect(lines).toContain("Dana drove the Security Car 33 miles and returned it at 1/4 tank.");
+    expect(lines).toContain("Dana drove the Golf Cart 1 hour and still has it.");
   });
 });
 

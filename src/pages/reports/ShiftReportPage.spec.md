@@ -54,10 +54,12 @@ In this order. Each section's rules follow.
 2. **End of Shift Note.** The guard's own words, verbatim, when they wrote
    any. Omitted when empty.
 3. **Summary.** Sentences, not numbers, from a pure function the email
-   reuses (§ The email): check-ins made and checklists complete of total; incidents logged and tickets raised; one sentence per vehicle
-   driven ("{guard} drove the {vehicle} {distance} and returned it at
-   {fuel}", or "still has it" / "kept it past End of Shift"); "{n} things
-   need attention."
+   reuses (§ The email): checklists complete of total; incidents logged
+   and tickets raised; one sentence per vehicle driven ("{guard} drove the
+   {vehicle} 33 miles and returned it at 1/4 tank", or "still has it" /
+   "kept it past End of Shift"; *miles* or *hours* by the vehicle's meter,
+   pluralised by the distance, each a whole sentence in the catalog); "{n}
+   things need attention."
 4. **Needs attention.** One line per item, never truncated, in time order,
    each with where it happened and when. What qualifies:
    - an Incident logged (every one; "bad" when its status is still open at
@@ -112,6 +114,15 @@ window, or was expected to be: it was created in the window, or one of its
 sections came due in it. In the report it shows only that shift's items;
 the rest are summarized as *{n} items done in the previous shift*. Items
 still open at End of Shift count as missed in this shift.
+
+### Check-ins are left out, for now
+
+Owner's call, 2026-10-30: the report shows no check-ins at all — no
+check-in items in the Location cards, no check-in count, no Manual or
+outside-radius attention lines, and the summary does not count them.
+Everything below about check-ins describes what the compiler does when it
+is given them; `useShiftReportInputs` passes it none. Reports stored before
+this change keep the check-ins they were compiled with.
 
 ### Checkpoints are never "missed"
 

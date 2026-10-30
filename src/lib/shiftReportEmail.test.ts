@@ -26,7 +26,7 @@ const doc: ShiftReportDoc = {
 };
 
 // A translator that shows its key and values, so the test reads the shape.
-const t = (key: string, values: Record<string, string> = {}) =>
+const t = (key: string, values: Record<string, string | number> = {}) =>
   `${key}${Object.keys(values).length ? "{" + Object.entries(values).map(([k, v]) => `${k}=${v}`).join(",") + "}" : ""}`;
 const format = { day: () => "Tue Oct 20", time: (iso: string) => iso.slice(11, 16) };
 
@@ -39,7 +39,7 @@ describe("shiftReportEmail", () => {
 
   it("opens with the summary, quotes the note, lists every attention line, then the link, with no greeting", () => {
     const lines = email.body.split("\n");
-    expect(lines[0]).toMatch(/^summary\.checkIns\{guard=Dana/);
+    expect(lines[0]).toMatch(/^summary\.checklists\{guard=Dana/);
     expect(lines).toContain("“Quiet night apart from the truck.”");
     expect(lines.filter((l) => l.startsWith("- ")).length).toBe(23);
     expect(lines).toContain("- Dock 1: attention.manualCheckin{checkpoint=CP 1,reason=No tag} (03:20)");

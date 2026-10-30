@@ -572,16 +572,23 @@ export function worstMark(items: RecordItem[]): Mark {
   return "ok";
 }
 
+/** A summary sentence. A vehicle's carries `count` (the distance, so the
+ *  unit pluralises) and `context` (its meter: "mileage" or "hours"), which
+ *  i18next resolves to a whole sentence such as `droveReturned_mileage_other`. */
+export interface SummaryFact {
+  key: string;
+  values: Record<string, string | number>;
+}
+
 /** The summary's sentences, as keys and values under reports:summary. */
-export function summaryFacts(doc: ShiftReportDoc): Phrase[] {
+export function summaryFacts(doc: ShiftReportDoc): SummaryFact[] {
   const first = doc.shift.guardName.split(" ")[0] || doc.shift.guardName;
   const complete = doc.checklists.filter((c) => c.done === c.total).length;
-  const out: Phrase[] = [
+  const out: SummaryFact[] = [
     {
-      key: "checkIns",
+      key: "checklists",
       values: {
         guard: first,
-        checkIns: String(doc.checkIns),
         complete: String(complete),
         total: String(doc.checklists.length),
       },
@@ -591,7 +598,16 @@ export function summaryFacts(doc: ShiftReportDoc): Phrase[] {
   for (const v of doc.vehicles) {
     if (v.distance == null || v.odometerOut == null) continue;
     const key = v.end?.kind === "kept" ? "droveKept" : v.end?.kind === "in" ? "droveReturned" : "droveStillOut";
-    out.push({ key, values: { guard: first, vehicle: v.name, distance: String(v.distance), unit: v.meterType ?? "", fuel: v.fuelBack == null ? "" : String(v.fuelBack) } });
+    out.push({
+      key,
+      values: {
+        guard: first,
+        vehicle: v.name,
+        count: v.distance,
+        context: v.meterType === "mileage" ? "mileage" : "hours",
+        fuel: v.fuelBack == null ? "" : String(v.fuelBack),
+      },
+    });
   }
   out.push({ key: "attention", values: { count: String(doc.attention.length) } });
   return out;

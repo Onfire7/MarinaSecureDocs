@@ -50,13 +50,23 @@ export const reports = {
     showMore: "Show {{count}} more",
     showProblemsOnly: "Show problems only",
   },
-  /** The summary's sentences, from summaryFacts(). */
+  /** The summary's sentences, from summaryFacts(). A vehicle's sentence is
+   *  chosen by its meter (context) and the distance (count). */
   summary: {
-    checkIns: "{{guard}} made {{checkIns}} check-ins and completed {{complete}} of {{total}} checklists.",
+    checklists: "{{guard}} completed {{complete}} of {{total}} checklists.",
     raised: "{{incidents}} incidents were logged and {{tickets}} tickets raised.",
-    droveReturned: "{{guard}} drove the {{vehicle}} {{distance}} {{unit}} and returned it at {{fuel}}/4 tank.",
-    droveStillOut: "{{guard}} drove the {{vehicle}} {{distance}} {{unit}} and still has it.",
-    droveKept: "{{guard}} drove the {{vehicle}} {{distance}} {{unit}} and kept it past End of Shift.",
+    droveReturned_mileage_one: "{{guard}} drove the {{vehicle}} {{count, number}} mile and returned it at {{fuel}}/4 tank.",
+    droveReturned_mileage_other: "{{guard}} drove the {{vehicle}} {{count, number}} miles and returned it at {{fuel}}/4 tank.",
+    droveReturned_hours_one: "{{guard}} drove the {{vehicle}} {{count, number}} hour and returned it at {{fuel}}/4 tank.",
+    droveReturned_hours_other: "{{guard}} drove the {{vehicle}} {{count, number}} hours and returned it at {{fuel}}/4 tank.",
+    droveStillOut_mileage_one: "{{guard}} drove the {{vehicle}} {{count, number}} mile and still has it.",
+    droveStillOut_mileage_other: "{{guard}} drove the {{vehicle}} {{count, number}} miles and still has it.",
+    droveStillOut_hours_one: "{{guard}} drove the {{vehicle}} {{count, number}} hour and still has it.",
+    droveStillOut_hours_other: "{{guard}} drove the {{vehicle}} {{count, number}} hours and still has it.",
+    droveKept_mileage_one: "{{guard}} drove the {{vehicle}} {{count, number}} mile and kept it past End of Shift.",
+    droveKept_mileage_other: "{{guard}} drove the {{vehicle}} {{count, number}} miles and kept it past End of Shift.",
+    droveKept_hours_one: "{{guard}} drove the {{vehicle}} {{count, number}} hour and kept it past End of Shift.",
+    droveKept_hours_other: "{{guard}} drove the {{vehicle}} {{count, number}} hours and kept it past End of Shift.",
     attention: "{{count}} things need attention.",
   },
   /** Needs attention lines, by AttentionLine.kind. */
