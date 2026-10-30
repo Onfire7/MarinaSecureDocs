@@ -110,7 +110,7 @@ export const reports = {
     unknown: "{{kind}}",
   },
   email: {
-    subject: "Shift report: {{guard}}, {{day}}, {{start}}–{{end}}",
+    subject: "Shift report: {{guard}}, {{day}}",
     attentionHeading: "Needs attention:",
   },
   dialog: {

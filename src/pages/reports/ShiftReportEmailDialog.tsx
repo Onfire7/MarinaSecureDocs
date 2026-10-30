@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { date, time } from "../../i18n";
+import { date } from "../../i18n";
 import { publicOrigin } from "../../lib/config";
 import { shiftReportEmail } from "../../lib/shiftReportEmail";
 import type { ShiftReportDoc } from "../../lib/shiftReportDoc";
@@ -18,7 +18,6 @@ export function ShiftReportEmailDialog({ doc, onClose }: { doc: ShiftReportDoc; 
   const tr = (key: string, values?: Record<string, string | number>) => String((t as unknown as (k: string, v?: Record<string, string | number>) => string)(key, values));
   const email = shiftReportEmail(doc, link, tr, {
     day: (iso) => date(iso, { weekday: "short", month: "short", day: "numeric" }),
-    time: (iso) => time(iso, { hour: "numeric", minute: "2-digit" }),
   });
   const canCopy = typeof navigator !== "undefined" && !!navigator.clipboard?.writeText;
   const mailto = `mailto:?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.body)}`;

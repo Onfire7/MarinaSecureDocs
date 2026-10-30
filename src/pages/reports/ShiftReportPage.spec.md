@@ -200,7 +200,7 @@ uploads with everything else; the dialog says so (§ The email).
 
 A pure function, `shiftReportEmail(document, link)`, gives:
 
-- **Subject**: *Shift report: {guard}, {day}, {start}–{end}*.
+- **Subject**: *Shift report: {guard}, {day}*. No times; the report has them.
 - **Body**, plain text: the summary sentences; the End of Shift Note,
   quoted, if any; every *Needs attention* line, unlimited, without its
   time; a blank line; the Report Link, last. No greeting or sign-off, so

@@ -14,13 +14,11 @@ export function shiftReportEmail(
   doc: ShiftReportDoc,
   link: string,
   t: Translate,
-  format: { day: (iso: string) => string; time: (iso: string) => string },
+  format: { day: (iso: string) => string },
 ): ShiftReportEmail {
   const subject = t("email.subject", {
     guard: doc.shift.guardName,
     day: format.day(doc.shift.startedAt),
-    start: format.time(doc.shift.startedAt),
-    end: doc.shift.endedAt ? format.time(doc.shift.endedAt) : "",
   });
   const lines: string[] = summaryFacts(doc).map((p) => t(`summary.${p.key}`, p.values));
   if (doc.note) lines.push("", `“${doc.note}”`);

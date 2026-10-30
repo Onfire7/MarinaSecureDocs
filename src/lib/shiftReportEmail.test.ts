@@ -28,13 +28,13 @@ const doc: ShiftReportDoc = {
 // A translator that shows its key and values, so the test reads the shape.
 const t = (key: string, values: Record<string, string | number> = {}) =>
   `${key}${Object.keys(values).length ? "{" + Object.entries(values).map(([k, v]) => `${k}=${v}`).join(",") + "}" : ""}`;
-const format = { day: () => "Tue Oct 20", time: (iso: string) => iso.slice(11, 16) };
+const format = { day: () => "Tue Oct 20" };
 
 describe("shiftReportEmail", () => {
   const email = shiftReportEmail(doc, "https://beta2.marinasecure.com/r/shift/s", t, format);
 
-  it("gives the subject its guard, day and span", () => {
-    expect(email.subject).toBe("email.subject{guard=Dana Ruiz,day=Tue Oct 20,start=22:00,end=06:00}");
+  it("gives the subject its guard and day, without the shift's times", () => {
+    expect(email.subject).toBe("email.subject{guard=Dana Ruiz,day=Tue Oct 20}");
   });
 
   it("opens with the summary, quotes the note, lists every attention line, then the link, with no greeting", () => {
