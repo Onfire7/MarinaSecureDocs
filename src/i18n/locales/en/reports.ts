@@ -112,7 +112,6 @@ export const reports = {
   email: {
     subject: "Shift report: {{guard}}, {{day}}, {{start}}–{{end}}",
     attentionHeading: "Needs attention:",
-    ifLinkFails: "If the link doesn't open, ask {{marina}} for the report.",
   },
   dialog: {
     title: "Email the report",

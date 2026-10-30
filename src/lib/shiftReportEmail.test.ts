@@ -42,9 +42,11 @@ describe("shiftReportEmail", () => {
     expect(lines[0]).toMatch(/^summary\.checklists\{guard=Dana/);
     expect(lines).toContain("“Quiet night apart from the truck.”");
     expect(lines.filter((l) => l.startsWith("- ")).length).toBe(23);
-    expect(lines).toContain("- Dock 1: attention.manualCheckin{checkpoint=CP 1,reason=No tag} (03:20)");
+    expect(lines).toContain("- Dock 1: attention.manualCheckin{checkpoint=CP 1,reason=No tag}");
     expect(lines).toContain("https://beta2.marinasecure.com/r/shift/s");
-    expect(lines.at(-1)).toBe("email.ifLinkFails{marina=Harbor Point}");
+    // Ends on the link: no times on the attention lines, no "ask the marina" line.
+    expect(lines.at(-1)).toBe("https://beta2.marinasecure.com/r/shift/s");
+    expect(email.body).not.toMatch(/\(\d\d:\d\d\)/);
     expect(email.body).not.toMatch(/^(Hi|Hello|Dear)/m);
   });
 

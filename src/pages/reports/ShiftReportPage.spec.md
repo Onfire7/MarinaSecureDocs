@@ -202,9 +202,9 @@ A pure function, `shiftReportEmail(document, link)`, gives:
 
 - **Subject**: *Shift report: {guard}, {day}, {start}–{end}*.
 - **Body**, plain text: the summary sentences; the End of Shift Note,
-  quoted, if any; every *Needs attention* line, unlimited; a blank line; the
-  Report Link; one line saying who to ask if the link doesn't open. No
-  greeting or sign-off, so whoever pastes it adds their own.
+  quoted, if any; every *Needs attention* line, unlimited, without its
+  time; a blank line; the Report Link, last. No greeting or sign-off, so
+  whoever pastes it adds their own.
 
 The **dialog** (`ShiftReportEmailDialog`) shows the subject, the body and the
 link, each with its own Copy button, plus **Copy all** and an *Open in mail*

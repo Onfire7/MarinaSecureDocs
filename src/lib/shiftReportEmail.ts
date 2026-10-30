@@ -27,10 +27,9 @@ export function shiftReportEmail(
   if (doc.attention.length > 0) {
     lines.push("", t("email.attentionHeading"));
     for (const a of doc.attention) {
-      const when = a.at ? ` (${format.time(a.at)})` : "";
-      lines.push(`- ${a.where ? a.where + ": " : ""}${t(`attention.${a.kind}`, a.values)}${when}`);
+      lines.push(`- ${a.where ? a.where + ": " : ""}${t(`attention.${a.kind}`, a.values)}`);
     }
   }
-  lines.push("", link, "", t("email.ifLinkFails", { marina: doc.marinaName }));
+  lines.push("", link);
   return { subject, body: lines.join("\n") };
 }
